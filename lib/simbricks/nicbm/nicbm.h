@@ -31,6 +31,7 @@
 #include <set>
 
 #include <simbricks/base/cxxatomicfix.h>
+#include <lib/simbricks/trace/log.h>
 extern "C" {
 #include <simbricks/nicif/nicif.h>
 }
@@ -136,6 +137,8 @@ class Runner {
   const char *shmPath_;
   struct SimbricksNicIf nicif_;
   struct SimbricksProtoPcieDevIntro dintro_;
+
+  const sim_log::Logger::Log *log_;
 
   volatile union SimbricksProtoPcieD2H *D2HAlloc();
   volatile union SimbricksProtoNetMsg *D2NAlloc();

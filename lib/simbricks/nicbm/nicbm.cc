@@ -41,7 +41,7 @@ extern "C" {
 #include <simbricks/base/proto.h>
 }
 
-// #define DEBUG_NICBM 1
+#define DEBUG_NICBM 1
 #define STAT_NICBM 1
 #define DMA_MAX_PENDING 64
 
@@ -561,6 +561,11 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   pcieParams_.sock_path = argv[1];
   netParams_.sock_path = argv[2];
   shmPath_ = argv[3];
+
+#ifdef DEBUG_NICBM
+  log_ = new sim_log::Log(sim_log::StdTarget::to_err);
+#endif
+
   return 0;
 }
 
@@ -583,14 +588,19 @@ int Runner::RunMain() {
   bool sync_pcie = SimbricksBaseIfSyncEnabled(&nicif_.pcie.base);
   bool sync_net = SimbricksBaseIfSyncEnabled(&nicif_.net.base);
 
-  fprintf(stderr, "mac_addr=%lx\n", mac_addr_);
-  fprintf(stderr, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
+  const sim_log::Logger &log_err = sim_log::Logger::getErrorLogger();
+  log_err.log(*log_, "mac_addr=%lx\n", mac_addr_);
+  log_err.log(*log_, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
+  //fprintf(stderr, "mac_addr=%lx\n", mac_addr_);
+  //fprintf(stderr, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
 
   bool is_sync = sync_pcie || sync_net;
 
   while (!exiting) {
     while (SimbricksNicIfSync(&nicif_, main_time_)) {
-      fprintf(stderr, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
+      const sim_log::Logger &logWarn = sim_log::Logger::getWarnLogger();
+      logWarn.log(*log_, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
+      //fprintf(stderr, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
       YieldPoll();
     }
 

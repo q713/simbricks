@@ -40,3 +40,4 @@ dist/sockets/net_sockets
 trace/process
 mk/local.mk
 .eggs
+.vscode

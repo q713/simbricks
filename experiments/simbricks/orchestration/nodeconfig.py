@@ -421,12 +421,13 @@ class DctcpClient(AppConfig):
 
 class PingClient(AppConfig):
 
-    def __init__(self, server_ip: str = '192.168.64.1'):
+    def __init__(self, server_ip = '192.168.64.1', count = 100):
         super().__init__()
         self.server_ip = server_ip
+        self.count = count
 
     def run_cmds(self, node):
-        return [f'ping {self.server_ip} -c 10']
+        return [f'ping {self.server_ip} -c {self.count}']
 
 
 class IperfTCPServer(AppConfig):

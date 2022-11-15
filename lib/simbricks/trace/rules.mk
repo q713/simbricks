@@ -22,20 +22,12 @@
 
 include mk/subdir_pre.mk
 
-lib_simbricks := $(lib_dir)libsimbricks.a
+lib_log := $(d)log.a
 
-libsimbricks_objs :=
+OBJS := $(addprefix $(d),log.o)
 
-$(eval $(call subdir,base))
-$(eval $(call subdir,network))
-$(eval $(call subdir,pcie))
-$(eval $(call subdir,nicif))
-$(eval $(call subdir,nicbm))
-$(eval $(call subdir,trace))
+$(lib_log): $(OBJS)
 
-$(lib_simbricks): $(libsimbricks_objs)
-	$(AR) rcs $@ $(libsimbricks_objs)
+CLEAN := $(lib_log) $(OBJS)
 
-CLEAN := $(lib_simbricks)
-ALL := $(lib_simbricks)
 include mk/subdir_post.mk

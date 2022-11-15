@@ -420,7 +420,7 @@ class DctcpClient(AppConfig):
 
 
 class PingClient(AppConfig):
-
+    
     def __init__(self, server_ip = '192.168.64.1', count = 100):
         super().__init__()
         self.server_ip = server_ip

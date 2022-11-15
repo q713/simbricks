@@ -44,7 +44,7 @@ extern "C" {
 #include <simbricks/base/proto.h>
 }
 
-//#define DEBUG_NICBM 1
+#define DEBUG_NICBM 1
 #define STAT_NICBM 1
 #define DMA_MAX_PENDING 64
 
@@ -636,6 +636,10 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     return -1;
   }
 
+#ifdef DEBUG_NICBM
+  log_ = new sim_log::Log(sim_log::StdTarget::to_err);
+#endif
+
   return 0;
 }
 
@@ -657,6 +661,7 @@ int Runner::RunMain() {
   }
   bool sync_pcie = SimbricksBaseIfSyncEnabled(&nicif_.pcie.base);
   bool sync_net = SimbricksBaseIfSyncEnabled(&nicif_.net.base);
+
 
   DFLOGINFLOG(log_, "mac_addr=%lx\n", mac_addr_);
   DFLOGINFLOG(log_, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);

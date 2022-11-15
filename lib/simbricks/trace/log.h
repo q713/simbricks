@@ -1,53 +1,82 @@
 #ifndef SIMBRICKS_LOG_H_
 #define SIMBRICKS_LOG_H_
 
-#include<iostream>
-#include<fstream>
+#include <stdio.h>
 
-#include<stdio.h>
+#include <fstream>
+#include <iostream>
+#include <memory>
+#include <mutex>
 
 namespace sim_log {
 
-class Logger {
-    private:
-        const std::string &_log_file;
-        const std::string &_prefix;
-        int _line;
-        bool _must_delete = false;
-        std::ostream *_out;
+enum class StdTarget { to_err, to_out };
+class Log {
+  std::mutex *file_mutex_;
+  bool is_file_ = false;
+  std::ostream *out_;
 
-    public:
-        Logger(const std::string &log_file, const std::string &prefix) 
-            : _log_file(log_file), _prefix(prefix) {
-            
-            // try to log to specified file
-            std::ofstream *o = new std::ofstream{log_file};
-            if (o == nullptr || !o->is_open()) {
-                _out = o;
-                _must_delete = true;
-            } else {
-                // fall back to stdout
-                _out = &std::cout;
-            }
-        }
+ public:
+  Log(StdTarget target) {
+    if (target == StdTarget::to_err) {
+      out_ = &std::cerr;
+    } else {
+      out_ = &std::cout;
+    }
+  }
 
-        Logger(const std::string &prefix) : _prefix(prefix) {
-            // log to stdout
-            _out = &std::cout;
-        }
+  Log(const std::string &file_path) {
+    std::ofstream *o = new std::ofstream{file_path};
+    if (o != nullptr && !o->is_open()) {
+      out_ = o;
+      file_mutex_ = new std::mutex{};
+      is_file_ = true;
+    } else {
+      out_ = &std::cout;
+    }
+  }
 
-        ~Logger() {
-            if (_must_delete)
-                delete _out;
-        }
-
-        template<typename... Args>
-        void log(const char *format, Args... args) {
-            _out << _prefix; 
-            fprintf(_out, format, args);
-        }
+  ~Log() {
+    if (is_file_) {
+      delete out_;
+      delete file_mutex_;
+    }
+  }
 };
 
-}
+class Logger {
+ private:
+  const std::string &prefix_;
 
-#endif // SIMBRICKS_LOG_H_
+  Logger(const std::string &prefix) : prefix_(prefix) {
+  }
+
+ public:
+  static const Logger &getInfoLogger() {
+    static Logger logger("info: ");
+    return logger;
+  }
+
+  static const Logger &getErrorLogger() {
+    static Logger logger("error: ");
+    return logger;
+  }
+
+  static const Logger &getWarnLogger() {
+    static Logger logger("warn: ");
+    return logger;
+  }
+
+  template <typename... Args>
+  static void log(const Log &log, const char *format, Args... args) {
+    if (log.is_file_)
+      std::lock_guard<std::mutex> guard(log.file_mutex_);
+
+    log.out_ << prefix_;
+    fprintf(log.out_, format, args);
+  }
+};
+
+}  // namespace sim_log
+
+#endif  // SIMBRICKS_LOG_H_

@@ -134,6 +134,9 @@ class NICSim(PCIDevSim):
         if self.log_file is not None:
             cmd += f' --log-file-path {self.log_file}'
 
+        if self.log_file is not None:
+            cmd += f' {self.log_file}'
+
         if extra is not None:
             cmd += ' ' + extra
         return cmd

@@ -637,7 +637,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   }
 
 #ifdef DEBUG_NICBM
-  log_ = new sim_log::Log(sim_log::StdTarget::to_err);
+  log_ = new sim_log::Log();
 #endif
 
   return 0;
@@ -661,7 +661,6 @@ int Runner::RunMain() {
   }
   bool sync_pcie = SimbricksBaseIfSyncEnabled(&nicif_.pcie.base);
   bool sync_net = SimbricksBaseIfSyncEnabled(&nicif_.net.base);
-
 
   DFLOGINFLOG(log_, "mac_addr=%lx\n", mac_addr_);
   DFLOGINFLOG(log_, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);

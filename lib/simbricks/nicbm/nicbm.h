@@ -31,7 +31,7 @@
 #include <set>
 
 #include <simbricks/base/cxxatomicfix.h>
-#include <lib/simbricks/trace/log.h>
+#include <simbricks/trace/log.h>
 extern "C" {
 #include <simbricks/nicif/nicif.h>
 }

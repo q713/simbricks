@@ -544,6 +544,7 @@ Runner::Runner(Device &dev) : main_time_(0), dev_(dev), events_(EventCmp()) {
 }
 
 int Runner::ParseArgs(int argc, char *argv[]) {
+
   cxxopts::Options options("nicbm", "");
   std::string sync_mode;
   std::string pci_sock_path;
@@ -637,7 +638,12 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   }
 
 #ifdef DEBUG_NICBM
-  log_ = new sim_log::Log();
+  if (argc >= 11) {
+    log_ = sim_log::Log::createLog(argv[10]);
+  } 
+  if (log_ == nullptr || argc < 11) {
+    log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
+  }
 #endif
 
   return 0;

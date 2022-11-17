@@ -31,6 +31,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <getopt.h>
 
 #include <cassert>
 #include <ctime>
@@ -538,6 +539,24 @@ Runner::Runner(Device &dev) : main_time_(0), dev_(dev), events_(EventCmp()) {
 }
 
 int Runner::ParseArgs(int argc, char *argv[]) {
+
+  static char *short_ops = "p:c:s:y, " 
+  static struct option long_options[] = {
+    {"pci-socket", required_argument, 0, 0},
+    {"eth-socket", required_argument, 0, 0},
+    {"shm", required_argument, 0, 0},
+    {"sync-mode", required_argument, 0, 0},
+    {"start-tick", required_argument, 0, 0},
+    {"sync-period", required_argument, 0, 0},
+    {"pci-latency", required_argument, 0, 0},
+    {"eth-latency", required_argument, 0, 0},
+    {"log-file-path", required_argument, 0, 0},
+    {"mac-addr", required_argument, 0, 0},
+    {"help", no_argmument, 0, 0},
+    {0, 0, 0, 0}
+  } 
+
+
   if (argc < 4 || argc > 10) {
     fprintf(stderr,
             "Usage: corundum_bm PCI-SOCKET ETH-SOCKET "
@@ -563,10 +582,10 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 
 #ifdef DEBUG_NICBM
   if (argc >= 10) {
-    fprintf(stderr, "found log path");
     log_ = sim_log::Log::createLog(argv[9]);
   } 
-  if (log_ == nullptr || argc < 11) {
+  
+  if (log_ == nullptr || argc < 10) {
     log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
   }
 #endif

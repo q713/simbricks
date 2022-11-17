@@ -21,13 +21,13 @@ enum class StdTarget {
 class Log {  // TODO: use ostream..., no simple format without c++20...
  public:
   std::mutex *file_mutex_;
-  const std::string &file_;
+  const char *file_;
   StdTarget target_;
 
-  Log() : target_(StdTarget::to_err), file_("") {
+  Log() : target_(StdTarget::to_err) {
   }
 
-  Log(const std::string &file_path)
+  Log(const char *file_path)
       : file_(file_path), target_(StdTarget::to_file) {
     file_mutex_ = new std::mutex{};
   }
@@ -96,7 +96,7 @@ class Logger {
     std::lock_guard<std::mutex> guard(*(log.file_mutex_));
 
     // TODO: do not always open the file..., streams...
-    FILE *out = fopen(log.file_.c_str(), "a");
+    FILE *out = fopen(log.file_, "a");
     if (out == nullptr) {
       log_stderr_f(format, args...);
       return;
@@ -111,7 +111,7 @@ class Logger {
     std::lock_guard<std::mutex> guard(*(log.file_mutex_));
 
     // TODO: do not always open the file..., streams...
-    FILE *out = fopen(log.file_.c_str(), "a");
+    FILE *out = fopen(log.file_, "a");
     if (out == nullptr) {
       log_stderr(to_print);
       return;

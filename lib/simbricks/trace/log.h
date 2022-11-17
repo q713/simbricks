@@ -13,11 +13,11 @@ namespace sim_log {
 
 #define SIMLOG 1
 
-enum class StdTarget {
+enum StdTarget {
   to_err,
   to_out,
   to_file
-};           // TODO: remove this by inheritance and streams
+};           
 class Log {  // TODO: use ostream..., no simple format without c++20...
  public:
   std::mutex *file_mutex_;

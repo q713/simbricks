@@ -625,7 +625,7 @@ int Runner::RunMain() {
     YieldPoll();
   }
 
-  fprintf(stderr, "exit main_time: %lu\n", main_time_);
+  DFLOGERRLOG(*log_, "exit main_time: %lu\n", main_time_);
 #ifdef STAT_NICBM
   DFLOGERRLOG(*log_, "%20s: %22lu %20s: %22lu  poll_suc_rate: %f\n",
           "h2d_poll_total", h2d_poll_total, "h2d_poll_suc", h2d_poll_suc,

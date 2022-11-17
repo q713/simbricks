@@ -542,7 +542,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     fprintf(stderr,
             "Usage: corundum_bm PCI-SOCKET ETH-SOCKET "
             "SHM [SYNC-MODE] [START-TICK] [SYNC-PERIOD] [PCI-LATENCY] "
-            "[ETH-LATENCY] [MAC-ADDR]\n");
+            "[ETH-LATENCY] [MAC-ADDR] [LOG_FILE_PATH]\n");
     return -1;
   }
   if (argc >= 6)
@@ -562,7 +562,12 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   shmPath_ = argv[3];
 
 #ifdef DEBUG_NICBM
-  log_ = new sim_log::Log();
+  if (argc >= 11) {
+    log_ = sim_log::Log::createLog(argv[10]);
+  } 
+  if (log_ == nullptr || argc < 11) {
+    log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
+  }
 #endif
 
   return 0;

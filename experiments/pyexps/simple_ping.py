@@ -48,6 +48,7 @@ e.add_host(client)
 
 # attach client's NIC
 client_nic = I40eNIC()
+client_nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/client_nic.log'
 e.add_nic(client_nic)
 client.add_nic(client_nic)
 
@@ -63,6 +64,7 @@ e.add_host(server)
 
 # attach server's NIC
 server_nic = I40eNIC()
+server_nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/server_nic.log'
 e.add_nic(server_nic)
 server.add_nic(server_nic)
 

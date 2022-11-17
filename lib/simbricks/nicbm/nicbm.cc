@@ -542,7 +542,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     fprintf(stderr,
             "Usage: corundum_bm PCI-SOCKET ETH-SOCKET "
             "SHM [SYNC-MODE] [START-TICK] [SYNC-PERIOD] [PCI-LATENCY] "
-            "[ETH-LATENCY] [MAC-ADDR] [LOG_FILE_PATH]\n");
+            "[ETH-LATENCY] [LOG_FILE_PATH] [MAC-ADDR]\n");
     return -1;
   }
   if (argc >= 6)
@@ -554,16 +554,17 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     pcieParams_.link_latency = strtoull(argv[7], NULL, 0) * 1000ULL;
   if (argc >= 9)
     netParams_.link_latency = strtoull(argv[8], NULL, 0) * 1000ULL;
-  if (argc >= 10)
-    mac_addr_ = strtoull(argv[9], NULL, 16);
+  if (argc >= 11)
+    mac_addr_ = strtoull(argv[10], NULL, 16);
 
   pcieParams_.sock_path = argv[1];
   netParams_.sock_path = argv[2];
   shmPath_ = argv[3];
 
 #ifdef DEBUG_NICBM
-  if (argc >= 11) {
-    log_ = sim_log::Log::createLog(argv[10]);
+  if (argc >= 10) {
+    fprintf(stderr, "found log path");
+    log_ = sim_log::Log::createLog(argv[9]);
   } 
   if (log_ == nullptr || argc < 11) {
     log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);

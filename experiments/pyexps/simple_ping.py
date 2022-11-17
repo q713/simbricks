@@ -42,13 +42,13 @@ client_config.app = PingClient(server_ip = '10.0.0.2', count=1)
 client = Gem5Host(client_config)
 client.name = 'client'
 client.wait = True  # wait for client simulator to finish execution
-#client.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-client-log.log --debug-flags=SimBricksAll,DMA,CacheAll']
-client.variant = 'fast'
+client.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-client-log.log --debug-flags=SimBricksAll,DMA,CacheAll']
+client.variant = 'opt'
 e.add_host(client)
 
 # attach client's NIC
 client_nic = I40eNIC()
-#client_nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/client-nic.log'
+client_nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/client-nic.log'
 e.add_nic(client_nic)
 client.add_nic(client_nic)
 
@@ -58,13 +58,13 @@ server_config.ip = '10.0.0.2'
 server_config.app = IdleHost()
 server = Gem5Host(server_config)
 server.name = 'server'
-#server.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-server-log.log --debug-flags=SimBricksAll,DMA,CacheAll']
-server.variant = 'fast'
+server.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-server-log.log --debug-flags=SimBricksAll,DMA,CacheAll']
+server.variant = 'opt'
 e.add_host(server)
 
 # attach server's NIC
 server_nic = I40eNIC()
-#server_nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/server-nic.log'
+server_nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/server-nic.log'
 e.add_nic(server_nic)
 server.add_nic(server_nic)
 

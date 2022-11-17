@@ -639,10 +639,10 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 
 #ifdef DEBUG_NICBM
   if (argc >= 10) {
-    fprintf(stderr, "found log path");
     log_ = sim_log::Log::createLog(argv[9]);
   } 
-  if (log_ == nullptr || argc < 11) {
+  
+  if (log_ == nullptr || argc < 10) {
     log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
   }
 #endif

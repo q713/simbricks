@@ -11,6 +11,8 @@
 
 namespace sim_log {
 
+#define SIMLOG 1
+
 enum class StdTarget {
   to_err,
   to_out,
@@ -47,6 +49,11 @@ class Logger {
     fprintf(out, format, args...);
   }
 
+  inline void log_internal(FILE *out, const char *to_print) {
+    fprintf(out, prefix_.c_str());
+    fprintf(out, to_print);
+  }
+
  public:
   Logger(const std::string &prefix) : prefix_(prefix) {
   }
@@ -67,13 +74,32 @@ class Logger {
   }
 
   template <typename ...Args>
-  void log_file(const Log &log, const char *format, const Args &...args) {
+  inline void log_stdout_f(const char *format, const Args &...args) {
+    log_internal(stdout, format, args...);
+  }
+
+  template <typename ...Args>
+  inline void log_stderr_f(const char *format, const Args &...args) {
+    log_internal(stderr, format, args...);
+  }
+
+  inline void log_stdout(const char *to_print) {
+    log_internal(stdout, to_print);
+  }
+
+  inline void log_stderr(const char *to_print) {
+    log_internal(stderr, to_print);
+  }
+
+  template <typename ...Args>
+  void log_file_f(const Log &log, const char *format, const Args &...args) {
     std::lock_guard<std::mutex> guard(*(log.file_mutex_));
 
     // TODO: do not always open the file..., streams...
     FILE *out = fopen(log.file_.c_str(), "a");
     if (out == nullptr) {
-      log_stderr(format, args...);
+      log_stderr_f(format, args...);
+      return;
     }
 
     log_internal(out, format, args...);
@@ -81,45 +107,120 @@ class Logger {
     fclose(out);
   }
 
-  template <typename ...Args>
-  inline void log_stdout(const char *format, const Args &...args) {
-    log_internal(stdout, format, args...);
+  void log_file(const Log &log, const char *to_print) {
+    std::lock_guard<std::mutex> guard(*(log.file_mutex_));
+
+    // TODO: do not always open the file..., streams...
+    FILE *out = fopen(log.file_.c_str(), "a");
+    if (out == nullptr) {
+      log_stderr(to_print);
+      return;
+    }
+
+    log_internal(out, to_print);
+
+    fclose(out);
   }
 
   template <typename ...Args>
-  inline void log_stderr(const char *format, const Args &...args) {
-    log_internal(stderr, format, args...);
-  }
-
-  template <typename ...Args>
-  void log(const Log &log, const char *format, const Args &...args) {
+  void log_f(const Log &log, const char *format, const Args &...args) {
     if (log.target_ == StdTarget::to_file) {
-      log_file(log, format, args...);
+      log_file_f(log, format, args...);
     } else if (log.target_ == StdTarget::to_out) {
-      log_stdout(format, args...);
+      log_stdout_f(format, args...);
     } else {
-      log_stderr(format, args...);
+      log_stderr_f(format, args...);
+    }
+  }
+
+  void log(const Log &log, const char *to_print) {
+    if (log.target_ == StdTarget::to_file) {
+      log_file(log, to_print);
+    } else if (log.target_ == StdTarget::to_out) {
+      log_stdout(to_print);
+    } else {
+      log_stderr(to_print);
     }
   }
 };
 
-#define DLOGINFLOG(l, fmt, ...) \
-  sim_log::Logger::getInfoLogger().log(l, fmt, __VA_ARGS__);
+#ifdef SIMLOG
 
-#define DLOGWARNLOG(l, fmt, ...) \
-  sim_log::Logger::getWarnLogger().log(l, fmt, __VA_ARGS__);
+  #define DFLOGINFLOG(l, fmt, ...) \
+    sim_log::Logger::getInfoLogger().log_f(l, fmt, __VA_ARGS__);
 
-#define DLOGERRLOG(l, fmt, ...) \
-  sim_log::Logger::getErrorLogger().log(l, fmt, __VA_ARGS__);
+  #define DFLOGWARNLOG(l, fmt, ...) \
+    sim_log::Logger::getWarnLogger().log_f(l, fmt, __VA_ARGS__);
 
-#define DLOGIN(fmt, ...) \
-  sim_log::Logger::getInfoLogger().log_stdout(fmt, __VA_ARGS__);
+  #define DFLOGERRLOG(l, fmt, ...) \
+    sim_log::Logger::getErrorLogger().log_f(l, fmt, __VA_ARGS__);
 
-#define DLOGWARN(fmt, ...) \
-  sim_log::Logger::getWarnLogger().log_stderr(fmt, __VA_ARGS__);
+  #define DFLOGIN(fmt, ...) \
+    sim_log::Logger::getInfoLogger().log_stdout_f(fmt, __VA_ARGS__);
 
-#define DLOGERR(fmt, ...) \
-  sim_log::Logger::getErrorLogger().log_stderr(fmt, __VA_ARGS__);
+  #define DFLOGWARN(fmt, ...) \
+    sim_log::Logger::getWarnLogger().log_stderr_f(fmt, __VA_ARGS__);
+
+  #define DFLOGERR(fmt, ...) \
+    sim_log::Logger::getErrorLogger().log_stderr_f(fmt, __VA_ARGS__);
+
+  #define DLOGINFLOG(l, tp) \
+    sim_log::Logger::getInfoLogger().log(l, tp);
+
+  #define DLOGWARNLOG(l, tp) \
+    sim_log::Logger::getWarnLogger().log(l, tp);
+
+  #define DLOGERRLOG(l, tp) \
+    sim_log::Logger::getErrorLogger().log(l, tp);
+
+  #define DLOGIN(tp) \
+    sim_log::Logger::getInfoLogger().log_stdout(tp);
+
+  #define DLOGWARN(tp) \
+    sim_log::Logger::getWarnLogger().log_stderr(tp);
+
+  #define DLOGERR(tp) \
+    sim_log::Logger::getErrorLogger().log_stderr(tp);
+
+#else
+
+  #define DFLOGINFLOG(l, fmt, ...) \
+    do { } while(0)
+  
+  #define DFLOGWARNLOG(l, fmt, ...) \
+    do { } while(0)
+  
+  #define DFLOGERRLOG(l, fmt, ...) \
+    do { } while(0)
+
+  #define DFLOGIN(fmt, ...) \
+    do { } while(0)
+
+  #define DFLOGWARN(fmt, ...) \
+    do { } while(0)
+
+  #define DFLOGERR(fmt, ...) \
+    do { } while(0)
+
+  #define DLOGINFLOG(l, tp) \
+    do { } while(0)
+  
+  #define DLOGWARNLOG(l, tp) \
+    do { } while(0)
+  
+  #define DLOGERRLOG(l, tp) \
+    do { } while(0)
+
+  #define DLOGIN(tp) \
+    do { } while(0)
+
+  #define DLOGWARN(tp) \
+    do { } while(0)
+
+  #define DLOGERR(tp) \
+    do { } while(0)
+
+#endif
 
 }  // namespace sim_log
 

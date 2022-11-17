@@ -563,7 +563,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   shmPath_ = argv[3];
 
 #ifdef DEBUG_NICBM
-  log_ = new sim_log::Log(sim_log::StdTarget::to_err);
+  log_ = new sim_log::Log();
 #endif
 
   return 0;
@@ -588,9 +588,10 @@ int Runner::RunMain() {
   bool sync_pcie = SimbricksBaseIfSyncEnabled(&nicif_.pcie.base);
   bool sync_net = SimbricksBaseIfSyncEnabled(&nicif_.net.base);
 
-  const sim_log::Logger &log_err = sim_log::Logger::getErrorLogger();
-  log_err.log(*log_, "mac_addr=%lx\n", mac_addr_);
-  log_err.log(*log_, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
+  sim_log::Logger &logger = sim_log::Logger::getErrorLogger();
+  logger.log_stderr("mac_addr=%lx\n", mac_addr_);
+  logger.log_stderr("sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
+  DLOGERR("sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
   //fprintf(stderr, "mac_addr=%lx\n", mac_addr_);
   //fprintf(stderr, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
 
@@ -598,9 +599,7 @@ int Runner::RunMain() {
 
   while (!exiting) {
     while (SimbricksNicIfSync(&nicif_, main_time_)) {
-      const sim_log::Logger &logWarn = sim_log::Logger::getWarnLogger();
-      logWarn.log(*log_, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
-      //fprintf(stderr, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
+      fprintf(stderr, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
       YieldPoll();
     }
 

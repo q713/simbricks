@@ -7,38 +7,31 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <sstream>
 
 namespace sim_log {
 
-enum class StdTarget { to_err, to_out };
-class Log {
-  std::mutex *file_mutex_;
-  bool is_file_ = false;
-  std::ostream *out_;
-
+enum class StdTarget {
+  to_err,
+  to_out,
+  to_file
+};           // TODO: remove this by inheritance and streams
+class Log {  // TODO: use ostream..., no simple format without c++20...
  public:
-  Log(StdTarget target) {
-    if (target == StdTarget::to_err) {
-      out_ = &std::cerr;
-    } else {
-      out_ = &std::cout;
-    }
+  std::mutex *file_mutex_;
+  const std::string &file_;
+  StdTarget target_;
+
+  Log() : target_(StdTarget::to_err), file_("") {
   }
 
-  Log(const std::string &file_path) {
-    std::ofstream *o = new std::ofstream{file_path};
-    if (o != nullptr && !o->is_open()) {
-      out_ = o;
-      file_mutex_ = new std::mutex{};
-      is_file_ = true;
-    } else {
-      out_ = &std::cout;
-    }
+  Log(const std::string &file_path)
+      : file_(file_path), target_(StdTarget::to_file) {
+    file_mutex_ = new std::mutex{};
   }
 
   ~Log() {
-    if (is_file_) {
-      delete out_;
+    if (target_ == StdTarget::to_file) {
       delete file_mutex_;
     }
   }
@@ -48,34 +41,85 @@ class Logger {
  private:
   const std::string &prefix_;
 
-  Logger(const std::string &prefix) : prefix_(prefix) {
+  template <typename ...Args>
+  inline void log_internal(FILE *out, const char *format, Args... args) {
+    fprintf(out, prefix_.c_str());
+    fprintf(out, format, args...);
   }
 
  public:
-  static const Logger &getInfoLogger() {
+  Logger(const std::string &prefix) : prefix_(prefix) {
+  }
+
+  static Logger &getInfoLogger() {
     static Logger logger("info: ");
     return logger;
   }
 
-  static const Logger &getErrorLogger() {
+  static Logger &getErrorLogger() {
     static Logger logger("error: ");
     return logger;
   }
 
-  static const Logger &getWarnLogger() {
+  static Logger &getWarnLogger() {
     static Logger logger("warn: ");
     return logger;
   }
 
-  template <typename... Args>
-  static void log(const Log &log, const char *format, Args... args) {
-    if (log.is_file_)
-      std::lock_guard<std::mutex> guard(log.file_mutex_);
+  template <typename ...Args>
+  void log_file(const Log &log, const char *format, const Args &...args) {
+    std::lock_guard<std::mutex> guard(*(log.file_mutex_));
 
-    log.out_ << prefix_;
-    fprintf(log.out_, format, args);
+    // TODO: do not always open the file..., streams...
+    FILE *out = fopen(log.file_.c_str(), "a");
+    if (out == nullptr) {
+      log_stderr(format, args...);
+    }
+
+    log_internal(out, format, args...);
+
+    fclose(out);
+  }
+
+  template <typename ...Args>
+  inline void log_stdout(const char *format, const Args &...args) {
+    log_internal(stdout, format, args...);
+  }
+
+  template <typename ...Args>
+  inline void log_stderr(const char *format, const Args &...args) {
+    log_internal(stderr, format, args...);
+  }
+
+  template <typename ...Args>
+  void log(const Log &log, const char *format, const Args &...args) {
+    if (log.target_ == StdTarget::to_file) {
+      log_file(log, format, args...);
+    } else if (log.target_ == StdTarget::to_out) {
+      log_stdout(format, args...);
+    } else {
+      log_stderr(format, args...);
+    }
   }
 };
+
+#define DLOGINFLOG(l, fmt, ...) \
+  sim_log::Logger::getInfoLogger().log(l, fmt, __VA_ARGS__);
+
+#define DLOGWARNLOG(l, fmt, ...) \
+  sim_log::Logger::getWarnLogger().log(l, fmt, __VA_ARGS__);
+
+#define DLOGERRLOG(l, fmt, ...) \
+  sim_log::Logger::getErrorLogger().log(l, fmt, __VA_ARGS__);
+
+#define DLOGIN(fmt, ...) \
+  sim_log::Logger::getInfoLogger().log_stdout(fmt, __VA_ARGS__);
+
+#define DLOGWARN(fmt, ...) \
+  sim_log::Logger::getWarnLogger().log_stderr(fmt, __VA_ARGS__);
+
+#define DLOGERR(fmt, ...) \
+  sim_log::Logger::getErrorLogger().log_stderr(fmt, __VA_ARGS__);
 
 }  // namespace sim_log
 

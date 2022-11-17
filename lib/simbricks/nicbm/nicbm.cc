@@ -24,7 +24,7 @@
 
 #include "lib/simbricks/nicbm/nicbm.h"
 #include "lib/utils/cli/cxxopts.hpp"
-#include "lib/utils/string_util.h"
+#include "lib/utils/string_util.h" 
 
 #include <fcntl.h>
 #include <signal.h>
@@ -566,7 +566,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   cxxopts::ParseResult result;
   try {
     result = options.parse(argc, argv);
-
+    
     bool valid = false;
     if (result.count("pci-socket") && result.count("eth-socket") 
         && result.count("shm-path") && argc < 22) {
@@ -636,16 +636,6 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     fprintf(stderr, "error parsing options: %s \n", e.what());
     return -1;
   }
-
-#ifdef DEBUG_NICBM
-  if (argc >= 10) {
-    log_ = sim_log::Log::createLog(argv[9]);
-  } 
-  
-  if (log_ == nullptr || argc < 10) {
-    log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
-  }
-#endif
 
   return 0;
 }

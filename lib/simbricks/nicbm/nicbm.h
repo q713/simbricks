@@ -183,6 +183,10 @@ class Runner {
 
   uint64_t TimePs() const;
   uint64_t GetMacAddr() const;
+
+  const sim_log::Log &getLog() {
+    return *log_;
+  }
 };
 
 /**

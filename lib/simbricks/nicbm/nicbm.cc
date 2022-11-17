@@ -23,6 +23,7 @@
  */
 
 #include "lib/simbricks/nicbm/nicbm.h"
+#include "lib/simbricks/cli/cxxopts.hpp"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -540,52 +541,74 @@ Runner::Runner(Device &dev) : main_time_(0), dev_(dev), events_(EventCmp()) {
 
 int Runner::ParseArgs(int argc, char *argv[]) {
 
-  static char *short_ops = "p:c:s:y, " 
-  static struct option long_options[] = {
-    {"pci-socket", required_argument, 0, 0},
-    {"eth-socket", required_argument, 0, 0},
-    {"shm", required_argument, 0, 0},
-    {"sync-mode", required_argument, 0, 0},
-    {"start-tick", required_argument, 0, 0},
-    {"sync-period", required_argument, 0, 0},
-    {"pci-latency", required_argument, 0, 0},
-    {"eth-latency", required_argument, 0, 0},
-    {"log-file-path", required_argument, 0, 0},
-    {"mac-addr", required_argument, 0, 0},
-    {"help", no_argmument, 0, 0},
-    {0, 0, 0, 0}
-  } 
+  cxxopts::Options options("nicbm", "");
+  
+  std::string sync_mode;
+  std::string pci_sock_path;
+  std::string eth_sock_path;
+  std::string shm_path;
+  options.add_options()
+    ("pci-socket", "", cxxopts::value<std::string>(pci_sock_path))
+    ("eth-socket", "", cxxopts::value<std::string>(eth_sock_path))
+    ("shm-path", "", cxxopts::value<std::string>(shm_path))
+    ("sync-mode", "", cxxopts::value<std::string>(sync_mode))
+    ("start-tick", "", cxxopts::value<char *>())
+    ("sync-period", "", cxxopts::value<char *>())
+    ("pci-latency", "", cxxopts::value<char *>())
+    ("eth-latency", "", cxxopts::value<char *>())
+    ("log-file-path", "path to a file to write the nic log into", cxxopts::value<char *>())
+    ("mac-addr", "", cxxopts::value<char *>())
+  ;
 
+  cxxopts::ParseResult result;
+  try {
+    result = options.parse(argc, argv);
+  
+  } catch (const cxxopts::exceptions::exception& e) {
+    fprintf(stderr, "error parsing options: %s \n", e.what());
+    return -1;
+  }
 
-  if (argc < 4 || argc > 10) {
+  bool valid = false;
+  if (pcieParams_.sock_path && netParams_.sock_path && shmPath_ && argc < 22)
+    valid = true; 
+
+  if (!valid) {
     fprintf(stderr,
             "Usage: corundum_bm PCI-SOCKET ETH-SOCKET "
             "SHM [SYNC-MODE] [START-TICK] [SYNC-PERIOD] [PCI-LATENCY] "
             "[ETH-LATENCY] [LOG_FILE_PATH] [MAC-ADDR]\n");
+    fprintf(stderr, options.help().c_str());
     return -1;
   }
-  if (argc >= 6)
-    main_time_ = strtoull(argv[5], NULL, 0);
-  if (argc >= 7)
-    netParams_.sync_interval = pcieParams_.sync_interval =
-        strtoull(argv[6], NULL, 0) * 1000ULL;
-  if (argc >= 8)
-    pcieParams_.link_latency = strtoull(argv[7], NULL, 0) * 1000ULL;
-  if (argc >= 9)
-    netParams_.link_latency = strtoull(argv[8], NULL, 0) * 1000ULL;
-  if (argc >= 11)
-    mac_addr_ = strtoull(argv[10], NULL, 16);
 
-  pcieParams_.sock_path = argv[1];
-  netParams_.sock_path = argv[2];
-  shmPath_ = argv[3];
+  pcieParams_.sock_path = pci_sock_path.c_str();
+  netParams_.sock_path = eth_sock_path.c_str();
+  shmPath_ = shm_path.c_str();
+
+  //if (argc >= 6)
+  //  main_time_ = strtoull(argv[5], NULL, 0);
+  //if (argc >= 7)
+  //  netParams_.sync_interval = pcieParams_.sync_interval =
+  //      strtoull(argv[6], NULL, 0) * 1000ULL;
+  //if (argc >= 8)
+  //  pcieParams_.link_latency = strtoull(argv[7], NULL, 0) * 1000ULL;
+  //if (argc >= 9)
+  //  netParams_.link_latency = strtoull(argv[8], NULL, 0) * 1000ULL;
+  //if (argc >= 11)
+  //  mac_addr_ = strtoull(argv[10], NULL, 16);
+  //pcieParams_.sock_path = argv[1];
+  //netParams_.sock_path = argv[2];
+  //shmPath_ = argv[3];
 
 #ifdef DEBUG_NICBM
-  if (argc >= 10) {
-    log_ = sim_log::Log::createLog(argv[9]);
+  char *log_file_path = nullptr;
+  if (result.count("log-file-path")) {
+    log_file_path = result["log-file-path"].as<char *>();
+    log_ = sim_log::Log::createLog(log_file_path);
   } 
   
-  if (log_ == nullptr || argc < 10) {
+  if (log_ == nullptr || log_file_path == nullptr) {
     log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
   }
 #endif

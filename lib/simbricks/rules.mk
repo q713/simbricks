@@ -31,7 +31,6 @@ $(eval $(call subdir,network))
 $(eval $(call subdir,pcie))
 $(eval $(call subdir,nicif))
 $(eval $(call subdir,nicbm))
-$(eval $(call subdir,trace))
 
 $(lib_simbricks): $(libsimbricks_objs)
 	$(AR) rcs $@ $(libsimbricks_objs)

@@ -124,15 +124,15 @@ class NICSim(PCIDevSim):
 
     def basic_args(self, env, extra=None):
         cmd = (
-            f'{env.dev_pci_path(self)} {env.nic_eth_path(self)}'
-            f' {env.dev_shm_path(self)} {self.sync_mode} {self.start_tick}'
-            f' {self.sync_period} {self.pci_latency} {self.eth_latency}'
+            f'--pci-socket {env.dev_pci_path(self)} --eth-socket {env.nic_eth_path(self)}'
+            f' --shm-path {env.dev_shm_path(self)} --sync-mode {self.sync_mode} --start-tick {self.start_tick}'
+            f' --sync-period {self.sync_period} --pci-latency {self.pci_latency} --eth-latency {self.eth_latency}'
         )
         if self.mac is not None:
-            cmd += ' ' + (''.join(reversed(self.mac.split(':'))))
+            cmd += ' --mac-addr ' + (''.join(reversed(self.mac.split(':'))))
 
         if self.log_file is not None:
-            cmd += f' {self.log_file}'
+            cmd += f' --log-file-path {self.log_file}'
 
         if extra is not None:
             cmd += ' ' + extra

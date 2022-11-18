@@ -1,5 +1,5 @@
 ..
-  Copyright 2021 Max Planck Institute for Software Systems, and
+  Copyright 2022 Max Planck Institute for Software Systems, and
   National University of Singapore
 ..
   Permission is hereby granted, free of charge, to any person obtaining
@@ -22,48 +22,7 @@
   SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ###################################
-Simbricks Orchestration Command-Line Parameters
+Installing
 ###################################
 
-.. code-block:: bash
-   usage: run.py [-h] [--filter PATTERN [PATTERN ...]] [--pickled] [--runs N]
-               [--firstrun N] [--force] [--verbose] [--pcap] [--repo DIR]
-               [--workdir DIR] [--outdir DIR] [--cpdir DIR] [--parallel]
-               [--cores N] [--mem N] [--slurm] [--slurmdir DIR]
-               EXP [EXP ...]
-
-******************************
-Positional arguments
-******************************
-
-   *  ``--EXP``
-
-      An experiment file to run.
-
-
-
-******************************
-Optional arguments
-******************************
-
-   *  `` -h, --help``
-
-      show this help message and exit.
-   
-   * `` --filter PATTERN [PATTERN ...] ``
-      Pattern to match experiment names against
-
-
-******************************
-Environment
-******************************
-
-
-******************************
-Parallel Runtime
-******************************
-
-
-******************************
-Slurm Runtime
-******************************
+You can find all information at a glance in our README under the section `Quick Start <https://github.com/simbricks/simbricks#quick-start>`_.

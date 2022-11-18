@@ -35,6 +35,7 @@ class Simulator(object):
 
     def __init__(self):
         self.extra_deps = []
+        self.name = ''
 
     def resreq_cores(self):
         """Number of cores required for this simulator."""
@@ -58,7 +59,7 @@ class Simulator(object):
         """Command to run to execute simulator."""
         return None
 
-    def dependencies(self):
+    def dependencies(self) -> tp.List[Simulator]:
         """Other simulators this one depends on."""
         return []
 
@@ -85,7 +86,6 @@ class PCIDevSim(Simulator):
     def __init__(self):
         super().__init__()
 
-        self.name = ''
         self.sync_mode = 0
         self.start_tick = 0
         self.sync_period = 500
@@ -113,8 +113,11 @@ class NICSim(PCIDevSim):
         self.network: tp.Optional[NetSim] = None
         self.mac: tp.Optional[str] = None
         self.eth_latency = 500
+        """Ethernet latency in nanoseconds from this NIC to the network
+        component."""
 
     def set_network(self, net: NetSim):
+        """Connect this NIC to a network simulator."""
         self.network = net
         net.nics.append(self)
 
@@ -154,11 +157,14 @@ class NetSim(Simulator):
     def __init__(self):
         super().__init__()
 
-        self.name = ''
         self.opt = ''
         self.sync_mode = 0
         self.sync_period = 500
+        """Synchronization period in nanoseconds from this network to connected
+        components."""
         self.eth_latency = 500
+        """Ethernet latency in nanoseconds from this network to connected
+        components."""
         self.nics: list[NICSim] = []
         self.hosts_direct: list[HostSim] = []
         self.net_listen: list[NetSim] = []
@@ -172,7 +178,7 @@ class NetSim(Simulator):
         net.net_listen.append(self)
         self.net_connect.append(net)
 
-    def connect_sockets(self, env: ExpEnv):
+    def connect_sockets(self, env: ExpEnv) -> tp.List[tp.Tuple[Simulator, str]]:
         sockets = []
         for n in self.nics:
             sockets.append((n, env.nic_eth_path(n)))
@@ -204,12 +210,12 @@ class HostSim(Simulator):
     def __init__(self, node_config: NodeConfig):
         super().__init__()
         self.node_config = node_config
-        """Config for the simulated host. """
-        self.name = ''
+        """System configuration for this simulated host. """
         self.wait = False
         """
-        `True` - Wait for process of simulator to exit.
-        `False` - Don't wait and instead stop the process.
+        `True` - Wait for this simulator to finish execution. `False` - Don't
+        wait and instead shutdown the simulator as soon as all other awaited
+        simulators have completed execution.
         """
         self.sleep = 0
         self.cpu_freq = '8GHz'
@@ -229,13 +235,16 @@ class HostSim(Simulator):
         return 'host.' + self.name
 
     def add_nic(self, dev: NICSim):
+        """Add a NIC to this host."""
         self.add_pcidev(dev)
 
     def add_pcidev(self, dev: PCIDevSim):
+        """Add a PCIe device to this host."""
         dev.name = self.name + '.' + dev.name
         self.pcidevs.append(dev)
 
     def add_netdirect(self, net: NetSim):
+        """Add a direct connection to a network to this host."""
         net.hosts_direct.append(self)
         self.net_directs.append(net)
 
@@ -439,7 +448,6 @@ class MultiSubNIC(NICSim):
 
     def __init__(self, mn):
         super().__init__()
-        self.name = ''
         self.multinic = mn
 
     def full_name(self):
@@ -457,7 +465,6 @@ class I40eMultiNIC(Simulator):
     def __init__(self):
         super().__init__()
         self.subnics = []
-        self.name = ''
 
     def create_subnic(self):
         sn = MultiSubNIC(self)
@@ -562,9 +569,9 @@ class NS3DumbbellNet(NetSim):
         ports = ''
         for (n, s) in self.connect_sockets(env):
             if 'server' in n.name:
-                ports += '--CosimPortLeft=' + s + ' '
+                ports += f'--CosimPortLeft={s} '
             else:
-                ports += '--CosimPortRight=' + s + ' '
+                ports += f'--CosimPortRight={s} '
 
         cmd = (
             f'{env.repodir}/sims/external/ns-3'

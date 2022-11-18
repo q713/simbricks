@@ -581,15 +581,17 @@ int Runner::ParseArgs(int argc, char *argv[]) {
             " --shm-path SHM [--sync-mode SYNC-MODE]"
             " [--start-tick START-TICK] --sync-period [SYNC-PERIOD]"
             " [--pci-latency PCI-LATENCY] [--eth-latency ETH-LATENCY]"
-            " [--mac-addr MAC-ADDR] [--log-file-path LOG_FILE_PATH]");
-
+            " [--mac-addr MAC-ADDR] [--log-file-path LOG_FILE_PATH]\n");
     fprintf(stderr, options.help().c_str());
     return -1;
   }
 
-  sim_string_utils::copy_and_assign_terminate(pcieParams_.sock_path, pci_sock_path);
-  sim_string_utils::copy_and_assign_terminate(netParams_.sock_path, eth_sock_path);
-  sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path);
+  if(!sim_string_utils::copy_and_assign_terminate(pcieParams_.sock_path, pci_sock_path)
+     || !sim_string_utils::copy_and_assign_terminate(netParams_.sock_path, eth_sock_path)
+     || !sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path) {
+    fprintf(stderr, "Could not copy cli args to heap\n");
+    return -1;
+  }
 
   if (result.count("start-tick"))
     main_time_ = result["start-tick"].as<uint64_t>();

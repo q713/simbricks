@@ -22,7 +22,7 @@ bool copy_and_assign_terminate(const char* target, const std::string &to_copy) {
     if (to_copy.copy(tmp, length)) {
         tmp[length] = '\0';
         target = tmp;
-        return target;
+        return true;
     }
 
     delete [] tmp;

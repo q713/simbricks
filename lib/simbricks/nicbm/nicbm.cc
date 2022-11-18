@@ -573,6 +573,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
       valid = true; 
     }
 
+<<<<<<< HEAD
     if (!valid) {
       fprintf(stderr,
               "--pci-socket PCI-SOCKET --eth-socket ETH-SOCKET"

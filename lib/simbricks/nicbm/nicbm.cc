@@ -582,7 +582,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
             " [--start-tick START-TICK] --sync-period [SYNC-PERIOD]"
             " [--pci-latency PCI-LATENCY] [--eth-latency ETH-LATENCY]"
             " [--mac-addr MAC-ADDR] [--log-file-path LOG_FILE_PATH]\n");
-    fprintf(stderr, options.help().c_str());
+    fprintf(stderr, "%s", options.help().c_str());
     return -1;
   }
 

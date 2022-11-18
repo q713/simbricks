@@ -614,22 +614,13 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     }
 
 #ifdef DEBUG_NICBM
-    std::string log_file_path;
-    sim_log::Log *log;
-
-    if (result.count("log-file-path")) {
-      // no copy needed, createLog will directly open the file and store the 'fd'
-      log_file_path = result["log-file-path"].as<std::string>();
-      log = sim_log::Log::createLog(log_file_path.c_str());
-    } else {
-      log = sim_log::Log::createLog(sim_log::StdTarget::to_err);
-    }
-
-    if (log == nullptr) {
-      fprintf(stderr, "could not initilize log\n");
-      return -1;
-    }
-    log_ = log;
+  std::string log_file_path;
+  if (result.count("log-file-path")) {
+    log_file_path = result["log-file-path"].as<std::string>();
+    log_ = sim_log::Log::createLog(log_file_path.c_str());
+  } else {
+    log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
+  }
 #endif
 
   } catch (const cxxopts::exceptions::exception& e) {

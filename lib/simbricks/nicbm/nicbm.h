@@ -166,6 +166,10 @@ class Runner {
  public:
   explicit Runner(Device &dev_);
 
+  ~Runner() {
+    delete log_;
+  }
+
   /** Parse command line arguments. */
   int ParseArgs(int argc, char *argv[]);
 

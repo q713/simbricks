@@ -618,9 +618,12 @@ int Runner::ParseArgs(int argc, char *argv[]) {
   if (result.count("log-file-path")) {
     // no copy needed, createLog will directly open the file and store the 'fd'
     log_file_path = result["log-file-path"].as<std::string>();
-    log_ = sim_log::Log::createLog(log_file_path.c_str());
+    if (!sim_log::Log::initLog(log_, log_file_path.c_str())) {
+        fprintf(stderr, "could not initilize log\n");
+        return -1;
+    }
   } else {
-    log_ = sim_log::Log::createLog(sim_log::StdTarget::to_out);
+    sim_log::Log::initLog(log_, sim_log::StdTarget::to_err);
   }
 #endif
 

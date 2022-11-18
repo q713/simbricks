@@ -588,7 +588,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 
   if(!sim_string_utils::copy_and_assign_terminate(pcieParams_.sock_path, pci_sock_path)
      || !sim_string_utils::copy_and_assign_terminate(netParams_.sock_path, eth_sock_path)
-     || !sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path) {
+     || !sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path)) {
     fprintf(stderr, "Could not copy cli args to heap\n");
     return -1;
   }

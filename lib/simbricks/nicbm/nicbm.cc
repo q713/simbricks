@@ -583,9 +583,26 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     return -1;
   }
 
-  pcieParams_.sock_path = pci_sock_path.c_str();
-  netParams_.sock_path = eth_sock_path.c_str();
-  shmPath_ = shm_path.c_str();
+  char *temp;
+  std::size_t length;
+  
+  length = pci_sock_path.length();
+  temp = new char[length + 1];
+  pci_sock_path.copy(temp, length);
+  temp[length] = '\0';
+  pcieParams_.sock_path = temp;
+
+  length = eth_sock_path.length();
+  temp = new char[length + 1];
+  eth_sock_path.copy(temp, length);
+  temp[length] = '\0';
+  netParams_.sock_path = temp;
+
+  length = shm_path.length();
+  temp = new char[length + 1];
+  shm_path.copy(temp, length);
+  temp[length] = '\0';
+  shmPath_ = temp;
 
   if (result.count("start-tick"))
     main_time_ = result["start-tick"].as<uint64_t>();

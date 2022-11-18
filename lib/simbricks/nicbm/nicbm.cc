@@ -24,7 +24,7 @@
 
 #include "lib/simbricks/nicbm/nicbm.h"
 #include "lib/utils/cli/cxxopts.hpp"
-#include "lib/utils/string_util.h" 
+#include "lib/utils/string_util.h"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -616,6 +616,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 #ifdef DEBUG_NICBM
   std::string log_file_path;
   if (result.count("log-file-path")) {
+    // no copy needed, createLog will directly open the file and store the 'fd'
     log_file_path = result["log-file-path"].as<std::string>();
     log_ = sim_log::Log::createLog(log_file_path.c_str());
   } else {

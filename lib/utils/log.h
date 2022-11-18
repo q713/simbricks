@@ -26,6 +26,10 @@ class Log {
   FILE *file_;
   StdTarget target_;
 
+  Log() : file_(stderr), target_(StdTarget::to_err) {
+    file_mutex_ = new std::mutex{};
+  }
+
   ~Log() {
     if (file_mutex_ != nullptr) {
       delete file_mutex_;
@@ -36,23 +40,28 @@ class Log {
     }
   }
 
-  static const Log *createLog(StdTarget target) {
+  static bool initLog(Log &log, StdTarget target) {
     if (target == StdTarget::to_out) {
-      return new Log(stdout, StdTarget::to_out);
+      log.file_ = stdout;
+      log.target_ = StdTarget::to_out;
     } else {
-      return new Log(stderr, StdTarget::to_err);
-    } 
+      log.file_ = stderr;
+      log.target_ = StdTarget::to_err;
+    }
+    return true;
   }
 
-  static const Log *createLog(const char *file_path) {
+  static bool initLog(Log &log, const char *file_path) {
     if (file_path == nullptr)
-      return nullptr;
+      return false;
 
     FILE* file = fopen(file_path, "w");
     if (file == nullptr)
-      return nullptr;
+      return false;
 
-    return new Log(file, StdTarget::to_file);
+    log.file_ = file;
+    log.target_ = StdTarget::to_file;
+    return true;
   }
 };
 

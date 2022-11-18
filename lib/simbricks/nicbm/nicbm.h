@@ -138,7 +138,7 @@ class Runner {
   struct SimbricksNicIf nicif_;
   struct SimbricksProtoPcieDevIntro dintro_;
 
-  const sim_log::Log *log_;
+  sim_log::Log log_;
 
   volatile union SimbricksProtoPcieD2H *D2HAlloc();
   volatile union SimbricksProtoNetMsg *D2NAlloc();
@@ -165,10 +165,6 @@ class Runner {
  public:
   explicit Runner(Device &dev_);
 
-  ~Runner() {
-    delete log_;
-  }
-
   /** Parse command line arguments. */
   int ParseArgs(int argc, char *argv[]);
 
@@ -188,8 +184,8 @@ class Runner {
   uint64_t TimePs() const;
   uint64_t GetMacAddr() const;
 
-  const sim_log::Log &getLog() {
-    return *log_;
+  sim_log::Log &getLog() {
+    return log_;
   }
 };
 

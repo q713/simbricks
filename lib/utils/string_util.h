@@ -13,7 +13,7 @@ namespace sim_string_utils {
  * 
  * Note: the caller must ensre freeing the for target allocated memory.
  */
-bool copy_and_assign_terminate(const char* target, const std::string &to_copy) {
+bool copy_and_assign_terminate(const char *&target, const std::string &to_copy) {
     std::size_t length = to_copy.length();
     char *tmp = new char[length + 1];
     if (tmp == nullptr)

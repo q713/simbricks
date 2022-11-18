@@ -23,7 +23,8 @@
  */
 
 #include "lib/simbricks/nicbm/nicbm.h"
-#include "lib/simbricks/cli/cxxopts.hpp"
+#include "lib/utils/cli/cxxopts.hpp"
+#include "lib/utils/string_util.h"
 
 #include <fcntl.h>
 #include <signal.h>
@@ -576,33 +577,19 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 
   if (!valid) {
     fprintf(stderr,
-            "Usage: corundum_bm PCI-SOCKET ETH-SOCKET "
-            "SHM [SYNC-MODE] [START-TICK] [SYNC-PERIOD] [PCI-LATENCY] "
-            "[ETH-LATENCY] [LOG_FILE_PATH] [MAC-ADDR]\n");
+            "--pci-socket PCI-SOCKET --eth-socket ETH-SOCKET"
+            " --shm-path SHM [--sync-mode SYNC-MODE]"
+            " [--start-tick START-TICK] --sync-period [SYNC-PERIOD]"
+            " [--pci-latency PCI-LATENCY] [--eth-latency ETH-LATENCY]"
+            " [--mac-addr MAC-ADDR] [--log-file-path LOG_FILE_PATH]");
+
     fprintf(stderr, options.help().c_str());
     return -1;
   }
 
-  char *temp;
-  std::size_t length;
-  
-  length = pci_sock_path.length();
-  temp = new char[length + 1];
-  pci_sock_path.copy(temp, length);
-  temp[length] = '\0';
-  pcieParams_.sock_path = temp;
-
-  length = eth_sock_path.length();
-  temp = new char[length + 1];
-  eth_sock_path.copy(temp, length);
-  temp[length] = '\0';
-  netParams_.sock_path = temp;
-
-  length = shm_path.length();
-  temp = new char[length + 1];
-  shm_path.copy(temp, length);
-  temp[length] = '\0';
-  shmPath_ = temp;
+  sim_string_utils::copy_and_assign_terminate(pcieParams_.sock_path, pci_sock_path);
+  sim_string_utils::copy_and_assign_terminate(netParams_.sock_path, eth_sock_path);
+  sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path);
 
   if (result.count("start-tick"))
     main_time_ = result["start-tick"].as<uint64_t>();
@@ -619,6 +606,7 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 #ifdef DEBUG_NICBM
   std::string log_file_path;
   if (result.count("log-file-path")) {
+    // no copy needed, createLog will directly open the file and store the 'fd'
     log_file_path = result["log-file-path"].as<std::string>();
     log_ = sim_log::Log::createLog(log_file_path.c_str());
   } else {

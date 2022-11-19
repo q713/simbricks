@@ -20,7 +20,9 @@ bool copy_and_assign_terminate(const char *&target, const std::string &to_copy) 
         return false;
 
     if (to_copy.copy(tmp, length)) {
-        tmp[length] = '\0';
+        if (tmp[length] != '\0') {
+            tmp[length] = '\0';
+        }
         target = tmp;
         return true;
     }

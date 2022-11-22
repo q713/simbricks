@@ -138,7 +138,7 @@ class Runner {
   struct SimbricksNicIf nicif_;
   struct SimbricksProtoPcieDevIntro dintro_;
 
-  sim_log::Log log_;
+  sim_log::Log *log_;
 
   volatile union SimbricksProtoPcieD2H *D2HAlloc();
   volatile union SimbricksProtoNetMsg *D2NAlloc();
@@ -184,7 +184,7 @@ class Runner {
   uint64_t TimePs() const;
   uint64_t GetMacAddr() const;
 
-  sim_log::Log &getLog() {
+  sim_log::Log *getLog() {
     return log_;
   }
 };

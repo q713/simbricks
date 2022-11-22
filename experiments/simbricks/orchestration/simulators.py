@@ -115,7 +115,7 @@ class NICSim(PCIDevSim):
         self.eth_latency = 500
         """Ethernet latency in nanoseconds from this NIC to the network
         component."""
-        self.log_file: tp.Optional[str] = None
+        self.log_file: tp.Optional[str] = None 
 
     def set_network(self, net: NetSim):
         """Connect this NIC to a network simulator."""

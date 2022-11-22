@@ -15,53 +15,51 @@ namespace sim_log {
 
 enum StdTarget { to_err, to_out, to_file };
 class Log {
- private:
-  Log(FILE *file, StdTarget target) : file_(file), target_(target) {
-    file_mutex_ = new std::mutex{};
-  }
+  private:
+    Log(FILE *file, StdTarget target) : file_(file), target_(target) {}
 
   // TODO: use ostream..., no simple format without c++20...
  public:
-  std::mutex *file_mutex_;
+  std::mutex file_mutex_;
   FILE *file_;
   StdTarget target_;
 
-  Log() : file_(stderr), target_(StdTarget::to_err) {
-    file_mutex_ = new std::mutex{};
-  }
-
   ~Log() {
-    if (file_mutex_ != nullptr) {
-      delete file_mutex_;
-    }
+    file_mutex_.lock();
 
-    if (file_ != nullptr) {
+    if (file_ != nullptr && target_ == StdTarget::to_file) {
       fclose(file_);
     }
+
+    file_mutex_.unlock();
   }
 
-  static bool initLog(Log &log, StdTarget target) {
+  static Log *createLog(StdTarget target) {
+    FILE *out;
     if (target == StdTarget::to_out) {
-      log.file_ = stdout;
-      log.target_ = StdTarget::to_out;
+      out = stdout;
     } else {
-      log.file_ = stderr;
-      log.target_ = StdTarget::to_err;
+      target = StdTarget::to_err;
+      out = stderr;
     }
-    return true;
+    
+    return new Log{out, target};
   }
 
-  static bool initLog(Log &log, const char *file_path) {
+  static Log *createLog(const char *file_path) {
     if (file_path == nullptr)
-      return false;
+      return nullptr;
 
     FILE* file = fopen(file_path, "w");
     if (file == nullptr)
-      return false;
+      return nullptr;
 
-    log.file_ = file;
-    log.target_ = StdTarget::to_file;
-    return true;
+    Log *log = new Log{file, StdTarget::to_file};
+    if (log == nullptr) {
+      fclose(file);
+      return nullptr;
+    }
+    return log;
   }
 };
 
@@ -81,8 +79,7 @@ class Logger {
   }
 
  public:
-  Logger(const std::string &prefix) : prefix_(prefix) {
-  }
+  Logger(const std::string &prefix) : prefix_(prefix) {}
 
   static Logger &getInfoLogger() {
     static Logger logger("info: ");
@@ -118,33 +115,38 @@ class Logger {
   }
 
   template <typename... Args>
-  void log_file_f(const Log &log, const char *format, const Args &...args) {
-    std::lock_guard<std::mutex> guard(*(log.file_mutex_));
+  void log_f(Log *log, const char *format, const Args &...args) {
+    if (log == nullptr) {
+      log_stderr("log is null. it should not be!\n");
+      log_stderr_f(format, args...);
+      return;
+    }
 
-    log_internal(log.file_, format, args...);
-  }
+    std::lock_guard<std::mutex> guard(log->file_mutex_);
 
-  void log_file(const Log &log, const char *to_print) {
-    std::lock_guard<std::mutex> guard(*(log.file_mutex_));
-
-    log_internal(log.file_, to_print);
-  }
-
-  template <typename... Args>
-  void log_f(const Log &log, const char *format, const Args &...args) {
-    if (log.target_ == StdTarget::to_file) {
-      log_file_f(log, format, args...);
-    } else if (log.target_ == StdTarget::to_out) {
+    if (log->target_ == StdTarget::to_file) {
+      log_internal(log->file_, format, args...);
+      //log_file_f(log, format, args...);
+    } else if (log->target_ == StdTarget::to_out) {
       log_stdout_f(format, args...);
     } else {
       log_stderr_f(format, args...);
     }
   }
 
-  void log(const Log &log, const char *to_print) {
-    if (log.target_ == StdTarget::to_file) {
-      log_file(log, to_print);
-    } else if (log.target_ == StdTarget::to_out) {
+  void log(Log *log, const char *to_print) {
+    if (log == nullptr) {
+      log_stderr("trying to log into null log\n");
+      log_stderr(to_print);
+      return;
+    }
+
+    std::lock_guard<std::mutex> guard(log->file_mutex_);
+
+    if (log->target_ == StdTarget::to_file) {
+      log_internal(log->file_, to_print);
+      //log_file(log, to_print);
+    } else if (log->target_ == StdTarget::to_out) {
       log_stdout(to_print);
     } else {
       log_stderr(to_print);
@@ -155,34 +157,40 @@ class Logger {
 #ifdef SIMLOG
 
 #define DFLOGINFLOG(l, fmt, ...) \
-  sim_log::Logger::getInfoLogger().log_f(l, fmt, __VA_ARGS__);
+  do { sim_log::Logger::getInfoLogger().log_f(l, fmt, __VA_ARGS__); } while (0);
 
 #define DFLOGWARNLOG(l, fmt, ...) \
-  sim_log::Logger::getWarnLogger().log_f(l, fmt, __VA_ARGS__);
+  do { sim_log::Logger::getWarnLogger().log_f(l, fmt, __VA_ARGS__); } while (0);
 
 #define DFLOGERRLOG(l, fmt, ...) \
-  sim_log::Logger::getErrorLogger().log_f(l, fmt, __VA_ARGS__);
+  do { sim_log::Logger::getErrorLogger().log_f(l, fmt, __VA_ARGS__); } while (0);
 
 #define DFLOGIN(fmt, ...) \
-  sim_log::Logger::getInfoLogger().log_stdout_f(fmt, __VA_ARGS__);
+  do { sim_log::Logger::getInfoLogger().log_stdout_f(fmt, __VA_ARGS__); } while (0);
 
 #define DFLOGWARN(fmt, ...) \
-  sim_log::Logger::getWarnLogger().log_stderr_f(fmt, __VA_ARGS__);
+  do { sim_log::Logger::getWarnLogger().log_stderr_f(fmt, __VA_ARGS__); } while (0);
 
 #define DFLOGERR(fmt, ...) \
-  sim_log::Logger::getErrorLogger().log_stderr_f(fmt, __VA_ARGS__);
+  do { sim_log::Logger::getErrorLogger().log_stderr_f(fmt, __VA_ARGS__); } while (0);
 
-#define DLOGINFLOG(l, tp) sim_log::Logger::getInfoLogger().log(l, tp);
+#define DLOGINFLOG(l, tp) \
+  do { sim_log::Logger::getInfoLogger().log(l, tp); } while (0);
 
-#define DLOGWARNLOG(l, tp) sim_log::Logger::getWarnLogger().log(l, tp);
+#define DLOGWARNLOG(l, tp) \
+  do { sim_log::Logger::getWarnLogger().log(l, tp); } while (0);
 
-#define DLOGERRLOG(l, tp) sim_log::Logger::getErrorLogger().log(l, tp);
+#define DLOGERRLOG(l, tp) \
+  do { sim_log::Logger::getErrorLogger().log(l, tp); } while (0);
 
-#define DLOGIN(tp) sim_log::Logger::getInfoLogger().log_stdout(tp);
+#define DLOGIN(tp) \
+  do { sim_log::Logger::getInfoLogger().log_stdout(tp); } while (0);
 
-#define DLOGWARN(tp) sim_log::Logger::getWarnLogger().log_stderr(tp);
+#define DLOGWARN(tp) \
+  do { sim_log::Logger::getWarnLogger().log_stderr(tp); } while (0);
 
-#define DLOGERR(tp) sim_log::Logger::getErrorLogger().log_stderr(tp);
+#define DLOGERR(tp) \
+  do { sim_log::Logger::getErrorLogger().log_stderr(tp); } while (0);
 
 #else
 

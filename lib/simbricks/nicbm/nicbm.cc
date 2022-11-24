@@ -23,7 +23,7 @@
  */
 
 #include "lib/simbricks/nicbm/nicbm.h"
-#include "lib/utils/cli/cxxopts.hpp"
+#include "lib/utils/cxxopts.hpp"
 #include "lib/utils/string_util.h"
 
 #include <fcntl.h>
@@ -738,7 +738,6 @@ int Runner::RunMain() {
   delete [] pcieParams_.sock_path;
   delete [] netParams_.sock_path;
   delete [] shmPath_;
-  delete [] log_;
 
   return 0;
 }

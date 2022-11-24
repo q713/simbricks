@@ -60,11 +60,9 @@ class Log {
 
   ~Log() {
     file_mutex_.lock();
-
     if (file_ != nullptr && target_ == StdTarget::to_file) {
       fclose(file_);
     }
-
     file_mutex_.unlock();
   }
 
@@ -98,12 +96,23 @@ class Log {
 
 class Logger {
  private:
-  const std::string &prefix_;
+  const char *prefix_;
 
- public:
-  Logger(const std::string &prefix) : prefix_(prefix) {
+  template <typename... Args>
+  inline void log_internal(FILE *out, const char *format, Args... args) {
+    fprintf(out, prefix_);
+    fprintf(out, format, args...);
   }
 
+  inline void log_internal(FILE *out, const char *to_print) {
+    fprintf(out, prefix_);
+    fprintf(out, "%s", to_print);
+  }
+
+  Logger(const char *prefix) : prefix_(prefix) {
+  }
+
+ public:
   static Logger &getInfoLogger() {
     static Logger logger("info: ");
     return logger;
@@ -120,45 +129,33 @@ class Logger {
   }
 
   template <typename... Args>
-  void log_internal(FILE *out, const char *format, Args... args) {
-    fprintf(out, "%s", prefix_.c_str());
-    fprintf(out, format, args...);
-  }
-
-  void log_internal(FILE *out, const char *to_print) {
-    fprintf(out, "%s", prefix_.c_str());
-    fprintf(out, "%s", to_print);
-  }
-
-  template <typename... Args>
-  void log_stdout_f(const char *format, const Args &...args) {
+  inline void log_stdout_f(const char *format, const Args &...args) {
     this->log_internal(stdout, format, args...);
   }
 
   template <typename... Args>
-  void log_stderr_f(const char *format, const Args &...args) {
+  inline void log_stderr_f(const char *format, const Args &...args) {
     this->log_internal(stderr, format, args...);
   }
 
-  void log_stdout(const char *to_print) {
+  inline void log_stdout(const char *to_print) {
     this->log_internal(stdout, to_print);
   }
 
-  void log_stderr(const char *to_print) {
+  inline void log_stderr(const char *to_print) {
     this->log_internal(stderr, to_print);
   }
 
   template <typename... Args>
   void log_f(log_upt &log, const char *format, const Args &...args) {
-    if (log == nullptr) {
-      this->log_stderr("log is null. it should not be!\n");
+    if (log->file_ == nullptr) {
+      this->log_stderr("log file is null. it should not be!\n");
       this->log_stderr_f(format, args...);
       return;
     }
 
-    std::lock_guard<std::mutex> guard(log->file_mutex_);
-
     if (log->target_ == StdTarget::to_file) {
+      std::lock_guard<std::mutex>(log->file_mutex_);
       this->log_internal(log->file_, format, args...);
     } else if (log->target_ == StdTarget::to_out) {
       this->log_stdout_f(format, args...);
@@ -168,15 +165,14 @@ class Logger {
   }
 
   void log(log_upt &log, const char *to_print) {
-    if (log == nullptr) {
-      this->log_stderr("trying to log into null log\n");
+    if (log->file_ == nullptr) {
+      this->log_stderr("log file is null. it should not be!\n");
       this->log_stderr(to_print);
       return;
     }
 
-    std::lock_guard<std::mutex> guard(log->file_mutex_);
-
     if (log->target_ == StdTarget::to_file) {
+      std::lock_guard<std::mutex>(log->file_mutex_);
       this->log_internal(log->file_, to_print);
     } else if (log->target_ == StdTarget::to_out) {
       this->log_stdout(to_print);

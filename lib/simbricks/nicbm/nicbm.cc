@@ -44,8 +44,8 @@ extern "C" {
 #include <simbricks/base/proto.h>
 }
 
-//#define DEBUG_NICBM 1
-//#define STAT_NICBM 1
+#define DEBUG_NICBM 1
+#define STAT_NICBM 1
 #define DMA_MAX_PENDING 64
 
 namespace nicbm {
@@ -615,16 +615,17 @@ int Runner::ParseArgs(int argc, char *argv[]) {
 
 #ifdef DEBUG_NICBM
     std::string log_file_path;
+    sim_log::log_upt log;
+
     if (result.count("log-file-path")) {
       // no copy needed, createLog will directly open the file and store the 'fd'
       log_file_path = result["log-file-path"].as<std::string>();
-      if (!sim_log::Log::initLog(log_, log_file_path.c_str())) {
-          fprintf(stderr, "could not initilize log\n");
-          return -1;
-      }
+      log_ = sim_log::Log::createLog(log_file_path.c_str());
     } else {
-      sim_log::Log::initLog(log_, sim_log::StdTarget::to_err);
+      log_ = sim_log::Log::createLog(sim_log::StdTarget::to_err);
     }
+#else
+  log_ = sim_log::Log::createLog(sim_log::StdTarget::to_err);
 #endif
 
   } catch (const cxxopts::exceptions::exception& e) {
@@ -656,7 +657,7 @@ int Runner::RunMain() {
 
   DFLOGINFLOG(log_, "mac_addr=%lx\n", mac_addr_);
   DFLOGINFLOG(log_, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
-
+  
   bool is_sync = sync_pcie || sync_net;
 
   while (!exiting) {

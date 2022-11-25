@@ -54,10 +54,6 @@ class Log {
   FILE *file_;
   StdTarget target_;
 
-  Log() : file_(stderr), target_(StdTarget::to_err) {
-    file_mutex_ = new std::mutex{};
-  }
-
   ~Log() {
     file_mutex_.lock();
     if (file_ != nullptr && target_ == StdTarget::to_file) {
@@ -80,13 +76,13 @@ class Log {
 
   static log_upt createLog(const char *file_path) {
     if (file_path == nullptr) {
-      fprintf(stderr, "error: file_path is null, fallback to stderr logging");
+      fprintf(stderr, "error: file_path is null, fallback to stderr logging\n");
       return sim_log::Log::createLog(sim_log::StdTarget::to_err);
     }
 
     FILE *file = fopen(file_path, "w");
     if (file == nullptr) {
-      fprintf(stderr, "error: cannot open file, fallback to stderr logging");
+      fprintf(stderr, "error: cannot open file, fallback to stderr logging\n");
       return sim_log::Log::createLog(sim_log::StdTarget::to_err);
     }
 

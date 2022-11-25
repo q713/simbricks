@@ -191,7 +191,7 @@ void Runner::DmaDo(DMAOp &op) {
     int d;
     DFLOGINFLOG(log_, "main_time = %lu: nicbm: dma write data: \n", main_time_);
     for (d = 0; d < op.len_; d++) {
-      printf("%02X ", *tmp);
+      DFLOGINFLOG(log_, "%02X ", *tmp);
       tmp++;
     }
 #endif

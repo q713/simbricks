@@ -34,6 +34,7 @@
 extern "C" {
 #include <simbricks/nicif/nicif.h>
 }
+#include "lib/utils/log.h"
 
 namespace nicbm {
 
@@ -137,6 +138,8 @@ class Runner {
   struct SimbricksNicIf nicif_;
   struct SimbricksProtoPcieDevIntro dintro_;
 
+  sim_log::log_upt log_;
+
   volatile union SimbricksProtoPcieD2H *D2HAlloc();
   volatile union SimbricksProtoNetMsg *D2NAlloc();
 
@@ -180,6 +183,10 @@ class Runner {
 
   uint64_t TimePs() const;
   uint64_t GetMacAddr() const;
+
+  sim_log::log_upt &getLog() {
+    return log_;
+  }
 };
 
 /**

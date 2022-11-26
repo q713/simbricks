@@ -148,5 +148,7 @@ int main(int argc, char *argv[]) {
         ("__tpstrtab_thermal_apic_exit")
         ("__tpstrtab_thermal_apic_entry");
 
+    syms_filter.load_file(linux_dump);
+
     return 0;
 }

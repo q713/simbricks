@@ -38,6 +38,7 @@ experiments/slurm
 dist/rdma/net_rdma
 dist/sockets/net_sockets
 trace/process
+trace/trace
 mk/local.mk
 .eggs
 .vscode

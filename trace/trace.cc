@@ -27,6 +27,7 @@ class SymsFilter {
             std::stringstream address_stream;
             while(line.length() != 0) {
                 char letter = line.front();
+                DFLOGIN("found next character: %c\n", letter);
                 if (!std::isdigit(letter) || !std::isalpha(letter)) {
                     break;
                 }
@@ -37,7 +38,7 @@ class SymsFilter {
             std::string address_string = address_stream.str();
             DFLOGIN("address string: %s\n", address_string.c_str());
             if (address_string.length() != 16) {
-                DFLOGERR("address string is larger than 16, it has length %d\n", address_string.length());
+                DFLOGERR("address has not length 16, it has length %d\n", address_string.length());
                 return std::nullopt;
             }
 
@@ -90,10 +91,11 @@ class SymsFilter {
                 // trim space left and right
                 sim_string_utils::trim(line);
 
+                DFLOGIN("found line: %s\n", line.c_str());
                 // parse address
                 addressopt_t address_opt = parse_address(line);
                 if (!address_opt.has_value()) {
-                    DLOGERR("could not parse address");
+                    DLOGERR("could not parse address\n");
                     return false;
                 }
                 //address_t address = address_opt.value();

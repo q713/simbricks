@@ -28,7 +28,6 @@ using nameopt_t = std::optional<name_t>;
 class SymsFilter {
  private:
   std::set<name_t> symbol_filter_;
-  std::map<address_t, name_t> symbol_table_;
 
   std::optional<address_t> parse_address(std::string &line) {
     static std::function<bool(unsigned char)> is_address = [] (unsigned char c) {
@@ -104,6 +103,8 @@ class SymsFilter {
  public:
   SymsFilter() = default;
 
+// TODO: make private again!!!
+  std::map<address_t, name_t> symbol_table_;
   /*
    * Builder function to add symbols to the symbol filter.
    * After parsing the symbol table, only those symbols are included
@@ -209,6 +210,10 @@ int main(int argc, char *argv[]) {
   if (!syms_filter.load_file(linux_dump)) {
     DFLOGERR("could not load file with path '%s'\n", linux_dump);
     return EXIT_FAILURE;
+  }
+
+  for (auto it = syms_filter.symbol_table_.begin(); it != syms_filter.symbol_table_.end(); it++) {
+    std::cout << "[" << it->first << "]" << " = " << it->second << std::endl;
   }
 
   return 0;

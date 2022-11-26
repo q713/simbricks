@@ -28,6 +28,7 @@
 #include <algorithm>
 #include <functional>
 #include <string>
+#include <sstream>
 
 namespace sim_string_utils {
 
@@ -58,8 +59,8 @@ bool copy_and_assign_terminate(const char *&target,
   return false;
 }
 
-std::function<bool(unsigned char)> is_not_space = [](unsigned char c) {
-  return !std::isspace(c);
+static std::function<bool(unsigned char)> is_space = [] (unsigned char c) {
+  return std::isspace(c);
 };
 
 /*
@@ -67,8 +68,9 @@ std::function<bool(unsigned char)> is_not_space = [](unsigned char c) {
  * of a string.
  */
 inline void trimL(std::string &to_trim) {
-  to_trim.erase(to_trim.begin(),
-                std::find_if(to_trim.begin(), to_trim.end(), is_not_space));
+  auto till = std::find_if_not(to_trim.begin(), to_trim.end(), is_space);
+  if (till != to_trim.end())
+    to_trim.erase(to_trim.begin(), till);
 }
 
 /*
@@ -76,9 +78,9 @@ inline void trimL(std::string &to_trim) {
  * of a string.
  */
 inline void trimR(std::string &to_trim) {
-  to_trim.erase(
-      std::find_if(to_trim.rbegin(), to_trim.rend(), is_not_space).base(),
-      to_trim.end());
+  auto from = std::find_if_not(to_trim.rbegin(), to_trim.rend(), is_space).base(); 
+  if (from != to_trim.end())
+    to_trim.erase(from, to_trim.end());
 }
 
 /*
@@ -89,6 +91,30 @@ inline void trimR(std::string &to_trim) {
 inline void trim(std::string &to_trim) {
   trimL(to_trim);
   trimR(to_trim);
+}
+
+/*
+ * Trim all non whitespaces from left to the first whitespace character 
+ * of a string.
+ */
+inline void trimTillWhitespace(std::string &to_trim) {
+  auto till = std::find_if(to_trim.begin(), to_trim.end(), is_space);
+  if (till != to_trim.end())
+    to_trim.erase(to_trim.begin(), till);
+}
+
+inline std::string extract_and_substr_until(std::string &extract_from, std::function<bool (unsigned char)> &predicate) {
+  std::stringstream extract_builder;
+  while (extract_from.length() != 0)
+  {
+    unsigned char letter = extract_from[0];
+    if (!predicate(letter)) {
+      break;
+    }
+    extract_builder << letter;
+    extract_from = extract_from.substr(1);
+  }
+  return extract_builder.str();
 }
 
 }  // namespace sim_string_utils

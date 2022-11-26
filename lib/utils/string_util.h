@@ -25,36 +25,72 @@
 #ifndef SIMBRICKS_STRING_UTILS_H_
 #define SIMBRICKS_STRING_UTILS_H_
 
+#include <algorithm>
+#include <functional>
 #include <string>
 
 namespace sim_string_utils {
 
 /*
- * This function will copy the the contents of 
- * to_copy into target. For that it will allocate memory 
+ * This function will copy the the contents of
+ * to_copy into target. For that it will allocate memory
  * on the heap and assign target to that location and
  * afterwards copy the contents of to:copy to that memory region.
- * 
+ *
  * Note: the caller must ensre freeing the for target allocated memory.
  */
-bool copy_and_assign_terminate(const char *&target, const std::string &to_copy) {
-    std::size_t length = to_copy.length();
-    char *tmp = new char[length + 1];
-    if (tmp == nullptr)
-        return false;
-
-    if (to_copy.copy(tmp, length)) {
-        if (tmp[length] != '\0') {
-            tmp[length] = '\0';
-        }
-        target = tmp;
-        return true;
-    }
-
-    delete [] tmp;
+bool copy_and_assign_terminate(const char *&target,
+                               const std::string &to_copy) {
+  std::size_t length = to_copy.length();
+  char *tmp = new char[length + 1];
+  if (tmp == nullptr)
     return false;
+
+  if (to_copy.copy(tmp, length)) {
+    if (tmp[length] != '\0') {
+      tmp[length] = '\0';
+    }
+    target = tmp;
+    return true;
+  }
+
+  delete[] tmp;
+  return false;
 }
 
-} // namespace sim_string_utils
+std::function<bool(unsigned char)> is_not_space = [](unsigned char c) {
+  return !std::isspace(c);
+};
 
-#endif // SIMBRICKS_STRING_UTILS_H_
+/*
+ * Trim all whitespaces from left to the first non whitespace character
+ * of a string.
+ */
+inline void trimL(std::string &to_trim) {
+  to_trim.erase(to_trim.begin(),
+                std::find_if(to_trim.begin(), to_trim.end(), is_not_space));
+}
+
+/*
+ * Trim all whitespaces from right to the first non whitespace character 
+ * of a string.
+ */
+inline void trimR(std::string &to_trim) {
+  to_trim.erase(
+      std::find_if(to_trim.rbegin(), to_trim.rend(), is_not_space).base(),
+      to_trim.end());
+}
+
+/*
+ * Trim all whitespaces from left to the first non whitespace character 
+ * of a string and then trim all whitespaces from right to the first non
+ * whitespace character of a string.
+ */
+inline void trim(std::string &to_trim) {
+  trimL(to_trim);
+  trimR(to_trim);
+}
+
+}  // namespace sim_string_utils
+
+#endif  // SIMBRICKS_STRING_UTILS_H_

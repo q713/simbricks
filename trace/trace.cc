@@ -88,13 +88,13 @@ class SymsFilter {
   bool add_to_sym_table(address_t address, const name_t &name) {
     auto in_set = symbol_filter_.find(name);
     if (in_set == symbol_filter_.end()) {
-        DFLOGIN("filter out symbol with name '%s'", name.c_str());
+        DFLOGIN("filter out symbol with name '%s'\n", name.c_str());
         return false;
     }
     
     auto pair = symbol_table_.try_emplace(address, name);
     if (!pair.second) {
-        DFLOGWARN("could not insert new symbol table value at address '%u'", address);
+        DFLOGWARN("could not insert new symbol table value at address '%u'\n", address);
         return false;
     }
 
@@ -162,7 +162,7 @@ class SymsFilter {
       name_t name = name_opt.value();
 
       if (!add_to_sym_table(address, name)) {
-        DFLOGWARN("could not insert new val '[%u] = %s' into sym table", address, name);
+        DFLOGWARN("could not insert new val '[%u] = %s' into sym table\n", address, name);
       }
     }
 
@@ -207,7 +207,7 @@ int main(int argc, char *argv[]) {
       "__tpstrtab_thermal_apic_exit")("__tpstrtab_thermal_apic_entry");
 
   if (!syms_filter.load_file(linux_dump)) {
-    DFLOGERR("could not load file with path '%s'", linux_dump);
+    DFLOGERR("could not load file with path '%s'\n", linux_dump);
     return EXIT_FAILURE;
   }
 

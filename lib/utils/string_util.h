@@ -63,6 +63,10 @@ static std::function<bool(unsigned char)> is_space = [] (unsigned char c) {
   return std::isspace(c);
 };
 
+static std::function<bool(unsigned char)> is_alnum = [] (unsigned char c) {
+        return std::isalnum(c) != 0;
+};
+
 /*
  * Trim all whitespaces from left to the first non whitespace character
  * of a string.
@@ -115,6 +119,28 @@ inline std::string extract_and_substr_until(std::string &extract_from, std::func
     extract_from = extract_from.substr(1);
   }
   return extract_builder.str();
+}
+
+bool consume_and_trim_string(std::string &find_and_trim, const std::string &to_consume) {
+  auto res = find_and_trim.find(to_consume);
+  if (res != 0 || res == std::string::npos) {
+    return false;
+  }
+  auto begin = find_and_trim.begin();
+  find_and_trim.erase(begin, begin + to_consume.length());
+  return true;
+}
+
+bool consume_and_trim_char(std::string &find_and_trim, const char to_consume) {
+  if (find_and_trim.empty()) {
+    return false;
+  }
+  unsigned char letter = find_and_trim[0];
+  if (letter != to_consume)
+    return false;
+  
+  find_and_trim.erase(0, 1);
+  return true;
 }
 
 }  // namespace sim_string_utils

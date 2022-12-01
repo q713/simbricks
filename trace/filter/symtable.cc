@@ -56,7 +56,7 @@ symtable::addressopt_t symtable::SymsFilter::parse_address(std::string &line) {
 
 symtable::nameopt_t symtable::SymsFilter::parse_name(std::string &line) {
   static std::function<bool(unsigned char)> is_part_name = [](unsigned char c) {
-    return std::isalnum(c) || c == '_';
+    return std::isalnum(c) || c == '_' || c == '.';
   };
 
   sim_string_utils::trimL(line);
@@ -187,7 +187,7 @@ bool symtable::SSyms::load_file(const std::string &file_path) {
   std::string label = "";
   for (std::string line; reader.get_next_line(line, true);) {
 #ifdef SYMS_DEBUG_
-    DFLOGIN("%s: found line: %s\n", line.c_str());
+    DFLOGIN("%s: found line: %s\n", identifier_.c_str(), line.c_str());
 #endif
     sim_string_utils::trim(line);
 
@@ -236,7 +236,7 @@ bool symtable::SSyms::load_file(const std::string &file_path) {
     if (!add_to_sym_table(address, label)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table\n",
-                identifier_.c_str(), address, label);
+                identifier_.c_str(), address, label.c_str());
 #endif
     }
   }

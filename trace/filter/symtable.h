@@ -46,7 +46,7 @@ using nameopt_t = std::optional<name_t>;
 
 class SymsFilter {
  protected:
-  const std::string &identifier_;
+  const std::string identifier_;
   std::set<name_t> symbol_filter_;
 
   addressopt_t parse_address(std::string &line);
@@ -56,7 +56,7 @@ class SymsFilter {
   bool add_to_sym_table(address_t address, const name_t &name);
 
  public:
-  SymsFilter(const std::string &identifier) : identifier_(identifier){};
+  SymsFilter(const std::string identifier) : identifier_(identifier){};
 
   // TODO: make private again!!!
   std::map<address_t, name_t> symbol_table_;
@@ -105,7 +105,7 @@ class SymsSyms : public SymsFilter {
   void skip_alignment(std::string &line);
 
  public:
-  SymsSyms(const std::string &identifier) : SymsFilter(identifier) {
+  SymsSyms(const std::string identifier) : SymsFilter(identifier) {
   }
 
   bool load_file(const std::string &file_path) override;
@@ -113,7 +113,7 @@ class SymsSyms : public SymsFilter {
 
 class SSyms : public SymsFilter {
  public:
-  SSyms(const std::string &identifier) : SymsFilter(identifier) {
+  SSyms(const std::string identifier) : SymsFilter(identifier) {
   }
 
   bool load_file(const std::string &file_path) override;

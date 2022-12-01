@@ -53,6 +53,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  /*
   symtable::SymsSyms syms_filter{"SymbolTableFilter"};
   syms_filter("__tpstrtab_vector_free_moved")
     ("__tpstrtab_vector_setup")
@@ -68,6 +69,15 @@ int main(int argc, char *argv[]) {
     ("__tpstrtab_vector_config")
     ("__tpstrtab_thermal_apic_exit")
     ("__tpstrtab_thermal_apic_entry");
+    */
+
+   symtable::SSyms syms_filter{"SymbolTableFilter"};
+   syms_filter("_stext")
+    ("secondary_startup_64")
+    ("perf_trace_initcall_level")
+    ("perf_trace_initcall_start")
+    ("perf_trace_initcall_finish")
+  ;
 
   if (!syms_filter.load_file(linux_dump)) {
     DFLOGERR("could not load file with path '%s'\n", linux_dump);

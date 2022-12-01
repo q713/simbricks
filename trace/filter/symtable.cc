@@ -122,7 +122,7 @@ void symtable::SymsSyms::skip_alignment(std::string &line) {
 }
 
 bool symtable::SymsSyms::load_file(const std::string &file_path) {
-  LineReader reader(file_path);
+  reader::LineReader reader = reader::LineReader::create(file_path);
 
   if (!reader.is_valid()) {
 #ifdef SYMS_DEBUG_
@@ -174,7 +174,7 @@ bool symtable::SymsSyms::load_file(const std::string &file_path) {
 }
 
 bool symtable::SSyms::load_file(const std::string &file_path) {
-  LineReader reader(file_path);
+  reader::LineReader reader = reader::LineReader::create(file_path);
 
   if (!reader.is_valid()) {
 #ifdef SYMS_DEBUG_

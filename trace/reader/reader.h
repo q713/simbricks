@@ -25,53 +25,95 @@
 #ifndef SIMBRICKS_READER_H_
 #define SIMBRICKS_READER_H_
 
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 #include <fstream>
+#include <iostream>
 
 #include "lib/utils/log.h"
 
-class LineReader { // TODO: add support for gz files
+namespace reader {
+class LineReader {
   const std::string &file_path_;
-  std::ifstream input_stream_;
+  std::istream *input_stream_;
   int line_number_ = 0;
 
-  public:
-    LineReader(const std::string &file_path) : file_path_(file_path), 
-      input_stream_(std::ifstream(file_path, std::ios_base::in | std::ios_base::binary)) {}
+  /* for gz files */
+  std::ifstream *gz_file_;
+  boost::iostreams::filtering_istreambuf *gz_is_buf_;
 
-    ~LineReader() {
-      input_stream_.close();
+  explicit LineReader(const std::string &file_path, std::istream *input_stream)
+      : file_path_(file_path), input_stream_(input_stream) {
+  }
+
+  explicit LineReader(const std::string &file_path, std::istream *input_stream,
+                      std::ifstream *gz_file,
+                      boost::iostreams::filtering_istreambuf *gz_is_buf)
+      : file_path_(file_path),
+        input_stream_(input_stream),
+        gz_file_(gz_file),
+        gz_is_buf_(gz_is_buf) {
+  }
+
+ public:
+  ~LineReader() {
+    delete input_stream_;
+    if (gz_file_ != nullptr)
+      delete gz_file_;
+
+    if (gz_is_buf_ != nullptr)
+      delete gz_is_buf_;
+  }
+
+  inline static LineReader create(const std::string &file_path) {
+    std::istream *i_stream =
+        new std::ifstream(file_path, std::ios_base::in | std::ios_base::binary);
+    return LineReader(file_path, i_stream);
+  }
+
+  inline static LineReader create_gz(const std::string &file_path) {
+    std::ifstream *gz_file =
+        new std::ifstream(file_path, std::ios_base::in | std::ios_base::binary);
+    boost::iostreams::filtering_streambuf<boost::iostreams::input> *gz_in =
+        new boost::iostreams::filtering_streambuf<boost::iostreams::input>();
+    gz_in->push(boost::iostreams::gzip_decompressor());
+    gz_in->push(*gz_file);
+    std::istream *i_stream = new std::istream(gz_in);
+    return LineReader(file_path, i_stream, gz_file, gz_in);
+  }
+
+  int ln() {
+    return line_number_;
+  }
+
+  bool is_valid() {
+    return input_stream_->good();
+  }
+
+  bool get_next_line(std::string &target, bool skip_empty_line) {
+    if (!is_valid()) {
+      DFLOGERR("could not open file '%s'", file_path_);
+      return false;
     }
 
-    int ln() {
-      return line_number_;
-    }
-
-    bool is_valid() {
-      return input_stream_.is_open();
-    }
-
-    bool get_next_line(std::string &target, bool skip_empty_line) {
-      if (!is_valid()) {
-        DFLOGERR("could not open file '%s'", file_path_);
+    while (true) {
+      if (!std::getline(*input_stream_, target)) {
+        DLOGIN("reached end of file");
         return false;
       }
+      line_number_++;
 
-      while (true) {
-        if (!std::getline(input_stream_, target)) {
-          DLOGIN("reached end of file");
-          return false;
-        }
-        line_number_++;
-
-        if (skip_empty_line && target.empty()) {
-          continue;
-        }
-
-        break;
+      if (skip_empty_line && target.empty()) {
+        continue;
       }
-      
-      return true;
+
+      break;
     }
+
+    return true;
+  }
 };
 
-#endif // SIMBRICKS_READER_H_
+}  // namespace reader
+
+#endif  // SIMBRICKS_READER_H_

@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  for (auto it = syms_filter.symbol_table_.begin(); it != syms_filter.symbol_table_.end(); it++) {
+  for (auto it = syms_filter.get_sym_table().begin(); it != syms_filter.get_sym_table().end(); it++) {
     std::cout << "[" << it->first << "]" << " = " << it->second << std::endl;
   }
 

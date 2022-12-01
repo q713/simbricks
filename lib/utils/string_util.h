@@ -107,7 +107,7 @@ inline void trimTillWhitespace(std::string &to_trim) {
     to_trim.erase(to_trim.begin(), till);
 }
 
-inline std::string extract_and_substr_until(std::string &extract_from, std::function<bool (unsigned char)> &predicate) {
+std::string extract_and_substr_until(std::string &extract_from, std::function<bool (unsigned char)> &predicate) {
   std::stringstream extract_builder;
   while (extract_from.length() != 0)
   {

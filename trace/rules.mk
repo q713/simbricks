@@ -28,7 +28,7 @@ $(bin_trace_process): $(OBJS) -lboost_iostreams -lboost_coroutine \
 	-lboost_context
 
 bin_trace := $(d)trace
-OBJS_TRACE := $(addprefix $(d), trace.o)
+OBJS_TRACE := $(addprefix $(d), trace.o filter/symtable.o)
 $(bin_trace): $(OBJS_TRACE) -lboost_coroutine
 
 CLEAN := $(bin_trace_process) $(OBJS) $(bin_trace) $(OBJS_TRACE)

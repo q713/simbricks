@@ -27,19 +27,16 @@
 
 #pragma once
 
-#define SYMS_DEBUG_
+#define SYMS_DEBUG_ 1
 
-#include <algorithm>
-#include <climits>
-#include <fstream>
 #include <map>
 #include <optional>
 #include <set>
-#include <sstream>
+#include <string>
 
 #include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
-#include "trace/reader/reader.h"
+
+namespace symtable {
 
 using filter_ret_t = std::optional<std::string>;
 using address_t = uint64_t;
@@ -49,103 +46,43 @@ using nameopt_t = std::optional<name_t>;
 
 class SymsFilter {
  protected:
+  const std::string &identifier_;
   std::set<name_t> symbol_filter_;
 
-  std::optional<address_t> parse_address(std::string &line) {
-    std::string address_string = sim_string_utils::extract_and_substr_until(
-        line, sim_string_utils::is_alnum);
-    if (address_string.length() != 16) {
-#ifdef SYMS_DEBUG_
-      DFLOGERR("address has not length 16, it has length %d\n",
-               address_string.length());
-#endif
-      return std::nullopt;
-    }
+  addressopt_t parse_address(std::string &line);
 
-    char *end;
-    address_t address = std::strtoull(address_string.c_str(), &end, 16);
-    if (address == ULLONG_MAX) {
-#ifdef SYMS_DEBUG_
-      DFLOGERR("Could not parse address out of hex representation '%s'\n",
-               address_string.c_str());
-#endif
-      return std::nullopt;
-    }
+  nameopt_t parse_name(std::string &line);
 
-    return address;
-  }
-
-  nameopt_t parse_name(std::string &line) {
-    static std::function<bool(unsigned char)> is_part_name =
-        [](unsigned char c) { return std::isalnum(c) || c == '_'; };
-
-    sim_string_utils::trimL(line);
-    std::string name =
-        sim_string_utils::extract_and_substr_until(line, is_part_name);
-
-    if (name.empty()) {
-#ifdef SYMS_DEBUG_
-      DLOGERR("could not parse non empty name\n");
-#endif
-      return std::nullopt;
-    }
-
-    return name;
-  }
-
-  bool add_to_sym_table(address_t address, const name_t &name) {
-    auto in_set = symbol_filter_.find(name);
-    if (in_set == symbol_filter_.end()) {
-#ifdef SYMS_DEBUG_
-      DFLOGIN("filter out symbol with name '%s'\n", name.c_str());
-#endif
-      return false;
-    }
-
-    auto pair = symbol_table_.try_emplace(address, name);
-    if (!pair.second) {
-#ifdef SYMS_DEBUG_
-      DFLOGWARN("could not insert new symbol table value at address '%u'\n",
-                address);
-#endif
-      return false;
-    }
-
-    return true;
-  }
+  bool add_to_sym_table(address_t address, const name_t &name);
 
  public:
-  SymsFilter() = default;
+  SymsFilter(const std::string &identifier) : identifier_(identifier){};
 
   // TODO: make private again!!!
   std::map<address_t, name_t> symbol_table_;
+
   /*
    * Builder function to add symbols to the symbol filter.
    * After parsing the symbol table, only those symbols are included
-   * in the resulting symbol table.
+   * in the resulting symbol table that is used to translate addresses
+   * into symbols. That way this translation also acts as a filter.
    */
   inline SymsFilter &operator()(const name_t &symbol) {
     auto res = symbol_filter_.insert(symbol);
     if (!res.second) {
 #ifdef SYMS_DEBUG_
-      DFLOGWARN("could no insert '%s' into symbol map\n", symbol.c_str());
+      DFLOGWARN("%s: could no insert '%s' into symbol map\n",
+                identifier_.c_str(), symbol.c_str());
 #endif
     }
     return *this;
   }
 
   /*
-   * Filter function for later usage in parser. 
+   * Filter function for later usage in parser.
    * Get in address and receive label for address.
    */
-  filter_ret_t filter(uint64_t address) {
-    auto symbol = symbol_table_.find(address);
-    if (symbol != symbol_table_.end()) {
-      filter_ret_t(symbol->second);
-    }
-
-    return std::nullopt;
-  }
+  filter_ret_t filter(uint64_t address);
 
   virtual bool load_file(const std::string &file_path) = 0;
 };
@@ -160,189 +97,28 @@ class SymsFilter {
  * form.
  */
 class SymsSyms : public SymsFilter {
-  void skip_fags(std::string &line) {
-    sim_string_utils::trimL(line);
-    // flags are devided into 7 groups
-    line = line.substr(7);
-  }
+ protected:
+  void skip_fags(std::string &line);
 
-  void skip_section(std::string &line) {
-    sim_string_utils::trimL(line);
-    sim_string_utils::trimTillWhitespace(line);
-  }
+  void skip_section(std::string &line);
 
-  void skip_alignment(std::string &line) {
-    sim_string_utils::trimL(line);
-    sim_string_utils::trimTillWhitespace(line);
-  }
+  void skip_alignment(std::string &line);
 
  public:
-  SymsSyms() : SymsFilter() {
+  SymsSyms(const std::string &identifier) : SymsFilter(identifier) {
   }
 
-  bool load_file(const std::string &file_path) override {
-    LineReader reader(file_path);
-
-    if (!reader.is_valid()) {
-#ifdef SYMS_DEBUG_
-      DFLOGERR("could not open file with path '%s'\n", file_path.c_str());
-#endif
-      return false;
-    }
-
-    for (std::string line; reader.get_next_line(line, true);) {
-      DFLOGIN("found line: %s\n", line.c_str());
-      sim_string_utils::trim(line);
-
-      // parse address
-      addressopt_t address_opt = parse_address(line);
-      if (!address_opt.has_value()) {
-#ifdef SYMS_DEBUG_
-        DFLOGWARN("could not parse address from line with number: %d\n",
-                  reader.ln());
-#endif
-        continue;
-      }
-      address_t address = address_opt.value();
-
-      // skip yet uninteresting values of ELF format
-      skip_fags(line);
-      skip_section(line);
-      skip_alignment(line);
-
-      // parse name
-      nameopt_t name_opt = parse_name(line);
-      if (!name_opt.has_value()) {
-#ifdef SYMS_DEBUG_
-        DFLOGWARN("could not parse name from line with number: %d\n",
-                  reader.ln());
-#endif
-        continue;
-      }
-      name_t name = name_opt.value();
-
-      if (!add_to_sym_table(address, name)) {
-#ifdef SYMS_DEBUG_
-        DFLOGWARN("could not insert new val '[%u] = %s' into sym table\n",
-                  address, name);
-#endif
-      }
-    }
-    return true;
-  }
-
-  /*
-  std::ifstream infile(file_path, std::ios_base::in | std::ios_base::binary);
-  if (!infile.is_open()) {
-    DFLOGERR("could not open file with path '%s'\n", file_path.c_str());
-    return false;
-  }
-
-  int line_number = 0;
-  for (std::string line; std::getline(infile, line); line_number++) {
-    DFLOGIN("found line: %s\n", line.c_str());
-    sim_string_utils::trim(line);
-
-    // parse address
-    addressopt_t address_opt = parse_address(line);
-    if (!address_opt.has_value()) {
-      DFLOGWARN("could not parse address from line with number: %d\n",
-                line_number);
-      continue;
-    }
-    address_t address = address_opt.value();
-
-    // skip yet uninteresting values of ELF format
-    skip_fags(line);
-    skip_section(line);
-    skip_alignment(line);
-
-    // parse name
-    nameopt_t name_opt = parse_name(line);
-    if (!name_opt.has_value()) {
-      DFLOGWARN("could not parse name from line with number: %d\n",
-                line_number);
-      continue;
-    }
-    name_t name = name_opt.value();
-
-    if (!add_to_sym_table(address, name)) {
-      DFLOGWARN("could not insert new val '[%u] = %s' into sym table\n",
-  address, name);
-    }
-  }
-  */
+  bool load_file(const std::string &file_path) override;
 };
 
 class SSyms : public SymsFilter {
  public:
-  SSyms() : SymsFilter() {
+  SSyms(const std::string &identifier) : SymsFilter(identifier) {
   }
 
-  bool load_file(const std::string &file_path) override {
-    LineReader reader(file_path);
-
-    if (!reader.is_valid()) {
-#ifdef SYMS_DEBUG_
-      DFLOGERR("could not open file with path '%s'\n", file_path.c_str());
-#endif
-      return false;
-    }
-
-    std::string label = "";
-    for (std::string line; reader.get_next_line(line, true);) {
-#ifdef SYMS_DEBUG_
-      DFLOGIN("found line: %s\n", line.c_str());
-#endif
-      sim_string_utils::trim(line);
-
-      // parse address
-      addressopt_t address_opt = parse_address(line);
-      if (!address_opt.has_value()) {
-#ifdef SYMS_DEBUG_
-        DFLOGWARN("could not parse address from line with number: %d\n",
-                  reader.ln());
-#endif
-        continue;
-      }
-      address_t address = address_opt.value();
-
-      if (sim_string_utils::consume_and_trim_string(line, " <")) {
-        nameopt_t label_opt = parse_name(line);
-        if (label_opt.has_value()) {
-          if (!sim_string_utils::consume_and_trim_char(line, '>')) {
-            #ifdef SYMS_DEBUG_
-              DFLOGERR("could not parse label from line %d, unexpected format\n", reader.ln());
-            #endif
-            return false;
-          }
-          label = label_opt.value();
-        } else {
-#ifdef SYMS_DEBUG_
-          DFLOGERR("could not parse label from line %d\n", reader.ln());
-#endif
-          return false;
-        }
-      } else {
-        if (!sim_string_utils::consume_and_trim_char(line, ':')) {
-          label = "";
-#ifdef SYMS_DEBUG_
-        DFLOGWARN("could neiter parse label nor body addresses from line %d\n",
-                  reader.ln());
-#endif
-        continue;
-        }  
-      }
-
-      if (!add_to_sym_table(address, label)) {
-#ifdef SYMS_DEBUG_
-        DFLOGWARN("could not insert new val '[%u] = %s' into sym table\n",
-                  address, label);
-#endif
-      }
-    }
-    return true;
-  }
+  bool load_file(const std::string &file_path) override;
 };
+
+}  // namespace symtable
 
 #endif  // SIMBRICKS_TRACE_SYMS_H_

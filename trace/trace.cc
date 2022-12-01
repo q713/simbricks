@@ -1,14 +1,29 @@
-#include <algorithm>
-#include <climits>
-#include <fstream>
-#include <map>
-#include <optional>
-#include <set>
-#include <sstream>
+/*
+ * Copyright 2022 Max Planck Institute for Software Systems, and
+ * National University of Singapore
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining
+ * a copy of this software and associated documentation files (the
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
+ * distribute, sublicense, and/or sell copies of the Software, and to
+ * permit persons to whom the Software is furnished to do so, subject to
+ * the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+ * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+ * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+ * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
 
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
 #include "trace/filter/symtable.h"
 
 int main(int argc, char *argv[]) {
@@ -25,20 +40,20 @@ int main(int argc, char *argv[]) {
 
     if (result.count("help")) {
       printf("%s", options.help().c_str());
-      return EXIT_SUCCESS;
+      exit(EXIT_SUCCESS);
     }
 
     if (!result.count("linux-dump")) {
       DLOGERR("could not parse option 'linux-dump'\n");
-      return EXIT_FAILURE;
+      exit(EXIT_FAILURE);
     }
 
   } catch (cxxopts::exceptions::exception &e) {
     DFLOGERR("Could not parse cli options: %s\n", e.what());
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
-  SymsSyms syms_filter = SymsSyms{};
+  symtable::SymsSyms syms_filter{"SymbolTableFilter"};
   syms_filter("__tpstrtab_vector_free_moved")
     ("__tpstrtab_vector_setup")
     ("__tpstrtab_vector_teardown")
@@ -56,7 +71,7 @@ int main(int argc, char *argv[]) {
 
   if (!syms_filter.load_file(linux_dump)) {
     DFLOGERR("could not load file with path '%s'\n", linux_dump);
-    return EXIT_FAILURE;
+    exit(EXIT_FAILURE);
   }
 
   for (auto it = syms_filter.symbol_table_.begin(); it != syms_filter.symbol_table_.end(); it++) {
@@ -72,5 +87,6 @@ int main(int argc, char *argv[]) {
   //6) how should events look like?
   //7)add identifiers to know sources
   //8) try trace?  
-  return 0;
+
+  exit(EXIT_SUCCESS);
 }

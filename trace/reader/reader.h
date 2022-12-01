@@ -25,8 +25,6 @@
 #ifndef SIMBRICKS_READER_H_
 #define SIMBRICKS_READER_H_
 
-#pragma once
-
 #include <fstream>
 
 #include "lib/utils/log.h"

@@ -27,8 +27,9 @@
 
 #include <algorithm>
 #include <functional>
-#include <string>
 #include <sstream>
+#include <string>
+#include <climits>
 
 namespace sim_string_utils {
 
@@ -40,8 +41,8 @@ namespace sim_string_utils {
  *
  * Note: the caller must ensre freeing the for target allocated memory.
  */
-bool copy_and_assign_terminate(const char *&target,
-                               const std::string &to_copy) {
+inline bool copy_and_assign_terminate(const char *&target,
+                                      const std::string &to_copy) {
   std::size_t length = to_copy.length();
   char *tmp = new char[length + 1];
   if (tmp == nullptr)
@@ -59,12 +60,16 @@ bool copy_and_assign_terminate(const char *&target,
   return false;
 }
 
-static std::function<bool(unsigned char)> is_space = [] (unsigned char c) {
+static std::function<bool(unsigned char)> is_space = [](unsigned char c) {
   return std::isspace(c);
 };
 
-static std::function<bool(unsigned char)> is_alnum = [] (unsigned char c) {
-        return std::isalnum(c) != 0;
+static std::function<bool(unsigned char)> is_alnum = [](unsigned char c) {
+  return std::isalnum(c) != 0;
+};
+
+static std::function<bool(unsigned char)> is_num = [](unsigned char c) {
+  return std::isdigit(c);
 };
 
 /*
@@ -78,17 +83,18 @@ inline void trimL(std::string &to_trim) {
 }
 
 /*
- * Trim all whitespaces from right to the first non whitespace character 
+ * Trim all whitespaces from right to the first non whitespace character
  * of a string.
  */
 inline void trimR(std::string &to_trim) {
-  auto from = std::find_if_not(to_trim.rbegin(), to_trim.rend(), is_space).base(); 
+  auto from =
+      std::find_if_not(to_trim.rbegin(), to_trim.rend(), is_space).base();
   if (from != to_trim.end())
     to_trim.erase(from, to_trim.end());
 }
 
 /*
- * Trim all whitespaces from left to the first non whitespace character 
+ * Trim all whitespaces from left to the first non whitespace character
  * of a string and then trim all whitespaces from right to the first non
  * whitespace character of a string.
  */
@@ -98,7 +104,7 @@ inline void trim(std::string &to_trim) {
 }
 
 /*
- * Trim all non whitespaces from left to the first whitespace character 
+ * Trim all non whitespaces from left to the first whitespace character
  * of a string.
  */
 inline void trimTillWhitespace(std::string &to_trim) {
@@ -107,10 +113,10 @@ inline void trimTillWhitespace(std::string &to_trim) {
     to_trim.erase(to_trim.begin(), till);
 }
 
-std::string extract_and_substr_until(std::string &extract_from, std::function<bool (unsigned char)> &predicate) {
+inline std::string extract_and_substr_until(
+    std::string &extract_from, std::function<bool(unsigned char)> &predicate) {
   std::stringstream extract_builder;
-  while (extract_from.length() != 0)
-  {
+  while (extract_from.length() != 0) {
     unsigned char letter = extract_from[0];
     if (!predicate(letter)) {
       break;
@@ -121,25 +127,60 @@ std::string extract_and_substr_until(std::string &extract_from, std::function<bo
   return extract_builder.str();
 }
 
-bool consume_and_trim_string(std::string &find_and_trim, const std::string &to_consume) {
-  auto res = find_and_trim.find(to_consume);
-  if (res != 0 || res == std::string::npos) {
+inline bool trim_till_consume(std::string &tt, const std::string &tc,
+                              bool strict) {
+  auto res = tt.find(tc);
+  if (res == std::string::npos) {
     return false;
   }
-  auto begin = find_and_trim.begin();
-  find_and_trim.erase(begin, begin + to_consume.length());
-  return true;
+
+  if (strict && res != 0) {
+    return false;
+  }
+
+  auto begin = tt.begin();
+  auto end = tt.begin() + res + tc.length();
+  return tt.erase(begin, end) != tt.end();
 }
 
-bool consume_and_trim_char(std::string &find_and_trim, const char to_consume) {
+inline bool consume_and_trim_till_string(std::string &find_and_trim,
+                                         const std::string &to_consume) {
+  return trim_till_consume(find_and_trim, to_consume, false);
+}
+
+inline bool consume_and_trim_string(std::string &find_and_trim,
+                                    const std::string &to_consume) {
+  return trim_till_consume(find_and_trim, to_consume, true);
+}
+
+inline bool consume_and_trim_char(std::string &find_and_trim,
+                                  const char to_consume) {
   if (find_and_trim.empty()) {
     return false;
   }
   unsigned char letter = find_and_trim[0];
   if (letter != to_consume)
     return false;
-  
+
   find_and_trim.erase(0, 1);
+  return true;
+}
+
+inline bool parse_uint_trim(std::string &s, int base, uint64_t *target) {
+  auto pred = base == 10 ? is_num : is_alnum;
+
+  std::string num_string = extract_and_substr_until(s, pred);
+  if (num_string.empty()) {
+    return false;
+  }
+
+  char *end;
+  uint64_t num = std::strtoul(num_string.c_str(), &end, 16);
+  if (num == ULONG_MAX) {
+    return false;
+  }
+
+  *target = num;
   return true;
 }
 

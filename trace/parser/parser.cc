@@ -31,6 +31,7 @@
 #include "lib/utils/log.h"
 #include "lib/utils/string_util.h"
 #include "trace/reader/reader.h"
+#include "trace/events/events.h"
 
 #include <inttypes.h>
 
@@ -77,7 +78,6 @@ bool logparser::Gem5Parser::parse(const std::string &log_file_path) {
   reader::LineReader line_reader(log_file_path);
 
   if (!line_reader.is_valid()) {
-    std::cout << "sdjgkdfgolbgl" << std::endl;
 #ifdef PARSER_DEBUG_
     DFLOGERR("%s: could not open file with path '%s'\n", identifier_.c_str(),
              log_file_path.c_str());
@@ -113,8 +113,19 @@ bool logparser::Gem5Parser::parse(const std::string &log_file_path) {
 #endif
       continue;
     }
-    // TODO: add sym filter functionalities
-    std::cout << "timestamp: " << t << ", found address: " << std::hex << ao.value() << std::endl;
+    logparser::address_t addr = ao.value();
+
+    symtable::filter_ret_t instr_o = symbol_table_.filter(addr);
+    if (!instr_o.has_value()) {
+#ifdef PARSER_DEBUG_
+      DFLOGIN("%s: filter out event at timestamp %u with address %u", identifier_.c_str(), t, addr);
+#endif
+      continue;
+    }
+    std::string instr = instr_o.value();
+
+    Event event(t, instr);
+    std::cout << identifier_ << ": found event --> " << event << std::endl;
 
     // TODO: gather more info about executed actions?
   }

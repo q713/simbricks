@@ -60,44 +60,50 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  /*
   symtable::SymsSyms syms_filter{"SymbolTableFilter"};
-  syms_filter("__tpstrtab_vector_free_moved")
-    ("__tpstrtab_vector_setup")
-    ("__tpstrtab_vector_teardown")
-    ("__tpstrtab_vector_deactivate")
-    ("__tpstrtab_vector_activate")
-    ("__tpstrtab_vector_alloc_managed")
-    ("__tpstrtab_vector_alloc")
-    ("__tpstrtab_vector_reserve")
-    ("__tpstrtab_vector_reserve_managed")
-    ("__tpstrtab_vector_clear")
-    ("__tpstrtab_vector_update")
-    ("__tpstrtab_vector_config")
-    ("__tpstrtab_thermal_apic_exit")
-    ("__tpstrtab_thermal_apic_entry");
-    */
+  syms_filter("entry_SYSCALL_64")
+    ("__do_sys_gettimeofday")
+    ("__sys_sendto")
+    ("i40e_lan_xmit_frame")
+    ("syscall_return_via_sysret")
+    ("__sys_recvfrom")
+    ("deactivate_task")
+    ("interrupt_entry")
+    ("i40e_msix_clean_rings")
+    ("napi_schedule_prep")
+    ("__do_softirq")
+    ("trace_napi_poll")
+    ("net_rx_action")
+    ("i40e_napi_poll")
+    ("activate_task")
+    ("copyout")
+    ;
 
-   symtable::SSyms syms_filter{"SymbolTableFilter"};
-   /*syms_filter("_stext")
-    ("secondary_startup_64")
-    ("perf_trace_initcall_level")
-    ("perf_trace_initcall_start")
-    ("perf_trace_initcall_finish")
-  ;
-
+   /*symtable::SSyms syms_filter{"SymbolTableFilter"};
+  syms_filter("entry_SYSCALL_64")
+    ("__do_sys_gettimeofday")
+    ("__sys_sendto")
+    ("i40e_lan_xmit_frame")
+    ("syscall_return_via_sysret")
+    ("__sys_recvfrom")
+    ("deactivate_task")
+    ("interrupt_entry")
+    ("i40e_msix_clean_rings")
+    ("napi_schedule_prep")
+    ("__do_softirq")
+    ("trace_napi_poll")
+    ("net_rx_action")
+    ("i40e_napi_poll")
+    ("activate_task")
+    ("copyout")
+    ;
+  ;*/
   if (!syms_filter.load_file(linux_dump)) {
     DFLOGERR("could not load file with path '%s'\n", linux_dump);
     exit(EXIT_FAILURE);
   }
 
-  for (auto it = syms_filter.get_sym_table().begin(); it != syms_filter.get_sym_table().end(); it++) {
-    std::cout << "[" << it->first << "]" << " = " << it->second << std::endl;
-  }
-  */
-
  logparser::Gem5Parser gem5Par("Gem5Parser", syms_filter);
-
  if (!gem5Par.parse(gem5_log)) {
     DFLOGERR("could not parse gem5 log file with path '%s'\n", linux_dump.c_str());
     exit(EXIT_FAILURE);

@@ -42,11 +42,11 @@ using addressopt_t = std::optional<address_t>;
 class LogParser {
  protected:
   const std::string &identifier_;
-  const symtable::SymsFilter &symbol_table_;
+  symtable::SymsFilter &symbol_table_;
 
  public:
   explicit LogParser(const std::string &identifier,
-                     const symtable::SymsFilter &symbol_table)
+                     symtable::SymsFilter &symbol_table)
       : identifier_(identifier), symbol_table_(symbol_table){};
 
   timestampopt_t parse_timestamp(std::string &line);
@@ -62,7 +62,7 @@ class Gem5Parser : public LogParser {
 
  public:
   explicit Gem5Parser(const std::string &identifier,
-                      const symtable::SymsFilter &symbol_table)
+                      symtable::SymsFilter &symbol_table)
       : LogParser(identifier, symbol_table) {
   }
 
@@ -72,7 +72,7 @@ class Gem5Parser : public LogParser {
 class NicBmParser : public LogParser {
   public:
   explicit NicBmParser(const std::string &identifier,
-                      const symtable::SymsFilter &symbol_table)
+                       symtable::SymsFilter &symbol_table)
       : LogParser(identifier, symbol_table) {
   }
 };

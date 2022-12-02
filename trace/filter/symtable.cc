@@ -87,7 +87,7 @@ bool symtable::SymsFilter::add_to_sym_table(symtable::address_t address,
 symtable::filter_ret_t symtable::SymsFilter::filter(uint64_t address) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
-    filter_ret_t(symbol->second);
+    symbol->second;
   }
 
   return std::nullopt;

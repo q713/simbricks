@@ -25,15 +25,17 @@
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
 #include "trace/filter/symtable.h"
+#include "trace/parser/parser.h"
 
 int main(int argc, char *argv[]) {
   std::string linux_dump;
+  std::string gem5_log;
 
   cxxopts::Options options("Tracing", "Log File Analysis/Tracing Tool");
-  options.add_options()("h,help", "Print usage")(
-      "linux-dump",
-      "file path to a output file obtained by 'objdump --syms linux_image'",
-      cxxopts::value<std::string>(linux_dump));
+  options.add_options()("h,help", "Print usage")
+    ("linux-dump", "file path to a output file obtained by 'objdump --syms linux_image'", cxxopts::value<std::string>(linux_dump))
+    ("gem5-log", "file path to a log file written by gem5", cxxopts::value<std::string>(gem5_log))
+  ;
 
   try {
     cxxopts::ParseResult result = options.parse(argc, argv);
@@ -45,6 +47,11 @@ int main(int argc, char *argv[]) {
 
     if (!result.count("linux-dump")) {
       DLOGERR("could not parse option 'linux-dump'\n");
+      exit(EXIT_FAILURE);
+    }
+
+    if (!result.count("gem5-log")) {
+      DLOGERR("could not parse option 'gem-5-log'\n");
       exit(EXIT_FAILURE);
     }
 
@@ -72,7 +79,7 @@ int main(int argc, char *argv[]) {
     */
 
    symtable::SSyms syms_filter{"SymbolTableFilter"};
-   syms_filter("_stext")
+   /*syms_filter("_stext")
     ("secondary_startup_64")
     ("perf_trace_initcall_level")
     ("perf_trace_initcall_start")
@@ -87,6 +94,14 @@ int main(int argc, char *argv[]) {
   for (auto it = syms_filter.get_sym_table().begin(); it != syms_filter.get_sym_table().end(); it++) {
     std::cout << "[" << it->first << "]" << " = " << it->second << std::endl;
   }
+  */
+
+ logparser::Gem5Parser gem5Par("Gem5Parser", syms_filter);
+
+ if (!gem5Par.parse(gem5_log)) {
+    DFLOGERR("could not parse gem5 log file with path '%s'\n", linux_dump.c_str());
+    exit(EXIT_FAILURE);
+ }
 
   // TODO:
   //1) check for parsing 'objdump -S vmlinux'

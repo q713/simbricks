@@ -25,32 +25,20 @@
 #include "trace/filter/symtable.h"
 
 #include <functional>
-#include <climits>
 
 #include "lib/utils/string_util.h"
 #include "trace/reader/reader.h"
 
 symtable::addressopt_t symtable::SymsFilter::parse_address(std::string &line) {
-  std::string address_string = sim_string_utils::extract_and_substr_until(
-      line, sim_string_utils::is_alnum);
-  if (address_string.length() != 16) {
+  sim_string_utils::trimL(line);
+  address_t address;
+  if (!sim_string_utils::parse_uint_trim(line, 16, &address)) {
 #ifdef SYMS_DEBUG_
-    DFLOGERR("%s: address has not length 16, it has length %d\n",
-             identifier_.c_str(), address_string.length());
+    DFLOGERR("%s: could not parse address out of line '%s'\n",
+             identifier_.c_str(), line.c_str());
 #endif
     return std::nullopt;
   }
-
-  char *end;
-  address_t address = std::strtoull(address_string.c_str(), &end, 16);
-  if (address == ULLONG_MAX) {
-#ifdef SYMS_DEBUG_
-    DFLOGERR("%s: could not parse address out of hex representation '%s'\n",
-             identifier_.c_str(), address_string.c_str());
-#endif
-    return std::nullopt;
-  }
-
   return address;
 }
 
@@ -122,7 +110,7 @@ void symtable::SymsSyms::skip_alignment(std::string &line) {
 }
 
 bool symtable::SymsSyms::load_file(const std::string &file_path) {
-  reader::LineReader reader = reader::LineReader::create(file_path);
+  reader::LineReader reader(file_path);
 
   if (!reader.is_valid()) {
 #ifdef SYMS_DEBUG_
@@ -174,7 +162,7 @@ bool symtable::SymsSyms::load_file(const std::string &file_path) {
 }
 
 bool symtable::SSyms::load_file(const std::string &file_path) {
-  reader::LineReader reader = reader::LineReader::create(file_path);
+  reader::LineReader reader(file_path);
 
   if (!reader.is_valid()) {
 #ifdef SYMS_DEBUG_

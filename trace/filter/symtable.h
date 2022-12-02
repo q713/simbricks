@@ -45,7 +45,6 @@ using name_t = std::string;
 using nameopt_t = std::optional<name_t>;
 using symtable_t = std::map<address_t, name_t>;
 
-
 class SymsFilter {
  protected:
   const std::string identifier_;

@@ -26,23 +26,99 @@
 
 #include "trace/parser/parser.h"
 
+#include <errno.h>
+
 #include "lib/utils/log.h"
+#include "lib/utils/string_util.h"
 #include "trace/reader/reader.h"
 
-bool logparser::LogParser::parse(const std::string &log_file_path) {
-  LineReader line_reader{log_file_path};
+#include <inttypes.h>
+
+logparser::timestampopt_t logparser::LogParser::parse_timestamp(
+    std::string &line) {
+  sim_string_utils::trimL(line);
+  logparser::timestamp_t timestamp;
+  if (!sim_string_utils::parse_uint_trim(line, 16, &timestamp)) {
+#ifdef PARSER_DEBUG_
+    DFLOGERR("%s, could not parse string repr. of timestamp from line '%s'\n",
+             identifier_.c_str(), line.c_str());
+#endif
+    return std::nullopt;
+  }
+  return timestamp;
+}
+
+bool logparser::Gem5Parser::skip_till_address(std::string &line) {
+  if (!sim_string_utils::consume_and_trim_till_string(line, "0x")) {
+#ifdef PARSER_DEBUG_
+    DFLOGERR("%s: could not parse till address in line '%s'\n",
+             identifier_.c_str(), line.c_str());
+#endif
+    return false;
+  }
+  return true;
+}
+
+logparser::addressopt_t logparser::Gem5Parser::parse_address(
+    std::string &line) {
+  // TODO: act on . plus offset addresses
+  logparser::address_t address;
+  if (!sim_string_utils::parse_uint_trim(line, 16, &address)) {
+#ifdef PARSER_DEBUG_
+    DFLOGERR("%s: could not parse instr. address from line '%s'\n",
+             identifier_.c_str(), line.c_str());
+#endif
+    return std::nullopt;
+  }
+  return address;
+}
+
+bool logparser::Gem5Parser::parse(const std::string &log_file_path) {
+  reader::LineReader line_reader(log_file_path);
 
   if (!line_reader.is_valid()) {
+    std::cout << "sdjgkdfgolbgl" << std::endl;
 #ifdef PARSER_DEBUG_
-    DFLOGERR("%s: could not open file with path '%s'", identifier_.c_str(),
+    DFLOGERR("%s: could not open file with path '%s'\n", identifier_.c_str(),
              log_file_path.c_str());
 #endif
     return false;
   }
 
   for (std::string line; line_reader.get_next_line(line, true);) {
-    // TODO
+    logparser::timestampopt_t to = parse_timestamp(line);
+    if (!to.has_value()) {
+#ifdef PARSER_DEBUG_
+      DFLOGWARN("%s: could not parse timestamp from line '%s'\n",
+                identifier_.c_str(), line.c_str());
+#endif
+      continue;
+    }
+    logparser::timestamp_t t = to.value();
+
+    if (!skip_till_address(line)) {
+#ifdef PARSER_DEBUG_
+      DFLOGWARN(
+          "%s: could not skip till an address start (0x) was found in '%s'\n",
+          identifier_.c_str(), line.c_str());
+#endif
+      continue;
+    }
+
+    logparser::addressopt_t ao = parse_address(line);
+    if (!ao.has_value()) {
+#ifdef PARSER_DEBUG_
+      DFLOGWARN("%s: could not parse address from line '%s'\n",
+                identifier_.c_str(), line.c_str());
+#endif
+      continue;
+    }
+    // TODO: add sym filter functionalities
+    std::cout << "timestamp: " << t << ", found address: " << std::hex << ao.value() << std::endl;
+
+    // TODO: gather more info about executed actions?
   }
 
   return true;
 }
+

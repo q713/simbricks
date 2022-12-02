@@ -27,23 +27,56 @@
 
 #pragma once
 
+#include <optional>
 #include <string>
 
 #include "trace/filter/symtable.h"
 
 namespace logparser {
 
+using timestamp_t = uint64_t;
+using timestampopt_t = std::optional<timestamp_t>;
+using address_t = uint64_t;
+using addressopt_t = std::optional<address_t>;
+
 class LogParser {
+ protected:
   const std::string &identifier_;
   const symtable::SymsFilter &symbol_table_;
 
  public:
-  LogParser(const std::string &identifier, const symtable::SymsFilter &symbol_table)
-      : identifier_(identifier), symbol_table_(symbol_table) {};
+  explicit LogParser(const std::string &identifier,
+                     const symtable::SymsFilter &symbol_table)
+      : identifier_(identifier), symbol_table_(symbol_table){};
 
-  bool parse(const std::string &log_file_path);
+  timestampopt_t parse_timestamp(std::string &line);
+
+  virtual bool parse(const std::string &log_file_path) = 0;
 };
 
-} // namespace logparser
+class Gem5Parser : public LogParser {
+ protected:
+  bool skip_till_address(std::string &line);
+
+  addressopt_t parse_address(std::string &line);
+
+ public:
+  explicit Gem5Parser(const std::string &identifier,
+                      const symtable::SymsFilter &symbol_table)
+      : LogParser(identifier, symbol_table) {
+  }
+
+  bool parse(const std::string &log_file_path) override;
+};
+
+class NicBmParser : public LogParser {
+  public:
+  explicit NicBmParser(const std::string &identifier,
+                      const symtable::SymsFilter &symbol_table)
+      : LogParser(identifier, symbol_table) {
+  }
+};
+
+}  // namespace logparser
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

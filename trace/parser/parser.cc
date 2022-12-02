@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define PARSER_DEBUG_ 1
+//#define PARSER_DEBUG_ 1
 
 #include "trace/parser/parser.h"
 
@@ -96,6 +96,10 @@ bool logparser::Gem5Parser::parse(const std::string &log_file_path) {
     }
     logparser::timestamp_t t = to.value();
 
+    // TODO: a lot of not mapped addresses... 
+    // TODO: parse symbricks events within log file!!!!!!!!!!!
+    // TODO: gather more info about executed actions?
+
     if (!skip_till_address(line)) {
 #ifdef PARSER_DEBUG_
       DFLOGWARN(
@@ -118,7 +122,7 @@ bool logparser::Gem5Parser::parse(const std::string &log_file_path) {
     symtable::filter_ret_t instr_o = symbol_table_.filter(addr);
     if (!instr_o.has_value()) {
 #ifdef PARSER_DEBUG_
-      DFLOGIN("%s: filter out event at timestamp %u with address %u", identifier_.c_str(), t, addr);
+      DFLOGIN("%s: filter out event at timestamp %u with address %u\n", identifier_.c_str(), t, addr);
 #endif
       continue;
     }
@@ -126,8 +130,6 @@ bool logparser::Gem5Parser::parse(const std::string &log_file_path) {
 
     Event event(t, instr);
     std::cout << identifier_ << ": found event --> " << event << std::endl;
-
-    // TODO: gather more info about executed actions?
   }
 
   return true;

@@ -31,6 +31,11 @@
 
 symtable::addressopt_t symtable::SymsFilter::parse_address(std::string &line) {
   sim_string_utils::trimL(line);
+  // skip address offset ffffffff
+  //if (line.length() > 8) {
+  //  line = line.substr(8);
+  //}
+
   address_t address;
   if (!sim_string_utils::parse_uint_trim(line, 16, &address)) {
 #ifdef SYMS_DEBUG_
@@ -64,7 +69,7 @@ symtable::nameopt_t symtable::SymsFilter::parse_name(std::string &line) {
 bool symtable::SymsFilter::add_to_sym_table(symtable::address_t address,
                                             const name_t &name) {
   auto in_set = symbol_filter_.find(name);
-  if (in_set == symbol_filter_.end()) {
+  if (!symbol_filter_.empty() && in_set == symbol_filter_.end()) {
 #ifdef SYMS_DEBUG_
     DFLOGIN("%s: filter out symbol with name '%s'\n", identifier_.c_str(),
             name.c_str());
@@ -72,7 +77,7 @@ bool symtable::SymsFilter::add_to_sym_table(symtable::address_t address,
     return false;
   }
 
-  auto pair = symbol_table_.try_emplace(address, name);
+  auto pair = symbol_table_.insert(std::make_pair(address, name));
   if (!pair.second) {
 #ifdef SYMS_DEBUG_
     DFLOGWARN("%s: could not insert new symbol table value at address '%u'\n",
@@ -87,7 +92,7 @@ bool symtable::SymsFilter::add_to_sym_table(symtable::address_t address,
 symtable::filter_ret_t symtable::SymsFilter::filter(uint64_t address) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
-    symbol->second;
+    return symbol->second;
   }
 
   return std::nullopt;

@@ -27,7 +27,7 @@
 
 #pragma once
 
-#define SYMS_DEBUG_ 1
+//#define SYMS_DEBUG_ 1
 
 #include <map>
 #include <optional>
@@ -63,8 +63,11 @@ class SymsFilter {
   /*
    * Builder function to add symbols to the symbol filter.
    * After parsing the symbol table, only those symbols are included
-   * in the resulting symbol table that is used to translate addresses
+   * in the resulting symbol table, that is used to translate addresses
    * into symbols. That way this translation also acts as a filter.
+   * 
+   * In case one does not insert any symbols into this set, 
+   * no filtering is performed.
    */
   inline SymsFilter &operator()(const name_t &symbol) {
     auto res = symbol_filter_.insert(symbol);

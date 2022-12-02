@@ -62,15 +62,15 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  symtable::SymsSyms syms_filter{"SymbolTableFilter"};
-  syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
-      "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
-      "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
-      "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
-      "i40e_napi_poll")("activate_task")("copyout");
+  //symtable::SymsSyms syms_filter{"SymbolTableFilter"};
+  //syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
+  //    "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
+  //    "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
+  //    "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
+  //    "i40e_napi_poll")("activate_task")("copyout");
 
-  /*symtable::SSyms syms_filter{"SymbolTableFilter"};
- syms_filter("entry_SYSCALL_64")
+  symtable::SSyms syms_filter{"SymbolTableFilter"};
+  syms_filter("entry_SYSCALL_64")
    ("__do_sys_gettimeofday")
    ("__sys_sendto")
    ("i40e_lan_xmit_frame")
@@ -86,18 +86,12 @@ int main(int argc, char *argv[]) {
    ("i40e_napi_poll")
    ("activate_task")
    ("copyout")
-   ;
- ;*/
+  ;
+  
   if (!syms_filter.load_file(linux_dump)) {
     DFLOGERR("could not load file with path '%s'\n", linux_dump);
     exit(EXIT_FAILURE);
   }
-
-  // for (auto ele = syms_filter.get_sym_table().begin(); ele !=
-  // syms_filter.get_sym_table().end(); ele++) {
-  //   std::cout << "found element [" << ele->first << "] = " << ele->second <<
-  //   std::endl;
-  // }
 
   logparser::Gem5Parser gem5Par("Gem5Parser", syms_filter);
   if (!gem5Par.parse(gem5_log)) {

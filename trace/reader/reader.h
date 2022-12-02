@@ -51,7 +51,6 @@ class Reader {
 
     while (true) {
       if (!std::getline(in, target)) {
-        DLOGIN("reached end of file");
         return false;
       }
       line_number_++;

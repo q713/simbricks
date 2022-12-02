@@ -101,11 +101,11 @@ class SymsFilter {
  */
 class SymsSyms : public SymsFilter {
  protected:
-  void skip_fags(std::string &line);
+  bool skip_fags(std::string &line);
 
-  void skip_section(std::string &line);
+  bool skip_section(std::string &line);
 
-  void skip_alignment(std::string &line);
+  bool skip_alignment(std::string &line);
 
  public:
   explicit SymsSyms(const std::string identifier) : SymsFilter(identifier) {

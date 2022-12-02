@@ -93,20 +93,32 @@ symtable::filter_ret_t symtable::SymsFilter::filter(uint64_t address) {
   return std::nullopt;
 }
 
-void symtable::SymsSyms::skip_fags(std::string &line) {
+bool symtable::SymsSyms::skip_fags(std::string &line) {
   sim_string_utils::trimL(line);
   // flags are devided into 7 groups
+  if (line.length() < 8) {
+#ifdef SYMS_DEBUG_
+    DFLOGWARN(
+        "%s: line has not more than 7 chars (flags), hence it is the wrong "
+        "format",
+        identifier_.c_str());
+#endif
+    return false;
+  }
   line = line.substr(7);
+  return true;
 }
 
-void symtable::SymsSyms::skip_section(std::string &line) {
+bool symtable::SymsSyms::skip_section(std::string &line) {
   sim_string_utils::trimL(line);
   sim_string_utils::trimTillWhitespace(line);
+  return true;
 }
 
-void symtable::SymsSyms::skip_alignment(std::string &line) {
+bool symtable::SymsSyms::skip_alignment(std::string &line) {
   sim_string_utils::trimL(line);
   sim_string_utils::trimTillWhitespace(line);
+  return true;
 }
 
 bool symtable::SymsSyms::load_file(const std::string &file_path) {
@@ -121,7 +133,6 @@ bool symtable::SymsSyms::load_file(const std::string &file_path) {
   }
 
   for (std::string line; reader.get_next_line(line, true);) {
-    DFLOGIN("%s: found line: %s\n", line.c_str());
     sim_string_utils::trim(line);
 
     // parse address
@@ -136,9 +147,15 @@ bool symtable::SymsSyms::load_file(const std::string &file_path) {
     address_t address = address_opt.value();
 
     // skip yet uninteresting values of ELF format
-    skip_fags(line);
-    skip_section(line);
-    skip_alignment(line);
+    if (!skip_fags(line) || !skip_section(line) || !skip_alignment(line)) {
+#ifdef SYMS_DEBUG_
+      DFLOGWARN(
+          "%s: line '%s' seems to have wrong format regarding flags, section "
+          "or alignment\n",
+          identifier_.c_str(), line.c_str());
+#endif
+      continue;
+    }
 
     // parse name
     symtable::nameopt_t name_opt = parse_name(line);
@@ -154,7 +171,7 @@ bool symtable::SymsSyms::load_file(const std::string &file_path) {
     if (!add_to_sym_table(address, name)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table\n",
-                identifier_.c_str(), address, name);
+                identifier_.c_str(), address, name.c_str());
 #endif
     }
   }

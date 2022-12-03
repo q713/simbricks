@@ -30,6 +30,7 @@
 int main(int argc, char *argv[]) {
   std::string linux_dump;
   std::string gem5_log;
+  std::string nicbm_log;
 
   cxxopts::Options options("Tracing", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")(
@@ -37,7 +38,9 @@ int main(int argc, char *argv[]) {
       "file path to a output file obtained by 'objdump --syms linux_image'",
       cxxopts::value<std::string>(linux_dump))(
       "gem5-log", "file path to a log file written by gem5",
-      cxxopts::value<std::string>(gem5_log));
+      cxxopts::value<std::string>(gem5_log))(
+      "nicbm-log", "file path to a log file written by the nicbm",
+      cxxopts::value<std::string>(nicbm_log));
 
   try {
     cxxopts::ParseResult result = options.parse(argc, argv);
@@ -57,55 +60,60 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
     }
 
+    if (!result.count("nicbm-log")) {
+      DLOGERR("could not parse option 'nicbm-log'\n");
+      exit(EXIT_FAILURE);
+    }
+
   } catch (cxxopts::exceptions::exception &e) {
     DFLOGERR("Could not parse cli options: %s\n", e.what());
     exit(EXIT_FAILURE);
   }
 
-  //symtable::SymsSyms syms_filter{"SymbolTableFilter"};
+  // symtable::SymsSyms syms_filter{"SymbolTableFilter"};
+  // syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
+  //     "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
+  //     "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
+  //     "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
+  //     "i40e_napi_poll")("activate_task")("copyout");
+
+  //symtable::SSyms syms_filter{"SymbolTableFilter"};
   //syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
   //    "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
   //    "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
   //    "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
   //    "i40e_napi_poll")("activate_task")("copyout");
 
-  symtable::SSyms syms_filter{"SymbolTableFilter"};
-  syms_filter("entry_SYSCALL_64")
-   ("__do_sys_gettimeofday")
-   ("__sys_sendto")
-   ("i40e_lan_xmit_frame")
-   ("syscall_return_via_sysret")
-   ("__sys_recvfrom")
-   ("deactivate_task")
-   ("interrupt_entry")
-   ("i40e_msix_clean_rings")
-   ("napi_schedule_prep")
-   ("__do_softirq")
-   ("trace_napi_poll")
-   ("net_rx_action")
-   ("i40e_napi_poll")
-   ("activate_task")
-   ("copyout")
-  ;
-  
-  if (!syms_filter.load_file(linux_dump)) {
-    DFLOGERR("could not load file with path '%s'\n", linux_dump);
-    exit(EXIT_FAILURE);
-  }
+  //if (!syms_filter.load_file(linux_dump)) {
+  //  DFLOGERR("could not load file with path '%s'\n", linux_dump);
+  //  exit(EXIT_FAILURE);
+  //}
 
-  logparser::Gem5Parser gem5Par("Gem5Parser", syms_filter);
-  if (!gem5Par.parse(gem5_log)) {
-    DFLOGERR("could not parse gem5 log file with path '%s'\n",
-             linux_dump.c_str());
+  //logparser::Gem5Parser gem5Par("Gem5Parser", syms_filter);
+  //if (!gem5Par.parse(gem5_log)) {
+  //  DFLOGERR("could not parse gem5 log file with path '%s'\n",
+  //           linux_dump.c_str());
+  //  exit(EXIT_FAILURE);
+  //}
+
+  logparser::NicBmParser nicBmPar("NicBmParser");
+  if (!nicBmPar.parse(nicbm_log)) {
+    DFLOGERR("could not parse nicbm log file with path '%s'\n", nicbm_log.c_str());
     exit(EXIT_FAILURE);
   }
 
   // TODO:
   // 1) check for parsing 'objdump -S vmlinux'
   // 2) which gem5 flags -> before witing parser --> use Exec without automatic
-  // translation + Syscall 3) gem5 parser 4) nicbm parser 5) merge events by
-  // timestamp 6) how should events look like? 7)add identifiers to know sources
-  // 8) try trace?
+  // translation + Syscall 
+  // 3) gem5 parser 
+  // 4) nicbm parser
+  // 5) handle symbricks events in all parsers 
+  // 6) merge events by timestamp 
+  // 7) how should events look like? 
+  // 8) add identifiers to know sources
+  // 9) try trace?
+  // 10) default events for not parsed lines / unexpected lines?
 
   exit(EXIT_SUCCESS);
 }

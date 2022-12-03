@@ -30,6 +30,7 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <optional>
 
 #include "lib/utils/log.h"
 
@@ -66,13 +67,16 @@ class Reader {
   }
 
  public:
-  explicit Reader(const std::string &file_path)
-      : file_path_(file_path) {}
+  explicit Reader(const std::string &file_path) : file_path_(file_path) {
+  }
 
   int ln() {
     return line_number_;
   }
+
+  virtual bool get_next_line(std::string &target, bool skip_empty_line) = 0;
 };
+
 class LineReader : public Reader {
   std::ifstream input_stream_;
 
@@ -87,8 +91,17 @@ class LineReader : public Reader {
     return input_stream_.is_open();
   }
 
-  bool get_next_line(std::string &target, bool skip_empty_line) {
+  bool get_next_line(std::string &target, bool skip_empty_line) override {
     return Reader::get_next_line(input_stream_, target, skip_empty_line);
+  }
+
+  static std::optional<LineReader> create(const std::string &file_path) {
+    LineReader line_reader(file_path);
+    if (!line_reader.is_valid()) {
+      DFLOGERR("could not open file with path '%s'\n", file_path.c_str());
+      return std::nullopt;
+    }
+    return line_reader;
   }
 };
 
@@ -97,6 +110,7 @@ class GzLineReader : public Reader {
   boost::iostreams::filtering_streambuf<boost::iostreams::input> gz_in_;
   std::istream *input_stream_;
   int line_number_ = 0;
+
 
  public:
   explicit GzLineReader(const std::string &file_path)
@@ -112,7 +126,7 @@ class GzLineReader : public Reader {
     return input_stream_ != nullptr && input_stream_->good();
   }
 
-  bool get_next_line(std::string &target, bool skip_empty_line) {
+  bool get_next_line(std::string &target, bool skip_empty_line) override {
     return Reader::get_next_line(*input_stream_, target, skip_empty_line);
   }
 };

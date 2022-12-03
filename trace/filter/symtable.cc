@@ -31,11 +31,6 @@
 
 symtable::addressopt_t symtable::SymsFilter::parse_address(std::string &line) {
   sim_string_utils::trimL(line);
-  // skip address offset ffffffff
-  //if (line.length() > 8) {
-  //  line = line.substr(8);
-  //}
-
   address_t address;
   if (!sim_string_utils::parse_uint_trim(line, 16, &address)) {
 #ifdef SYMS_DEBUG_
@@ -127,15 +122,14 @@ bool symtable::SymsSyms::skip_alignment(std::string &line) {
 }
 
 bool symtable::SymsSyms::load_file(const std::string &file_path) {
-  reader::LineReader reader(file_path);
-
-  if (!reader.is_valid()) {
+  auto reader_opt = reader::LineReader::create(log_file_path);
+  if (!reader_opt.has_value()) {
 #ifdef SYMS_DEBUG_
-    DFLOGERR("%s: could not open file with path '%s'\n", identifier_.c_str(),
-             file_path.c_str());
+    DFLOGERR("%s: could not create reader\n", identifier_.c_str());
 #endif
     return false;
   }
+  auto reader = std::move(reader_opt.value());
 
   for (std::string line; reader.get_next_line(line, true);) {
     sim_string_utils::trim(line);

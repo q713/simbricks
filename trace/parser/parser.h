@@ -31,6 +31,7 @@
 #include <string>
 
 #include "trace/filter/symtable.h"
+#include "trace/reader/reader.h"
 
 namespace logparser {
 
@@ -42,39 +43,49 @@ using addressopt_t = std::optional<address_t>;
 class LogParser {
  protected:
   const std::string &identifier_;
-  symtable::SymsFilter &symbol_table_;
-
- public:
-  explicit LogParser(const std::string &identifier,
-                     symtable::SymsFilter &symbol_table)
-      : identifier_(identifier), symbol_table_(symbol_table){};
 
   timestampopt_t parse_timestamp(std::string &line);
+
+  addressopt_t parse_address(std::string &line);
+
+ public:
+  explicit LogParser(const std::string &identifier) : identifier_(identifier){};
 
   virtual bool parse(const std::string &log_file_path) = 0;
 };
 
 class Gem5Parser : public LogParser {
+  symtable::SymsFilter &symbol_table_;
+
  protected:
   bool skip_till_address(std::string &line);
-
-  addressopt_t parse_address(std::string &line);
 
  public:
   explicit Gem5Parser(const std::string &identifier,
                       symtable::SymsFilter &symbol_table)
-      : LogParser(identifier, symbol_table) {
+      : LogParser(identifier), symbol_table_(symbol_table) {
   }
 
   bool parse(const std::string &log_file_path) override;
 };
 
 class NicBmParser : public LogParser {
-  public:
-  explicit NicBmParser(const std::string &identifier,
-                       symtable::SymsFilter &symbol_table)
-      : LogParser(identifier, symbol_table) {
+ protected:
+  bool parse_off_len_val_comma(std::string &line, address_t &off, size_t &len,
+                               address_t &val);
+
+  bool parse_op_addr_len_pending(std::string &line, address_t &op,
+                                 address_t &addr, size_t &len, size_t &pending);
+
+  bool parse_mac_address(std::string &line, address_t &address);
+
+  bool parse_sync_info(std::string &line, bool &sync_pcie, bool &sync_eth);
+
+ public:
+  explicit NicBmParser(const std::string &identifier) : LogParser(identifier) {
   }
+
+  bool parse(const std::string &log_file_path) override;
 };
 
 }  // namespace logparser

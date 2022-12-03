@@ -27,7 +27,7 @@
 
 #pragma once
 
-//#define SYMS_DEBUG_ 1
+#define SYMS_DEBUG_ 1
 
 #include <map>
 #include <optional>

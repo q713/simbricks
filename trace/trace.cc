@@ -70,14 +70,14 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  // symtable::SymsSyms syms_filter{"SymbolTableFilter"};
+  // SymsSyms syms_filter{"SymbolTableFilter"};
   // syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
   //     "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
   //     "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
   //     "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
   //     "i40e_napi_poll")("activate_task")("copyout");
 
-  //symtable::SSyms syms_filter{"SymbolTableFilter"};
+  //SSyms syms_filter{"SymbolTableFilter"};
   //syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
   //    "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
   //    "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
@@ -89,14 +89,14 @@ int main(int argc, char *argv[]) {
   //  exit(EXIT_FAILURE);
   //}
 
-  //logparser::Gem5Parser gem5Par("Gem5Parser", syms_filter);
+  //Gem5Parser gem5Par("Gem5Parser", syms_filter);
   //if (!gem5Par.parse(gem5_log)) {
   //  DFLOGERR("could not parse gem5 log file with path '%s'\n",
   //           linux_dump.c_str());
   //  exit(EXIT_FAILURE);
   //}
 
-  logparser::NicBmParser nicBmPar("NicBmParser");
+  NicBmParser nicBmPar("NicBmParser");
   if (!nicBmPar.parse(nicbm_log)) {
     DFLOGERR("could not parse nicbm log file with path '%s'\n", nicbm_log.c_str());
     exit(EXIT_FAILURE);
@@ -114,6 +114,8 @@ int main(int argc, char *argv[]) {
   // 8) add identifiers to know sources
   // 9) try trace?
   // 10) default events for not parsed lines / unexpected lines?
-
+  // 11) gem5 logfile only from checkpoint on
+  // 12) gem5 only write logfile only after certain timestamp
+  
   exit(EXIT_SUCCESS);
 }

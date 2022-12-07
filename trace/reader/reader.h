@@ -25,6 +25,8 @@
 #ifndef SIMBRICKS_READER_H_
 #define SIMBRICKS_READER_H_
 
+#pragma once
+
 #include <boost/iostreams/filter/gzip.hpp>
 #include <boost/iostreams/filtering_streambuf.hpp>
 #include <fstream>
@@ -33,8 +35,6 @@
 #include <optional>
 
 #include "lib/utils/log.h"
-
-namespace reader {
 
 class Reader {
   int line_number_ = 0;
@@ -108,7 +108,7 @@ class LineReader : public Reader {
 class GzLineReader : public Reader {
   std::ifstream gz_file_;
   boost::iostreams::filtering_streambuf<boost::iostreams::input> gz_in_;
-  std::istream *input_stream_;
+  std::istream *input_stream_ = nullptr;
   int line_number_ = 0;
 
 
@@ -122,6 +122,12 @@ class GzLineReader : public Reader {
     input_stream_ = new std::istream(&gz_in_);
   }
 
+  ~GzLineReader() {
+    if (input_stream_) {
+      delete input_stream_;
+    }
+  }
+
   bool is_valid() override {
     return input_stream_ != nullptr && input_stream_->good();
   }
@@ -130,7 +136,5 @@ class GzLineReader : public Reader {
     return Reader::get_next_line(*input_stream_, target, skip_empty_line);
   }
 };
-
-}  // namespace reader
 
 #endif  // SIMBRICKS_READER_H_

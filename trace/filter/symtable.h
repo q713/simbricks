@@ -25,8 +25,6 @@
 #ifndef SIMBRICKS_TRACE_SYMS_H_
 #define SIMBRICKS_TRACE_SYMS_H_
 
-#pragma once
-
 #define SYMS_DEBUG_ 1
 
 #include <map>
@@ -36,26 +34,17 @@
 
 #include "lib/utils/log.h"
 
-namespace symtable {
-
-using filter_ret_t = std::optional<std::string>;
-using address_t = uint64_t;
-using addressopt_t = std::optional<address_t>;
-using name_t = std::string;
-using nameopt_t = std::optional<name_t>;
-using symtable_t = std::map<address_t, name_t>;
-
 class SymsFilter {
  protected:
   const std::string identifier_;
-  std::set<name_t> symbol_filter_;
-  symtable_t symbol_table_;
+  std::set<std::string> symbol_filter_;
+  std::map<uint64_t, std::string> symbol_table_;
 
-  addressopt_t parse_address(std::string &line);
+  bool parse_address(std::string &line, uint64_t address);
 
-  nameopt_t parse_name(std::string &line);
+  bool parse_name(std::string &line, std::string &name);
 
-  bool add_to_sym_table(address_t address, const name_t &name);
+  bool add_to_sym_table(uint64_t address, const std::string &name);
 
  public:
   explicit SymsFilter(const std::string identifier) : identifier_(identifier){};
@@ -69,7 +58,7 @@ class SymsFilter {
    * In case one does not insert any symbols into this set, 
    * no filtering is performed.
    */
-  inline SymsFilter &operator()(const name_t &symbol) {
+  inline SymsFilter &operator()(const std::string &symbol) {
     auto res = symbol_filter_.insert(symbol);
     if (!res.second) {
 #ifdef SYMS_DEBUG_
@@ -80,7 +69,7 @@ class SymsFilter {
     return *this;
   }
 
-  inline const symtable_t &get_sym_table() {
+  inline const std::map<uint64_t, std::string> &get_sym_table() {
     return symbol_table_;
   }
 
@@ -88,7 +77,7 @@ class SymsFilter {
    * Filter function for later usage in parser.
    * Get in address and receive label for address.
    */
-  filter_ret_t filter(uint64_t address);
+  std::optional<std::string> filter(uint64_t address);
 
   virtual bool load_file(const std::string &file_path) = 0;
 };
@@ -133,7 +122,5 @@ class SSyms : public SymsFilter {
 
   bool load_file(const std::string &file_path) override;
 };
-
-}  // namespace symtable
 
 #endif  // SIMBRICKS_TRACE_SYMS_H_

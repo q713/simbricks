@@ -26,6 +26,7 @@
 #include "lib/utils/log.h"
 #include "trace/filter/symtable.h"
 #include "trace/parser/parser.h"
+#include "trace/reader/reader.h"
 
 int main(int argc, char *argv[]) {
   std::string linux_dump;
@@ -50,15 +51,15 @@ int main(int argc, char *argv[]) {
       exit(EXIT_SUCCESS);
     }
 
-    if (!result.count("linux-dump")) {
-      DLOGERR("could not parse option 'linux-dump'\n");
-      exit(EXIT_FAILURE);
-    }
-
-    if (!result.count("gem5-log")) {
-      DLOGERR("could not parse option 'gem-5-log'\n");
-      exit(EXIT_FAILURE);
-    }
+    //if (!result.count("linux-dump")) {
+    //  DLOGERR("could not parse option 'linux-dump'\n");
+    //  exit(EXIT_FAILURE);
+    //}
+    //
+    //if (!result.count("gem5-log")) {
+    //  DLOGERR("could not parse option 'gem-5-log'\n");
+    //  exit(EXIT_FAILURE);
+    //}
 
     if (!result.count("nicbm-log")) {
       DLOGERR("could not parse option 'nicbm-log'\n");
@@ -96,7 +97,8 @@ int main(int argc, char *argv[]) {
   //  exit(EXIT_FAILURE);
   //}
 
-  NicBmParser nicBmPar("NicBmParser");
+  LineReader lr;
+  NicBmParser nicBmPar("NicBmParser", lr);
   if (!nicBmPar.parse(nicbm_log)) {
     DFLOGERR("could not parse nicbm log file with path '%s'\n", nicbm_log.c_str());
     exit(EXIT_FAILURE);
@@ -106,7 +108,7 @@ int main(int argc, char *argv[]) {
   // 1) check for parsing 'objdump -S vmlinux'
   // 2) which gem5 flags -> before witing parser --> use Exec without automatic
   // translation + Syscall 
-  // 3) gem5 parser 
+  // 3) gem5 parser -> gem5 events!!!
   // 4) nicbm parser
   // 5) handle symbricks events in all parsers 
   // 6) merge events by timestamp 

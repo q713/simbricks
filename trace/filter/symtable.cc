@@ -29,25 +29,21 @@
 #include "lib/utils/string_util.h"
 #include "trace/reader/reader.h"
 
-bool SymsFilter::parse_address(std::string &line, uint64_t address) {
-  sim_string_utils::trimL(line);
-  if (!sim_string_utils::parse_uint_trim(line, 16, &address)) {
+bool SymsFilter::parse_address(uint64_t &address) {
+  line_reader_.trimL();
+  if (!line_reader_.parse_uint_trim(16, address)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not parse address out of line '%s'\n",
-             identifier_.c_str(), line.c_str());
+             identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
     return false;
   }
   return true;
 }
 
-bool SymsFilter::parse_name(std::string &line, std::string &name) {
-  static std::function<bool(unsigned char)> is_part_name = [](unsigned char c) {
-    return std::isalnum(c) || c == '_' || c == '.';
-  };
-
-  sim_string_utils::trimL(line);
-  name = sim_string_utils::extract_and_substr_until(line, is_part_name);
+bool SymsFilter::parse_name(std::string &name) {
+  line_reader_.trimL();
+  name = line_reader_.extract_and_substr_until(sim_string_utils::is_alnum_dot_bar);
 
   if (name.empty()) {
 #ifdef SYMS_DEBUG_
@@ -81,19 +77,20 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name) {
   return true;
 }
 
-std::optional<std::string> SymsFilter::filter(uint64_t address) {
+bool SymsFilter::filter(uint64_t address, std::string &sym_name_target) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
-    return symbol->second;
+    sym_name_target = symbol->second;
+    return true;
   }
 
-  return std::nullopt;
+  return false;
 }
 
-bool SymsSyms::skip_fags(std::string &line) {
-  sim_string_utils::trimL(line);
+bool SymsSyms::skip_fags() {
+  line_reader_.trimL();
   // flags are devided into 7 groups
-  if (line.length() < 8) {
+  if (line_reader_.cur_length() < 8) {
 #ifdef SYMS_DEBUG_
     DFLOGWARN(
         "%s: line has not more than 7 chars (flags), hence it is the wrong "
@@ -102,62 +99,60 @@ bool SymsSyms::skip_fags(std::string &line) {
 #endif
     return false;
   }
-  line = line.substr(7);
+  line_reader_.move_forward(7);
   return true;
 }
 
-bool SymsSyms::skip_section(std::string &line) {
-  sim_string_utils::trimL(line);
-  sim_string_utils::trimTillWhitespace(line);
+bool SymsSyms::skip_section() {
+  line_reader_.trimL();
+  line_reader_.trimTillWhitespace();
   return true;
 }
 
-bool SymsSyms::skip_alignment(std::string &line) {
-  sim_string_utils::trimL(line);
-  sim_string_utils::trimTillWhitespace(line);
+bool SymsSyms::skip_alignment() {
+  line_reader_.trimL();
+  line_reader_.trimTillWhitespace();
   return true;
 }
 
 bool SymsSyms::load_file(const std::string &file_path) {
-  auto reader_opt = LineReader::create(file_path);
-  if (!reader_opt.has_value()) {
+  if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
 #endif
     return false;
   }
-  auto reader = std::move(reader_opt.value());
 
   uint64_t address = 0;
   std::string name = "";
-  for (std::string line; reader.get_next_line(line, true);) {
-    sim_string_utils::trim(line);
+  while (line_reader_.next_line()) {
+    line_reader_.trimL();
 
     // parse address
-    if (!parse_address(line, address)) {
+    if (!parse_address(address)) {
 #ifdef SYMS_DEBUG_
-      DFLOGWARN("%s: could not parse address from line with number: %d\n",
-                identifier_.c_str(), reader.ln());
+      DFLOGWARN("%s: could not parse address from line '%s'\n",
+                identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
 
     // skip yet uninteresting values of ELF format
-    if (!skip_fags(line) || !skip_section(line) || !skip_alignment(line)) {
+    if (!skip_fags() || !skip_section() || !skip_alignment()) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN(
           "%s: line '%s' seems to have wrong format regarding flags, section "
           "or alignment\n",
-          identifier_.c_str(), line.c_str());
+          identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
 
     // parse name
-    if (!parse_name(line, name)) {
+    if (!parse_name(name)) {
 #ifdef SYMS_DEBUG_
-      DFLOGWARN("%s: could not parse name from line with number: %d\n",
-                identifier_.c_str(), reader.ln());
+      DFLOGWARN("%s: could not parse name from line '%s'\n",
+                identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -173,56 +168,54 @@ bool SymsSyms::load_file(const std::string &file_path) {
 }
 
 bool SSyms::load_file(const std::string &file_path) {
-  auto reader_opt = LineReader::create(file_path);
-  if (!reader_opt.has_value()) {
+  if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
 #endif
     return false;
   }
-  auto reader = std::move(reader_opt.value());
 
   uint64_t address = 0;
   std::string label = "";
-  for (std::string line; reader.get_next_line(line, true);) {
+  while (line_reader_.next_line()) {
 #ifdef SYMS_DEBUG_
-    DFLOGIN("%s: found line: %s\n", identifier_.c_str(), line.c_str());
+    DFLOGIN("%s: found line: %s\n", identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
-    sim_string_utils::trim(line);
+    line_reader_.trimL();
 
     // parse address
-    if (!parse_address(line, address)) {
+    if (!parse_address(address)) {
 #ifdef SYMS_DEBUG_
-      DFLOGWARN("%s: could not parse address from line with number: %d\n",
-                identifier_.c_str(), reader.ln());
+      DFLOGWARN("%s: could not parse address from line '%s'\n",
+                identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
 
-    if (sim_string_utils::consume_and_trim_string(line, " <")) {
-      if (parse_name(line, label)) {
-        if (!sim_string_utils::consume_and_trim_char(line, '>')) {
+    if (line_reader_.consume_and_trim_string(" <")) {
+      if (parse_name(label)) {
+        if (!line_reader_.consume_and_trim_char('>')) {
 #ifdef SYMS_DEBUG_
           DFLOGERR(
-              "%s: could not parse label from line %d, unexpected format\n",
-              identifier_.c_str(), reader.ln());
+              "%s: could not parse label from line '%s'\n",
+              identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
           return false;
         }
       } else {
 #ifdef SYMS_DEBUG_
-        DFLOGERR("%s: could not parse label from line %d\n",
-                 identifier_.c_str(), reader.ln());
+        DFLOGERR("%s: could not parse label from line '%s'\n",
+                 identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         return false;
       }
     } else {
-      if (!sim_string_utils::consume_and_trim_char(line, ':')) {
+      if (!line_reader_.consume_and_trim_char(':')) {
         label = "";
 #ifdef SYMS_DEBUG_
         DFLOGWARN(
-            "%s: could neiter parse label nor body addresses from line %d\n",
-            identifier_.c_str(), reader.ln());
+            "%s: could neiter parse label nor body addresses from line '%s'\n",
+            identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         continue;
       }

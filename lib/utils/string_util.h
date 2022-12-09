@@ -26,10 +26,10 @@
 #define SIMBRICKS_STRING_UTILS_H_
 
 #include <algorithm>
+#include <climits>
 #include <functional>
 #include <sstream>
 #include <string>
-#include <climits>
 
 namespace sim_string_utils {
 
@@ -71,6 +71,9 @@ static std::function<bool(unsigned char)> is_alnum = [](unsigned char c) {
 static std::function<bool(unsigned char)> is_num = [](unsigned char c) {
   return std::isdigit(c);
 };
+
+static std::function<bool(unsigned char)> is_alnum_dot_bar =
+    [](unsigned char c) { return std::isalnum(c) || c == '_' || c == '.'; };
 
 /*
  * Trim all whitespaces from left to the first non whitespace character

@@ -25,45 +25,44 @@
 #ifndef SIMBRICKS_TRACE_PARSER_H_
 #define SIMBRICKS_TRACE_PARSER_H_
 
-#pragma once
-
-#include <optional>
 #include <string>
 
+#include "trace/events/events.h"
+#include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
-
-namespace logparser {
-
-using timestamp_t = uint64_t;
-using timestampopt_t = std::optional<timestamp_t>;
-using address_t = uint64_t;
-using addressopt_t = std::optional<address_t>;
 
 class LogParser {
  protected:
   const std::string &identifier_;
+  LineReader &line_reader_;
 
-  timestampopt_t parse_timestamp(std::string &line);
+  bool parse_timestamp(uint64_t &timestamp);
 
-  addressopt_t parse_address(std::string &line);
+  bool parse_address(uint64_t &address);
 
  public:
-  explicit LogParser(const std::string &identifier) : identifier_(identifier){};
+  explicit LogParser(const std::string &identifier, LineReader &line_reader)
+      : identifier_(identifier), line_reader_(line_reader){};
 
   virtual bool parse(const std::string &log_file_path) = 0;
 };
 
 class Gem5Parser : public LogParser {
-  symtable::SymsFilter &symbol_table_;
+  SymsFilter &symbol_table_;
+  ComponentFilter &component_table_;
 
  protected:
-  bool skip_till_address(std::string &line);
+  bool parse_event(uint64_t timestamp, std::string &symbol);
+
+  bool skip_till_address();
 
  public:
-  explicit Gem5Parser(const std::string &identifier,
-                      symtable::SymsFilter &symbol_table)
-      : LogParser(identifier), symbol_table_(symbol_table) {
+  explicit Gem5Parser(const std::string &identifier, SymsFilter &symbol_table,
+                      ComponentFilter &component_table, LineReader &line_reader)
+      : LogParser(identifier, line_reader),
+        symbol_table_(symbol_table),
+        component_table_(component_table) {
   }
 
   bool parse(const std::string &log_file_path) override;
@@ -71,23 +70,21 @@ class Gem5Parser : public LogParser {
 
 class NicBmParser : public LogParser {
  protected:
-  bool parse_off_len_val_comma(std::string &line, address_t &off, size_t &len,
-                               address_t &val);
+  bool parse_off_len_val_comma(uint64_t &off, size_t &len, uint64_t &val);
 
-  bool parse_op_addr_len_pending(std::string &line, address_t &op,
-                                 address_t &addr, size_t &len, size_t &pending);
+  bool parse_op_addr_len_pending(uint64_t &op, uint64_t &addr, size_t &len,
+                                 size_t &pending, bool with_pending);
 
-  bool parse_mac_address(std::string &line, address_t &address);
+  bool parse_mac_address(uint64_t &address);
 
-  bool parse_sync_info(std::string &line, bool &sync_pcie, bool &sync_eth);
+  bool parse_sync_info(bool &sync_pcie, bool &sync_eth);
 
  public:
-  explicit NicBmParser(const std::string &identifier) : LogParser(identifier) {
+  explicit NicBmParser(const std::string &identifier, LineReader &line_reader)
+      : LogParser(identifier, line_reader) {
   }
 
   bool parse(const std::string &log_file_path) override;
 };
-
-}  // namespace logparser
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

@@ -22,36 +22,39 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define PARSER_DEBUG_ 1
+#ifndef SIMBRICKS_TRACE_COMP_H_
+#define SIMBRICKS_TRACE_COMP_H_
 
-#include "trace/parser/parser.h"
+#include <set>
+#include <string>
 
-#include <errno.h>
-#include <inttypes.h>
+class ComponentFilter {
+ private:
+  const std::string &identifier_;
+  std::set<std::string> component_table_;
 
-#include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
-#include "trace/events/events.h"
+ public:
+  explicit ComponentFilter(const std::string &identifier)
+      : identifier_(identifier){};
 
-bool LogParser::parse_timestamp(uint64_t &timestamp) {
-  line_reader_.trimL();
-  if (!line_reader_.parse_uint_trim(16, timestamp)) {
-#ifdef PARSER_DEBUG_
-    DFLOGERR("%s, could not parse string repr. of timestamp from line '%s'\n",
-             identifier_.c_str(), line_reader_.get_raw_line().c_str());
-#endif
-    return false;
+  inline ComponentFilter &operator()(const std::string &symbol) {
+    component_table_.insert(symbol);
+    return *this;
   }
-  return true;
-}
 
-bool LogParser::parse_address(uint64_t &address) {
-  if (!line_reader_.parse_uint_trim(16, address)) {
-#ifdef PARSER_DEBUG_
-    DFLOGERR("%s: could not parse address from line '%s'\n",
-             identifier_.c_str(), line_reader_.get_raw_line().c_str());
-#endif
-    return false;
+  inline const std::set<std::string> &get_component_table() {
+    return component_table_;
   }
-  return true;
-}
+
+  bool filter(const std::string &comp) {
+    if (component_table_.empty())
+        return true;
+        
+    auto found = component_table_.find(comp);
+    return found != component_table_.end();
+  }
+
+  virtual bool load_file(const std::string &file_path) = 0;
+};
+
+#endif  // SIMBRICKS_TRACE_COMP_H_

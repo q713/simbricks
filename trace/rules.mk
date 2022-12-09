@@ -27,10 +27,10 @@ include mk/subdir_pre.mk
 #$(bin_trace_process): $(OBJS) -lboost_iostreams -lboost_coroutine \
 #	-lboost_context
 
-bin_trace := $(d)trace
+bin_trace := $(d)trace	
 OBJS_TRACE := $(addprefix $(d), trace.o filter/symtable.o parser/parser.o \
- parser/gem5.o parser/nicbm.o)
-	
+	parser/nicbm.o reader/reader.o parser/gem5.o)
+
 $(bin_trace): $(OBJS_TRACE) -lboost_coroutine
 
 CLEAN := $(bin_trace) $(OBJS_TRACE) #$(bin_trace_process) $(OBJS)

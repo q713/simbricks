@@ -27,83 +27,91 @@
 
 #pragma once
 
-#include <boost/iostreams/filter/gzip.hpp>
-#include <boost/iostreams/filtering_streambuf.hpp>
 #include <fstream>
 #include <iostream>
-#include <memory>
-#include <optional>
+#include <string>
 
 #include "lib/utils/log.h"
+#include "lib/utils/string_util.h"
 
-class Reader {
-  int line_number_ = 0;
-
- protected:
-  const std::string &file_path_;
-  virtual bool is_valid() = 0;
-
-  bool get_next_line(std::istream &in, std::string &target,
-                     bool skip_empty_line) {
-    if (!is_valid()) {
-      DFLOGERR("could not open file '%s'", file_path_.c_str());
-      return false;
-    }
-
-    while (true) {
-      if (!std::getline(in, target)) {
-        return false;
-      }
-      line_number_++;
-
-      if (skip_empty_line && target.empty()) {
-        continue;
-      }
-
-      break;
-    }
-
-    return true;
-  }
+class LineReader {
+  std::ifstream input_stream_;
+  size_t line_number_ = 0;
+  size_t cur_reading_pos_ = 0;
+  std::string cur_line_;
+  bool skip_empty_lines_ = true;
 
  public:
-  explicit Reader(const std::string &file_path) : file_path_(file_path) {
+  explicit LineReader() {
+  }
+
+  explicit LineReader(bool skip_empty_lines)
+      : skip_empty_lines_(skip_empty_lines) {
+  }
+
+  ~LineReader() {
+    if (input_stream_.is_open()) {
+      input_stream_.close();
+    }
   }
 
   int ln() {
     return line_number_;
   }
 
-  virtual bool get_next_line(std::string &target, bool skip_empty_line) = 0;
+  bool is_valid() {
+    return input_stream_.good();
+  }
+
+  std::string get_cur_string() {
+    if (cur_reading_pos_ >= cur_line_.length())
+      return ""; 
+    return std::string(cur_line_.begin() + cur_reading_pos_, cur_line_.end());
+  }
+
+  const std::string &get_raw_line() {
+    return cur_line_;
+  }
+
+  inline size_t cur_length() {
+    return cur_line_.length() - cur_reading_pos_;
+  }
+
+  inline bool is_empty() {
+    return cur_length() <= 0;
+  }
+
+  bool open_file(const std::string &file_path);
+
+  bool next_line();
+
+  bool move_forward(size_t steps);
+
+  void trimL();
+
+  void trimTillWhitespace();
+
+  std::string extract_and_substr_until(
+      std::function<bool(unsigned char)> &predicate);
+
+  bool trim_till_consume(const std::string &tc, bool strict);
+
+  inline bool consume_and_trim_till_string(const std::string &to_consume) {
+    return trim_till_consume(to_consume, false);
+  }
+
+  inline bool consume_and_trim_string(const std::string &to_consume) {
+    return trim_till_consume(to_consume, true);
+  }
+
+  bool consume_and_trim_char(const char to_consume);
+
+  bool parse_uint_trim(int base, uint64_t &target);
 };
 
-class LineReader : public Reader {
-  std::ifstream input_stream_;
-
- public:
-  explicit LineReader(const std::string &file_path)
-      : Reader(file_path),
-        input_stream_(std::move(std::ifstream(
-            file_path, std::ios_base::in | std::ios_base::binary))) {
-  }
-
-  bool is_valid() override {
-    return input_stream_.is_open();
-  }
-
-  bool get_next_line(std::string &target, bool skip_empty_line) override {
-    return Reader::get_next_line(input_stream_, target, skip_empty_line);
-  }
-
-  static std::optional<LineReader> create(const std::string &file_path) {
-    LineReader line_reader(file_path);
-    if (!line_reader.is_valid()) {
-      DFLOGERR("could not open file with path '%s'\n", file_path.c_str());
-      return std::nullopt;
-    }
-    return line_reader;
-  }
-};
+/*
+#include <boost/iostreams/filter/gzip.hpp>
+#include <boost/iostreams/filtering_streambuf.hpp>
 
 class GzLineReader : public Reader {
   std::ifstream gz_file_;
@@ -136,5 +144,6 @@ class GzLineReader : public Reader {
     return Reader::get_next_line(*input_stream_, target, skip_empty_line);
   }
 };
+*/
 
 #endif  // SIMBRICKS_READER_H_

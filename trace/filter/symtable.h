@@ -28,34 +28,36 @@
 #define SYMS_DEBUG_ 1
 
 #include <map>
-#include <optional>
 #include <set>
 #include <string>
 
 #include "lib/utils/log.h"
+#include "trace/reader/reader.h"
 
 class SymsFilter {
  protected:
-  const std::string identifier_;
+  const std::string &identifier_;
   std::set<std::string> symbol_filter_;
   std::map<uint64_t, std::string> symbol_table_;
+  LineReader &line_reader_;
 
-  bool parse_address(std::string &line, uint64_t address);
+  bool parse_address(uint64_t &address);
 
-  bool parse_name(std::string &line, std::string &name);
+  bool parse_name(std::string &name);
 
   bool add_to_sym_table(uint64_t address, const std::string &name);
 
  public:
-  explicit SymsFilter(const std::string identifier) : identifier_(identifier){};
+  explicit SymsFilter(const std::string &identifier, LineReader &line_reader)
+      : identifier_(identifier), line_reader_(line_reader){};
 
   /*
    * Builder function to add symbols to the symbol filter.
    * After parsing the symbol table, only those symbols are included
    * in the resulting symbol table, that is used to translate addresses
    * into symbols. That way this translation also acts as a filter.
-   * 
-   * In case one does not insert any symbols into this set, 
+   *
+   * In case one does not insert any symbols into this set,
    * no filtering is performed.
    */
   inline SymsFilter &operator()(const std::string &symbol) {
@@ -77,7 +79,7 @@ class SymsFilter {
    * Filter function for later usage in parser.
    * Get in address and receive label for address.
    */
-  std::optional<std::string> filter(uint64_t address);
+  bool filter(uint64_t address, std::string &sym_name_target);
 
   virtual bool load_file(const std::string &file_path) = 0;
 };
@@ -93,14 +95,15 @@ class SymsFilter {
  */
 class SymsSyms : public SymsFilter {
  protected:
-  bool skip_fags(std::string &line);
+  bool skip_fags();
 
-  bool skip_section(std::string &line);
+  bool skip_section();
 
-  bool skip_alignment(std::string &line);
+  bool skip_alignment();
 
  public:
-  explicit SymsSyms(const std::string identifier) : SymsFilter(identifier) {
+  explicit SymsSyms(const std::string &identifier, LineReader &line_reader)
+      : SymsFilter(identifier, line_reader) {
   }
 
   bool load_file(const std::string &file_path) override;
@@ -117,7 +120,8 @@ class SymsSyms : public SymsFilter {
  */
 class SSyms : public SymsFilter {
  public:
-  explicit SSyms(const std::string identifier) : SymsFilter(identifier) {
+  explicit SSyms(const std::string &identifier, LineReader &line_reader)
+      : SymsFilter(identifier, line_reader) {
   }
 
   bool load_file(const std::string &file_path) override;

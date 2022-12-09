@@ -41,11 +41,28 @@ class Event {
   }
 };
 
-class E_NIC_MSIX : public Event {
+/* Host related events */
+// TODO: add more events
+class HostCall : public Event {
+ public:
+  const std::string &func_;
+
+  HostCall(uint64_t ts, const std::string &func) : Event(ts), func_(func) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "H.CALL ";
+    Event::display(os);
+    os << "func=" << func_;
+  }
+};
+
+/* NIC related events */
+class NicMsix : public Event {
  public:
   uint16_t vec_;
 
-  E_NIC_MSIX(uint64_t ts, uint16_t vec) : Event(ts), vec_(vec) {
+  NicMsix(uint64_t ts, uint16_t vec) : Event(ts), vec_(vec) {
   }
 
   void display(std::ostream &os) override {
@@ -55,115 +72,117 @@ class E_NIC_MSIX : public Event {
   }
 };
 
-class E_NIC_DMA : public Event {
+class NicDma : public Event {
  public:
   uint64_t id_;
   uint64_t addr_;
   uint64_t len_;
 
-  E_NIC_DMA(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+  NicDma(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
       : Event(ts), id_(id), addr_(addr), len_(len) {
   }
 
   void display(std::ostream &os) override {
     Event::display(os);
-    os << "id=" << std::hex << id_ << ", addr=" << std::hex << addr_ << ", size=" << len_;
+    os << "id=" << std::hex << id_ << ", addr=" << std::hex << addr_
+       << ", size=" << len_;
   }
 };
 
-class E_NIC_DMA_I : public E_NIC_DMA {
+class NicDmaI : public NicDma {
  public:
-  E_NIC_DMA_I(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
-      : E_NIC_DMA(ts, id, addr, len) {
+  NicDmaI(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+      : NicDma(ts, id, addr, len) {
   }
 
   void display(std::ostream &os) override {
     os << "N.DMAI ";
-    E_NIC_DMA::display(os);
+    NicDma::display(os);
   }
 };
 
-class E_NIC_DMA_E : public E_NIC_DMA {
+class NicDmaE : public NicDma {
  public:
-  E_NIC_DMA_E(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
-      : E_NIC_DMA(ts, id, addr, len) {
+  NicDmaE(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+      : NicDma(ts, id, addr, len) {
   }
 
   void display(std::ostream &os) {
     os << "N.DMAC ";
-    E_NIC_DMA::display(os);
+    NicDma::display(os);
   }
 };
 
-class E_NIC_DMA_CR : public E_NIC_DMA {
+class NicDmaCR : public NicDma {
  public:
-  E_NIC_DMA_CR(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
-      : E_NIC_DMA(ts, id, addr, len) {
+  NicDmaCR(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+      : NicDma(ts, id, addr, len) {
   }
 
   void display(std::ostream &os) {
     os << "N.DMACR ";
-    E_NIC_DMA::display(os);
+    NicDma::display(os);
   }
 };
 
-class E_NIC_DMA_CW : public E_NIC_DMA {
+class NicDmaCW : public NicDma {
  public:
-  E_NIC_DMA_CW(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
-      : E_NIC_DMA(ts, id, addr, len) {
+  NicDmaCW(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+      : NicDma(ts, id, addr, len) {
   }
 
   void display(std::ostream &os) {
     os << "N.DMACW ";
-    E_NIC_DMA::display(os);
+    NicDma::display(os);
   }
 };
 
-class E_NIC_MMIO : public Event {
+class NicMmio : public Event {
  public:
   uint64_t off_;
   uint64_t len_;
   uint64_t val_;
 
-  E_NIC_MMIO(uint64_t ts, uint64_t off, uint64_t len, uint64_t val)
+  NicMmio(uint64_t ts, uint64_t off, uint64_t len, uint64_t val)
       : Event(ts), off_(off), len_(len), val_(val) {
   }
 
   virtual void display(std::ostream &os) override {
     Event::display(os);
-    os << "off=" << std::hex << off_ << ", len=" << len_ << " val=" << std::hex << val_;
+    os << "off=" << std::hex << off_ << ", len=" << len_ << " val=" << std::hex
+       << val_;
   }
 };
 
-class E_NIC_MMIO_R : public E_NIC_MMIO {
+class NicMmioR : public NicMmio {
  public:
-  E_NIC_MMIO_R(uint64_t ts, uint64_t off, uint64_t len, uint64_t val)
-      : E_NIC_MMIO(ts, off, len, val) {
+  NicMmioR(uint64_t ts, uint64_t off, uint64_t len, uint64_t val)
+      : NicMmio(ts, off, len, val) {
   }
 
   void display(std::ostream &os) override {
     os << "N.MMIOR ";
-    E_NIC_MMIO::display(os);
+    NicMmio::display(os);
   }
 };
 
-class E_NIC_MMIO_W : public E_NIC_MMIO {
+class NicMmioW : public NicMmio {
  public:
-  E_NIC_MMIO_W(uint64_t ts, uint64_t off, uint64_t len, uint64_t val)
-      : E_NIC_MMIO(ts, off, len, val) {
+  NicMmioW(uint64_t ts, uint64_t off, uint64_t len, uint64_t val)
+      : NicMmio(ts, off, len, val) {
   }
 
   void display(std::ostream &os) override {
     os << "N.MMIOW ";
-    E_NIC_MMIO::display(os);
+    NicMmio::display(os);
   }
 };
 
-class E_NIC_TRX : public Event {
+class NicTrx : public Event {
  public:
   uint16_t len_;
 
-  E_NIC_TRX(uint64_t ts, uint16_t len) : Event(ts), len_(len) {
+  NicTrx(uint64_t ts, uint16_t len) : Event(ts), len_(len) {
   }
 
   void display(std::ostream &os) {
@@ -172,25 +191,25 @@ class E_NIC_TRX : public Event {
   }
 };
 
-class E_NIC_TX : public E_NIC_TRX {
+class NicTx : public NicTrx {
  public:
-  E_NIC_TX(uint64_t ts, uint16_t len) : E_NIC_TRX(ts, len) {
+  NicTx(uint64_t ts, uint16_t len) : NicTrx(ts, len) {
   }
 
   void display(std::ostream &os) {
     os << "N.TX ";
-    E_NIC_TRX::display(os);
+    NicTrx::display(os);
   }
 };
 
-class E_NIC_RX : public E_NIC_TRX {
+class NicRx : public NicTrx {
  public:
-  E_NIC_RX(uint64_t ts, uint16_t len) : E_NIC_TRX(ts, len) {
+  NicRx(uint64_t ts, uint16_t len) : NicTrx(ts, len) {
   }
 
   void display(std::ostream &os) {
     os << "N.RX ";
-    E_NIC_TRX::display(os);
+    NicTrx::display(os);
   }
 };
 
@@ -200,10 +219,9 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
 }
 
 struct EventComperator {
-  bool operator() (const Event &e1, const Event &e2) {
+  bool operator()(const Event &e1, const Event &e2) {
     return e1.timestamp_ < e2.timestamp_;
   }
 };
-
 
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

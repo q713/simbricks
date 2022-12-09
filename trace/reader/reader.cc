@@ -37,16 +37,25 @@ bool LineReader::open_file(const std::string &file_path) {
 }
 
 bool LineReader::next_line() {
-  if (input_stream_.eof() || !is_valid()) {
-    return false;
-  }
+  bool found = false;
+  while (!found) {
+    if (input_stream_.eof() || !is_valid()) {
+      return false;
+    }
 
-  std::getline(input_stream_, cur_line_);
-  if (input_stream_.fail()) {
-    return false;
-  }
+    std::getline(input_stream_, cur_line_);
+    if (input_stream_.fail()) {
+      return false;
+    }
 
-  ++line_number_;
+    ++line_number_;
+  
+    if (cur_line_.empty()) {
+      continue;
+    } else {
+      found = true;
+    }
+  }
   cur_reading_pos_ = 0;
   return true;
 }

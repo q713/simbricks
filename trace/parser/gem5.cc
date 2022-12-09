@@ -21,7 +21,10 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-#define PARSER_DEBUG_GEM5_ 1
+
+#include "trace/parser/parser.h"
+
+//#define PARSER_DEBUG_GEM5_ 1
 
 #include <errno.h>
 #include <inttypes.h>
@@ -31,7 +34,6 @@
 #include "lib/utils/log.h"
 #include "lib/utils/string_util.h"
 #include "trace/events/events.h"
-#include "trace/parser/parser.h"
 
 bool Gem5Parser::skip_till_address() {
   if (!line_reader_.consume_and_trim_till_string("0x")) {

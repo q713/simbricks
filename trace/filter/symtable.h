@@ -25,7 +25,7 @@
 #ifndef SIMBRICKS_TRACE_SYMS_H_
 #define SIMBRICKS_TRACE_SYMS_H_
 
-#define SYMS_DEBUG_ 1
+//#define SYMS_DEBUG_ 1
 
 #include <map>
 #include <set>
@@ -36,7 +36,7 @@
 
 class SymsFilter {
  protected:
-  const std::string &identifier_;
+  const std::string identifier_;
   std::set<std::string> symbol_filter_;
   std::map<uint64_t, std::string> symbol_table_;
   LineReader &line_reader_;
@@ -48,8 +48,8 @@ class SymsFilter {
   bool add_to_sym_table(uint64_t address, const std::string &name);
 
  public:
-  explicit SymsFilter(const std::string &identifier, LineReader &line_reader)
-      : identifier_(identifier), line_reader_(line_reader){};
+  explicit SymsFilter(const std::string identifier, LineReader &line_reader)
+      : identifier_(std::move(identifier)), line_reader_(line_reader){};
 
   /*
    * Builder function to add symbols to the symbol filter.
@@ -61,7 +61,7 @@ class SymsFilter {
    * no filtering is performed.
    */
   inline SymsFilter &operator()(const std::string &symbol) {
-    auto res = symbol_filter_.insert(symbol);
+    auto res = symbol_filter_.insert(symbol); 
     if (!res.second) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could no insert '%s' into symbol map\n",
@@ -102,8 +102,8 @@ class SymsSyms : public SymsFilter {
   bool skip_alignment();
 
  public:
-  explicit SymsSyms(const std::string &identifier, LineReader &line_reader)
-      : SymsFilter(identifier, line_reader) {
+  explicit SymsSyms(const std::string identifier, LineReader &line_reader)
+      : SymsFilter(std::move(identifier), line_reader) {
   }
 
   bool load_file(const std::string &file_path) override;
@@ -120,8 +120,8 @@ class SymsSyms : public SymsFilter {
  */
 class SSyms : public SymsFilter {
  public:
-  explicit SSyms(const std::string &identifier, LineReader &line_reader)
-      : SymsFilter(identifier, line_reader) {
+  explicit SSyms(const std::string identifier, LineReader &line_reader)
+      : SymsFilter(std::move(identifier), line_reader) {
   }
 
   bool load_file(const std::string &file_path) override;

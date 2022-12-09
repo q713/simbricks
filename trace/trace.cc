@@ -51,46 +51,68 @@ int main(int argc, char *argv[]) {
       exit(EXIT_SUCCESS);
     }
 
-    //if (!result.count("linux-dump")) {
-    //  DLOGERR("could not parse option 'linux-dump'\n");
-    //  exit(EXIT_FAILURE);
-    //}
-    //
-    //if (!result.count("gem5-log")) {
-    //  DLOGERR("could not parse option 'gem-5-log'\n");
-    //  exit(EXIT_FAILURE);
-    //}
-
-    if (!result.count("nicbm-log")) {
-      DLOGERR("could not parse option 'nicbm-log'\n");
+    if (!result.count("linux-dump")) {
+      DLOGERR("could not parse option 'linux-dump'\n");
       exit(EXIT_FAILURE);
     }
+    
+    if (!result.count("gem5-log")) {
+      DLOGERR("could not parse option 'gem-5-log'\n");
+      exit(EXIT_FAILURE);
+    }
+
+    //if (!result.count("nicbm-log")) {
+    //  DLOGERR("could not parse option 'nicbm-log'\n");
+    //  exit(EXIT_FAILURE);
+    //}
 
   } catch (cxxopts::exceptions::exception &e) {
     DFLOGERR("Could not parse cli options: %s\n", e.what());
     exit(EXIT_FAILURE);
   }
 
-  // SymsSyms syms_filter{"SymbolTableFilter"};
-  // syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
-  //     "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
-  //     "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
-  //     "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
-  //     "i40e_napi_poll")("activate_task")("copyout");
-
   LineReader ssymsLr;
-  SSyms syms_filter{"SymbolTableFilter", ssymsLr};
-  syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
-      "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
-      "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
-      "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
-      "i40e_napi_poll")("activate_task")("copyout");
+  SymsSyms syms_filter{"SymbolTableFilter", ssymsLr};
+  //syms_filter("entry_SYSCALL_64")
+  //  ("__do_sys_gettimeofday")
+  //  ("__sys_sendto")
+  //  ("i40e_lan_xmit_frame")
+  //  ("syscall_return_via_sysret")
+  //  ("__sys_recvfrom")
+  //  ("deactivate_task")
+  //  ("interrupt_entry")
+  //  ("i40e_msix_clean_rings")
+  //  ("napi_schedule_prep")
+  //  ("__do_softirq")
+  //  ("trace_napi_poll")
+  //  ("net_rx_action")
+  //  ("i40e_napi_poll")
+  //  ("activate_task")
+  //  ("copyout");
+  //SSyms syms_filter("SymbolTableFilter", ssymsLr);
+  //syms_filter("entry_SYSCALL_64")
+  //  ("__do_sys_gettimeofday")
+  //  ("__sys_sendto")
+  //  ("i40e_lan_xmit_frame")
+  //  ("syscall_return_via_sysret")
+  //  ("__sys_recvfrom")
+  //  ("deactivate_task")
+  //  ("interrupt_entry")
+  //  ("i40e_msix_clean_rings")
+  //  ("napi_schedule_prep")
+  //  ("__do_softirq")
+  //  ("trace_napi_poll")
+  //  ("net_rx_action")
+  //  ("i40e_napi_poll")
+  //  ("activate_task")
+  //  ("copyout");
+
   if (!syms_filter.load_file(linux_dump)) {
     DFLOGERR("could not load file with path '%s'\n", linux_dump);
     exit(EXIT_FAILURE);
   }
 
-  ComponentFilter compF{"Component Filter"};
+  ComponentFilter compF("Component Filter");
   compF("system.switch_cpus")("system.cpu");
 
   LineReader gem5Lr;

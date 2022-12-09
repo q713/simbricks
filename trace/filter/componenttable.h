@@ -53,8 +53,6 @@ class ComponentFilter {
     auto found = component_table_.find(comp);
     return found != component_table_.end();
   }
-
-  virtual bool load_file(const std::string &file_path) = 0;
 };
 
 #endif  // SIMBRICKS_TRACE_COMP_H_

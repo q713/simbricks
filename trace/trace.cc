@@ -78,31 +78,35 @@ int main(int argc, char *argv[]) {
   //     "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
   //     "i40e_napi_poll")("activate_task")("copyout");
 
-  //SSyms syms_filter{"SymbolTableFilter"};
-  //syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
-  //    "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
-  //    "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
-  //    "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
-  //    "i40e_napi_poll")("activate_task")("copyout");
-
-  //if (!syms_filter.load_file(linux_dump)) {
-  //  DFLOGERR("could not load file with path '%s'\n", linux_dump);
-  //  exit(EXIT_FAILURE);
-  //}
-
-  //Gem5Parser gem5Par("Gem5Parser", syms_filter);
-  //if (!gem5Par.parse(gem5_log)) {
-  //  DFLOGERR("could not parse gem5 log file with path '%s'\n",
-  //           linux_dump.c_str());
-  //  exit(EXIT_FAILURE);
-  //}
-
-  LineReader lr;
-  NicBmParser nicBmPar("NicBmParser", lr);
-  if (!nicBmPar.parse(nicbm_log)) {
-    DFLOGERR("could not parse nicbm log file with path '%s'\n", nicbm_log.c_str());
+  LineReader ssymsLr;
+  SSyms syms_filter{"SymbolTableFilter", ssymsLr};
+  syms_filter("entry_SYSCALL_64")("__do_sys_gettimeofday")("__sys_sendto")(
+      "i40e_lan_xmit_frame")("syscall_return_via_sysret")("__sys_recvfrom")(
+      "deactivate_task")("interrupt_entry")("i40e_msix_clean_rings")(
+      "napi_schedule_prep")("__do_softirq")("trace_napi_poll")("net_rx_action")(
+      "i40e_napi_poll")("activate_task")("copyout");
+  if (!syms_filter.load_file(linux_dump)) {
+    DFLOGERR("could not load file with path '%s'\n", linux_dump);
     exit(EXIT_FAILURE);
   }
+
+  ComponentFilter compF{"Component Filter"};
+  compF("system.switch_cpus")("system.cpu");
+
+  LineReader gem5Lr;
+  Gem5Parser gem5Par{"Gem5Parser", syms_filter, compF, gem5Lr};
+  if (!gem5Par.parse(gem5_log)) {
+    DFLOGERR("could not parse gem5 log file with path '%s'\n",
+             linux_dump.c_str());
+    exit(EXIT_FAILURE);
+  }
+
+  //LineReader lr;
+  //NicBmParser nicBmPar("NicBmParser", lr);
+  //if (!nicBmPar.parse(nicbm_log)) {
+  //  DFLOGERR("could not parse nicbm log file with path '%s'\n", nicbm_log.c_str());
+  //  exit(EXIT_FAILURE);
+  //}
 
   // TODO:
   // 1) check for parsing 'objdump -S vmlinux'

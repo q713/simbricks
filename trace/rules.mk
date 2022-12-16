@@ -31,7 +31,7 @@ bin_trace := $(d)trace
 OBJS_TRACE := $(addprefix $(d), trace.o filter/symtable.o parser/parser.o \
 	parser/nicbm.o reader/reader.o parser/gem5.o)
 
-$(bin_trace): $(OBJS_TRACE) -lboost_coroutine
+$(bin_trace): $(OBJS_TRACE) -lboost_coroutine -lboost_context
 
 CLEAN := $(bin_trace) $(OBJS_TRACE) #$(bin_trace_process) $(OBJS)
 ALL := $(bin_trace) # $(bin_trace_process)

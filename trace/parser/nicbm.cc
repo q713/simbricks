@@ -200,12 +200,12 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   return true;
 }
 
-bool NicBmParser::parse(const std::string &log_file_path) {
-  if (!line_reader_.open_file(log_file_path)) {
+void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
+  if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
 #endif
-    return false;
+    return;
   }
 
   uint64_t mac_address = 0;
@@ -215,7 +215,7 @@ bool NicBmParser::parse(const std::string &log_file_path) {
   // parse mac address and sync informations
   if (line_reader_.next_line()) {
     if (!parse_mac_address(mac_address)) {
-      return false;
+      return;
     }
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGIN("%s: found mac_addr=%lx\n", identifier_.c_str(), mac_address);
@@ -223,7 +223,7 @@ bool NicBmParser::parse(const std::string &log_file_path) {
   }
   if (line_reader_.next_line()) {
     if (!parse_sync_info(sync_pci, sync_eth)) {
-      return false;
+      return;
     }
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGIN("%s: found sync_pcie=%d sync_eth=%d\n", identifier_.c_str(),
@@ -282,69 +282,60 @@ bool NicBmParser::parse(const std::string &log_file_path) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        NicMmioR e(timestamp, off, len, val);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicMmioR>(timestamp, off, len, val));
 
       } else if (line_reader_.consume_and_trim_till_string("write(")) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        NicMmioW e(timestamp, off, len, val);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicMmioW>(timestamp, off, len, val));
 
       } else if (line_reader_.consume_and_trim_till_string("issuing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        NicDmaI e(timestamp, op, addr, len);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicDmaI>(timestamp, op, addr, len));
 
       } else if (line_reader_.consume_and_trim_till_string("executing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        NicDmaE e(timestamp, op, addr, len);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicDmaE>(timestamp, op, addr, len));
 
       } else if (line_reader_.consume_and_trim_till_string(
                      "completed dma read")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
           continue;
         }
-        NicDmaCR e(timestamp, op, addr, len);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicDmaCR>(timestamp, op, addr, len));
 
       } else if (line_reader_.consume_and_trim_till_string(
                      "completed dma write")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
           continue;
         }
-        NicDmaCW e(timestamp, op, addr, len);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicDmaCW>(timestamp, op, addr, len));
 
       } else if (line_reader_.consume_and_trim_till_string(
                      "issue MSI-X interrupt vec ")) {
         if (!line_reader_.parse_uint_trim(10, vec)) {
           continue;
         }
-        NicMsix e(timestamp, vec);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicMsix>(timestamp, vec));
 
       } else if (line_reader_.consume_and_trim_till_string("eth tx: len ")) {
         if (!line_reader_.parse_uint_trim(10, len)) {
           continue;
         }
-        NicTx e(timestamp, len);
-        std::cout << identifier_ << ": " << e << std::endl;
+        sink(std::make_shared<NicTx>(timestamp, len));
 
       } else if (line_reader_.consume_and_trim_till_string(
                      "eth rx: port 0 len ")) {
         if (!line_reader_.parse_uint_trim(10, len)) {
           continue;
         }
-        NicRx e(timestamp, len);
-        std::cout << identifier_ << ": " << e << std::endl;
-
+        sink(std::make_shared<NicRx>(timestamp, len));
+        
       } else {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: line '%s' did not match any expected main line\n",
@@ -361,5 +352,5 @@ bool NicBmParser::parse(const std::string &log_file_path) {
     }
   }
 
-  return true;
+  return;
 }

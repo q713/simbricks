@@ -24,7 +24,7 @@
 
 #include "trace/parser/parser.h"
 
-//#define PARSER_DEBUG_GEM5_ 1
+// #define PARSER_DEBUG_GEM5_ 1
 
 #include <errno.h>
 #include <inttypes.h>
@@ -46,7 +46,9 @@ bool Gem5Parser::skip_till_address() {
   return true;
 }
 
-bool Gem5Parser::parse_event(uint64_t timestamp, std::string &symbol) {
+bool Gem5Parser::parse_event(
+    corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp,
+    std::string &symbol) {
   // NOTE: currently micro ops are ignored
   if (line_reader_.consume_and_trim_char('.')) {
 #ifdef PARSER_DEBUG_GEM5_
@@ -59,17 +61,16 @@ bool Gem5Parser::parse_event(uint64_t timestamp, std::string &symbol) {
   // TODO: parse events from other components?
   // TODO: parse more different events!
 
-  HostCall e(timestamp, symbol);
-  std::cout << identifier_ << ": " << e << std::endl;
+  sink(std::make_shared<HostCall>(timestamp, symbol));
   return true;
 }
 
-bool Gem5Parser::parse(const std::string &log_file_path) {
-  if (!line_reader_.open_file(log_file_path)) {
+void Gem5Parser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
+  if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
 #endif
-    return false;
+    return;
   }
 
   std::string component;
@@ -128,7 +129,7 @@ bool Gem5Parser::parse(const std::string &log_file_path) {
     }
 
     // parse instructions
-    if (!parse_event(timestamp, symbol)) {
+    if (!parse_event(sink, timestamp, symbol)) {
 #ifdef PARSER_DEBUG_GEM5_
       DFLOGIN("%s: could not parse event in '%s'\n", identifier_.c_str(),
               line_reader_.get_raw_line().c_str());
@@ -136,5 +137,5 @@ bool Gem5Parser::parse(const std::string &log_file_path) {
     }
   }
 
-  return true;
+  return;
 }

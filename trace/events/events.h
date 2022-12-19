@@ -26,8 +26,11 @@
 #define SIMBRICKS_TRACE_EVENTS_H_
 
 #include <cstdint>
+#include <memory>
 #include <ostream>
 #include <string>
+
+#include "trace/corobelt/belt.h"
 
 class Event {
  public:
@@ -107,7 +110,7 @@ class NicDmaE : public NicDma {
       : NicDma(ts, id, addr, len) {
   }
 
-  void display(std::ostream &os) {
+  void display(std::ostream &os) override {
     os << "N.DMAC ";
     NicDma::display(os);
   }
@@ -119,7 +122,7 @@ class NicDmaCR : public NicDma {
       : NicDma(ts, id, addr, len) {
   }
 
-  void display(std::ostream &os) {
+  void display(std::ostream &os) override {
     os << "N.DMACR ";
     NicDma::display(os);
   }
@@ -131,7 +134,7 @@ class NicDmaCW : public NicDma {
       : NicDma(ts, id, addr, len) {
   }
 
-  void display(std::ostream &os) {
+  void display(std::ostream &os) override {
     os << "N.DMACW ";
     NicDma::display(os);
   }
@@ -185,7 +188,7 @@ class NicTrx : public Event {
   NicTrx(uint64_t ts, uint16_t len) : Event(ts), len_(len) {
   }
 
-  void display(std::ostream &os) {
+  void display(std::ostream &os) override {
     Event::display(os);
     os << ", len=" << len_;
   }
@@ -196,7 +199,7 @@ class NicTx : public NicTrx {
   NicTx(uint64_t ts, uint16_t len) : NicTrx(ts, len) {
   }
 
-  void display(std::ostream &os) {
+  void display(std::ostream &os) override {
     os << "N.TX ";
     NicTrx::display(os);
   }
@@ -207,7 +210,7 @@ class NicRx : public NicTrx {
   NicRx(uint64_t ts, uint16_t len) : NicTrx(ts, len) {
   }
 
-  void display(std::ostream &os) {
+  void display(std::ostream &os) override {
     os << "N.RX ";
     NicTrx::display(os);
   }
@@ -221,6 +224,16 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
 struct EventComperator {
   bool operator()(const Event &e1, const Event &e2) {
     return e1.timestamp_ < e2.timestamp_;
+  }
+};
+
+class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
+ public:
+  void consume(corobelt::coro_pull_t<std::shared_ptr<Event>> &source) {
+    for (std::shared_ptr<Event> event : source) {
+      std::cout << "EventPrinter: " << *event << std::endl;
+    }
+    return;
   }
 };
 

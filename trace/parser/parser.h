@@ -25,16 +25,19 @@
 #ifndef SIMBRICKS_TRACE_PARSER_H_
 #define SIMBRICKS_TRACE_PARSER_H_
 
+#include <memory>
 #include <string>
 
+#include "trace/corobelt/belt.h"
 #include "trace/events/events.h"
 #include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
 
-class LogParser {
+class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
  protected:
-  const std::string &identifier_;
+  const std::string identifier_;
+  const std::string log_file_path_;
   LineReader &line_reader_;
 
   bool parse_timestamp(uint64_t &timestamp);
@@ -42,10 +45,18 @@ class LogParser {
   bool parse_address(uint64_t &address);
 
  public:
-  explicit LogParser(const std::string &identifier, LineReader &line_reader)
-      : identifier_(identifier), line_reader_(line_reader){};
+  explicit LogParser(const std::string identifier,
+                     const std::string log_file_path, LineReader &line_reader)
+      : identifier_(std::move(identifier)),
+        log_file_path_(std::move(log_file_path)),
+        line_reader_(line_reader){};
 
-  virtual bool parse(const std::string &log_file_path) = 0;
+  // virtual bool parse(const std::string &log_file_path) = 0;
+
+  virtual void produce(
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
+    return;
+  };
 };
 
 class Gem5Parser : public LogParser {
@@ -53,19 +64,21 @@ class Gem5Parser : public LogParser {
   ComponentFilter &component_table_;
 
  protected:
-  bool parse_event(uint64_t timestamp, std::string &symbol);
+  bool parse_event(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
+                   uint64_t timestamp, std::string &symbol);
 
   bool skip_till_address();
 
  public:
-  explicit Gem5Parser(const std::string &identifier, SymsFilter &symbol_table,
+  explicit Gem5Parser(const std::string identifier,
+                      const std::string log_file_path, SymsFilter &symbol_table,
                       ComponentFilter &component_table, LineReader &line_reader)
-      : LogParser(identifier, line_reader),
+      : LogParser(std::move(identifier), std::move(log_file_path), line_reader),
         symbol_table_(symbol_table),
         component_table_(component_table) {
   }
 
-  bool parse(const std::string &log_file_path) override;
+  void produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override;
 };
 
 class NicBmParser : public LogParser {
@@ -80,11 +93,13 @@ class NicBmParser : public LogParser {
   bool parse_sync_info(bool &sync_pcie, bool &sync_eth);
 
  public:
-  explicit NicBmParser(const std::string &identifier, LineReader &line_reader)
-      : LogParser(identifier, line_reader) {
+  explicit NicBmParser(const std::string identifier,
+                       const std::string log_file_path, LineReader &line_reader)
+      : LogParser(std::move(identifier), std::move(log_file_path),
+                  line_reader) {
   }
 
-  bool parse(const std::string &log_file_path) override;
+  void produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override;
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

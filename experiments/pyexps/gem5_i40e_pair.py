@@ -60,6 +60,7 @@ gem5BaseLogFilePath = '--debug-file /OS/endhost-networking/work/sim/jakob/simbri
 for h in servers + clients:
     h.cpu_type = 'TimingSimpleCPU'
     h.cpu_type_cp = 'TimingSimpleCPU'
+    h.variant = 'opt'
 
 for s in servers:
     logFile = gem5BaseLogFilePath + '/gem5-server-log.log'

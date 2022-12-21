@@ -42,7 +42,7 @@ client_config.app = PingClient(server_ip = '10.0.0.2', count=5)
 client = Gem5Host(client_config)
 client.name = 'client'
 client.wait = True  # wait for client simulator to finish execution
-client.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-client-log.log --debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecFaulting,ExecUser,ExecKernel']
+client.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-client-log.log --debug-flags=SimBricksAll,SyscallAll,ExecAll,EthernetAll,PciDevice,PciHost']
 client.variant = 'opt'
 e.add_host(client)
 
@@ -58,7 +58,7 @@ server_config.ip = '10.0.0.2'
 server_config.app = IdleHost()
 server = Gem5Host(server_config)
 server.name = 'server'
-server.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-server-log.log --debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecFaulting,ExecUser,ExecKernel']
+server.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-server-log.log --debug-flags=SimBricksAll,SyscallAll,ExecAll,EthernetAll,PciDevice,PciHost']
 server.variant = 'opt'
 e.add_host(server)
 

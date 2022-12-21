@@ -54,12 +54,27 @@ clients = create_basic_hosts(
     ip_start=2
 )
 
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecAll,EthernetAll,PciDevice,PciHost'
+gem5BaseLogFilePath = '--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out'
+
 for h in servers + clients:
     h.cpu_type = 'TimingSimpleCPU'
     h.cpu_type_cp = 'TimingSimpleCPU'
 
+for s in servers:
+    logFile = gem5BaseLogFilePath + '/gem5-server-log.log'
+    s.extra_main_args = [logFile, gem5DebugFlags]
+    nic = s.pcidevs[0]
+    nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/server-nic.log'
+
+index = 0
 for c in clients:
+    index += 1
     c.wait = True
     c.node_config.app.server_ip = servers[0].node_config.ip
+    logFile = gem5BaseLogFilePath + '/gem5-cliet-{}-log.log'.format(index)
+    c.extra_main_args = [logFile, gem5DebugFlags]
+    nic = c.pcidevs[0]
+    nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/client-{}-nic.log'.format(index)
 
 experiments = [e]

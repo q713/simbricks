@@ -64,12 +64,18 @@ class HostCall : public Event {
 class NicMsix : public Event {
  public:
   uint16_t vec_;
+  bool isX_;
 
-  NicMsix(uint64_t ts, uint16_t vec) : Event(ts), vec_(vec) {
+  NicMsix(uint64_t ts, uint16_t vec, bool isX)
+      : Event(ts), vec_(vec), isX_(isX) {
   }
 
   void display(std::ostream &os) override {
-    os << "N.MSIX ";
+    if (isX_) {
+      os << "N.MSIX ";
+    } else {
+      os << "N.MSI ";
+    }
     Event::display(os);
     os << ", vec=" << vec_;
   }
@@ -92,6 +98,20 @@ class NicDma : public Event {
   }
 };
 
+class SetIX : public Event {
+ public:
+  uint64_t intr_;
+
+  SetIX(uint64_t ts, uint64_t intr) : Event(ts), intr_(intr) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "N.SETIX ";
+    Event::display(os);
+    os << "interrupt=" << std::hex << intr_;
+  }
+};
+
 class NicDmaI : public NicDma {
  public:
   NicDmaI(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
@@ -104,14 +124,26 @@ class NicDmaI : public NicDma {
   }
 };
 
-class NicDmaE : public NicDma {
+class NicDmaEx : public NicDma {
  public:
-  NicDmaE(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+  NicDmaEx(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
       : NicDma(ts, id, addr, len) {
   }
 
   void display(std::ostream &os) override {
-    os << "N.DMAC ";
+    os << "N.DMAEX ";
+    NicDma::display(os);
+  }
+};
+
+class NicDmaEn : public NicDma {
+ public:
+  NicDmaEn(uint64_t ts, uint64_t id, uint64_t addr, uint64_t len)
+      : NicDma(ts, id, addr, len) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "N.DMAEN ";
     NicDma::display(os);
   }
 };
@@ -206,13 +238,17 @@ class NicTx : public NicTrx {
 };
 
 class NicRx : public NicTrx {
+  uint64_t port_;
+
  public:
-  NicRx(uint64_t ts, uint16_t len) : NicTrx(ts, len) {
+  NicRx(uint64_t ts, uint64_t port, uint16_t len)
+      : NicTrx(ts, len), port_(port) {
   }
 
   void display(std::ostream &os) override {
     os << "N.RX ";
     NicTrx::display(os);
+    os << ", port=" << port_;
   }
 };
 

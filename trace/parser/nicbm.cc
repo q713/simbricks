@@ -31,6 +31,29 @@
 #include "trace/events/events.h"
 #include "trace/parser/parser.h"
 
+/*
+ * NOTE: in the following is a list of prints from the nicbm which are currently
+ *       not parsed by this parser.
+ *
+ * - "issue_dma: write too big (%zu), can only fit up to (%zu)\n",op.len_,
+ *   maxlen - sizeof(struct SimbricksProtoPcieH2DReadcomp)
+ * - "issue_dma: write too big (%zu), can only fit up to (%zu)\n", op.len_,
+ *   maxlen
+ * - sizeof(*write)
+ * - "D2NAlloc: entry successfully allocated\n"
+ * - "D2NAlloc: warning waiting for entry (%zu)\n",nicif_.pcie.base.out_pos
+ * - "D2HAlloc: entry successfully allocated\n"
+ * - "D2HAlloc: warning waiting for entry (%zu)\n", nicif_.pcie.base.out_pos
+ * - "Runner::D2HAlloc: peer already terminated\n"
+ * - "[%p] main_time = %lu\n", r, r->TimePs()
+ * - "poll_h2d: peer terminated\n"
+ * - "poll_h2d: unsupported type=%u\n", type
+ * - "poll_n2d: unsupported type=%u", t
+ * - "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_
+ * - "exit main_time: %lu\n", main_time_
+ * - statistics output at the end....
+ */
+
 bool NicBmParser::parse_sync_info(bool &sync_pcie, bool &sync_eth) {
   if (line_reader_.consume_and_trim_till_string("sync_pci")) {
     if (!line_reader_.consume_and_trim_char('=')) {
@@ -231,7 +254,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
 #endif
   }
 
-  uint64_t timestamp, off, val, op, addr, vec, len, pending;
+  uint64_t timestamp, off, val, op, addr, vec, len, pending, port;
   // parse the actual events of interest
   while (line_reader_.next_line()) {
     line_reader_.trimL();
@@ -283,58 +306,98 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           continue;
         }
         sink(std::make_shared<NicMmioR>(timestamp, off, len, val));
+        continue;
 
       } else if (line_reader_.consume_and_trim_till_string("write(")) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
         sink(std::make_shared<NicMmioW>(timestamp, off, len, val));
+        continue;
 
       } else if (line_reader_.consume_and_trim_till_string("issuing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
         sink(std::make_shared<NicDmaI>(timestamp, op, addr, len));
+        continue;
 
       } else if (line_reader_.consume_and_trim_till_string("executing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaE>(timestamp, op, addr, len));
+        sink(std::make_shared<NicDmaEx>(timestamp, op, addr, len));
+        continue;
 
-      } else if (line_reader_.consume_and_trim_till_string(
-                     "completed dma read")) {
-        if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
+      } else if (line_reader_.consume_and_trim_till_string("enqueuing dma")) {
+        if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaCR>(timestamp, op, addr, len));
+        sink(std::make_shared<NicDmaEn>(timestamp, op, addr, len));
+        continue;
 
-      } else if (line_reader_.consume_and_trim_till_string(
-                     "completed dma write")) {
-        if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
+      } else if (line_reader_.consume_and_trim_till_string("completed dma")) {
+        if (line_reader_.consume_and_trim_till_string("read")) {
+          if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
+            continue;
+          }
+          sink(std::make_shared<NicDmaCR>(timestamp, op, addr, len));
+        } else if (line_reader_.consume_and_trim_till_string("write")) {
+          if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
+            continue;
+          }
+          sink(std::make_shared<NicDmaCW>(timestamp, op, addr, len));
+        }
+        continue;
+
+      } else if (line_reader_.consume_and_trim_till_string("issue MSI")) {
+        bool isX;
+        if (line_reader_.consume_and_trim_till_string("-X interrupt vec ")) {
+          isX = true;
+        } else if (line_reader_.consume_and_trim_till_string(
+                       "interrupt vec ")) {
+          isX = false;
+        } else {
           continue;
         }
-        sink(std::make_shared<NicDmaCW>(timestamp, op, addr, len));
-
-      } else if (line_reader_.consume_and_trim_till_string(
-                     "issue MSI-X interrupt vec ")) {
         if (!line_reader_.parse_uint_trim(10, vec)) {
           continue;
         }
-        sink(std::make_shared<NicMsix>(timestamp, vec));
+        sink(std::make_shared<NicMsix>(timestamp, vec, isX));
+        continue;
 
-      } else if (line_reader_.consume_and_trim_till_string("eth tx: len ")) {
-        if (!line_reader_.parse_uint_trim(10, len)) {
+      } else if (line_reader_.consume_and_trim_till_string("eth")) {
+        if (line_reader_.consume_and_trim_till_string("tx: len ")) {
+          if (!line_reader_.parse_uint_trim(10, len)) {
+            continue;
+          }
+          sink(std::make_shared<NicTx>(timestamp, len));
+          continue;
+
+        } else if (line_reader_.consume_and_trim_till_string("rx: port ")) {
+          if (!line_reader_.parse_uint_trim(10, port)) {
+            continue;
+          }
+          if (!line_reader_.consume_and_trim_till_string("len ")) {
+            continue;
+          }
+          if (!line_reader_.parse_uint_trim(10, len)) {
+            continue;
+          }
+          sink(std::make_shared<NicRx>(timestamp, port, len));
+        }
+        continue;
+
+      } else if (line_reader_.consume_and_trim_till_string("set intx interrupt")) {
+        if (!parse_address(addr)) {
           continue;
         }
-        sink(std::make_shared<NicTx>(timestamp, len));
-
-      } else if (line_reader_.consume_and_trim_till_string(
-                     "eth rx: port 0 len ")) {
-        if (!line_reader_.parse_uint_trim(10, len)) {
-          continue;
-        }
-        sink(std::make_shared<NicRx>(timestamp, len));
+        sink(std::make_shared<SetIX>(timestamp, addr));
+        continue;
+        
+      } else if (line_reader_.consume_and_trim_till_string("dma write data")) {
+        // ignrore this event, maybe parse data if it turns out to be helpful
+        continue;
         
       } else {
 #ifdef PARSER_DEBUG_NICBM_

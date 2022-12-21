@@ -74,23 +74,7 @@ class IntPrinter : public corobelt::Consumer<int> {
 };
 
 int main(int argc, char *argv[]) {
-  /*
-  IntProd gen1(1);
-  IntProd gen2(2);
-  IntAdder adder1;
-  IntAdder adder2;
-  IntAdder adder3;
-  IntPrinter printer;
-  corobelt::Pipeline<int> pipeline1(&gen1, {&adder1});
-  corobelt::Pipeline<int> pipeline2(&gen2, {&adder2});
-  corobelt::Collector<int> collector({&pipeline1, &pipeline2});
-  corobelt::Pipeline<int> pipeline3(&collector, {&adder3});
-  corobelt::Awaiter<int> awaiter(&pipeline3, &printer);
-  if (!awaiter.await_termination()) {
-    std::cout << "could not await termination of the pipeline" << std::endl;
-  }
-  */
-
+  
   std::string linux_dump;
   std::string gem5_log;
   std::string nicbm_log;

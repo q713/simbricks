@@ -23,22 +23,23 @@
  */
 
 #include "lib/simbricks/nicbm/nicbm.h"
-#include "lib/utils/cxxopts.hpp"
-#include "lib/utils/string_util.h"
 
 #include <fcntl.h>
+#include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <getopt.h>
 
 #include <cassert>
 #include <ctime>
 #include <iostream>
 #include <vector>
+
+#include "lib/utils/cxxopts.hpp"
+#include "lib/utils/string_util.h"
 
 extern "C" {
 #include <simbricks/base/proto.h>
@@ -99,7 +100,7 @@ volatile union SimbricksProtoPcieD2H *Runner::D2HAlloc() {
   while ((msg = SimbricksPcieIfD2HOutAlloc(&nicif_.pcie, main_time_)) == NULL) {
     if (first) {
       DFLOGWARNLOG(log_, "D2HAlloc: warning waiting for entry (%zu)\n",
-              nicif_.pcie.base.out_pos);
+                   nicif_.pcie.base.out_pos);
       first = false;
     }
     YieldPoll();
@@ -118,7 +119,7 @@ volatile union SimbricksProtoNetMsg *Runner::D2NAlloc() {
   while ((msg = SimbricksNetIfOutAlloc(&nicif_.net, main_time_)) == NULL) {
     if (first) {
       DFLOGWARNLOG(log_, "D2NAlloc: warning waiting for entry (%zu)\n",
-              nicif_.pcie.base.out_pos);
+                   nicif_.pcie.base.out_pos);
       first = false;
     }
     YieldPoll();
@@ -134,16 +135,18 @@ void Runner::IssueDma(DMAOp &op) {
   if (dma_pending_ < DMA_MAX_PENDING) {
     // can directly issue
 #ifdef DEBUG_NICBM
-    DFLOGINFLOG(log_, 
-        "main_time = %lu: nicbm: issuing dma op %p addr %lx len %zu pending %zu\n",
-        main_time_, &op, op.dma_addr_, op.len_, dma_pending_);
+    DFLOGINFLOG(log_,
+                "main_time = %lu: nicbm: issuing dma op %p addr %lx len %zu "
+                "pending %zu\n",
+                main_time_, &op, op.dma_addr_, op.len_, dma_pending_);
 #endif
     DmaDo(op);
   } else {
 #ifdef DEBUG_NICBM
     DFLOGINFLOG(log_,
-       "main_time = %lu: nicbm: enqueuing dma op %p addr %lx len %zu pending %zu\n",
-        main_time_, &op, op.dma_addr_, op.len_, dma_pending_);
+                "main_time = %lu: nicbm: enqueuing dma op %p addr %lx len %zu "
+                "pending %zu\n",
+                main_time_, &op, op.dma_addr_, op.len_, dma_pending_);
 #endif
     dma_queue_.push_back(&op);
   }
@@ -166,18 +169,19 @@ void Runner::DmaDo(DMAOp &op) {
   volatile union SimbricksProtoPcieD2H *msg = D2HAlloc();
   dma_pending_++;
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, 
-      "main_time = %lu: nicbm: executing dma op %p addr %lx len %zu pending %zu\n",
-      main_time_, &op, op.dma_addr_, op.len_, dma_pending_);
+  DFLOGINFLOG(log_,
+              "main_time = %lu: nicbm: executing dma op %p addr %lx len %zu "
+              "pending %zu\n",
+              main_time_, &op, op.dma_addr_, op.len_, dma_pending_);
 #endif
 
   size_t maxlen = SimbricksBaseIfOutMsgLen(&nicif_.pcie.base);
   if (op.write_) {
     volatile struct SimbricksProtoPcieD2HWrite *write = &msg->write;
     if (maxlen < sizeof(*write) + op.len_) {
-      DFLOGERRLOG(log_, 
-              "issue_dma: write too big (%zu), can only fit up to (%zu)\n",
-              op.len_, maxlen - sizeof(*write));
+      DFLOGERRLOG(log_,
+                  "issue_dma: write too big (%zu), can only fit up to (%zu)\n",
+                  op.len_, maxlen - sizeof(*write));
       abort();
     }
 
@@ -200,10 +204,9 @@ void Runner::DmaDo(DMAOp &op) {
   } else {
     volatile struct SimbricksProtoPcieD2HRead *read = &msg->read;
     if (maxlen < sizeof(struct SimbricksProtoPcieH2DReadcomp) + op.len_) {
-      DFLOGERRLOG(log_, 
-                  "issue_dma: write too big (%zu), can only fit up to (%zu)\n",
-                  op.len_, 
-                  maxlen - sizeof(struct SimbricksProtoPcieH2DReadcomp));
+      DFLOGERRLOG(
+          log_, "issue_dma: write too big (%zu), can only fit up to (%zu)\n",
+          op.len_, maxlen - sizeof(struct SimbricksProtoPcieH2DReadcomp));
       abort();
     }
 
@@ -221,8 +224,8 @@ void Runner::MsiIssue(uint8_t vec) {
 
   volatile union SimbricksProtoPcieD2H *msg = D2HAlloc();
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: issue MSI interrupt vec %u\n", main_time_,
-         vec);
+  DFLOGINFLOG(log_, "main_time = %lu: nicbm: issue MSI interrupt vec %u\n",
+              main_time_, vec);
 #endif
   volatile struct SimbricksProtoPcieD2HInterrupt *intr = &msg->interrupt;
   intr->vector = vec;
@@ -238,7 +241,7 @@ void Runner::MsiXIssue(uint8_t vec) {
 
   volatile union SimbricksProtoPcieD2H *msg = D2HAlloc();
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: issue MSI-X interrupt vec %u\n", 
+  DFLOGINFLOG(log_, "main_time = %lu: nicbm: issue MSI-X interrupt vec %u\n",
               main_time_, vec);
 #endif
   volatile struct SimbricksProtoPcieD2HInterrupt *intr = &msg->interrupt;
@@ -255,7 +258,8 @@ void Runner::IntXIssue(bool level) {
 
   volatile union SimbricksProtoPcieD2H *msg = D2HAlloc();
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: set intx interrupt %u\n", main_time_, level);
+  DFLOGINFLOG(log_, "main_time = %lu: nicbm: set intx interrupt %u\n",
+              main_time_, level);
 #endif
   volatile struct SimbricksProtoPcieD2HInterrupt *intr = &msg->interrupt;
   intr->vector = 0;
@@ -289,8 +293,9 @@ void Runner::H2DRead(volatile struct SimbricksProtoPcieH2DRead *read) {
   memcpy(&dbg_val, (const void *)rc->data, read->len <= 8 ? read->len : 8);
   auto offset = read->offset;
   auto len = read->len;
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: read(off=0x%lx, len=%u, val=0x%lx)\n",
-         main_time_, offset, len, dbg_val);
+  DFLOGINFLOG(log_,
+              "main_time = %lu: nicbm: read(off=0x%lx, len=%u, val=0x%lx)\n",
+              main_time_, offset, len, dbg_val);
 #endif
 
   SimbricksPcieIfD2HOutSend(&nicif_.pcie, msg,
@@ -309,8 +314,9 @@ void Runner::H2DWrite(volatile struct SimbricksProtoPcieH2DWrite *write) {
   memcpy(&dbg_val, (const void *)write->data, write->len <= 8 ? write->len : 8);
   auto offset = write->offset;
   auto len = write->len;
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: write(off=0x%lx, len=%u, val=0x%lx)\n",
-         main_time_, offset, len, dbg_val);
+  DFLOGINFLOG(log_,
+              "main_time = %lu: nicbm: write(off=0x%lx, len=%u, val=0x%lx)\n",
+              main_time_, offset, len, dbg_val);
 #endif
   dev_.RegWrite(write->bar, write->offset, (void *)write->data, write->len);
   wc->req_id = write->req_id;
@@ -323,8 +329,10 @@ void Runner::H2DReadcomp(volatile struct SimbricksProtoPcieH2DReadcomp *rc) {
   DMAOp *op = (DMAOp *)(uintptr_t)rc->req_id;
 
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: completed dma read op %p addr %lx len %zu\n",
-         main_time_, op, op->dma_addr_, op->len_);
+  DFLOGINFLOG(
+      log_,
+      "main_time = %lu: nicbm: completed dma read op %p addr %lx len %zu\n",
+      main_time_, op, op->dma_addr_, op->len_);
 #endif
 
   memcpy(op->data_, (void *)rc->data, op->len_);
@@ -338,8 +346,10 @@ void Runner::H2DWritecomp(volatile struct SimbricksProtoPcieH2DWritecomp *wc) {
   DMAOp *op = (DMAOp *)(uintptr_t)wc->req_id;
 
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: completed dma write op %p addr %lx len %zu\n",
-         main_time_, op, op->dma_addr_, op->len_);
+  DFLOGINFLOG(
+      log_,
+      "main_time = %lu: nicbm: completed dma write op %p addr %lx len %zu\n",
+      main_time_, op, op->dma_addr_, op->len_);
 #endif
 
   dev_.DmaComplete(*op);
@@ -355,8 +365,8 @@ void Runner::H2DDevctrl(volatile struct SimbricksProtoPcieH2DDevctrl *dc) {
 void Runner::EthRecv(volatile struct SimbricksProtoNetMsgPacket *packet) {
 #ifdef DEBUG_NICBM
   auto len = packet->len;
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: eth rx: port %u len %u\n", main_time_,
-         packet->port, len);
+  DFLOGINFLOG(log_, "main_time = %lu: nicbm: eth rx: port %u len %u\n",
+              main_time_, packet->port, len);
 #endif
 
   dev_.EthRx(packet->port, (void *)packet->data, packet->len);
@@ -364,7 +374,8 @@ void Runner::EthRecv(volatile struct SimbricksProtoNetMsgPacket *packet) {
 
 void Runner::EthSend(const void *data, size_t len) {
 #ifdef DEBUG_NICBM
-  DFLOGINFLOG(log_, "main_time = %lu: nicbm: eth tx: len %zu\n", main_time_, len);
+  DFLOGINFLOG(log_, "main_time = %lu: nicbm: eth tx: len %zu\n", main_time_,
+              len);
 #endif
 
   volatile union SimbricksProtoNetMsg *msg = D2NAlloc();
@@ -544,33 +555,32 @@ Runner::Runner(Device &dev) : main_time_(0), dev_(dev), events_(EventCmp()) {
 }
 
 int Runner::ParseArgs(int argc, char *argv[]) {
-
   cxxopts::Options options("nicbm", "");
   std::string sync_mode;
   std::string pci_sock_path;
   std::string eth_sock_path;
   std::string shm_path;
-  options.add_options()
-    ("pci-socket", "", cxxopts::value<std::string>(pci_sock_path))
-    ("eth-socket", "", cxxopts::value<std::string>(eth_sock_path))
-    ("shm-path", "", cxxopts::value<std::string>(shm_path))
-    ("sync-mode", "", cxxopts::value<std::string>(sync_mode))
-    ("start-tick", "", cxxopts::value<uint64_t>())
-    ("sync-period", "", cxxopts::value<uint64_t>())
-    ("pci-latency", "", cxxopts::value<uint64_t>())
-    ("eth-latency", "", cxxopts::value<uint64_t>())
-    ("log-file-path", "path to a file to write the nic log into", cxxopts::value<std::string>())
-    ("mac-addr", "", cxxopts::value<uint64_t>())
-  ;
+  options.add_options()("pci-socket", "",
+                        cxxopts::value<std::string>(pci_sock_path))(
+      "eth-socket", "", cxxopts::value<std::string>(eth_sock_path))(
+      "shm-path", "", cxxopts::value<std::string>(shm_path))(
+      "sync-mode", "", cxxopts::value<std::string>(sync_mode))(
+      "start-tick", "", cxxopts::value<uint64_t>())("sync-period", "",
+                                                    cxxopts::value<uint64_t>())(
+      "pci-latency", "", cxxopts::value<uint64_t>())(
+      "eth-latency", "", cxxopts::value<uint64_t>())(
+      "log-file-path", "path to a file to write the nic log into",
+      cxxopts::value<std::string>())("mac-addr", "",
+                                     cxxopts::value<uint64_t>());
 
   cxxopts::ParseResult result;
   try {
     result = options.parse(argc, argv);
-    
+
     bool valid = false;
-    if (result.count("pci-socket") && result.count("eth-socket") 
-        && result.count("shm-path") && argc < 22) {
-      valid = true; 
+    if (result.count("pci-socket") && result.count("eth-socket") &&
+        result.count("shm-path") && argc < 22) {
+      valid = true;
     }
 
     if (!valid) {
@@ -584,9 +594,11 @@ int Runner::ParseArgs(int argc, char *argv[]) {
       return -1;
     }
 
-    if(!sim_string_utils::copy_and_assign_terminate(pcieParams_.sock_path, pci_sock_path)
-       || !sim_string_utils::copy_and_assign_terminate(netParams_.sock_path, eth_sock_path)
-       || !sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path)) {
+    if (!sim_string_utils::copy_and_assign_terminate(pcieParams_.sock_path,
+                                                     pci_sock_path) ||
+        !sim_string_utils::copy_and_assign_terminate(netParams_.sock_path,
+                                                     eth_sock_path) ||
+        !sim_string_utils::copy_and_assign_terminate(shmPath_, shm_path)) {
       fprintf(stderr, "Could not copy cli args to heap\n");
       return -1;
     }
@@ -598,18 +610,18 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     if (result.count("sync-period")) {
       uint64_t sync_interval = result["sync-period"].as<uint64_t>() * 1000ULL;
       netParams_.sync_interval = sync_interval;
-      pcieParams_.sync_interval = sync_interval;    
+      pcieParams_.sync_interval = sync_interval;
     }
     if (result.count("pci-latency")) {
       uint64_t link_latency = result["pci-latency"].as<uint64_t>() * 1000ULL;
-      pcieParams_.link_latency = link_latency; 
+      pcieParams_.link_latency = link_latency;
     }
     if (result.count("eth-latency")) {
       uint64_t link_latency = result["eth-latency"].as<uint64_t>() * 1000ULL;
       netParams_.link_latency = link_latency;
     }
     if (result.count("mac-addr")) {
-      uint64_t mac_addr = result["mac-addr"].as<uint64_t>(); 
+      uint64_t mac_addr = result["mac-addr"].as<uint64_t>();
       mac_addr_ = mac_addr;
     }
 
@@ -618,17 +630,18 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     sim_log::log_upt log;
 
     if (result.count("log-file-path")) {
-      // no copy needed, createLog will directly open the file and store the 'fd'
+      // no copy needed, createLog will directly open the file and store the
+      // 'fd'
       log_file_path = result["log-file-path"].as<std::string>();
       log_ = sim_log::Log::createLog(log_file_path.c_str());
     } else {
       log_ = sim_log::Log::createLog(sim_log::StdTarget::to_err);
     }
 #else
-  log_ = sim_log::Log::createLog(sim_log::StdTarget::to_err);
+    log_ = sim_log::Log::createLog(sim_log::StdTarget::to_err);
 #endif
 
-  } catch (const cxxopts::exceptions::exception& e) {
+  } catch (const cxxopts::exceptions::exception &e) {
     fprintf(stderr, "error parsing options: %s \n", e.what());
     return -1;
   }
@@ -657,12 +670,13 @@ int Runner::RunMain() {
 
   DFLOGINFLOG(log_, "mac_addr=%lx\n", mac_addr_);
   DFLOGINFLOG(log_, "sync_pci=%d sync_eth=%d\n", sync_pcie, sync_net);
-  
+
   bool is_sync = sync_pcie || sync_net;
 
   while (!exiting) {
     while (SimbricksNicIfSync(&nicif_, main_time_)) {
-      DFLOGERRLOG(log_, "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_);
+      DFLOGERRLOG(log_, "warn: SimbricksNicIfSync failed (t=%lu)\n",
+                  main_time_);
       YieldPoll();
     }
 
@@ -696,49 +710,50 @@ int Runner::RunMain() {
   DFLOGINFLOG(log_, "exit main_time: %lu\n", main_time_);
 #ifdef STAT_NICBM
   DFLOGINFLOG(log_, "%20s: %22lu %20s: %22lu  poll_suc_rate: %f\n",
-          "h2d_poll_total", h2d_poll_total, "h2d_poll_suc", h2d_poll_suc,
-          (double)h2d_poll_suc / h2d_poll_total);
+              "h2d_poll_total", h2d_poll_total, "h2d_poll_suc", h2d_poll_suc,
+              (double)h2d_poll_suc / h2d_poll_total);
 
   DFLOGINFLOG(log_, "%65s: %22lu  sync_rate: %f\n", "h2d_poll_sync",
-          h2d_poll_sync, (double)h2d_poll_sync / h2d_poll_suc);
+              h2d_poll_sync, (double)h2d_poll_sync / h2d_poll_suc);
 
   DFLOGINFLOG(log_, "%20s: %22lu %20s: %22lu  poll_suc_rate: %f\n",
-          "n2d_poll_total", n2d_poll_total, "n2d_poll_suc", n2d_poll_suc,
-          (double)n2d_poll_suc / n2d_poll_total);
+              "n2d_poll_total", n2d_poll_total, "n2d_poll_suc", n2d_poll_suc,
+              (double)n2d_poll_suc / n2d_poll_total);
 
   DFLOGINFLOG(log_, "%65s: %22lu  sync_rate: %f\n", "n2d_poll_sync",
-          n2d_poll_sync, (double)n2d_poll_sync / n2d_poll_suc);
+              n2d_poll_sync, (double)n2d_poll_sync / n2d_poll_suc);
 
-  DFLOGINFLOG(log_, "%20s: %22lu %20s: %22lu  sync_rate: %f\n", "recv_total",
+  DFLOGINFLOG(
+      log_, "%20s: %22lu %20s: %22lu  sync_rate: %f\n", "recv_total",
       h2d_poll_suc + n2d_poll_suc, "recv_sync", h2d_poll_sync + n2d_poll_sync,
       (double)(h2d_poll_sync + n2d_poll_sync) / (h2d_poll_suc + n2d_poll_suc));
 
   DFLOGINFLOG(log_, "%20s: %22lu %20s: %22lu  poll_suc_rate: %f\n",
-          "s_h2d_poll_total", s_h2d_poll_total, "s_h2d_poll_suc",
-          s_h2d_poll_suc, (double)s_h2d_poll_suc / s_h2d_poll_total);
+              "s_h2d_poll_total", s_h2d_poll_total, "s_h2d_poll_suc",
+              s_h2d_poll_suc, (double)s_h2d_poll_suc / s_h2d_poll_total);
 
   DFLOGINFLOG(log_, "%65s: %22lu  sync_rate: %f\n", "s_h2d_poll_sync",
-          s_h2d_poll_sync, (double)s_h2d_poll_sync / s_h2d_poll_suc);
+              s_h2d_poll_sync, (double)s_h2d_poll_sync / s_h2d_poll_suc);
 
   DFLOGINFLOG(log_, "%20s: %22lu %20s: %22lu  poll_suc_rate: %f\n",
-          "s_n2d_poll_total", s_n2d_poll_total, "s_n2d_poll_suc",
-          s_n2d_poll_suc, (double)s_n2d_poll_suc / s_n2d_poll_total);
+              "s_n2d_poll_total", s_n2d_poll_total, "s_n2d_poll_suc",
+              s_n2d_poll_suc, (double)s_n2d_poll_suc / s_n2d_poll_total);
 
   DFLOGINFLOG(log_, "%65s: %22lu  sync_rate: %f\n", "s_n2d_poll_sync",
-          s_n2d_poll_sync, (double)s_n2d_poll_sync / s_n2d_poll_suc);
+              s_n2d_poll_sync, (double)s_n2d_poll_sync / s_n2d_poll_suc);
 
   DFLOGINFLOG(log_, "%20s: %22lu %20s: %22lu  sync_rate: %f\n", "s_recv_total",
-          s_h2d_poll_suc + s_n2d_poll_suc, "s_recv_sync",
-          s_h2d_poll_sync + s_n2d_poll_sync,
-          (double)(s_h2d_poll_sync + s_n2d_poll_sync) /
-              (s_h2d_poll_suc + s_n2d_poll_suc));
+              s_h2d_poll_suc + s_n2d_poll_suc, "s_recv_sync",
+              s_h2d_poll_sync + s_n2d_poll_sync,
+              (double)(s_h2d_poll_sync + s_n2d_poll_sync) /
+                  (s_h2d_poll_suc + s_n2d_poll_suc));
 #endif
 
   SimbricksNicIfCleanup(&nicif_);
   // allocated in parse args, must be cleaned up
-  delete [] pcieParams_.sock_path;
-  delete [] netParams_.sock_path;
-  delete [] shmPath_;
+  delete[] pcieParams_.sock_path;
+  delete[] netParams_.sock_path;
+  delete[] shmPath_;
 
   return 0;
 }

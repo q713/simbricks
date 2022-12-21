@@ -22,18 +22,13 @@
 
 include mk/subdir_pre.mk
 
-#bin_trace_process := $(d)process
-#OBJS := $(addprefix $(d), process.o sym_map.o log_parser.o gem5.o nicbm.o)
-#$(bin_trace_process): $(OBJS) -lboost_iostreams -lboost_coroutine \
-#	-lboost_context
-
 bin_trace := $(d)trace	
 OBJS_TRACE := $(addprefix $(d), trace.o filter/symtable.o parser/parser.o \
 	parser/nicbm.o reader/reader.o parser/gem5.o)
 
 $(bin_trace): $(OBJS_TRACE) -lboost_coroutine -lboost_context
 
-CLEAN := $(bin_trace) $(OBJS_TRACE) #$(bin_trace_process) $(OBJS)
-ALL := $(bin_trace) # $(bin_trace_process)
+CLEAN := $(bin_trace) $(OBJS_TRACE)
+ALL := $(bin_trace)
 
 include mk/subdir_post.mk

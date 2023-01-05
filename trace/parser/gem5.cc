@@ -106,23 +106,35 @@ bool Gem5Parser::parse_simbricks_event(
     uint64_t id, addr, size;
     line_reader_.trimL();
     if (line_reader_.consume_and_trim_string("received ")) {
-      int isReadOrWrite = 0;
-      if (line_reader_.consume_and_trim_string("write ")) {
-        isReadOrWrite = -1;
-      } else if (line_reader_.consume_and_trim_string("read ")) {
-        isReadOrWrite = 1;
-      }
-      if (isReadOrWrite != 0 &&
+      if (line_reader_.consume_and_trim_string("write ") &&
           line_reader_.consume_and_trim_string("completion id ") &&
           line_reader_.parse_uint_trim(10, id)) {
-        if (isReadOrWrite == -1) {
-          sink(std::make_shared<HostMmioCW>(timestamp, this, id));
-        } else {
-          sink(std::make_shared<HostMmioCR>(timestamp, this, id));
-        }
+        sink(std::make_shared<HostMmioCW>(timestamp, this, id));
         return true;
+      } else if (line_reader_.consume_and_trim_string("read ") &&
+                 line_reader_.consume_and_trim_string("completion id ") &&
+                 line_reader_.parse_uint_trim(10, id)) {
+        sink(std::make_shared<HostMmioCR>(timestamp, this, id));
+        return true;
+      } else if (line_reader_.consume_and_trim_string("DMA ")) {
+        if (line_reader_.consume_and_trim_string("write id ") &&
+            line_reader_.parse_uint_trim(10, id) &&
+            line_reader_.consume_and_trim_string(" addr ") &&
+            line_reader_.parse_uint_trim(16, addr) &&
+            line_reader_.consume_and_trim_string(" size ") &&
+            line_reader_.parse_uint_trim(10, size)) {
+          sink(std::make_shared<HostDmaW>(timestamp, this, id, addr, size));
+          return true;
+        } else if (line_reader_.consume_and_trim_string("read id ") &&
+                   line_reader_.parse_uint_trim(10, id) &&
+                   line_reader_.consume_and_trim_string(" addr ") &&
+                   line_reader_.parse_uint_trim(16, addr) &&
+                   line_reader_.consume_and_trim_string(" size ") &&
+                   line_reader_.parse_uint_trim(10, size)) {
+          sink(std::make_shared<HostDmaR>(timestamp, this, id, addr, size));
+          return true;
+        }
       }
-
     } else if (line_reader_.consume_and_trim_string("sending ")) {
       int isReadWrite = 0;
       if (line_reader_.consume_and_trim_string("read addr ")) {
@@ -130,7 +142,7 @@ bool Gem5Parser::parse_simbricks_event(
       } else if (line_reader_.consume_and_trim_string("write addr ")) {
         isReadWrite = -1;
       } else if (line_reader_.consume_and_trim_string(
-                     "sending immediate response for posted write")) {
+                     "immediate response for posted write")) {
         sink(std::make_shared<HostMmioImRespPoW>(timestamp, this));
         return true;
       }
@@ -147,6 +159,10 @@ bool Gem5Parser::parse_simbricks_event(
         }
         return true;
       }
+    } else if (line_reader_.consume_and_trim_string("completed DMA id ") &&
+               line_reader_.parse_uint_trim(10, id)) {
+      sink(std::make_shared<HostDmaC>(timestamp, this, id));
+      return true;
     }
     // sending immediate response for posted write
   }
@@ -198,27 +214,20 @@ void Gem5Parser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
       line_reader_.trimL();
       if (!parse_simbricks_event(sink, timestamp)) {
 #ifdef PARSER_DEBUG_GEM5_
-        DFLOGERR("%s: could not parse simbricks event from line '%s'\n",
-                 identifier_.c_str(), line_reader_.get_raw_line().c_str());
+        DFLOGWARN("%s: could not parse simbricks event from line '%s'\n",
+                  identifier_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       }
       continue;
     }
 
-    if (component == "system.switch_cpus") {
-      if (!parse_switch_cpus_event(sink, timestamp)) {
+    if (!parse_switch_cpus_event(sink, timestamp)) {
 #ifdef PARSER_DEBUG_GEM5_
-        DFLOGIN("%s: could not parse system.switch_cpus event in line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+      DFLOGWARN("%s: could not parse event in line '%s'\n", identifier_.c_str(),
+                line_reader_.get_raw_line().c_str());
 #endif
-      }
       continue;
     }
-
-#ifdef PARSER_DEBUG_GEM5_
-    DFLOGIN("%s: could not parse event in line '%s'\n", identifier_.c_str(),
-            line_reader_.get_raw_line().c_str());
-#endif
   }
 
   return;

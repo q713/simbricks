@@ -84,6 +84,17 @@ class SymsFilter {
   virtual bool load_file(const std::string &file_path) = 0;
 };
 
+inline std::ostream &operator<<(std::ostream &os, SymsFilter &syms_filter) {
+  std::map<uint64_t, std::string> table = syms_filter.get_sym_table();
+
+  os << "SymsFilter:" << std::endl;
+  for (auto &key_val : table) {
+    os << "[" << key_val.first << "] = " << key_val.second << std::endl;
+  }
+  
+  return os;
+}
+
 /*
  * This class is used to parse a symbol table given in ELF format.
  * This could look as follows:

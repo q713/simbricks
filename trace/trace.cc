@@ -138,6 +138,10 @@ int main(int argc, char *argv[]) {
   // symbol filter to translate hex address to function-name/label
   LineReader ssymsLr;
   SymsSyms syms_filter{"SymbolTableFilter", ssymsLr};
+  if (!syms_filter.load_file(linux_dump)) {
+    std::cerr << "could not initialize symbol table" << std::endl;
+    exit(EXIT_FAILURE);
+  }
 
   // component filter to only parse events written from certain components
   ComponentFilter compF("Component Filter");
@@ -152,7 +156,7 @@ int main(int argc, char *argv[]) {
   // an awaiter to wait for the termination of the parsing + printing pipeline (a.k.a. to block)
   corobelt::Awaiter<std::shared_ptr<Event>> awaiter(&gem5Par, &eventPrinter);
   if (!awaiter.await_termination()) {
-    std::cout << "could not await termination of the pipeline" << std::endl;
+    std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }
 

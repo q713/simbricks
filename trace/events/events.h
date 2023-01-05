@@ -37,21 +37,21 @@
 class Event {
  public:
   uint64_t timestamp_;
-  const LogParser *src_;
+  LogParser *src_;
 
-  explicit Event(uint64_t ts, const LogParser *src)
-      : timestamp_(ts), src_(src) {
+  explicit Event(uint64_t ts, LogParser *src) : timestamp_(ts), src_(src) {
   }
 
   virtual void display(std::ostream &os) {
-    os << "Event: timestamp=" << timestamp_ << " ";
+    os << "Event: source=" << src_->getIdent() << ", timestamp=" << timestamp_
+       << " ";
   }
 };
 
 /* Simbricks Events */
 class SimSendSync : public Event {
  public:
-  explicit SimSendSync(uint64_t ts, const LogParser *src) : Event(ts, src) {
+  explicit SimSendSync(uint64_t ts, LogParser *src) : Event(ts, src) {
   }
 
   void display(std::ostream &os) override {
@@ -62,7 +62,7 @@ class SimSendSync : public Event {
 
 class SimProcInEvent : public Event {
  public:
-  explicit SimProcInEvent(uint64_t ts, const LogParser *src) : Event(ts, src) {
+  explicit SimProcInEvent(uint64_t ts, LogParser *src) : Event(ts, src) {
   }
 
   void display(std::ostream &os) override {
@@ -76,7 +76,7 @@ class HostCall : public Event {
  public:
   const std::string &func_;
 
-  HostCall(uint64_t ts, const LogParser *src, const std::string &func)
+  HostCall(uint64_t ts, LogParser *src, const std::string &func)
       : Event(ts, src), func_(func) {
   }
 
@@ -89,8 +89,7 @@ class HostCall : public Event {
 
 class HostMmioImRespPoW : public Event {
  public:
-  explicit HostMmioImRespPoW(uint64_t ts, const LogParser *src)
-      : Event(ts, src) {
+  explicit HostMmioImRespPoW(uint64_t ts, LogParser *src) : Event(ts, src) {
   }
 
   void display(std::ostream &os) override {
@@ -99,11 +98,11 @@ class HostMmioImRespPoW : public Event {
   }
 };
 
-class HostMmio : public Event {
+class HostIdOp : public Event {
   uint64_t id_;
 
  public:
-  explicit HostMmio(uint64_t ts, const LogParser *src, uint64_t id)
+  explicit HostIdOp(uint64_t ts, LogParser *src, uint64_t id)
       : Event(ts, src), id_(id) {
   }
 
@@ -113,68 +112,106 @@ class HostMmio : public Event {
   }
 };
 
-class HostMmioCR : public HostMmio {
+class HostMmioCR : public HostIdOp {
  public:
-  explicit HostMmioCR(uint64_t ts, const LogParser *src, uint64_t id)
-      : HostMmio(ts, src, id) {
+  explicit HostMmioCR(uint64_t ts, LogParser *src, uint64_t id)
+      : HostIdOp(ts, src, id) {
   }
 
   void display(std::ostream &os) override {
     os << "HostMmioCR ";
-    HostMmio::display(os);
+    HostIdOp::display(os);
   }
 };
-class HostMmioCW : public HostMmio {
+class HostMmioCW : public HostIdOp {
  public:
-  explicit HostMmioCW(uint64_t ts, const LogParser *src, uint64_t id)
-      : HostMmio(ts, src, id) {
+  explicit HostMmioCW(uint64_t ts, LogParser *src, uint64_t id)
+      : HostIdOp(ts, src, id) {
   }
 
   void display(std::ostream &os) override {
     os << "HostMmioCW ";
-    HostMmio::display(os);
+    HostIdOp::display(os);
   }
 };
 
-class HostMmioRW : public HostMmio {
+class HostAddrSizeOp : public HostIdOp {
   uint64_t addr_;
   uint64_t size_;
 
  public:
-  explicit HostMmioRW(uint64_t ts, const LogParser *src, uint64_t id,
-                      uint64_t addr, uint64_t size)
-      : HostMmio(ts, src, id) {
+  explicit HostAddrSizeOp(uint64_t ts, LogParser *src, uint64_t id,
+                          uint64_t addr, uint64_t size)
+      : HostIdOp(ts, src, id) {
   }
 
   void display(std::ostream &os) override {
-    HostMmio::display(os);
+    HostIdOp::display(os);
     os << ", addr=" << std::hex << addr_ << ", size=" << size_ << " ";
   }
 };
 
-class HostMmioR : public HostMmioRW {
+class HostMmioR : public HostAddrSizeOp {
  public:
-  explicit HostMmioR(uint64_t ts, const LogParser *src, uint64_t id,
-                     uint64_t addr, uint64_t size)
-      : HostMmioRW(ts, src, id, addr, size) {
+  explicit HostMmioR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+                     uint64_t size)
+      : HostAddrSizeOp(ts, src, id, addr, size) {
   }
 
   void display(std::ostream &os) override {
     os << "HostMmioR ";
-    HostMmioRW::display(os);
+    HostAddrSizeOp::display(os);
   }
 };
 
-class HostMmioW : public HostMmioRW {
+class HostMmioW : public HostAddrSizeOp {
  public:
-  explicit HostMmioW(uint64_t ts, const LogParser *src, uint64_t id,
-                     uint64_t addr, uint64_t size)
-      : HostMmioRW(ts, src, id, addr, size) {
+  explicit HostMmioW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+                     uint64_t size)
+      : HostAddrSizeOp(ts, src, id, addr, size) {
   }
 
   void display(std::ostream &os) override {
     os << "HostMmioW ";
-    HostMmioRW::display(os);
+    HostAddrSizeOp::display(os);
+  }
+};
+
+class HostDmaC : public HostIdOp {
+ public:
+  explicit HostDmaC(uint64_t ts, LogParser *src, uint64_t id)
+      : HostIdOp(ts, src, id) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostDmaC ";
+    HostIdOp::display(os);
+  }
+};
+
+class HostDmaR : public HostAddrSizeOp {
+ public:
+  explicit HostDmaR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+                    uint64_t size)
+      : HostAddrSizeOp(ts, src, id, addr, size) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostDmaR ";
+    HostAddrSizeOp::display(os);
+  }
+};
+
+class HostDmaW : public HostAddrSizeOp {
+ public:
+  explicit HostDmaW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+                    uint64_t size)
+      : HostAddrSizeOp(ts, src, id, addr, size) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostDmaW ";
+    HostAddrSizeOp::display(os);
   }
 };
 
@@ -184,7 +221,7 @@ class NicMsix : public Event {
   uint16_t vec_;
   bool isX_;
 
-  NicMsix(uint64_t ts, const LogParser *src, uint16_t vec, bool isX)
+  NicMsix(uint64_t ts, LogParser *src, uint16_t vec, bool isX)
       : Event(ts, src), vec_(vec), isX_(isX) {
   }
 
@@ -205,8 +242,7 @@ class NicDma : public Event {
   uint64_t addr_;
   uint64_t len_;
 
-  NicDma(uint64_t ts, const LogParser *src, uint64_t id, uint64_t addr,
-         uint64_t len)
+  NicDma(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr, uint64_t len)
       : Event(ts, src), id_(id), addr_(addr), len_(len) {
   }
 
@@ -221,7 +257,7 @@ class SetIX : public Event {
  public:
   uint64_t intr_;
 
-  SetIX(uint64_t ts, const LogParser *src, uint64_t intr)
+  SetIX(uint64_t ts, LogParser *src, uint64_t intr)
       : Event(ts, src), intr_(intr) {
   }
 
@@ -234,8 +270,7 @@ class SetIX : public Event {
 
 class NicDmaI : public NicDma {
  public:
-  NicDmaI(uint64_t ts, const LogParser *src, uint64_t id, uint64_t addr,
-          uint64_t len)
+  NicDmaI(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr, uint64_t len)
       : NicDma(ts, src, id, addr, len) {
   }
 
@@ -247,7 +282,7 @@ class NicDmaI : public NicDma {
 
 class NicDmaEx : public NicDma {
  public:
-  NicDmaEx(uint64_t ts, const LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaEx(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, src, id, addr, len) {
   }
@@ -260,7 +295,7 @@ class NicDmaEx : public NicDma {
 
 class NicDmaEn : public NicDma {
  public:
-  NicDmaEn(uint64_t ts, const LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaEn(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, src, id, addr, len) {
   }
@@ -273,7 +308,7 @@ class NicDmaEn : public NicDma {
 
 class NicDmaCR : public NicDma {
  public:
-  NicDmaCR(uint64_t ts, const LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaCR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, src, id, addr, len) {
   }
@@ -286,7 +321,7 @@ class NicDmaCR : public NicDma {
 
 class NicDmaCW : public NicDma {
  public:
-  NicDmaCW(uint64_t ts, const LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaCW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, src, id, addr, len) {
   }
@@ -303,8 +338,7 @@ class NicMmio : public Event {
   uint64_t len_;
   uint64_t val_;
 
-  NicMmio(uint64_t ts, const LogParser *src, uint64_t off, uint64_t len,
-          uint64_t val)
+  NicMmio(uint64_t ts, LogParser *src, uint64_t off, uint64_t len, uint64_t val)
       : Event(ts, src), off_(off), len_(len), val_(val) {
   }
 
@@ -317,7 +351,7 @@ class NicMmio : public Event {
 
 class NicMmioR : public NicMmio {
  public:
-  NicMmioR(uint64_t ts, const LogParser *src, uint64_t off, uint64_t len,
+  NicMmioR(uint64_t ts, LogParser *src, uint64_t off, uint64_t len,
            uint64_t val)
       : NicMmio(ts, src, off, len, val) {
   }
@@ -330,7 +364,7 @@ class NicMmioR : public NicMmio {
 
 class NicMmioW : public NicMmio {
  public:
-  NicMmioW(uint64_t ts, const LogParser *src, uint64_t off, uint64_t len,
+  NicMmioW(uint64_t ts, LogParser *src, uint64_t off, uint64_t len,
            uint64_t val)
       : NicMmio(ts, src, off, len, val) {
   }
@@ -345,7 +379,7 @@ class NicTrx : public Event {
  public:
   uint16_t len_;
 
-  NicTrx(uint64_t ts, const LogParser *src, uint16_t len)
+  NicTrx(uint64_t ts, LogParser *src, uint16_t len)
       : Event(ts, src), len_(len) {
   }
 

@@ -305,35 +305,35 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        sink(std::make_shared<NicMmioR>(timestamp, off, len, val));
+        sink(std::make_shared<NicMmioR>(timestamp, this, off, len, val));
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("write(")) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        sink(std::make_shared<NicMmioW>(timestamp, off, len, val));
+        sink(std::make_shared<NicMmioW>(timestamp, this, off, len, val));
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("issuing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaI>(timestamp, op, addr, len));
+        sink(std::make_shared<NicDmaI>(timestamp, this, op, addr, len));
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("executing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaEx>(timestamp, op, addr, len));
+        sink(std::make_shared<NicDmaEx>(timestamp, this, op, addr, len));
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("enqueuing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaEn>(timestamp, op, addr, len));
+        sink(std::make_shared<NicDmaEn>(timestamp, this, op, addr, len));
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("completed dma")) {
@@ -341,12 +341,12 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
-          sink(std::make_shared<NicDmaCR>(timestamp, op, addr, len));
+          sink(std::make_shared<NicDmaCR>(timestamp, this, op, addr, len));
         } else if (line_reader_.consume_and_trim_till_string("write")) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
-          sink(std::make_shared<NicDmaCW>(timestamp, op, addr, len));
+          sink(std::make_shared<NicDmaCW>(timestamp, this, op, addr, len));
         }
         continue;
 
@@ -363,7 +363,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
         if (!line_reader_.parse_uint_trim(10, vec)) {
           continue;
         }
-        sink(std::make_shared<NicMsix>(timestamp, vec, isX));
+        sink(std::make_shared<NicMsix>(timestamp, this, vec, isX));
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("eth")) {
@@ -371,7 +371,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           if (!line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
-          sink(std::make_shared<NicTx>(timestamp, len));
+          sink(std::make_shared<NicTx>(timestamp, this, len));
           continue;
 
         } else if (line_reader_.consume_and_trim_till_string("rx: port ")) {
@@ -384,7 +384,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           if (!line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
-          sink(std::make_shared<NicRx>(timestamp, port, len));
+          sink(std::make_shared<NicRx>(timestamp, this, port, len));
         }
         continue;
 
@@ -392,7 +392,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
         if (!parse_address(addr)) {
           continue;
         }
-        sink(std::make_shared<SetIX>(timestamp, addr));
+        sink(std::make_shared<SetIX>(timestamp, this, addr));
         continue;
         
       } else if (line_reader_.consume_and_trim_till_string("dma write data")) {

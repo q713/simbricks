@@ -29,10 +29,37 @@
 #include <string>
 
 #include "trace/corobelt/belt.h"
-#include "trace/events/events.h"
+//#include "trace/events/events.h"
 #include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
+
+class Event;
+class SimSendSync;
+class SimProcInEvent;
+class HostCall;
+class HostMmioImRespPoW;
+class HostMmio;
+class HostMmioCR;
+class HostMmioCW;
+class HostMmioRW;
+class HostMmioR;
+class HostMmioW;
+class NicMsix;
+class NicDma;
+class SetIX;
+class NicDmaI;
+class NicDmaEx;
+class NicDmaEn;
+class NicDmaCR;
+class NicDmaCW;
+class NicMmio;
+class NicMmioR;
+class NicMmioW;
+class NicTrx;
+class NicTx;
+class NicRx;
+
 
 class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
  protected:
@@ -51,7 +78,9 @@ class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
         log_file_path_(std::move(log_file_path)),
         line_reader_(line_reader){};
 
-  // virtual bool parse(const std::string &log_file_path) = 0;
+  const std::string &getIdent() {
+    return identifier_;
+  }
 
   virtual void produce(
       corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
@@ -66,8 +95,8 @@ class Gem5Parser : public LogParser {
  protected:
   bool skip_till_address();
 
-  bool parse_event(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
-                   uint64_t timestamp, std::string &symbol);
+  bool parse_switch_cpus_event(
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
 
   bool parse_simbricks_event(
       corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);

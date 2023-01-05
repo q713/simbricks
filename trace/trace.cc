@@ -26,7 +26,7 @@
 #include "lib/utils/log.h"
 #include "trace/corobelt/belt.h"
 #include "trace/filter/symtable.h"
-#include "trace/parser/parser.h"
+#include "trace/events/events.h"
 #include "trace/reader/reader.h"
 
 class IntProd : public corobelt::Producer<int> {
@@ -117,24 +117,6 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  // LineReader ssymsLr;
-  // SymsSyms syms_filter{"SymbolTableFilter", ssymsLr};
-  // syms_filter("entry_SYSCALL_64")
-  //   ("__do_sys_gettimeofday")
-  //   ("__sys_sendto")
-  //   ("i40e_lan_xmit_frame")
-  //   ("syscall_return_via_sysret")
-  //   ("__sys_recvfrom")
-  //   ("deactivate_task")
-  //   ("interrupt_entry")
-  //   ("i40e_msix_clean_rings")
-  //   ("napi_schedule_prep")
-  //   ("__do_softirq")
-  //   ("trace_napi_poll")
-  //   ("net_rx_action")
-  //   ("i40e_napi_poll")
-  //   ("activate_task")
-  //   ("copyout");
   // SSyms syms_filter("SymbolTableFilter", ssymsLr);
   // syms_filter("entry_SYSCALL_64")
   //   ("__do_sys_gettimeofday")
@@ -152,26 +134,26 @@ int main(int argc, char *argv[]) {
   //   ("i40e_napi_poll")
   //   ("activate_task")
   //   ("copyout");
-  // if (!syms_filter.load_file(linux_dump)) {
-  //   DFLOGERR("could not load file with path '%s'\n", linux_dump);
-  //   exit(EXIT_FAILURE);
-  // }
-  // ComponentFilter compF("Component Filter");
-  // compF("system.switch_cpus")("system.cpu");
-  // LineReader gem5Lr;
-  // Gem5Parser gem5Par{"Gem5Parser", syms_filter, compF, gem5Lr};
-  // if (!gem5Par.parse(gem5_log)) {
-  //   DFLOGERR("could not parse gem5 log file with path '%s'\n",
-  //            linux_dump.c_str());
-  //   exit(EXIT_FAILURE);
-  // }
 
-  LineReader lr;
-  NicBmParser nicBmPar("NicBmParser", nicbm_log, lr);
+  // symbol filter to translate hex address to function-name/label
+  LineReader ssymsLr;
+  SymsSyms syms_filter{"SymbolTableFilter", ssymsLr};
+
+  // component filter to only parse events written from certain components
+  ComponentFilter compF("Component Filter");
+  
+  // log parser that generates events
+  LineReader gem5Lr;
+  Gem5Parser gem5Par{"Gem5Parser", gem5_log, syms_filter, compF, gem5Lr};
+  
+  // printer to consume pipeline and to print events
   EventPrinter eventPrinter;
-  corobelt::Awaiter<std::shared_ptr<Event>> awaiter(&nicBmPar, &eventPrinter);
+
+  // an awaiter to wait for the termination of the parsing + printing pipeline (a.k.a. to block)
+  corobelt::Awaiter<std::shared_ptr<Event>> awaiter(&gem5Par, &eventPrinter);
   if (!awaiter.await_termination()) {
     std::cout << "could not await termination of the pipeline" << std::endl;
+    exit(EXIT_FAILURE);
   }
 
   exit(EXIT_SUCCESS);

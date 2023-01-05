@@ -32,6 +32,7 @@
 
 #include "trace/corobelt/belt.h"
 
+/* Parent class for all events of interest */
 class Event {
  public:
   uint64_t timestamp_;
@@ -41,6 +42,29 @@ class Event {
 
   virtual void display(std::ostream &os) {
     os << "Event: timestamp=" << timestamp_ << " ";
+  }
+};
+
+/* Simbricks Events */
+class SimSendSync : public Event {
+ public:
+  explicit SimSendSync(uint64_t ts) : Event(ts) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "simbricks: sending sync message ";
+    Event::display(os);
+  }
+};
+
+class SimProcInEvent : public Event {
+ public:
+  explicit SimProcInEvent(uint64_t ts) : Event(ts) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "simbricks: processInEvent ";
+    Event::display(os);
   }
 };
 

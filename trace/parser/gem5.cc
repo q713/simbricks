@@ -65,6 +65,23 @@ bool Gem5Parser::parse_event(
   return true;
 }
 
+bool Gem5Parser::parse_simbricks_event(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
+                           uint64_t timestamp) {
+  line_reader_.trimL();
+  if (line_reader_.consume_and_trim_string("processInEvent")) {
+    sink(std::make_shared<SimProcInEvent>(timestamp));
+    return true;
+  } else if (line_reader_.consume_and_trim_string("sending sync message")) {
+    sink(std::make_shared<SimSendSync>(timestamp));
+    return true;
+  } else {
+#ifdef PARSER_DEBUG_GEM5_
+    DFLOGERR("%s: found unknown simbricks event in line '%s'\n", identifier_.c_str(), line_reader_.get_raw_line().c_str());
+#endif
+    return false;
+  }
+}
+
 void Gem5Parser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
   if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_GEM5_
@@ -99,6 +116,17 @@ void Gem5Parser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
     }
     if (!component_table_.filter(component)) {
       continue;
+    }
+
+    if (line_reader_.consume_and_trim_string("simbricks:")) {
+      line_reader_.trimL();
+      if (!parse_simbricks_event(sink, timestamp)) {
+#ifdef PARSER_DEBUG_GEM5_
+        DFLOGERR("%s: could not parse simbricks event from line '%s'\n",
+                 identifier_.c_str(), line_reader_.get_raw_line().c_str());
+#endif
+        continue;
+      }
     }
 
     if (!skip_till_address()) {

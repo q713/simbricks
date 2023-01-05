@@ -43,6 +43,7 @@ class Log;
 
 using log_upt = std::unique_ptr<Log>;
 
+// TODO: add proper log levels (compile time)
 class Log {
  private:
   Log(FILE *file, StdTarget target) : file_(file), target_(target) {

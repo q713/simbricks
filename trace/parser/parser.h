@@ -64,10 +64,13 @@ class Gem5Parser : public LogParser {
   ComponentFilter &component_table_;
 
  protected:
+  bool skip_till_address();
+
   bool parse_event(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
                    uint64_t timestamp, std::string &symbol);
 
-  bool skip_till_address();
+  bool parse_simbricks_event(
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
 
  public:
   explicit Gem5Parser(const std::string identifier,

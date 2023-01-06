@@ -153,15 +153,16 @@ int main(int argc, char *argv[]) {
   // nicbm log parser that generates events
   LineReader nicSerLr;
   NicBmParser nicSerPar{"NicbmServerParser",
-                        result["nicbm-log-server"].as<std::string>(),
-                        nicSerLr};
+                        result["nicbm-log-server"].as<std::string>(), nicSerLr};
   LineReader nicCliLr;
   NicBmParser nicCliPar{"NicbmClientParser",
-                        result["nicbm-log-client"].as<std::string>(),
-                        nicCliLr};
+                        result["nicbm-log-client"].as<std::string>(), nicCliLr};
 
   // printer to consume pipeline and to print events
   EventPrinter eventPrinter;
+
+  // filter events out of stream
+  EventTypeFilter<NicDmaEn, NicMsix> eventFilter;
 
   // colelctor that merges event pipelines together in order of the given
   // comparator

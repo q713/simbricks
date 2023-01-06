@@ -104,7 +104,7 @@ class Consumer {
   explicit Consumer() = default;
 
   virtual void consume(coro_pull_t<T> &source) {
-    for (T event : source) {
+    for ([[maybe_unused]] volatile T event : source) {
       ;
     }
     return;

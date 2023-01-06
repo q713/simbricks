@@ -29,6 +29,7 @@
 #include <memory>
 #include <ostream>
 #include <string>
+#include <type_traits>
 
 #include "trace/corobelt/belt.h"
 #include "trace/parser/parser.h"
@@ -74,10 +75,10 @@ class SimProcInEvent : public Event {
 /* Host related events */
 class HostCall : public Event {
  public:
-  const std::string &func_;
+  const std::string func_;
 
-  HostCall(uint64_t ts, LogParser *src, const std::string &func)
-      : Event(ts, src), func_(func) {
+  HostCall(uint64_t ts, LogParser *src, const std::string func)
+      : Event(ts, src), func_(std::move(func)) {
   }
 
   void display(std::ostream &os) override {
@@ -433,6 +434,45 @@ class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
       std::cout << "EventPrinter: " << *event << std::endl;
     }
     return;
+  }
+};
+
+template <typename... EventTypes>
+class EventTypeFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
+
+  private:
+    template<typename... event_types>
+    bool is_one_of(std::shared_ptr<Event> event) {
+      bool is = false;
+      is = is || is_one_of<event_types...>(event); 
+      return is;
+    }
+
+    template<typename event_types>
+    bool is_one_of(std::shared_ptr<Event> event) {
+      std::shared_ptr<event_types> e = std::dynamic_pointer_cast<event_types>(event);
+      if (e) {
+        return true;
+      }
+      return false;
+    }
+
+ public:
+  explicit EventTypeFilter()
+      : corobelt::Pipe<std::shared_ptr<Event>>() {
+    static_assert(
+        std::conjunction<std::is_base_of<Event, EventTypes>...>::value,
+        "the type given in the template argument is not a subclass of Event");
+  }
+
+  void process(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
+               corobelt::coro_pull_t<std::shared_ptr<Event>> &source) override {
+    for (std::shared_ptr<Event> event : source) {
+      bool isToSink = is_one_of<EventTypes...>(event);
+      if (isToSink) {
+        sink(event);
+      }
+    }
   }
 };
 

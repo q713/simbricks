@@ -35,6 +35,27 @@
 #include "lib/utils/string_util.h"
 #include "trace/events/events.h"
 
+// TODO: component based parsing:
+//
+// system.switch_cpus
+// system.pc.pci_host.interface[00:04.0]
+// system.pc.pci_host
+// system.pc.simbricks_0ls
+//
+// --------------------------
+//
+// example event lines:
+//
+// 1473659826000: system.pc.pci_host.interface[00:04.0]: postInt
+// 1473661882374: system.pc.pci_host.interface[00:04.0]: clearInt
+//
+// 1369143037374: system.pc.simbricks_0: readConfig:  dev 0 func 0 reg 0x3d 1 bytes: data = 0x1
+// 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4 2 bytes: data = 0x6
+// 
+// 1369143199499: system.pc.pci_host: 00:00.0: read: offset=0x4, size=0x2
+//
+// 1472990805875: system.switch_cpus: A0 T0 : 0xffffffff81107470    :   NOP                      : IntAlu : 
+
 bool Gem5Parser::skip_till_address() {
   if (!line_reader_.consume_and_trim_till_string("0x")) {
 #ifdef PARSER_DEBUG_GEM5_
@@ -70,7 +91,7 @@ bool Gem5Parser::parse_switch_cpus_event(
   std::string symbol;
   if (!symbol_table_.filter(addr, symbol)) {
 #ifdef PARSER_DEBUG_GEM5_
-    DFLOGIN("%s: filter out event at timestamp %u with address %u\n",
+    DFLOGIN("%s: filter out event at timestamp %u with address %lx\n",
             identifier_.c_str(), timestamp, addr);
 #endif
     return false;

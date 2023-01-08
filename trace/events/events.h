@@ -216,6 +216,91 @@ class HostDmaW : public HostAddrSizeOp {
   }
 };
 
+class HostMsiX : public Event {
+  uint64_t vec_;
+
+ public:
+  explicit HostMsiX(uint64_t ts, LogParser *src, uint64_t vec)
+      : Event(ts, src), vec_(vec) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostMsiX ";
+    Event::display(os);
+    os << ", vec=" << vec_;
+  }
+};
+
+class HostConf : public Event {
+  uint64_t dev_;
+  uint64_t func_;
+  uint64_t reg_;
+  uint64_t bytes_;
+  uint64_t data_;
+  bool is_read_;
+
+ public:
+  explicit HostConf(uint64_t ts, LogParser *src, uint64_t dev, uint64_t func,
+                    uint64_t reg, uint64_t bytes, uint64_t data, bool is_read)
+      : Event(ts, src),
+        dev_(dev),
+        func_(func),
+        reg_(reg),
+        bytes_(bytes),
+        data_(data),
+        is_read_(is_read) {
+  }
+
+  void display(std::ostream &os) override {
+    if (is_read_) {
+      os << "HostConfRead ";
+    } else {
+      os << "HostConfWrite ";
+    }
+    Event::display(os);
+    os << ", dev=" << dev_ << ", func=" << func_ << ", reg=" << std::hex << reg_
+       << ", bytes=" << bytes_ << ", data=" << std::hex << data_;
+  }
+};
+
+class HostClearInt : public Event {
+ public:
+  explicit HostClearInt(uint64_t ts, LogParser *src) : Event(ts, src) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostClearInt ";
+    Event::display(os);
+  }
+};
+
+class HostPostInt : public Event {
+ public:
+  explicit HostPostInt(uint64_t ts, LogParser *src) : Event(ts, src) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostPostInt ";
+    Event::display(os);
+  }
+};
+
+class HostPciR : public Event {
+  uint64_t offset_;
+  uint64_t size_;
+
+ public:
+  explicit HostPciR(uint64_t ts, LogParser *src, uint64_t offset, uint64_t size)
+      : Event(ts, src), offset_(offset), size_(size) {
+  }
+
+  void display(std::ostream &os) override {
+    os << "HostPciR ";
+    Event::display(os);
+    os << ", offset=" << std::hex << offset_ << ", size=" << std::hex << size_;
+  }
+};
+
 /* NIC related events */
 class NicMsix : public Event {
  public:
@@ -422,7 +507,8 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
 }
 
 struct EventComperator {
-  bool operator()(const std::shared_ptr<Event> &e1, const std::shared_ptr<Event> &e2) const {
+  bool operator()(const std::shared_ptr<Event> &e1,
+                  const std::shared_ptr<Event> &e2) const {
     return e1->timestamp_ < e2->timestamp_;
   }
 };
@@ -439,27 +525,30 @@ class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
 
 template <typename... EventTypes>
 class EventTypeFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
+ private:
+  template <typename event_type_a, typename event_type_b,
+            typename... event_types>
+  bool is_one_of(std::shared_ptr<Event> event) {
+    bool is = false;
+    is = is || is_one_of<event_type_a>(event);
+    is = is || is_one_of<event_type_b, event_types...>(event);
+    return is;
+  }
 
-  private:
-    template<typename... event_types>
-    bool is_one_of(std::shared_ptr<Event> event) {
-      bool is = false;
-      is = is || is_one_of<event_types...>(event); 
-      return is;
+  template <typename event_type>
+  bool is_one_of(std::shared_ptr<Event> event) {
+    // maybe it might be better to use an enum type which is embeded into the
+    // events
+    std::shared_ptr<event_type> e =
+        std::dynamic_pointer_cast<event_type>(event);
+    if (e) {
+      return true;
     }
-
-    template<typename event_types>
-    bool is_one_of(std::shared_ptr<Event> event) {
-      std::shared_ptr<event_types> e = std::dynamic_pointer_cast<event_types>(event);
-      if (e) {
-        return true;
-      }
-      return false;
-    }
+    return false;
+  }
 
  public:
-  explicit EventTypeFilter()
-      : corobelt::Pipe<std::shared_ptr<Event>>() {
+  explicit EventTypeFilter() : corobelt::Pipe<std::shared_ptr<Event>>() {
     static_assert(
         std::conjunction<std::is_base_of<Event, EventTypes>...>::value,
         "the type given in the template argument is not a subclass of Event");

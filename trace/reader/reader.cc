@@ -103,6 +103,23 @@ std::string LineReader::extract_and_substr_until(
   return extract_builder.str();
 }
 
+ bool LineReader::skip_till(std::function<bool(unsigned char)> &predicate) {
+  if (is_empty()) {
+    return false;
+  }
+
+  auto begin = cur_line_.begin() + cur_reading_pos_;
+  auto end = std::find_if(begin, cur_line_.end(), predicate);
+
+  if (end != cur_line_.end()) {
+    auto distance = std::distance(begin, end);
+    cur_reading_pos_ += distance;
+    return true;
+  }
+
+  return false;
+ }
+
 bool LineReader::trim_till_consume(const std::string &tc, bool strict) {
   if (is_empty() || cur_length() < tc.length()) {
     return false;

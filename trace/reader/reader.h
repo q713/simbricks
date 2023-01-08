@@ -94,6 +94,12 @@ class LineReader {
   std::string extract_and_substr_until(
       std::function<bool(unsigned char)> &predicate);
 
+  bool skip_till(std::function<bool(unsigned char)> &predicate);
+
+  bool skip_till_whitespace() {
+    return skip_till(sim_string_utils::is_space);
+  }
+
   bool trim_till_consume(const std::string &tc, bool strict);
 
   inline bool consume_and_trim_till_string(const std::string &to_consume) {

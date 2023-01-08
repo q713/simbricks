@@ -29,7 +29,7 @@
 #include <string>
 
 #include "trace/corobelt/belt.h"
-//#include "trace/events/events.h"
+// #include "trace/events/events.h"
 #include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
@@ -59,7 +59,6 @@ class NicMmioW;
 class NicTrx;
 class NicTx;
 class NicRx;
-
 
 class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
  protected:
@@ -93,9 +92,19 @@ class Gem5Parser : public LogParser {
   ComponentFilter &component_table_;
 
  protected:
-  bool skip_till_address();
+  bool parse_global_event(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
+                          uint64_t timestamp);
 
-  bool parse_switch_cpus_event(
+  bool parse_system_switch_cpus(
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+
+  bool parse_system_pc_pci_host(
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+
+  bool parse_system_pc_pci_host_interface(
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+
+  bool parse_system_pc_simbricks(
       corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
 
   bool parse_simbricks_event(

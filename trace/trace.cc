@@ -162,16 +162,22 @@ int main(int argc, char *argv[]) {
   EventPrinter eventPrinter;
 
   // filter events out of stream
-  EventTypeFilter<NicDmaEn, NicMsix> eventFilter;
+  //EventTypeFilter<SimSendSync, HostCall, HostMmioImRespPoW, HostMmioCR, 
+  //  HostMmioCW, HostMmioR, HostMmioW, NicMsix, NicDma, SetIX, NicDmaI,
+  //  NicDmaEx, NicDmaEn, NicDmaCR, NicDmaCW, NicMmioR, NicMmioW, NicTx,
+  //  NicRx> eventFilter;
+  EventTypeFilter<HostCall> eventFilter;
 
   // colelctor that merges event pipelines together in order of the given
   // comparator
   corobelt::Collector<std::shared_ptr<Event>, EventComperator> collector{
       {&nicSerPar, &nicCliPar, &gem5ServerPar, &gem5ClientPar}};
 
+  corobelt::Pipeline<std::shared_ptr<Event>> pipeline{&collector, {&eventFilter}};
+
   // an awaiter to wait for the termination of the parsing + printing pipeline
   // that means the awaiter is used to block till all events are processed
-  corobelt::Awaiter<std::shared_ptr<Event>> awaiter(&collector, &eventPrinter);
+  corobelt::Awaiter<std::shared_ptr<Event>> awaiter(&pipeline, &eventPrinter);
   if (!awaiter.await_termination()) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);

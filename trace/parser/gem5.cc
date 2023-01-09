@@ -105,13 +105,14 @@ bool Gem5Parser::parse_system_pc_pci_host(
   // 1369143199499: system.pc.pci_host: 00:00.0: read: offset=0x4, size=0x2
 
   uint64_t offset, size;
-  if (line_reader_.consume_and_trim_till_string("read: offset=0x") 
-    && line_reader_.parse_uint_trim(16, offset)
-    && line_reader_.consume_and_trim_string(", size=0x")
-    && line_reader_.parse_uint_trim(16, size)) {
-    
-    sink(std::make_shared<HostPciR>(timestamp, this, offset, size));
-    return true;
+  bool is_read = line_reader_.consume_and_trim_till_string("read: offset=0x");
+  if (is_read || line_reader_.consume_and_trim_till_string("write: offset=0x")) {
+    if (line_reader_.parse_uint_trim(16, offset) &&
+        line_reader_.consume_and_trim_string(", size=0x") &&
+        line_reader_.parse_uint_trim(16, size)) {
+      sink(std::make_shared<HostPciRW>(timestamp, this, offset, size, is_read));
+      return true;
+    }
   }
 
   return false;
@@ -154,31 +155,22 @@ bool Gem5Parser::parse_system_pc_simbricks(
   // 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4 2 bytes: data = 0x6
 
   uint64_t dev, func, reg, bytes, data;
-  if (line_reader_.consume_and_trim_string("readConfig:")) {
+  bool is_readConf = line_reader_.consume_and_trim_string("readConfig:");
+  if (is_readConf || line_reader_.consume_and_trim_string("writeConfig:")) {
     line_reader_.trimL();
     if (line_reader_.consume_and_trim_string("dev ") && line_reader_.parse_uint_trim(10, dev)
      && line_reader_.consume_and_trim_string(" func ") && line_reader_.parse_uint_trim(10, func)
      && line_reader_.consume_and_trim_string(" reg 0x") && line_reader_.parse_uint_trim(16, reg) 
      && line_reader_.consume_and_trim_char(' ') && line_reader_.parse_uint_trim(10, bytes) 
-     && line_reader_.consume_and_trim_string(" bytes: data = 0x") 
-     && line_reader_.parse_uint_trim(16, data)) {
-      sink(std::make_shared<HostConf>(timestamp, this, dev, func,
-                    reg, bytes, data, true));
-      return true;
+     && line_reader_.consume_and_trim_string(" bytes: data = ")) {
+      if (line_reader_.consume_and_trim_string("0x") && line_reader_.parse_uint_trim(16, data)) {
+        sink(std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes, data, is_readConf));
+        return true;
+      } else if (line_reader_.consume_and_trim_char('0')) {
+        sink(std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes, 0, is_readConf));
+        return true;
+      }
     }
-  } else if (line_reader_.consume_and_trim_string("writeConfig:")) {
-    line_reader_.trimL();
-    if (line_reader_.consume_and_trim_string("dev ") && line_reader_.parse_uint_trim(10, dev)
-     && line_reader_.consume_and_trim_string(" func ") && line_reader_.parse_uint_trim(10, func)
-     && line_reader_.consume_and_trim_string(" reg 0x") && line_reader_.parse_uint_trim(16, reg) 
-     && line_reader_.consume_and_trim_char(' ') && line_reader_.parse_uint_trim(10, bytes) 
-     && line_reader_.consume_and_trim_string(" bytes: data = 0x") 
-     && line_reader_.parse_uint_trim(16, data)) {
-      sink(std::make_shared<HostConf>(timestamp, this, dev, func,
-                    reg, bytes, data, false));
-      return true;
-    }
-
   } else if (line_reader_.consume_and_trim_string("simbricks-pci:")) {
     uint64_t id, addr, size, vec;
     line_reader_.trimL();
@@ -294,7 +286,7 @@ void Gem5Parser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
     // call parsing function based on component
     if (line_reader_.consume_and_trim_string("global:") &&
         component_table_.filter("global")) {
-      if (parse_global_event(sink, timestamp)) {
+      if (!parse_global_event(sink, timestamp)) {
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN("%s: could not parse global event from line '%s'\n",
                   identifier_.c_str(), line_reader_.get_raw_line().c_str());

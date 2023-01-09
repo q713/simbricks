@@ -285,17 +285,22 @@ class HostPostInt : public Event {
   }
 };
 
-class HostPciR : public Event {
+class HostPciRW : public Event {
   uint64_t offset_;
   uint64_t size_;
+  bool is_read_;
 
  public:
-  explicit HostPciR(uint64_t ts, LogParser *src, uint64_t offset, uint64_t size)
-      : Event(ts, src), offset_(offset), size_(size) {
+  explicit HostPciRW(uint64_t ts, LogParser *src, uint64_t offset, uint64_t size, bool is_read)
+      : Event(ts, src), offset_(offset), size_(size), is_read_(is_read) {
   }
 
   void display(std::ostream &os) override {
-    os << "HostPciR ";
+    if (is_read_) {
+      os << "HostPciR ";
+    } else {
+      os << "HostPciW ";
+    }
     Event::display(os);
     os << ", offset=" << std::hex << offset_ << ", size=" << std::hex << size_;
   }

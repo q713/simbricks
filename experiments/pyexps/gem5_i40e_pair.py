@@ -54,7 +54,8 @@ clients = create_basic_hosts(
     ip_start=2
 )
 
-gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecAsid,ExecCPSeq,ExecEffAddr,ExecEnable,ExecFaulting,ExecFetchSeq,ExecKernel,ExecOpClass,ExecRegDelta,ExecThread,ExecUser,EthernetAll,PciDevice,PciHost'
+gem5DebugStart = '--debug-start=1468431070625'
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecAsid,ExecCPSeq,ExecEffAddr,ExecEnable,ExecFaulting,ExecFetchSeq,ExecKernel,ExecOpClass,ExecMicro,ExecMacro,ExecRegDelta,ExecUser,EthernetAll,PciDevice,PciHost'
 gem5BaseLogFilePath = '--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out'
 
 for h in servers + clients:
@@ -64,7 +65,7 @@ for h in servers + clients:
 
 for s in servers:
     logFile = gem5BaseLogFilePath + '/gem5-server-log.log'
-    s.extra_main_args = [logFile, gem5DebugFlags]
+    s.extra_main_args = [logFile, gem5DebugFlags, gem5DebugStart]
     nic = s.pcidevs[0]
     nic.log_file = '/OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/server-nic.log'
 

@@ -75,6 +75,17 @@ bool Gem5Parser::parse_system_switch_cpus(
     return false;
   }
 
+  line_reader_.trimL();
+  if (line_reader_.consume_and_trim_char(':')) {
+    line_reader_.trimL();
+    // NOTE: purposely ignored lines
+    if (line_reader_.consume_and_trim_string("NOP") ||
+        line_reader_.consume_and_trim_string("MFENCE") ||
+        line_reader_.consume_and_trim_string("LFENCE")) {
+      return false;
+    }
+  }
+
   // filter out uninteresting addresses
   std::string symbol;
   if (!symbol_table_.filter(addr, symbol)) {
@@ -106,7 +117,8 @@ bool Gem5Parser::parse_system_pc_pci_host(
 
   uint64_t offset, size;
   bool is_read = line_reader_.consume_and_trim_till_string("read: offset=0x");
-  if (is_read || line_reader_.consume_and_trim_till_string("write: offset=0x")) {
+  if (is_read ||
+      line_reader_.consume_and_trim_till_string("write: offset=0x")) {
     if (line_reader_.parse_uint_trim(16, offset) &&
         line_reader_.consume_and_trim_string(", size=0x") &&
         line_reader_.parse_uint_trim(16, size)) {
@@ -126,7 +138,7 @@ bool Gem5Parser::parse_system_pc_pci_host_interface(
   // 1473661882374: system.pc.pci_host.interface[00:04.0]: clearInt
   if (!line_reader_.skip_till_whitespace()) {
     return false;
-  } 
+  }
   line_reader_.trimL();
 
   if (line_reader_.consume_and_trim_string("clearInt")) {
@@ -149,25 +161,34 @@ bool Gem5Parser::parse_system_pc_simbricks(
 
   // TODO: parse simbricks
   // 1369143037374: system.pc.simbricks _0: readConfig:  dev 0 func 0 reg 0x3d 1
-  // 1693978886124: system.pc.simbricks _0.pio: simbricks-pci: sending immediate response for posted write 
-  // 1693980306000: system.pc.simbricks_0: simbricks-pci: received MSI-X intr vec 1 
-  // 1369143037374: system.pc.simbricks_0: readConfig:  dev 0 func 0 reg 0x3d 1 bytes: data = 0x1 
-  // 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4 2 bytes: data = 0x6
+  // 1693978886124: system.pc.simbricks _0.pio: simbricks-pci: sending immediate
+  // response for posted write 1693980306000: system.pc.simbricks_0:
+  // simbricks-pci: received MSI-X intr vec 1 1369143037374:
+  // system.pc.simbricks_0: readConfig:  dev 0 func 0 reg 0x3d 1 bytes: data =
+  // 0x1 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4
+  // 2 bytes: data = 0x6
 
   uint64_t dev, func, reg, bytes, data;
   bool is_readConf = line_reader_.consume_and_trim_string("readConfig:");
   if (is_readConf || line_reader_.consume_and_trim_string("writeConfig:")) {
     line_reader_.trimL();
-    if (line_reader_.consume_and_trim_string("dev ") && line_reader_.parse_uint_trim(10, dev)
-     && line_reader_.consume_and_trim_string(" func ") && line_reader_.parse_uint_trim(10, func)
-     && line_reader_.consume_and_trim_string(" reg 0x") && line_reader_.parse_uint_trim(16, reg) 
-     && line_reader_.consume_and_trim_char(' ') && line_reader_.parse_uint_trim(10, bytes) 
-     && line_reader_.consume_and_trim_string(" bytes: data = ")) {
-      if (line_reader_.consume_and_trim_string("0x") && line_reader_.parse_uint_trim(16, data)) {
-        sink(std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes, data, is_readConf));
+    if (line_reader_.consume_and_trim_string("dev ") &&
+        line_reader_.parse_uint_trim(10, dev) &&
+        line_reader_.consume_and_trim_string(" func ") &&
+        line_reader_.parse_uint_trim(10, func) &&
+        line_reader_.consume_and_trim_string(" reg 0x") &&
+        line_reader_.parse_uint_trim(16, reg) &&
+        line_reader_.consume_and_trim_char(' ') &&
+        line_reader_.parse_uint_trim(10, bytes) &&
+        line_reader_.consume_and_trim_string(" bytes: data = ")) {
+      if (line_reader_.consume_and_trim_string("0x") &&
+          line_reader_.parse_uint_trim(16, data)) {
+        sink(std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes,
+                                        data, is_readConf));
         return true;
       } else if (line_reader_.consume_and_trim_char('0')) {
-        sink(std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes, 0, is_readConf));
+        sink(std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes,
+                                        0, is_readConf));
         return true;
       }
     }

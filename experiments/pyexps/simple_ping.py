@@ -35,6 +35,9 @@ from simbricks.orchestration.simulators import Gem5Host, I40eNIC, SwitchNet
 e = Experiment(name='simple_ping')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
+gem5DebugStart = '--debug-start=1468431070625'
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecAsid,ExecCPSeq,ExecEffAddr,ExecEnable,ExecFaulting,ExecFetchSeq,ExecKernel,ExecOpClass,ExecMicro,ExecMacro,ExecRegDelta,ExecUser,EthernetAll,PciDevice,PciHost'
+
 # create client
 client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
 client_config.ip = '10.0.0.1'
@@ -42,7 +45,7 @@ client_config.app = PingClient(server_ip = '10.0.0.2', count=5)
 client = Gem5Host(client_config)
 client.name = 'client'
 client.wait = True  # wait for client simulator to finish execution
-client.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-client-log.log', '--debug-flags=SimBricksAll,SyscallAll,ExecAsid,ExecCPSeq,ExecEffAddr,ExecEnable,ExecFaulting,ExecFetchSeq,ExecKernel,ExecOpClass,ExecRegDelta,ExecThread,ExecUser,EthernetAll,PciDevice,PciHost']
+client.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-client-log.log', gem5DebugStart, gem5DebugFlags]
 client.variant = 'opt'
 e.add_host(client)
 
@@ -58,7 +61,7 @@ server_config.ip = '10.0.0.2'
 server_config.app = IdleHost()
 server = Gem5Host(server_config)
 server.name = 'server'
-server.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-server-log.log', '--debug-flags=SimBricksAll,SyscallAll,ExecAsid,ExecCPSeq,ExecEffAddr,ExecEnable,ExecFaulting,ExecFetchSeq,ExecKernel,ExecOpClass,ExecRegDelta,ExecThread,ExecUser,EthernetAll,PciDevice,PciHost']
+server.extra_main_args = ['--debug-file /OS/endhost-networking/work/sim/jakob/simbricks-fork/experiments/out/gem5-server-log.log', gem5DebugFlags, gem5DebugStart]
 server.variant = 'opt'
 e.add_host(server)
 

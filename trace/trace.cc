@@ -27,6 +27,7 @@
 #include "trace/corobelt/belt.h"
 #include "trace/events/events.h"
 #include "trace/filter/symtable.h"
+#include "trace/parser/parser.h"
 #include "trace/reader/reader.h"
 
 class IntProd : public corobelt::Producer<int> {
@@ -162,18 +163,24 @@ int main(int argc, char *argv[]) {
   EventPrinter eventPrinter;
 
   // filter events out of stream
-  //EventTypeFilter<SimSendSync, HostCall, HostMmioImRespPoW, HostMmioCR, 
-  //  HostMmioCW, HostMmioR, HostMmioW, NicMsix, NicDma, SetIX, NicDmaI,
-  //  NicDmaEx, NicDmaEn, NicDmaCR, NicDmaCW, NicMmioR, NicMmioW, NicTx,
-  //  NicRx> eventFilter;
-  EventTypeFilter<HostCall> eventFilter;
+  EventTypeFilter eventFilter{
+      {EventType::SimSendSync_t, EventType::HostCall_t,
+       EventType::HostMmioImRespPoW_t, EventType::HostMmioCR_t,
+       EventType::HostMmioCW_t, EventType::HostMmioR_t, EventType::HostMmioW_t,
+       EventType::NicMsix_t, EventType::NicDma_t, EventType::SetIX_t,
+       EventType::NicDmaI_t, EventType::NicDmaEx_t, EventType::NicDmaEn_t,
+       EventType::NicDmaCR_t, EventType::NicDmaCW_t, EventType::NicMmioR_t,
+       EventType::NicMmioW_t, EventType::NicTx_t, EventType::NicRx_t}};
+  EventTypeStatistics statistics{
+      {EventType::NicMmioR_t, EventType::NicMmioW_t}};
 
   // colelctor that merges event pipelines together in order of the given
   // comparator
   corobelt::Collector<std::shared_ptr<Event>, EventComperator> collector{
       {&nicSerPar, &nicCliPar, &gem5ServerPar, &gem5ClientPar}};
 
-  corobelt::Pipeline<std::shared_ptr<Event>> pipeline{&collector, {&eventFilter}};
+  corobelt::Pipeline<std::shared_ptr<Event>> pipeline{
+      &nicSerPar, {&eventFilter, &statistics}};
 
   // an awaiter to wait for the termination of the parsing + printing pipeline
   // that means the awaiter is used to block till all events are processed
@@ -182,6 +189,7 @@ int main(int argc, char *argv[]) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }
+  std::cout << statistics << std::endl;
 
   exit(EXIT_SUCCESS);
 }

@@ -34,7 +34,7 @@
 
 namespace corobelt {
 
-#define COROBELT_DEBUG_ 1
+//#define COROBELT_DEBUG_ 1
 
 // helper makro for erro print logging
 #ifdef COROBELT_DEBUG_

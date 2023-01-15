@@ -26,129 +26,183 @@
 #define SIMBRICKS_TRACE_EVENTS_H_
 
 #include <cstdint>
+#include <map>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <type_traits>
 
+#include "lib/utils/log.h"
 #include "trace/corobelt/belt.h"
-#include "trace/parser/parser.h"
+
+#define DEBUG_EVENT_ ;
+
+class LogParser;
+
+enum EventType {
+  Event_t,
+  SimSendSync_t,
+  SimProcInEvent_t,
+  HostInstr_t,
+  HostCall_t,
+  HostMmioImRespPoW_t,
+  HostIdOp_t,
+  HostMmioCR_t,
+  HostMmioCW_t,
+  HostAddrSizeOp_t,
+  HostMmioR_t,
+  HostMmioW_t,
+  HostDmaC_t,
+  HostDmaR_t,
+  HostDmaW_t,
+  HostMsiX_t,
+  HostConf_t,
+  HostClearInt_t,
+  HostPostInt_t,
+  HostPciRW_t,
+  NicMsix_t,
+  NicDma_t,
+  SetIX_t,
+  NicDmaI_t,
+  NicDmaEx_t,
+  NicDmaEn_t,
+  NicDmaCR_t,
+  NicDmaCW_t,
+  NicMmio_t,
+  NicMmioR_t,
+  NicMmioW_t,
+  NicTrx_t,
+  NicTx_t,
+  NicRx_t
+};
 
 /* Parent class for all events of interest */
 class Event {
+  EventType type_;
+  std::string name_;
+
  public:
   uint64_t timestamp_;
   LogParser *src_;
 
-  explicit Event(uint64_t ts, LogParser *src) : timestamp_(ts), src_(src) {
+  const std::string &getName() {
+    return name_;
   }
 
-  virtual void display(std::ostream &os) {
-    os << "Event: source=" << src_->getIdent() << ", timestamp=" << timestamp_
-       << " ";
+  EventType getType() {
+    return type_;
+  }
+
+  virtual void display(std::ostream &os);
+
+ protected:
+  explicit Event(uint64_t ts, LogParser *src, EventType type, std::string name)
+      : type_(type), name_(std::move(name)), timestamp_(ts), src_(src) {
   }
 };
 
 /* Simbricks Events */
 class SimSendSync : public Event {
  public:
-  explicit SimSendSync(uint64_t ts, LogParser *src) : Event(ts, src) {
+  explicit SimSendSync(uint64_t ts, LogParser *src)
+      : Event(ts, src, EventType::SimSendSync_t, "SimSendSyncSimSendSync") {
   }
 
-  void display(std::ostream &os) override {
-    os << "simbricks: sending sync message ";
-    Event::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class SimProcInEvent : public Event {
  public:
-  explicit SimProcInEvent(uint64_t ts, LogParser *src) : Event(ts, src) {
+  explicit SimProcInEvent(uint64_t ts, LogParser *src)
+      : Event(ts, src, EventType::SimProcInEvent_t, "SimProcInEvent") {
   }
 
-  void display(std::ostream &os) override {
-    os << "simbricks: processInEvent ";
-    Event::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 /* Host related events */
-class HostCall : public Event {
+
+class HostInstr : public Event {
+ public:
+  uint64_t pc_;
+
+  HostInstr(uint64_t ts, LogParser *src, uint64_t pc)
+      : Event(ts, src, EventType::HostInstr_t, "HostInstr"), pc_(pc) {
+  }
+
+  HostInstr(uint64_t ts, LogParser *src, uint64_t pc, EventType type,
+            std::string name)
+      : Event(ts, src, type, name), pc_(pc) {
+  }
+
+  void display(std::ostream &os) override;
+};
+
+class HostCall : public HostInstr {
  public:
   const std::string func_;
 
-  HostCall(uint64_t ts, LogParser *src, const std::string func)
-      : Event(ts, src), func_(std::move(func)) {
+  explicit HostCall(uint64_t ts, LogParser *src, uint64_t pc,
+                    const std::string func)
+      : HostInstr(ts, src, pc, EventType::HostCall_t, "HostCall"),
+        func_(std::move(func)) {
   }
 
-  void display(std::ostream &os) override {
-    os << "H.CALL ";
-    Event::display(os);
-    os << "func=" << func_;
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostMmioImRespPoW : public Event {
  public:
-  explicit HostMmioImRespPoW(uint64_t ts, LogParser *src) : Event(ts, src) {
+  explicit HostMmioImRespPoW(uint64_t ts, LogParser *src)
+      : Event(ts, src, EventType::HostMmioImRespPoW_t, "HostMmioImRespPoW") {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostMmioImRespPoW ";
-    Event::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostIdOp : public Event {
+ public:
   uint64_t id_;
 
- public:
-  explicit HostIdOp(uint64_t ts, LogParser *src, uint64_t id)
-      : Event(ts, src), id_(id) {
-  }
+  void display(std::ostream &os) override;
 
-  void display(std::ostream &os) override {
-    Event::display(os);
-    os << "id=" << id_;
+ protected:
+  explicit HostIdOp(uint64_t ts, LogParser *src, EventType type,
+                    std::string name, uint64_t id)
+      : Event(ts, src, type, std::move(name)), id_(id) {
   }
 };
 
 class HostMmioCR : public HostIdOp {
  public:
   explicit HostMmioCR(uint64_t ts, LogParser *src, uint64_t id)
-      : HostIdOp(ts, src, id) {
+      : HostIdOp(ts, src, EventType::HostMmioCR_t, "HostMmioCR", id) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostMmioCR ";
-    HostIdOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 class HostMmioCW : public HostIdOp {
  public:
   explicit HostMmioCW(uint64_t ts, LogParser *src, uint64_t id)
-      : HostIdOp(ts, src, id) {
+      : HostIdOp(ts, src, EventType::HostMmioCW_t, "HostMmioCW", id) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostMmioCW ";
-    HostIdOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostAddrSizeOp : public HostIdOp {
+ public:
   uint64_t addr_;
   uint64_t size_;
 
- public:
-  explicit HostAddrSizeOp(uint64_t ts, LogParser *src, uint64_t id,
-                          uint64_t addr, uint64_t size)
-      : HostIdOp(ts, src, id) {
-  }
+  void display(std::ostream &os) override;
 
-  void display(std::ostream &os) override {
-    HostIdOp::display(os);
-    os << ", addr=" << std::hex << addr_ << ", size=" << size_ << " ";
+ protected:
+  explicit HostAddrSizeOp(uint64_t ts, LogParser *src, EventType type,
+                          std::string name, uint64_t id, uint64_t addr,
+                          uint64_t size)
+      : HostIdOp(ts, src, type, std::move(name), id) {
   }
 };
 
@@ -156,82 +210,68 @@ class HostMmioR : public HostAddrSizeOp {
  public:
   explicit HostMmioR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
                      uint64_t size)
-      : HostAddrSizeOp(ts, src, id, addr, size) {
+      : HostAddrSizeOp(ts, src, EventType::HostMmioR_t, "HostMmioR", id, addr,
+                       size) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostMmioR ";
-    HostAddrSizeOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostMmioW : public HostAddrSizeOp {
  public:
   explicit HostMmioW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
                      uint64_t size)
-      : HostAddrSizeOp(ts, src, id, addr, size) {
+      : HostAddrSizeOp(ts, src, EventType::HostMmioW_t, "HostMmioW", id, addr,
+                       size) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostMmioW ";
-    HostAddrSizeOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostDmaC : public HostIdOp {
  public:
   explicit HostDmaC(uint64_t ts, LogParser *src, uint64_t id)
-      : HostIdOp(ts, src, id) {
+      : HostIdOp(ts, src, EventType::HostDmaC_t, "HostDmaC", id) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostDmaC ";
-    HostIdOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostDmaR : public HostAddrSizeOp {
  public:
   explicit HostDmaR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
                     uint64_t size)
-      : HostAddrSizeOp(ts, src, id, addr, size) {
+      : HostAddrSizeOp(ts, src, EventType::HostDmaR_t, "HostDmaR", id, addr,
+                       size) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostDmaR ";
-    HostAddrSizeOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostDmaW : public HostAddrSizeOp {
  public:
   explicit HostDmaW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
                     uint64_t size)
-      : HostAddrSizeOp(ts, src, id, addr, size) {
+      : HostAddrSizeOp(ts, src, EventType::HostDmaW_t, "HostDmaW", id, addr,
+                       size) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostDmaW ";
-    HostAddrSizeOp::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostMsiX : public Event {
+ public:
   uint64_t vec_;
 
- public:
   explicit HostMsiX(uint64_t ts, LogParser *src, uint64_t vec)
-      : Event(ts, src), vec_(vec) {
+      : Event(ts, src, EventType::HostMsiX_t, "HostMsiX"), vec_(vec) {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostMsiX ";
-    Event::display(os);
-    os << ", vec=" << vec_;
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostConf : public Event {
+ public:
   uint64_t dev_;
   uint64_t func_;
   uint64_t reg_;
@@ -239,10 +279,10 @@ class HostConf : public Event {
   uint64_t data_;
   bool is_read_;
 
- public:
   explicit HostConf(uint64_t ts, LogParser *src, uint64_t dev, uint64_t func,
                     uint64_t reg, uint64_t bytes, uint64_t data, bool is_read)
-      : Event(ts, src),
+      : Event(ts, src, EventType::HostConf_t,
+              is_read ? "HostConfRead" : "HostConfWrite"),
         dev_(dev),
         func_(func),
         reg_(reg),
@@ -251,59 +291,43 @@ class HostConf : public Event {
         is_read_(is_read) {
   }
 
-  void display(std::ostream &os) override {
-    if (is_read_) {
-      os << "HostConfRead ";
-    } else {
-      os << "HostConfWrite ";
-    }
-    Event::display(os);
-    os << ", dev=" << dev_ << ", func=" << func_ << ", reg=" << std::hex << reg_
-       << ", bytes=" << bytes_ << ", data=" << std::hex << data_;
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostClearInt : public Event {
  public:
-  explicit HostClearInt(uint64_t ts, LogParser *src) : Event(ts, src) {
+  explicit HostClearInt(uint64_t ts, LogParser *src)
+      : Event(ts, src, EventType::HostClearInt_t, "HostClearInt") {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostClearInt ";
-    Event::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostPostInt : public Event {
  public:
-  explicit HostPostInt(uint64_t ts, LogParser *src) : Event(ts, src) {
+  explicit HostPostInt(uint64_t ts, LogParser *src)
+      : Event(ts, src, EventType::HostPostInt_t, "HostPostInt") {
   }
 
-  void display(std::ostream &os) override {
-    os << "HostPostInt ";
-    Event::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class HostPciRW : public Event {
+ public:
   uint64_t offset_;
   uint64_t size_;
   bool is_read_;
 
- public:
-  explicit HostPciRW(uint64_t ts, LogParser *src, uint64_t offset, uint64_t size, bool is_read)
-      : Event(ts, src), offset_(offset), size_(size), is_read_(is_read) {
+  explicit HostPciRW(uint64_t ts, LogParser *src, uint64_t offset,
+                     uint64_t size, bool is_read)
+      : Event(ts, src, EventType::HostPciRW_t,
+              is_read ? "HostPciR" : "HostPciW"),
+        offset_(offset),
+        size_(size),
+        is_read_(is_read) {
   }
 
-  void display(std::ostream &os) override {
-    if (is_read_) {
-      os << "HostPciR ";
-    } else {
-      os << "HostPciW ";
-    }
-    Event::display(os);
-    os << ", offset=" << std::hex << offset_ << ", size=" << std::hex << size_;
-  }
+  void display(std::ostream &os) override;
 };
 
 /* NIC related events */
@@ -313,18 +337,12 @@ class NicMsix : public Event {
   bool isX_;
 
   NicMsix(uint64_t ts, LogParser *src, uint16_t vec, bool isX)
-      : Event(ts, src), vec_(vec), isX_(isX) {
+      : Event(ts, src, EventType::NicMsix_t, isX ? "NicMsix" : "NicMsi"),
+        vec_(vec),
+        isX_(isX) {
   }
 
-  void display(std::ostream &os) override {
-    if (isX_) {
-      os << "N.MSIX ";
-    } else {
-      os << "N.MSI ";
-    }
-    Event::display(os);
-    os << ", vec=" << vec_;
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicDma : public Event {
@@ -333,14 +351,12 @@ class NicDma : public Event {
   uint64_t addr_;
   uint64_t len_;
 
-  NicDma(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr, uint64_t len)
-      : Event(ts, src), id_(id), addr_(addr), len_(len) {
-  }
+  void display(std::ostream &os) override;
 
-  void display(std::ostream &os) override {
-    Event::display(os);
-    os << "id=" << std::hex << id_ << ", addr=" << std::hex << addr_
-       << ", size=" << len_;
+ protected:
+  NicDma(uint64_t ts, LogParser *src, EventType type, std::string name,
+         uint64_t id, uint64_t addr, uint64_t len)
+      : Event(ts, src, type, std::move(name)), id_(id), addr_(addr), len_(len) {
   }
 };
 
@@ -349,78 +365,59 @@ class SetIX : public Event {
   uint64_t intr_;
 
   SetIX(uint64_t ts, LogParser *src, uint64_t intr)
-      : Event(ts, src), intr_(intr) {
+      : Event(ts, src, EventType::SetIX_t, "SetIX"), intr_(intr) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.SETIX ";
-    Event::display(os);
-    os << "interrupt=" << std::hex << intr_;
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicDmaI : public NicDma {
  public:
   NicDmaI(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr, uint64_t len)
-      : NicDma(ts, src, id, addr, len) {
+      : NicDma(ts, src, EventType::NicDmaI_t, "NicDmaI", id, addr, len) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.DMAI ";
-    NicDma::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicDmaEx : public NicDma {
  public:
   NicDmaEx(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, id, addr, len) {
+      : NicDma(ts, src, EventType::NicDmaEx_t, "NicDmaEx", id, addr, len) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.DMAEX ";
-    NicDma::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicDmaEn : public NicDma {
  public:
   NicDmaEn(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, id, addr, len) {
+      : NicDma(ts, src, EventType::NicDmaEn_t, "NicDmaEn", id, addr, len) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.DMAEN ";
-    NicDma::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicDmaCR : public NicDma {
  public:
   NicDmaCR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, id, addr, len) {
+      : NicDma(ts, src, EventType::NicDmaCR_t, "NicDmaCR", id, addr, len) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.DMACR ";
-    NicDma::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicDmaCW : public NicDma {
  public:
   NicDmaCW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, id, addr, len) {
+      : NicDma(ts, src, EventType::NicDmaCW_t, "NicDmaCW", id, addr, len) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.DMACW ";
-    NicDma::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicMmio : public Event {
@@ -429,14 +426,12 @@ class NicMmio : public Event {
   uint64_t len_;
   uint64_t val_;
 
-  NicMmio(uint64_t ts, LogParser *src, uint64_t off, uint64_t len, uint64_t val)
-      : Event(ts, src), off_(off), len_(len), val_(val) {
-  }
+  virtual void display(std::ostream &os) override;
 
-  virtual void display(std::ostream &os) override {
-    Event::display(os);
-    os << "off=" << std::hex << off_ << ", len=" << len_ << " val=" << std::hex
-       << val_;
+ protected:
+  NicMmio(uint64_t ts, LogParser *src, EventType type, std::string name,
+          uint64_t off, uint64_t len, uint64_t val)
+      : Event(ts, src, type, std::move(name)), off_(off), len_(len), val_(val) {
   }
 };
 
@@ -444,51 +439,42 @@ class NicMmioR : public NicMmio {
  public:
   NicMmioR(uint64_t ts, LogParser *src, uint64_t off, uint64_t len,
            uint64_t val)
-      : NicMmio(ts, src, off, len, val) {
+      : NicMmio(ts, src, EventType::NicMmioR_t, "NicMmioR", off, len, val) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.MMIOR ";
-    NicMmio::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicMmioW : public NicMmio {
  public:
   NicMmioW(uint64_t ts, LogParser *src, uint64_t off, uint64_t len,
            uint64_t val)
-      : NicMmio(ts, src, off, len, val) {
+      : NicMmio(ts, src, EventType::NicMmioW_t, "NicMmioW", off, len, val) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.MMIOW ";
-    NicMmio::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicTrx : public Event {
  public:
   uint16_t len_;
 
-  NicTrx(uint64_t ts, LogParser *src, uint16_t len)
-      : Event(ts, src), len_(len) {
-  }
+  void display(std::ostream &os) override;
 
-  void display(std::ostream &os) override {
-    Event::display(os);
-    os << ", len=" << len_;
+ protected:
+  NicTrx(uint64_t ts, LogParser *src, EventType type, std::string name,
+         uint16_t len)
+      : Event(ts, src, type, std::move(name)), len_(len) {
   }
 };
 
 class NicTx : public NicTrx {
  public:
-  NicTx(uint64_t ts, LogParser *src, uint16_t len) : NicTrx(ts, src, len) {
+  NicTx(uint64_t ts, LogParser *src, uint16_t len)
+      : NicTrx(ts, src, EventType::NicTx_t, "NicTx", len) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.TX ";
-    NicTrx::display(os);
-  }
+  void display(std::ostream &os) override;
 };
 
 class NicRx : public NicTrx {
@@ -496,14 +482,10 @@ class NicRx : public NicTrx {
 
  public:
   NicRx(uint64_t ts, LogParser *src, uint64_t port, uint16_t len)
-      : NicTrx(ts, src, len), port_(port) {
+      : NicTrx(ts, src, EventType::NicRx_t, "NicRx", len), port_(port) {
   }
 
-  void display(std::ostream &os) override {
-    os << "N.RX ";
-    NicTrx::display(os);
-    os << ", port=" << port_;
-  }
+  void display(std::ostream &os) override;
 };
 
 inline std::ostream &operator<<(std::ostream &os, Event &e) {
@@ -528,44 +510,166 @@ class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
   }
 };
 
-template <typename... EventTypes>
+/* Filter out all events that do not have one of the in the template specified
+ * type */
 class EventTypeFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
- private:
-  template <typename event_type_a, typename event_type_b,
-            typename... event_types>
-  bool is_one_of(std::shared_ptr<Event> event) {
-    bool is = false;
-    is = is || is_one_of<event_type_a>(event);
-    is = is || is_one_of<event_type_b, event_types...>(event);
-    return is;
-  }
-
-  template <typename event_type>
-  bool is_one_of(std::shared_ptr<Event> event) {
-    // maybe it might be better to use an enum type which is embeded into the
-    // events
-    std::shared_ptr<event_type> e =
-        std::dynamic_pointer_cast<event_type>(event);
-    if (e) {
-      return true;
-    }
-    return false;
-  }
+  std::set<EventType> types_to_filter_;
 
  public:
-  explicit EventTypeFilter() : corobelt::Pipe<std::shared_ptr<Event>>() {
-    static_assert(
-        std::conjunction<std::is_base_of<Event, EventTypes>...>::value,
-        "the type given in the template argument is not a subclass of Event");
+  EventTypeFilter(std::set<EventType> types_to_filter)
+      : corobelt::Pipe<std::shared_ptr<Event>>(),
+        types_to_filter_(std::move(types_to_filter)) {
   }
 
   void process(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
                corobelt::coro_pull_t<std::shared_ptr<Event>> &source) override {
     for (std::shared_ptr<Event> event : source) {
-      bool isToSink = is_one_of<EventTypes...>(event);
-      if (isToSink) {
+      auto search = types_to_filter_.find(event->getType());
+      if (search != types_to_filter_.end()) {
         sink(event);
       }
+    }
+  }
+};
+
+struct EventStat {
+  uint64_t last_ts_;
+  uint64_t first_ts_;
+  uint64_t event_count_;
+  uint64_t min_time_;
+  uint64_t max_time_;
+  uint64_t mean_time_;
+  const std::string name_;
+
+  EventStat(const std::string name)
+      : last_ts_(0),
+        first_ts_(0),
+        event_count_(0),
+        min_time_(UINT64_MAX),
+        max_time_(0),
+        mean_time_(0),
+        name_(std::move(name)) {
+  }
+
+  friend std::ostream &operator<<(std::ostream &out, EventStat &statistic) {
+    out << "\ttypeinfo name:" << statistic.name_ << std::endl;
+    out << "\t\tlast_ts: " << std::to_string(statistic.last_ts_) << std::endl;
+    out << "\t\tfirst_ts: " << std::to_string(statistic.first_ts_)
+        << std::endl;
+    out << "\t\tevent_count: " << std::to_string(statistic.event_count_)
+        << std::endl;
+    out << "\t\tmin_time: " << std::to_string(statistic.min_time_)
+        << std::endl;
+    out << "\t\tmax_time: " << std::to_string(statistic.max_time_)
+        << std::endl;
+    out << "\t\tmean_time: " << std::to_string(statistic.mean_time_)
+        << std::endl;
+    return out;
+  }
+};
+
+/* Filter the event stream by the specified event types and collect some simple
+ * statistics about these types */
+class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
+  std::set<EventType> types_to_gather_statistic_;
+
+  // TODO: map from event_type,simulator -> statistics
+  // NOTE that this is also possible with the pipeline features by gathering
+  // statistics before merging event streams of different simulators
+  std::map<EventType, std::shared_ptr<EventStat>> statistics_by_type_;
+
+  bool update_statistics(std::shared_ptr<Event> event_ptr) {
+    EventType key = event_ptr->getType();
+    std::shared_ptr<EventStat> statistic;
+    const auto &statistics_search = statistics_by_type_.find(key);
+    if (statistics_search == statistics_by_type_.end()) {
+      statistic = std::make_shared<EventStat>(event_ptr->getName());
+      if (statistic) {
+        statistic->first_ts_ = event_ptr->timestamp_;
+        statistic->min_time_ = event_ptr->timestamp_;
+        auto success = statistics_by_type_.insert(
+            std::make_pair(key, std::move(statistic)));
+        if (!success.second) {
+          return false;
+        }
+        statistic = success.first->second;
+      } else {
+        return false;
+      }
+    } else {
+      statistic = statistics_search->second;
+    }
+
+    if (statistic == nullptr) {
+      return false;
+    }
+
+    uint64_t latency = event_ptr->timestamp_ - statistic->last_ts_;
+    if (latency < statistic->min_time_) {
+      statistic->min_time_ = latency;
+    }
+    if (latency > statistic->max_time_) {
+      statistic->max_time_ = latency;
+    }
+
+    statistic->event_count_ = statistic->event_count_ + 1;
+    statistic->last_ts_ = event_ptr->timestamp_;
+
+    if (statistic->event_count_ != 0) {
+      statistic->mean_time_ = (statistic->last_ts_ - statistic->first_ts_) /
+                              statistic->event_count_;
+    }
+    return true;
+  }
+
+ public:
+  EventTypeStatistics(std::set<EventType> types_to_gather_statistic)
+      : corobelt::Pipe<std::shared_ptr<Event>>(),
+        types_to_gather_statistic_(std::move(types_to_gather_statistic)) {
+  }
+
+  ~EventTypeStatistics() {
+  }
+
+  const std::map<EventType, std::shared_ptr<EventStat>> &getStatistics() {
+    return statistics_by_type_;
+  }
+
+  std::optional<std::shared_ptr<EventStat>> getStatistic(EventType type) {
+    auto statistic_search = statistics_by_type_.find(type);
+    if (statistic_search != statistics_by_type_.end()) {
+      return std::make_optional(statistic_search->second);
+    }
+    return std::nullopt;
+  }
+
+  friend std::ostream &operator<<(std::ostream &out,
+                                  EventTypeStatistics &eventTypeStatistics) {
+    out << "EventTypeStatistics:" << std::endl;
+    std::shared_ptr<EventStat> statistic_ptr;
+    const std::map<EventType, std::shared_ptr<EventStat>> &statistics =
+        eventTypeStatistics.getStatistics();
+    for (auto it = statistics.begin(); it != statistics.end(); it++) {
+      statistic_ptr = it->second;
+      EventStat statistic(*statistic_ptr);
+      out << statistic;
+    }
+    return out;
+  }
+
+  void process(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
+               corobelt::coro_pull_t<std::shared_ptr<Event>> &source) override {
+    for (std::shared_ptr<Event> event_ptr : source) {
+      auto search = types_to_gather_statistic_.find(event_ptr->getType());
+      if (search != types_to_gather_statistic_.end()) {
+        if (!update_statistics(event_ptr)) {
+#ifdef DEBUG_EVENT_
+          DFLOGWARN("statistics for event with name %s could not be updated\n",
+                    event_ptr->getName().c_str());
+#endif
+        }
+      }
+      sink(event_ptr);
     }
   }
 };

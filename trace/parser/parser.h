@@ -29,37 +29,10 @@
 #include <string>
 
 #include "trace/corobelt/belt.h"
-// #include "trace/events/events.h"
+#include "trace/events/events.h"
 #include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
-
-class Event;
-class SimSendSync;
-class SimProcInEvent;
-class HostCall;
-class HostMmioImRespPoW;
-class HostMmio;
-class HostMmioCR;
-class HostMmioCW;
-class HostMmioRW;
-class HostMmioR;
-class HostMmioW;
-class NicMsix;
-class NicDma;
-class SetIX;
-class NicDmaI;
-class NicDmaEx;
-class NicDmaEn;
-class NicDmaCR;
-class NicDmaCW;
-class NicMmio;
-class NicMmioR;
-class NicMmioW;
-class NicTrx;
-class NicTx;
-class NicRx;
-
 class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
  protected:
   const std::string identifier_;

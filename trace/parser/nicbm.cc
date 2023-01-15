@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define PARSER_DEBUG_NICBM_ 1
+//#define PARSER_DEBUG_NICBM_ 1
 
 #include <errno.h>
 #include <inttypes.h>

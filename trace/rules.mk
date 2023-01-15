@@ -23,8 +23,8 @@
 include mk/subdir_pre.mk
 
 bin_trace := $(d)trace	
-OBJS_TRACE := $(addprefix $(d), trace.o filter/symtable.o parser/parser.o \
-	parser/nicbm.o reader/reader.o parser/gem5.o)
+OBJS_TRACE := $(addprefix $(d), trace.o filter/symtable.o events/events.o \
+	parser/parser.o parser/nicbm.o reader/reader.o parser/gem5.o)
 
 $(bin_trace): $(OBJS_TRACE) -lboost_coroutine -lboost_context
 

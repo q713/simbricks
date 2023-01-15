@@ -57,17 +57,9 @@ bool Gem5Parser::parse_system_switch_cpus(
   // verw_Mw_or_Rv (unimplemented) : No_OpClass :system.switch_cpus:
   // 1472990805875: system.switch_cpus: A0 T0 : 0xffffffff81107470    :   NOP :
   // IntAlu :
-  if (!line_reader_.consume_and_trim_till_string("0x")) {
-#ifdef PARSER_DEBUG_GEM5_
-    DFLOGWARN(
-        "%s: could not skip till an address start (0x) was found in '%s'\n",
-        identifier_.c_str(), line_reader_.get_raw_line().c_str());
-#endif
-    return false;
-  }
-
   uint64_t addr;
-  if (!parse_address(addr)) {
+  if (!line_reader_.consume_and_trim_till_string("0x") ||
+      !line_reader_.parse_uint_trim(16, addr)) {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGWARN("%s: could not parse address from line '%s'\n",
               identifier_.c_str(), line_reader_.get_raw_line().c_str());
@@ -86,28 +78,23 @@ bool Gem5Parser::parse_system_switch_cpus(
     }
   }
 
-  // filter out uninteresting addresses
+  // in case the given instruction is a call we expect to be able to 
+  // translate the address to a symbol name
   std::string symbol;
   if (!symbol_table_.filter(addr, symbol)) {
-#ifdef PARSER_DEBUG_GEM5_
-    DFLOGIN("%s: filter out event at timestamp %u with address %lx\n",
-            identifier_.c_str(), timestamp, addr);
-#endif
-    return false;
+    symbol = "";
   }
 
-  // NOTE: currently micro ops are ignored
   if (line_reader_.consume_and_trim_char('.')) {
-#ifdef PARSER_DEBUG_GEM5_
-    DFLOGERR("%s: ignore micro op '%s'\n", identifier_.c_str(),
-             line_reader_.get_raw_line().c_str());
-#endif
-    return false;
+    // TODO: gather micro operation information? if yes, which informations?
+    sink(std::make_shared<HostInstr>(timestamp, this, addr));
+    return true;
+  } else if (!symbol.empty()) {
+    sink(std::make_shared<HostCall>(timestamp, this, addr, symbol));
+    return true;
   }
-
-  // TODO: parse more about the instruction itself (MicroOps etc.)!
-  sink(std::make_shared<HostCall>(timestamp, this, symbol));
-  return true;
+  
+  return false;
 }
 
 bool Gem5Parser::parse_system_pc_pci_host(

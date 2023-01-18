@@ -105,7 +105,8 @@ int main(int argc, char *argv[]) {
 
   if (!result.count("linux-dump-server-client") ||
       !result.count("gem5-log-server") || !result.count("nicbm-log-server") ||
-      !result.count("gem5-log-client") || !result.count("nicbm-log-client")) {
+      !result.count("gem5-log-client") || 
+      !result.count("nicbm-log-client")) {
     std::cerr << "invalid arguments given" << std::endl
               << options.help() << std::endl;
     exit(EXIT_FAILURE);
@@ -180,7 +181,7 @@ int main(int argc, char *argv[]) {
       {&nicSerPar, &nicCliPar, &gem5ServerPar, &gem5ClientPar}};
 
   corobelt::Pipeline<std::shared_ptr<Event>> pipeline{
-      &nicSerPar, {&eventFilter, &statistics}};
+      &collector, {&eventFilter, &statistics}};
 
   // an awaiter to wait for the termination of the parsing + printing pipeline
   // that means the awaiter is used to block till all events are processed

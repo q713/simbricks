@@ -23,11 +23,12 @@
  */
 
 #include "trace/events/events.h"
+
 #include "trace/parser/parser.h"
 
 void Event::display(std::ostream &os) {
-  os << getName() << ": source=" << src_->getIdent() << ", timestamp=" << timestamp_
-     << " ";
+  os << getName() << ": source=" << src_->getIdent()
+     << ", timestamp=" << std::to_string(timestamp_) << " ";
 }
 
 void SimSendSync::display(std::ostream &os) {

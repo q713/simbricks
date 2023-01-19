@@ -25,8 +25,8 @@
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
 #include "trace/corobelt/belt.h"
-#include "trace/events/events.h"
 #include "trace/events/eventStreamOperators.h"
+#include "trace/events/events.h"
 #include "trace/filter/symtable.h"
 #include "trace/parser/parser.h"
 #include "trace/reader/reader.h"
@@ -172,6 +172,12 @@ int main(int argc, char *argv[]) {
        EventType::NicDmaEn_t, EventType::NicDmaCR_t, EventType::NicDmaCW_t,
        EventType::NicMmioR_t, EventType::NicMmioW_t, EventType::NicTx_t,
        EventType::NicRx_t}};
+  EventTimestampFilter timestampFilter {
+    EventTimestampFilter::EventTimeBoundary {
+      EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND,
+          EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND
+    }
+  };
   EventTypeStatistics statistics{{EventType::NicMmioR_t, EventType::NicMmioW_t,
                                   EventType::HostCall_t, EventType::NicDma_t,
                                   EventType::NicDmaEn_t, EventType::NicDmaCR_t,
@@ -184,7 +190,7 @@ int main(int argc, char *argv[]) {
       {&nicSerPar, &nicCliPar, &gem5ServerPar, &gem5ClientPar}};
 
   corobelt::Pipeline<std::shared_ptr<Event>> pipeline{
-      &collector, {&eventFilter, &statistics}};
+      &collector, {&timestampFilter, &eventFilter, &statistics}};
 
   // an awaiter to wait for the termination of the parsing + printing pipeline
   // that means the awaiter is used to block till all events are processed

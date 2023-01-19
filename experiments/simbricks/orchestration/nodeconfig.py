@@ -557,6 +557,20 @@ class NetperfClient(AppConfig):
             )
         ]
 
+class SimpleNetperfClient(AppConfig):
+
+    def __init__(self, server_ip = '10.0.0.1'):
+        super().__init__()
+        self.server_ip = server_ip
+        self.duration_tp = 10
+        self.duration_lat = 10
+
+    def run_cmds(self, node):
+        return [
+            f'netperf -H {self.server_ip} -l {self.duration_lat} -t TCP_RR'
+            ' -- -o mean_latency'
+        ]
+
 
 class VRReplica(AppConfig):
 

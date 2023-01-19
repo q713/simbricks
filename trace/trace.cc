@@ -26,6 +26,7 @@
 #include "lib/utils/log.h"
 #include "trace/corobelt/belt.h"
 #include "trace/events/events.h"
+#include "trace/events/eventStreamOperators.h"
 #include "trace/filter/symtable.h"
 #include "trace/parser/parser.h"
 #include "trace/reader/reader.h"
@@ -105,8 +106,7 @@ int main(int argc, char *argv[]) {
 
   if (!result.count("linux-dump-server-client") ||
       !result.count("gem5-log-server") || !result.count("nicbm-log-server") ||
-      !result.count("gem5-log-client") || 
-      !result.count("nicbm-log-client")) {
+      !result.count("gem5-log-client") || !result.count("nicbm-log-client")) {
     std::cerr << "invalid arguments given" << std::endl
               << options.help() << std::endl;
     exit(EXIT_FAILURE);
@@ -165,15 +165,18 @@ int main(int argc, char *argv[]) {
 
   // filter events out of stream
   EventTypeFilter eventFilter{
-      {EventType::SimSendSync_t, EventType::HostCall_t,
-       EventType::HostMmioImRespPoW_t, EventType::HostMmioCR_t,
-       EventType::HostMmioCW_t, EventType::HostMmioR_t, EventType::HostMmioW_t,
-       EventType::NicMsix_t, EventType::NicDma_t, EventType::SetIX_t,
-       EventType::NicDmaI_t, EventType::NicDmaEx_t, EventType::NicDmaEn_t,
-       EventType::NicDmaCR_t, EventType::NicDmaCW_t, EventType::NicMmioR_t,
-       EventType::NicMmioW_t, EventType::NicTx_t, EventType::NicRx_t}};
-  EventTypeStatistics statistics{
-      {EventType::NicMmioR_t, EventType::NicMmioW_t}};
+      {EventType::HostCall_t, EventType::HostMmioImRespPoW_t,
+       EventType::HostMmioCR_t, EventType::HostMmioCW_t, EventType::HostMmioR_t,
+       EventType::HostMmioW_t, EventType::NicMsix_t, EventType::NicDma_t,
+       EventType::SetIX_t, EventType::NicDmaI_t, EventType::NicDmaEx_t,
+       EventType::NicDmaEn_t, EventType::NicDmaCR_t, EventType::NicDmaCW_t,
+       EventType::NicMmioR_t, EventType::NicMmioW_t, EventType::NicTx_t,
+       EventType::NicRx_t}};
+  EventTypeStatistics statistics{{EventType::NicMmioR_t, EventType::NicMmioW_t,
+                                  EventType::HostCall_t, EventType::NicDma_t,
+                                  EventType::NicDmaEn_t, EventType::NicDmaCR_t,
+                                  EventType::NicDmaCW_t, EventType::NicMmioR_t,
+                                  EventType::NicMmioW_t, EventType::NicMsix_t}};
 
   // colelctor that merges event pipelines together in order of the given
   // comparator

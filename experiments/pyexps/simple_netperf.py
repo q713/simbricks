@@ -32,7 +32,7 @@ from simbricks.orchestration.nodeconfig import (
 )
 from simbricks.orchestration.simulators import Gem5Host, I40eNIC, SwitchNet
 
-e = Experiment(name='simple_ping')
+e = Experiment(name='simple_netperf')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
 gem5DebugStart = '--debug-start=1468431070625'

@@ -31,50 +31,6 @@
 #include "trace/parser/parser.h"
 #include "trace/reader/reader.h"
 
-class IntProd : public corobelt::Producer<int> {
-  int id_;
-
- public:
-  IntProd(int id) : corobelt::Producer<int>(), id_(id) {
-  }
-
-  void produce(corobelt::coro_push_t<int> &sink) override {
-    for (int e = 0; e < 10; e++) {
-      sink(id_);
-    }
-    return;
-  }
-};
-
-class IntAdder : public corobelt::Pipe<int> {
- public:
-  IntAdder() : corobelt::Pipe<int>() {
-  }
-
-  void process(corobelt::coro_push_t<int> &sink,
-               corobelt::coro_pull_t<int> &source) override {
-    for (int event : source) {
-      event += 10;
-      sink(event);
-    }
-    return;
-  }
-};
-
-class IntPrinter : public corobelt::Consumer<int> {
- public:
-  explicit IntPrinter() : corobelt::Consumer<int>() {
-  }
-
-  void consume(corobelt::coro_pull_t<int> &source) override {
-    std::cout << "start to sinkhole events" << std::endl;
-    for (int e : source) {
-      std::cout << "consumed " << e << std::endl;
-    }
-    return;
-  }
-};
-
 int main(int argc, char *argv[]) {
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")(
@@ -165,24 +121,15 @@ int main(int argc, char *argv[]) {
 
   // filter events out of stream
   EventTypeFilter eventFilter{
-      {EventType::HostCall_t, EventType::HostMmioImRespPoW_t,
-       EventType::HostMmioCR_t, EventType::HostMmioCW_t, EventType::HostMmioR_t,
-       EventType::HostMmioW_t, EventType::NicMsix_t, EventType::NicDma_t,
-       EventType::SetIX_t, EventType::NicDmaI_t, EventType::NicDmaEx_t,
-       EventType::NicDmaEn_t, EventType::NicDmaCR_t, EventType::NicDmaCW_t,
-       EventType::NicMmioR_t, EventType::NicMmioW_t, EventType::NicTx_t,
-       EventType::NicRx_t}};
-  EventTimestampFilter timestampFilter {
-    EventTimestampFilter::EventTimeBoundary {
+      {EventType::HostMmioImRespPoW_t, EventType::HostMmioCR_t,
+       EventType::HostMmioCW_t, EventType::HostMmioR_t, EventType::HostMmioW_t},
+      false};
+
+  EventTimestampFilter timestampFilter{EventTimestampFilter::EventTimeBoundary{
       EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND,
-          EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND
-    }
-  };
-  EventTypeStatistics statistics{{EventType::NicMmioR_t, EventType::NicMmioW_t,
-                                  EventType::HostCall_t, EventType::NicDma_t,
-                                  EventType::NicDmaEn_t, EventType::NicDmaCR_t,
-                                  EventType::NicDmaCW_t, EventType::NicMmioR_t,
-                                  EventType::NicMmioW_t, EventType::NicMsix_t}};
+      EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND}};
+
+  EventTypeStatistics statistics{{}};
 
   // colelctor that merges event pipelines together in order of the given
   // comparator

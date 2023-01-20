@@ -114,11 +114,16 @@ class Consumer {
 template <typename T>
 class Pipe {
  public:
+  virtual void act_on(T event,
+                      coro_push_t<T> &sink) {
+    sink(event);
+  }
+
   explicit Pipe() = default;
 
   virtual void process(coro_push_t<T> &sink, coro_pull_t<T> &source) {
     for (T event : source) {
-      sink(event);
+      act_on(event, sink);
     }
     return;
   }

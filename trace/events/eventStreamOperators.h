@@ -38,39 +38,50 @@ class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
   }
 };
 
-/* Filter out all events that do not have one of the in the template specified
- * type */
-class EventTypeFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
+class EventFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
+ public:
+  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) {
+    return true;
+  }
+
+  explicit EventFilter() : corobelt::Pipe<std::shared_ptr<Event>>() {
+  }
+
+  virtual void act_on(
+      std::shared_ptr<Event> event_ptr,
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
+    if (is_to_sink(event_ptr)) {
+      sink(event_ptr);
+    }
+  }
+};
+
+class EventTypeFilter : public EventFilter {
   std::set<EventType> types_to_filter_;
   bool inverted_;
 
  public:
+  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) override {
+    auto search = types_to_filter_.find(event_ptr->getType());
+    bool is_to_sink = inverted_ ? search == types_to_filter_.end()
+                                : search != types_to_filter_.end();
+    return is_to_sink;
+  }
+
   EventTypeFilter(std::set<EventType> types_to_filter)
-      : corobelt::Pipe<std::shared_ptr<Event>>(),
+      : EventFilter(),
         types_to_filter_(std::move(types_to_filter)),
         inverted_(false) {
   }
 
   EventTypeFilter(std::set<EventType> types_to_filter, bool invert_filter)
-      : corobelt::Pipe<std::shared_ptr<Event>>(),
+      : EventFilter(),
         types_to_filter_(std::move(types_to_filter)),
         inverted_(invert_filter) {
   }
-
-  void process(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
-               corobelt::coro_pull_t<std::shared_ptr<Event>> &source) override {
-    for (std::shared_ptr<Event> event : source) {
-      auto search = types_to_filter_.find(event->getType());
-      bool is_to_sink = inverted_ ? search == types_to_filter_.end()
-                                  : search != types_to_filter_.end();
-      if (is_to_sink) {
-        sink(event);
-      }
-    }
-  }
 };
 
-class EventTimestampFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
+class EventTimestampFilter : public EventFilter {
  public:
   struct EventTimeBoundary {
     uint64_t lower_bound_;
@@ -87,7 +98,8 @@ class EventTimestampFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
  private:
   std::vector<EventTimeBoundary> event_time_boundaries_;
 
-  bool is_within_boundaries(std::shared_ptr<Event> event_ptr) {
+ public:
+  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) override {
     uint64_t ts = event_ptr->timestamp_;
     for (auto &boundary : event_time_boundaries_) {
       if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
@@ -97,29 +109,27 @@ class EventTimestampFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
     return false;
   }
 
- public:
-  EventTimestampFilter(EventTimeBoundary boundary)
-      : corobelt::Pipe<std::shared_ptr<Event>>() {
+  EventTimestampFilter(EventTimeBoundary boundary) : EventFilter() {
     event_time_boundaries_.push_back(std::move(boundary));
   }
 
   EventTimestampFilter(std::vector<EventTimeBoundary> event_time_boundaries)
-      : corobelt::Pipe<std::shared_ptr<Event>>(),
+      : EventFilter(),
         event_time_boundaries_(std::move(event_time_boundaries)) {
-  }
-
-  void process(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
-               corobelt::coro_pull_t<std::shared_ptr<Event>> &source) override {
-    for (std::shared_ptr<Event> event : source) {
-      if (is_within_boundaries(event)) {
-        sink(event);
-      }
-    }
   }
 };
 
-/* Filter the event stream by the specified event types and collect some simple
- * statistics about these types */
+class HostMmioTimeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
+ public:
+  explicit HostMmioTimeStatistics() : corobelt::Pipe<std::shared_ptr<Event>>() {
+  }
+
+  virtual void act_on(
+      std::shared_ptr<Event> event_ptr,
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
+  }
+};
+
 class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
  public:
   struct EventStat {
@@ -254,21 +264,20 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
     return out;
   }
 
-  void process(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
-               corobelt::coro_pull_t<std::shared_ptr<Event>> &source) override {
-    for (std::shared_ptr<Event> event_ptr : source) {
-      auto search = types_to_gather_statistic_.find(event_ptr->getType());
-      if (search != types_to_gather_statistic_.end()) {
-        if (!update_statistics(event_ptr)) {
+  virtual void act_on(
+      std::shared_ptr<Event> event_ptr,
+      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
+    auto search = types_to_gather_statistic_.find(event_ptr->getType());
+    if (search != types_to_gather_statistic_.end()) {
+      if (!update_statistics(event_ptr)) {
 #ifdef DEBUG_EVENT_
-          DFLOGWARN("statistics for event with name %s could not be updated\n",
-                    event_ptr->getName().c_str());
+        DFLOGWARN("statistics for event with name %s could not be updated\n",
+                  event_ptr->getName().c_str());
 #endif
-        }
       }
-      total_event_count_ = total_event_count_ + 1;
-      sink(event_ptr);
     }
+    total_event_count_ = total_event_count_ + 1;
+    sink(event_ptr);
   }
 };
 

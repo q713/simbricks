@@ -32,7 +32,7 @@ class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
  public:
   void consume(corobelt::coro_pull_t<std::shared_ptr<Event>> &source) {
     for (std::shared_ptr<Event> event : source) {
-      std::cout << "EventPrinter: " << *event << std::endl;
+      std::cout << *event << std::endl;
     }
     return;
   }
@@ -53,6 +53,20 @@ class EventFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
     if (is_to_sink(event_ptr)) {
       sink(event_ptr);
     }
+  }
+};
+
+class GenericEventFilter : public EventFilter {
+  std::function<bool(std::shared_ptr<Event> event_ptr)> &to_filter_;
+
+ public:
+  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) override {
+    return to_filter_(event_ptr);
+  }
+
+  GenericEventFilter(
+      std::function<bool(std::shared_ptr<Event> event_ptr)> &to_filter)
+      : EventFilter(), to_filter_(to_filter) {
   }
 };
 
@@ -136,19 +150,10 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
     uint64_t last_ts_;
     uint64_t first_ts_;
     uint64_t event_count_;
-    uint64_t min_time_;
-    uint64_t max_time_;
-    uint64_t mean_time_;
     const std::string name_;
 
     EventStat(const std::string name)
-        : last_ts_(0),
-          first_ts_(0),
-          event_count_(0),
-          min_time_(UINT64_MAX),
-          max_time_(0),
-          mean_time_(0),
-          name_(std::move(name)) {
+        : last_ts_(0), first_ts_(0), event_count_(0), name_(std::move(name)) {
     }
 
     friend std::ostream &operator<<(std::ostream &out, EventStat &statistic) {
@@ -157,9 +162,6 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
       out << "first_ts: " << std::to_string(statistic.first_ts_) << std::endl;
       out << "event_count: " << std::to_string(statistic.event_count_)
           << std::endl;
-      out << "min_time: " << std::to_string(statistic.min_time_) << std::endl;
-      out << "max_time: " << std::to_string(statistic.max_time_) << std::endl;
-      out << "mean_time: " << std::to_string(statistic.mean_time_) << std::endl;
       return out;
     }
   };
@@ -180,9 +182,7 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
     if (statistics_search == statistics_by_type_.end()) {
       statistic = std::make_shared<EventStat>(event_ptr->getName());
       if (statistic) {
-        statistic->event_count_ = 0;
         statistic->first_ts_ = event_ptr->timestamp_;
-        statistic->min_time_ = event_ptr->timestamp_;
         auto success = statistics_by_type_.insert(
             std::make_pair(key, std::move(statistic)));
         if (!success.second) {
@@ -200,26 +200,18 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
       return false;
     }
 
-    uint64_t latency = event_ptr->timestamp_ - statistic->last_ts_;
-    if (latency < statistic->min_time_) {
-      statistic->min_time_ = latency;
-    }
-    if (latency > statistic->max_time_) {
-      statistic->max_time_ = latency;
-    }
-
     statistic->event_count_ = statistic->event_count_ + 1;
     statistic->last_ts_ = event_ptr->timestamp_;
 
-    if (statistic->event_count_ != 0) {
-      statistic->mean_time_ = (statistic->last_ts_ - statistic->first_ts_) /
-                              statistic->event_count_;
-    }
     return true;
   }
 
  public:
-  EventTypeStatistics(std::set<EventType> types_to_gather_statistic)
+  explicit EventTypeStatistics()
+      : corobelt::Pipe<std::shared_ptr<Event>>(), total_event_count_(0) {
+  }
+
+  explicit EventTypeStatistics(std::set<EventType> types_to_gather_statistic)
       : corobelt::Pipe<std::shared_ptr<Event>>(),
         types_to_gather_statistic_(std::move(types_to_gather_statistic)),
         total_event_count_(0) {
@@ -268,7 +260,8 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
       std::shared_ptr<Event> event_ptr,
       corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
     auto search = types_to_gather_statistic_.find(event_ptr->getType());
-    if (search != types_to_gather_statistic_.end()) {
+    if (types_to_gather_statistic_.empty() ||
+        search != types_to_gather_statistic_.end()) {
       if (!update_statistics(event_ptr)) {
 #ifdef DEBUG_EVENT_
         DFLOGWARN("statistics for event with name %s could not be updated\n",

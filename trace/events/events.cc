@@ -28,11 +28,10 @@
 
 void Event::display(std::ostream &os) {
   os << getName() << ": source=" << src_->getIdent()
-     << ", timestamp=" << std::to_string(timestamp_) << " ";
+     << ", timestamp=" << timestamp_;
 }
 
 void SimSendSync::display(std::ostream &os) {
-  os << "simbricks: sending sync message ";
   Event::display(os);
 }
 
@@ -153,8 +152,8 @@ void NicDmaCW::display(std::ostream &os) {
 
 void NicMmio::display(std::ostream &os) {
   Event::display(os);
-  os << ", off=" << std::hex << off_ << ", len=" << len_ << " val=" << std::hex
-     << val_;
+  os << ", off=" << std::hex << off_ << ", len=" << len_
+     << " val=" << std::hex << val_;
 }
 
 void NicMmioR::display(std::ostream &os) {

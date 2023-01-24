@@ -24,7 +24,7 @@
 
 #include "trace/parser/parser.h"
 
-#define PARSER_DEBUG_GEM5_ 1
+//#define PARSER_DEBUG_GEM5_ 1
 
 #include <errno.h>
 #include <inttypes.h>

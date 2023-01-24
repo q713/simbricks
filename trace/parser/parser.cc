@@ -35,7 +35,7 @@
 
 bool LogParser::parse_timestamp(uint64_t &timestamp) {
   line_reader_.trimL();
-  if (!line_reader_.parse_uint_trim(16, timestamp)) {
+  if (!line_reader_.parse_uint_trim(10, timestamp)) {
 #ifdef PARSER_DEBUG_
     DFLOGERR("%s, could not parse string repr. of timestamp from line '%s'\n",
              identifier_.c_str(), line_reader_.get_raw_line().c_str());

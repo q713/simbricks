@@ -202,7 +202,7 @@ class HostAddrSizeOp : public HostIdOp {
   explicit HostAddrSizeOp(uint64_t ts, LogParser *src, EventType type,
                           std::string name, uint64_t id, uint64_t addr,
                           uint64_t size)
-      : HostIdOp(ts, src, type, std::move(name), id) {
+      : HostIdOp(ts, src, type, std::move(name), id), addr_(addr), size_(size) {
   }
 };
 

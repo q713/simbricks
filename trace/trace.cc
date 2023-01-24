@@ -121,15 +121,19 @@ int main(int argc, char *argv[]) {
 
   // filter events out of stream
   EventTypeFilter eventFilter{
-      {EventType::HostMmioImRespPoW_t, EventType::HostMmioCR_t,
-       EventType::HostMmioCW_t, EventType::HostMmioR_t, EventType::HostMmioW_t},
-      false};
-
+      {EventType::HostCall_t, EventType::HostInstr_t,
+       EventType::SimProcInEvent_t, EventType::SimSendSync_t},
+      true};
+  // 1475802058125
+  // 1596059510250
+  uint64_t lower_bound = EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND;
+  std::string logged_timestamp("1475800058125");
+  sim_string_utils::parse_uint_trim(logged_timestamp, 10, &lower_bound);
   EventTimestampFilter timestampFilter{EventTimestampFilter::EventTimeBoundary{
-      EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND,
+      lower_bound,
       EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND}};
 
-  EventTypeStatistics statistics{{}};
+  EventTypeStatistics statistics{};
 
   // colelctor that merges event pipelines together in order of the given
   // comparator
@@ -137,7 +141,7 @@ int main(int argc, char *argv[]) {
       {&nicSerPar, &nicCliPar, &gem5ServerPar, &gem5ClientPar}};
 
   corobelt::Pipeline<std::shared_ptr<Event>> pipeline{
-      &collector, {&timestampFilter, &eventFilter, &statistics}};
+      &collector, {&timestampFilter, &eventFilter}};
 
   // an awaiter to wait for the termination of the parsing + printing pipeline
   // that means the awaiter is used to block till all events are processed
@@ -146,7 +150,6 @@ int main(int argc, char *argv[]) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }
-  std::cout << statistics << std::endl;
 
   exit(EXIT_SUCCESS);
 }

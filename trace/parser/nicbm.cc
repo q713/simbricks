@@ -375,13 +375,9 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           continue;
 
         } else if (line_reader_.consume_and_trim_till_string("rx: port ")) {
-          if (!line_reader_.parse_uint_trim(10, port)) {
-            continue;
-          }
-          if (!line_reader_.consume_and_trim_till_string("len ")) {
-            continue;
-          }
-          if (!line_reader_.parse_uint_trim(10, len)) {
+          if (!line_reader_.parse_uint_trim(10, port) 
+            || !line_reader_.consume_and_trim_till_string("len ") 
+            || !line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
           sink(std::make_shared<NicRx>(timestamp, this, port, len));

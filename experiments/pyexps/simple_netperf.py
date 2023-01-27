@@ -35,8 +35,8 @@ from simbricks.orchestration.simulators import Gem5Host, I40eNIC, SwitchNet
 e = Experiment(name='simple_netperf')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
-gem5DebugStart = '--debug-start=1468431070625'
-gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecAsid,ExecCPSeq,ExecEffAddr,ExecEnable,ExecFaulting,ExecFetchSeq,ExecKernel,ExecOpClass,ExecMicro,ExecMacro,ExecRegDelta,ExecUser,EthernetAll,PciDevice,PciHost'
+gem5DebugStart = '--debug-start=0'
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
 
 # create client
 client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver

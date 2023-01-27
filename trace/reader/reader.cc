@@ -25,6 +25,7 @@
 #include "trace/reader/reader.h"
 
 bool LineReader::open_file(const std::string &file_path) {
+  close_input();
   input_stream_.open(file_path, std::ios_base::in | std::ios_base::binary);
   if (!input_stream_.is_open()) {
     return false;

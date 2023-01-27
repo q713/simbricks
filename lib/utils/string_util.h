@@ -187,6 +187,10 @@ inline bool parse_uint_trim(std::string &s, int base, uint64_t *target) {
   return true;
 }
 
+inline bool parse_uint_trim_copy(std::string s, int base, uint64_t *target) {
+  return parse_uint_trim(s, base, target);
+}
+
 }  // namespace sim_string_utils
 
 #endif  // SIMBRICKS_STRING_UTILS_H_

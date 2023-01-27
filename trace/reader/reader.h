@@ -49,10 +49,14 @@ class LineReader {
       : skip_empty_lines_(skip_empty_lines) {
   }
 
-  ~LineReader() {
+  void close_input() {
     if (input_stream_.is_open()) {
       input_stream_.close();
     }
+  }
+
+  ~LineReader() {
+    close_input();
   }
 
   int ln() {

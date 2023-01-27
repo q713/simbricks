@@ -25,8 +25,6 @@
 #ifndef SIMBRICKS_TRACE_SYMS_H_
 #define SIMBRICKS_TRACE_SYMS_H_
 
-//#define SYMS_DEBUG_ 1
-
 #include <map>
 #include <set>
 #include <string>
@@ -45,31 +43,18 @@ class SymsFilter {
 
   bool parse_name(std::string &name);
 
-  bool add_to_sym_table(uint64_t address, const std::string &name);
+  bool add_to_sym_table(uint64_t address, const std::string &name,
+                        uint64_t address_offset);
 
  public:
   explicit SymsFilter(const std::string identifier, LineReader &line_reader)
       : identifier_(std::move(identifier)), line_reader_(line_reader){};
 
-  /*
-   * Builder function to add symbols to the symbol filter.
-   * After parsing the symbol table, only those symbols are included
-   * in the resulting symbol table, that is used to translate addresses
-   * into symbols. That way this translation also acts as a filter.
-   *
-   * In case one does not insert any symbols into this set,
-   * no filtering is performed.
-   */
-  inline SymsFilter &operator()(const std::string &symbol) {
-    auto res = symbol_filter_.insert(symbol); 
-    if (!res.second) {
-#ifdef SYMS_DEBUG_
-      DFLOGWARN("%s: could no insert '%s' into symbol map\n",
-                identifier_.c_str(), symbol.c_str());
-#endif
-    }
-    return *this;
-  }
+  explicit SymsFilter(const std::string identifier, LineReader &line_reader,
+                      std::set<std::string> symbol_filter)
+      : identifier_(std::move(identifier)),
+        symbol_filter_(std::move(symbol_filter)),
+        line_reader_(line_reader){};
 
   inline const std::map<uint64_t, std::string> &get_sym_table() {
     return symbol_table_;
@@ -81,19 +66,23 @@ class SymsFilter {
    */
   bool filter(uint64_t address, std::string &sym_name_target);
 
-  virtual bool load_file(const std::string &file_path) = 0;
-};
+  virtual bool load_file(const std::string &file_path, uint64_t address_offset) = 0;
 
-inline std::ostream &operator<<(std::ostream &os, SymsFilter &syms_filter) {
-  std::map<uint64_t, std::string> table = syms_filter.get_sym_table();
-
-  os << "SymsFilter:" << std::endl;
-  for (auto &key_val : table) {
-    os << "[" << key_val.first << "] = " << key_val.second << std::endl;
+  friend std::ostream &operator<<(std::ostream &os, SymsFilter &filter) {
+    os << std::endl << std::endl;
+    os << "Symbol Table Filter:";
+    os << std::endl << std::endl;
+    auto &table = filter.get_sym_table();
+    os << "There were " << table.size() << " many entries found";
+    os << std::endl << std::endl;
+    for (auto &entry : table) {
+      os << "[" << std::hex << entry.first << "] = " << entry.second
+         << std::endl;
+    }
+    os << std::endl;
+    return os;
   }
-  
-  return os;
-}
+};
 
 /*
  * This class is used to parse a symbol table given in ELF format.
@@ -117,7 +106,14 @@ class SymsSyms : public SymsFilter {
       : SymsFilter(std::move(identifier), line_reader) {
   }
 
-  bool load_file(const std::string &file_path) override;
+  explicit SymsSyms(const std::string identifier, LineReader &line_reader,
+                    std::set<std::string> symbol_filter)
+      : SymsFilter(std::move(identifier), line_reader,
+                   std::move(symbol_filter)) {
+  }
+
+  bool load_file(const std::string &file_path,
+                 uint64_t address_offset) override;
 };
 
 /*
@@ -135,7 +131,30 @@ class SSyms : public SymsFilter {
       : SymsFilter(std::move(identifier), line_reader) {
   }
 
-  bool load_file(const std::string &file_path) override;
+  explicit SSyms(const std::string identifier, LineReader &line_reader,
+                       std::set<std::string> symbol_filter)
+      : SymsFilter(std::move(identifier), line_reader,
+                   std::move(symbol_filter)) {
+  }
+
+  bool load_file(const std::string &file_path,
+                 uint64_t address_offset) override;
+};
+
+class ReadElfSyms : public SymsFilter {
+ public:
+  explicit ReadElfSyms(const std::string identifier, LineReader &line_reader)
+      : SymsFilter(std::move(identifier), line_reader) {
+  }
+
+  explicit ReadElfSyms(const std::string identifier, LineReader &line_reader,
+                       std::set<std::string> symbol_filter)
+      : SymsFilter(std::move(identifier), line_reader,
+                   std::move(symbol_filter)) {
+  }
+
+  bool load_file(const std::string &file_path,
+                 uint64_t address_offset) override;
 };
 
 #endif  // SIMBRICKS_TRACE_SYMS_H_

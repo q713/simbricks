@@ -147,7 +147,7 @@ class Collector : public Producer<T> {
 
   // NOTE: producers have to be cleaned up by the caller
   std::vector<Producer<T> *> producer_;
-  // NOTE: data within the sources set is clened up by this class
+  // NOTE: data within the sources set is cleaned up by this class
   std::set<col_key_t<T>, Comperator> sources_;
 
  protected:

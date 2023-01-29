@@ -5,6 +5,7 @@
 .*.cmd
 *.pyc
 *.swp
+.sconsign.dblite
 __pycache__/
 _vimrc_local.vim
 sims/nic/corundum/corundum_verilator

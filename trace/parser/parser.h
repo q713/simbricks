@@ -28,12 +28,17 @@
 #include <memory>
 #include <string>
 
-#include "trace/corobelt/belt.h"
+#include "trace/corobelt/coroutine.h"
 #include "trace/events/events.h"
 #include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
-class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
+#include "trace/filter/symtable.h"
+
+using event_t = std::shared_ptr<Event>;
+using task_t = sim::coroutine::task<void>;
+using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+class LogParser : public sim::coroutine::producer<event_t> {
  protected:
   const std::string identifier_;
   const std::string log_file_path_;
@@ -46,7 +51,8 @@ class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
  public:
   explicit LogParser(const std::string identifier,
                      const std::string log_file_path, LineReader &line_reader)
-      : identifier_(std::move(identifier)),
+      : sim::coroutine::producer<event_t>(),
+        identifier_(std::move(identifier)),
         log_file_path_(std::move(log_file_path)),
         line_reader_(line_reader){};
 
@@ -54,10 +60,9 @@ class LogParser : public corobelt::Producer<std::shared_ptr<Event>> {
     return identifier_;
   }
 
-  virtual void produce(
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
-    return;
-  };
+  virtual task_t produce(chan_t *tar_chan) override {
+    co_return;
+  }
 };
 
 class Gem5Parser : public LogParser {
@@ -65,23 +70,17 @@ class Gem5Parser : public LogParser {
   ComponentFilter &component_table_;
 
  protected:
-  bool parse_global_event(corobelt::coro_push_t<std::shared_ptr<Event>> &sink,
-                          uint64_t timestamp);
+  event_t parse_global_event(uint64_t timestamp);
 
-  bool parse_system_switch_cpus(
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+  event_t parse_system_switch_cpus(uint64_t timestamp);
 
-  bool parse_system_pc_pci_host(
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+  event_t parse_system_pc_pci_host(uint64_t timestamp);
 
-  bool parse_system_pc_pci_host_interface(
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+  event_t parse_system_pc_pci_host_interface(uint64_t timestamp);
 
-  bool parse_system_pc_simbricks(
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+  event_t parse_system_pc_simbricks(uint64_t timestamp);
 
-  bool parse_simbricks_event(
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink, uint64_t timestamp);
+  event_t parse_simbricks_event(uint64_t timestamp);
 
  public:
   explicit Gem5Parser(const std::string identifier,
@@ -92,7 +91,7 @@ class Gem5Parser : public LogParser {
         component_table_(component_table) {
   }
 
-  void produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override;
+  task_t produce(chan_t *tar_chan) override;
 };
 
 class NicBmParser : public LogParser {
@@ -113,7 +112,7 @@ class NicBmParser : public LogParser {
                   line_reader) {
   }
 
-  void produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override;
+  task_t produce(chan_t *tar_chan) override;
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

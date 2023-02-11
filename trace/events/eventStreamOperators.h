@@ -25,47 +25,62 @@
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_
 
-#include "trace/corobelt/belt.h"
+#include "trace/corobelt/coroutine.h"
 #include "trace/events/events.h"
 
-class EventPrinter : public corobelt::Consumer<std::shared_ptr<Event>> {
+using event_t = std::shared_ptr<Event>;
+using task_t = sim::coroutine::task<void>;
+using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+
+class EventPrinter : public sim::coroutine::consumer<event_t> {
  public:
-  void consume(corobelt::coro_pull_t<std::shared_ptr<Event>> &source) {
-    for (std::shared_ptr<Event> event : source) {
-      std::cout << *event << std::endl;
+  task_t consume(chan_t *src_chan) override {
+    if (!src_chan) {
+      co_return;
     }
-    return;
+    std::optional<event_t> msg;
+    for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
+      std::cout << *(msg.value()) << std::endl;
+    }
+    co_return;
   }
 };
 
-class EventFilter : public corobelt::Pipe<std::shared_ptr<Event>> {
+class EventFilter : public sim::coroutine::pipe<event_t> {
  public:
-  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) {
-    return true;
+  virtual bool is_to_sink(event_t event);
+
+  explicit EventFilter() : sim::coroutine::pipe<event_t>() {
   }
 
-  explicit EventFilter() : corobelt::Pipe<std::shared_ptr<Event>>() {
-  }
-
-  virtual void act_on(
-      std::shared_ptr<Event> event_ptr,
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
-    if (is_to_sink(event_ptr)) {
-      sink(event_ptr);
+  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
+    if (!src_chan || !tar_chan) {
+      co_return;
     }
+
+    event_t event;
+    std::optional<event_t> msg;
+    for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
+      event = msg.value();
+      bool sink = is_to_sink(event); 
+      if (sink && !co_await tar_chan->write(event)) {
+        co_return;
+      }
+    }
+    co_return;
   }
 };
 
 class GenericEventFilter : public EventFilter {
-  std::function<bool(std::shared_ptr<Event> event_ptr)> &to_filter_;
+  std::function<bool(event_t event)> &to_filter_;
 
  public:
-  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) override {
+  bool is_to_sink(event_t event) override {
     return to_filter_(event_ptr);
   }
 
   GenericEventFilter(
-      std::function<bool(std::shared_ptr<Event> event_ptr)> &to_filter)
+      std::function<bool(event_t event)> &to_filter)
       : EventFilter(), to_filter_(to_filter) {
   }
 };
@@ -75,23 +90,21 @@ class EventTypeFilter : public EventFilter {
   bool inverted_;
 
  public:
-  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) override {
-    auto search = types_to_filter_.find(event_ptr->getType());
+  virtual bool is_to_sink(event_t event) override {
+    auto search = types_to_filter_.find(event->getType());
     bool is_to_sink = inverted_ ? search == types_to_filter_.end()
                                 : search != types_to_filter_.end();
     return is_to_sink;
-  }
-
-  EventTypeFilter(std::set<EventType> types_to_filter)
-      : EventFilter(),
-        types_to_filter_(std::move(types_to_filter)),
-        inverted_(false) {
   }
 
   EventTypeFilter(std::set<EventType> types_to_filter, bool invert_filter)
       : EventFilter(),
         types_to_filter_(std::move(types_to_filter)),
         inverted_(invert_filter) {
+  }
+
+  EventTypeFilter(std::set<EventType> types_to_filter)
+      : EventTypeFilter(std::move(types_to_filter), false) {
   }
 };
 
@@ -113,8 +126,8 @@ class EventTimestampFilter : public EventFilter {
   std::vector<EventTimeBoundary> event_time_boundaries_;
 
  public:
-  virtual bool is_to_sink(std::shared_ptr<Event> event_ptr) override {
-    uint64_t ts = event_ptr->timestamp_;
+  virtual bool is_to_sink(event_t event) override {
+    uint64_t ts = event->timestamp_;
     for (auto &boundary : event_time_boundaries_) {
       if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
         return true;
@@ -133,18 +146,19 @@ class EventTimestampFilter : public EventFilter {
   }
 };
 
-class HostMmioTimeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
- public:
-  explicit HostMmioTimeStatistics() : corobelt::Pipe<std::shared_ptr<Event>>() {
-  }
+// TODO
+//class HostMmioTimeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
+// public:
+//  explicit HostMmioTimeStatistics() : corobelt::Pipe<std::shared_ptr<Event>>() {
+//  }
+//
+//  virtual void act_on(
+//      std::shared_ptr<Event> event_ptr,
+//      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
+//  }
+//};
 
-  virtual void act_on(
-      std::shared_ptr<Event> event_ptr,
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
-  }
-};
-
-class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
+class EventTypeStatistics : public sim::coroutine::pipe<event_t> {
  public:
   struct EventStat {
     uint64_t last_ts_;
@@ -208,28 +222,45 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
 
  public:
   explicit EventTypeStatistics()
-      : corobelt::Pipe<std::shared_ptr<Event>>(), total_event_count_(0) {
+      : sim::coroutine::pipe<event_t>(), total_event_count_(0) {
   }
 
   explicit EventTypeStatistics(std::set<EventType> types_to_gather_statistic)
-      : corobelt::Pipe<std::shared_ptr<Event>>(),
+      : sim::coroutine::pipe<event_t>(),
         types_to_gather_statistic_(std::move(types_to_gather_statistic)),
         total_event_count_(0) {
   }
 
-  ~EventTypeStatistics() {
-  }
+  ~EventTypeStatistics() = default;
 
-  const std::map<EventType, std::shared_ptr<EventStat>> &getStatistics() {
-    return statistics_by_type_;
-  }
-
-  std::optional<std::shared_ptr<EventStat>> getStatistic(EventType type) {
-    auto statistic_search = statistics_by_type_.find(type);
-    if (statistic_search != statistics_by_type_.end()) {
-      return std::make_optional(statistic_search->second);
+  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
+    if (!src_chan || !tar_chan) {
+      co_return;
     }
-    return std::nullopt;
+
+    event_t event;
+    std::optional<event_t> msg;
+    for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
+      event = msg.value();
+
+      auto search = types_to_gather_statistic_.find(event->getType());
+      if (types_to_gather_statistic_.empty() ||
+        search != types_to_gather_statistic_.end()) {
+        if (!update_statistics(event)) {
+          #ifdef DEBUG_EVENT_
+          DFLOGWARN("statistics for event with name %s could not be updated\n",
+                  event_ptr->getName().c_str());
+          #endif
+        }
+      }
+      total_event_count_ = total_event_count_ + 1;
+    
+      if (!co_await tar_chan->write(event)) {
+        co_return;
+      }
+    }
+
+    co_return;
   }
 
   friend std::ostream &operator<<(std::ostream &out,
@@ -256,21 +287,16 @@ class EventTypeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
     return out;
   }
 
-  virtual void act_on(
-      std::shared_ptr<Event> event_ptr,
-      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
-    auto search = types_to_gather_statistic_.find(event_ptr->getType());
-    if (types_to_gather_statistic_.empty() ||
-        search != types_to_gather_statistic_.end()) {
-      if (!update_statistics(event_ptr)) {
-#ifdef DEBUG_EVENT_
-        DFLOGWARN("statistics for event with name %s could not be updated\n",
-                  event_ptr->getName().c_str());
-#endif
-      }
+  const std::map<EventType, std::shared_ptr<EventStat>> &getStatistics() {
+    return statistics_by_type_;
+  }
+
+  std::optional<std::shared_ptr<EventStat>> getStatistic(EventType type) {
+    auto statistic_search = statistics_by_type_.find(type);
+    if (statistic_search != statistics_by_type_.end()) {
+      return std::make_optional(statistic_search->second);
     }
-    total_event_count_ = total_event_count_ + 1;
-    sink(event_ptr);
+    return std::nullopt;
   }
 };
 

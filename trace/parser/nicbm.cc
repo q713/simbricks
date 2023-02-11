@@ -22,14 +22,11 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-//#define PARSER_DEBUG_NICBM_ 1
+#define PARSER_DEBUG_NICBM_ 1
 
-#include <errno.h>
-#include <inttypes.h>
+#include "trace/parser/parser.h"
 
 #include "lib/utils/log.h"
-#include "trace/events/events.h"
-#include "trace/parser/parser.h"
 
 /*
  * NOTE: in the following is a list of prints from the nicbm which are currently
@@ -223,12 +220,16 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   return true;
 }
 
-void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
+task_t NicBmParser::produce(chan_t *tar_chan) {
+  if (!tar_chan) {
+    co_return;
+  }
+
   if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
 #endif
-    return;
+    co_return;
   }
 
   uint64_t mac_address = 0;
@@ -238,7 +239,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
   // parse mac address and sync informations
   if (line_reader_.next_line()) {
     if (!parse_mac_address(mac_address)) {
-      return;
+      co_return;
     }
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGIN("%s: found mac_addr=%lx\n", identifier_.c_str(), mac_address);
@@ -246,7 +247,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
   }
   if (line_reader_.next_line()) {
     if (!parse_sync_info(sync_pci, sync_eth)) {
-      return;
+      co_return;
     }
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGIN("%s: found sync_pcie=%d sync_eth=%d\n", identifier_.c_str(),
@@ -254,6 +255,7 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
 #endif
   }
 
+  event_t event_ptr;
   uint64_t timestamp, off, val, op, addr, vec, len, pending, port;
   // parse the actual events of interest
   while (line_reader_.next_line()) {
@@ -305,35 +307,40 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        sink(std::make_shared<NicMmioR>(timestamp, this, off, len, val));
+        event_ptr = std::make_shared<NicMmioR>(timestamp, this, off, len, val);
+        co_await tar_chan->write(event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("write(")) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        sink(std::make_shared<NicMmioW>(timestamp, this, off, len, val));
+        event_ptr = std::make_shared<NicMmioW>(timestamp, this, off, len, val);
+        co_await tar_chan->write(event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("issuing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaI>(timestamp, this, op, addr, len));
+        event_ptr = std::make_shared<NicDmaI>(timestamp, this, op, addr, len);
+        co_await tar_chan->write(event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("executing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaEx>(timestamp, this, op, addr, len));
+        event_ptr = std::make_shared<NicDmaEx>(timestamp, this, op, addr, len);
+        co_await tar_chan->write(event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("enqueuing dma")) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        sink(std::make_shared<NicDmaEn>(timestamp, this, op, addr, len));
+        event_ptr = std::make_shared<NicDmaEn>(timestamp, this, op, addr, len);
+        co_await tar_chan->write(event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("completed dma")) {
@@ -341,12 +348,14 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
-          sink(std::make_shared<NicDmaCR>(timestamp, this, op, addr, len));
+          event_ptr = std::make_shared<NicDmaCR>(timestamp, this, op, addr, len);
+          co_await tar_chan->write(event_ptr);
         } else if (line_reader_.consume_and_trim_till_string("write")) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
-          sink(std::make_shared<NicDmaCW>(timestamp, this, op, addr, len));
+          event_ptr = std::make_shared<NicDmaCW>(timestamp, this, op, addr, len);
+          co_await tar_chan->write(event_ptr);
         }
         continue;
 
@@ -363,7 +372,8 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
         if (!line_reader_.parse_uint_trim(10, vec)) {
           continue;
         }
-        sink(std::make_shared<NicMsix>(timestamp, this, vec, isX));
+        event_ptr = std::make_shared<NicMsix>(timestamp, this, vec, isX);
+        co_await tar_chan->write(event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("eth")) {
@@ -371,7 +381,8 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
           if (!line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
-          sink(std::make_shared<NicTx>(timestamp, this, len));
+          event_ptr = std::make_shared<NicTx>(timestamp, this, len);
+          co_await tar_chan->write(event_ptr);
           continue;
 
         } else if (line_reader_.consume_and_trim_till_string("rx: port ")) {
@@ -380,7 +391,8 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
             || !line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
-          sink(std::make_shared<NicRx>(timestamp, this, port, len));
+          event_ptr = std::make_shared<NicRx>(timestamp, this, port, len);
+          co_await tar_chan->write(event_ptr);
         }
         continue;
 
@@ -388,7 +400,8 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
         if (!parse_address(addr)) {
           continue;
         }
-        sink(std::make_shared<SetIX>(timestamp, this, addr));
+        event_ptr = std::make_shared<SetIX>(timestamp, this, addr);
+        co_await tar_chan->write(event_ptr);
         continue;
         
       } else if (line_reader_.consume_and_trim_till_string("dma write data")) {
@@ -411,5 +424,5 @@ void NicBmParser::produce(corobelt::coro_push_t<std::shared_ptr<Event>> &sink) {
     }
   }
 
-  return;
+  co_return;
 }

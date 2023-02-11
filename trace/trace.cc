@@ -24,12 +24,7 @@
 
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
-#include "trace/corobelt/belt.h"
-#include "trace/events/eventStreamOperators.h"
-#include "trace/events/events.h"
-#include "trace/filter/symtable.h"
 #include "trace/parser/parser.h"
-#include "trace/reader/reader.h"
 
 int main(int argc, char *argv[]) {
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
@@ -333,7 +328,7 @@ int main(int argc, char *argv[]) {
                       "skb_free_head",
                       "kfree_skbmem",
                       "syscall_exit_work"}};*/
-
+/*
   if ((result.count("linux-dump-server-client") &&
        !syms_filter.load_file(
            result["linux-dump-server-client"].as<std::string>(), 0)) ||
@@ -412,6 +407,8 @@ int main(int argc, char *argv[]) {
   }
 
   std::cout << statistics << std::endl;
+
+  */
 
   exit(EXIT_SUCCESS);
 }

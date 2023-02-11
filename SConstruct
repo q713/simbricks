@@ -30,7 +30,7 @@ Type: 'scons' to build the trace production program,
 
 # flags for the c++ compiler
 #cxx_flags = '-Wall -Wextra -Wno-unused-parameter -fPIC -std=gnu++20 -fcoroutines'
-cxx_flags = '-Wall -Wextra -Wno-unused-parameter -std=gnu++20 -fcoroutines'
+cxx_flags = '-Wall -Wextra -Wno-unused-parameter -fPIC -std=gnu++20 -fcoroutines'
 # create the construction environment
 env = Environment(CXX='g++', CXXFLAGS=cxx_flags, CPPPATH = ['.'])
 # debug build without optimizations
@@ -41,7 +41,7 @@ if not int(debug):
 #    env.Append(CXXFLAGS = ' -fsanitize=address')
     
 # define external libraries needed for the built
-libraries = Split('-lboost_coroutine -lboost_context')
+libraries = Split('')
 linkcom = '$LINK -o $TARGET $LINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS -Wl,--start-group $_LIBFLAGS -Wl,--end-group'
 libpath = []
 # linker debugging flags
@@ -51,11 +51,11 @@ if int(verbose_link):
     link_flags = ['-Xlinker', '--verbose']
 
 # all source files that shall/need to be compiled
-#src_files = ['trace/trace.cc', Glob('trace/events/*.cc'), Glob('trace/filter/*.cc'), 
-#    Glob('trace/parser/*.cc'), Glob('trace/reader/*.cc'), Glob('trace/corobelt/*.cc')] 
-src_files = ['trace/test.cc'] 
+src_files = ['trace/trace.cc', Glob('trace/events/*.cc'), Glob('trace/filter/*.cc'), 
+    Glob('trace/parser/*.cc'), Glob('trace/reader/*.cc'), Glob('trace/corobelt/*.cc')] 
+#src_files = ['trace/test.cc'] 
 
 # the program that shall be built
-#env.Program(target='trace/trace', source=src_files, LIBS=libraries)
+env.Program(target='trace/trace', source=src_files, LIBS=libraries)
 # the program that shall be built
-env.Program(target='trace/test', source=src_files, LIBS=libraries, LIBPATH=libpath, LINKFLAGS=link_flags, LINKCOM = linkcom)
+#env.Program(target='trace/test', source=src_files, LIBS=libraries, LIBPATH=libpath, LINKFLAGS=link_flags, LINKCOM = linkcom)

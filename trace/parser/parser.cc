@@ -26,12 +26,8 @@
 
 #include "trace/parser/parser.h"
 
-#include <errno.h>
-#include <inttypes.h>
-
 #include "lib/utils/log.h"
 #include "lib/utils/string_util.h"
-#include "trace/events/events.h"
 
 bool LogParser::parse_timestamp(uint64_t &timestamp) {
   line_reader_.trimL();

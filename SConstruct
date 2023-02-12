@@ -58,4 +58,4 @@ src_files = ['trace/trace.cc', Glob('trace/events/*.cc'), Glob('trace/filter/*.c
 # the program that shall be built
 env.Program(target='trace/trace', source=src_files, LIBS=libraries)
 # the program that shall be built
-#env.Program(target='trace/test', source=src_files, LIBS=libraries, LIBPATH=libpath, LINKFLAGS=link_flags, LINKCOM = linkcom)
+env.Program(target='trace/test', source='trace/test.cc', LIBS=libraries, LIBPATH=libpath, LINKFLAGS=link_flags, LINKCOM = linkcom)

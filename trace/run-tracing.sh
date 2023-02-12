@@ -16,9 +16,7 @@ nic_client_log_arg='--nicbm-log-client /local/jakobg/simbricks-tracing-experimen
 echo gem5_client_log_arg: $gem5_client_log_arg
 echo nic_client_log_arg: $nic_client_log_arg
 
-LD_LIBRARY_PATH='/local/jakobg/lib'
-echo LD_LIBRARY_PATH: $LD_LIBRARY_PATH
 
 echo start running the program:
-echo LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./trace $linux_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH ./trace $linux_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg
+echo ./trace $linux_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg
+./trace $linux_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg

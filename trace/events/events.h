@@ -496,7 +496,7 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
 struct EventComperator {
   bool operator()(const std::shared_ptr<Event> &e1,
                   const std::shared_ptr<Event> &e2) const {
-    return e1->timestamp_ < e2->timestamp_;
+    return e1->timestamp_ > e2->timestamp_;
   }
 };
 

@@ -25,8 +25,8 @@
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_
 
-#include "trace/corobelt/coroutine.h"
 #include "trace/events/events.h"
+#include "trace/corobelt/coroutine.h"
 
 using event_t = std::shared_ptr<Event>;
 using task_t = sim::coroutine::task<void>;
@@ -48,7 +48,9 @@ class EventPrinter : public sim::coroutine::consumer<event_t> {
 
 class EventFilter : public sim::coroutine::pipe<event_t> {
  public:
-  virtual bool is_to_sink(event_t event);
+  virtual bool is_to_sink(event_t event) {
+    return true;
+  }
 
   explicit EventFilter() : sim::coroutine::pipe<event_t>() {
   }
@@ -75,8 +77,8 @@ class GenericEventFilter : public EventFilter {
   std::function<bool(event_t event)> &to_filter_;
 
  public:
-  bool is_to_sink(event_t event) override {
-    return to_filter_(event_ptr);
+  inline bool is_to_sink(event_t event) override {
+    return to_filter_(event);
   }
 
   GenericEventFilter(
@@ -104,7 +106,7 @@ class EventTypeFilter : public EventFilter {
   }
 
   EventTypeFilter(std::set<EventType> types_to_filter)
-      : EventTypeFilter(std::move(types_to_filter), false) {
+      : EventFilter(), types_to_filter_(std::move(types_to_filter)), inverted_(false) {
   }
 };
 
@@ -249,7 +251,7 @@ class EventTypeStatistics : public sim::coroutine::pipe<event_t> {
         if (!update_statistics(event)) {
           #ifdef DEBUG_EVENT_
           DFLOGWARN("statistics for event with name %s could not be updated\n",
-                  event_ptr->getName().c_str());
+                  event->getName().c_str());
           #endif
         }
       }

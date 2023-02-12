@@ -22,6 +22,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef SIM_COROUTINE_H_
+#define SIM_COROUTINE_H_
+
 #include <atomic>
 #include <concepts>
 #include <condition_variable>
@@ -802,11 +805,16 @@ struct awaiter {
       return false;
     }
 
-    task<void> producer_task = producer_.produce(target_chan_);
+    //bool is_prod_only = std::dynamic_cast<collector<T> *>(&producer_):
+    //is_prod_only = std::dynamic_cast<pipeline<T> *>(&producer_);
+
     task<void> consumer_task = consumer_.consume(target_chan_);
+    task<void> producer_task = producer_.produce(target_chan_);
 
     while (producer_task.is_not_done()) {
       producer_task.resume_handle();
+      //if (is_prod_only)
+      //  consumer_task.resume_handle();
     }
 
     producer_task.destroy();
@@ -834,3 +842,5 @@ struct awaiter {
 };  // namespace coroutine
 
 }; // namespace sim
+
+#endif // SIM_COROUTINE_H_

@@ -35,7 +35,7 @@ class IntProducer : public sim::coroutine::producer<int> {
   }
 
   virtual sim::coroutine::task<void> produce(sim::coroutine::unbuffered_single_chan<int>* tar_chan) override {
-    for (int i = 0; i < 10'000'000 && tar_chan && tar_chan->is_open(); i++) {
+    for (int i = 0; i < 10 && tar_chan && tar_chan->is_open(); i += 2) {
       int msg = start_ + i;
       if (!co_await tar_chan->write(msg)) {
         //std::cout << "producer write failure, start=" << start_
@@ -109,18 +109,16 @@ struct dummy : public sim::coroutine::pipe<int> {
 };
 
 int main(int argc, char* argv[]) {
-
-  // experimental_coroutine::unbuffered_single_chan<int> chan;
   IntProducer prodA{0};
-  IntProducer prodB{1};
-  IntProducer prodC{2};
-  IntProducer prodD{3};
+  IntProducer prodB{0};
+  IntProducer prodC{0};
+  IntProducer prodD{0};
   IntConsumer cons;
   IntAdder adder;
   dummy d;
-  sim::coroutine::collector<int> col{{prodA, prodB}};
-  sim::coroutine::pipeline<int> pip{prodA, {adder, d}};
-  if (sim::coroutine::awaiter<int>::await_termination(col, cons)) {
+  sim::coroutine::collector<int> col{{prodA, prodB, prodC, prodD}};
+  sim::coroutine::pipeline<int> pip{col, {adder, adder, adder}};
+  if (sim::coroutine::awaiter<int>::await_termination(pip, cons)) {
     std::cout << "awaiter finished successful" << std::endl;
   } else {
     std::cout << "awaiter finished with error!!" << std::endl;

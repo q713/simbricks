@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define PARSER_DEBUG_GEM5_ 1
+//#define PARSER_DEBUG_GEM5_ 1
 
 #include "trace/parser/parser.h"
 

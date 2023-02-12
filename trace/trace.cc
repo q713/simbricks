@@ -25,6 +25,7 @@
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
 #include "trace/parser/parser.h"
+#include "trace/events/eventStreamOperators.h"
 
 int main(int argc, char *argv[]) {
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
@@ -73,7 +74,7 @@ int main(int argc, char *argv[]) {
   // symbol filter to translate hex address to function-name/label
   LineReader ssymsLr;
   SSyms syms_filter{"SymbolTable-Client-Server",
-                    ssymsLr}; /*,
+                    ssymsLr,
                      {"entry_SYSCALL_64",
                       "__sys_sendto",
                       "__sys_recvfrom",
@@ -327,8 +328,8 @@ int main(int argc, char *argv[]) {
                       "skb_release_data",
                       "skb_free_head",
                       "kfree_skbmem",
-                      "syscall_exit_work"}};*/
-/*
+                      "syscall_exit_work"}};
+
   if ((result.count("linux-dump-server-client") &&
        !syms_filter.load_file(
            result["linux-dump-server-client"].as<std::string>(), 0)) ||
@@ -339,6 +340,10 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
+  /*
+   * Parsers
+   */
+
   // component filter to only parse events written from certain components
   ComponentFilter compF("ComponentFilter-Client-Server");
 
@@ -347,6 +352,7 @@ int main(int argc, char *argv[]) {
   Gem5Parser gem5ServerPar{"Gem5ServerParser",
                            result["gem5-log-server"].as<std::string>(),
                            syms_filter, compF, serverLr};
+
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
                            result["gem5-log-client"].as<std::string>(),
@@ -359,15 +365,10 @@ int main(int argc, char *argv[]) {
   LineReader nicCliLr;
   NicBmParser nicCliPar{"NicbmClientParser",
                         result["nicbm-log-client"].as<std::string>(), nicCliLr};
-
-  // printer to consume pipeline and to print events
-  EventPrinter eventPrinter;
-
-  // filter events out of stream
-  EventTypeFilter eventFilter{
-      {EventType::HostInstr_t, EventType::SimProcInEvent_t,
-       EventType::SimSendSync_t},
-      true};
+  
+  /*
+   * Filter and operators
+   */
 
   // 1475802058125
   // 1596059510250
@@ -389,26 +390,27 @@ int main(int argc, char *argv[]) {
 
   EventTypeStatistics statistics{};
 
-  // colelctor that merges event pipelines together in order of the given
-  // comparator
-  corobelt::Collector<std::shared_ptr<Event>, EventComperator> collector{
-      {&nicSerPar, &nicCliPar, &gem5ServerPar, &gem5ClientPar}};
+  // filter events out of stream
+  EventTypeFilter eventFilter{
+      {EventType::HostInstr_t, EventType::SimProcInEvent_t,
+       EventType::SimSendSync_t},
+      true};
 
-  corobelt::Pipeline<std::shared_ptr<Event>> pipeline{
-      &collector, {&timestampFilter, &eventFilter, &statistics}};
+  // printer to consume pipeline and to print events
+  EventPrinter eventPrinter;
 
-  // an awaiter to wait for the termination of the parsing + printing
-  // pipeline that means the awaiter is used to block till all events are
-  // processed
-  corobelt::Awaiter<std::shared_ptr<Event>> awaiter(&pipeline, &eventPrinter);
-  if (!awaiter.await_termination()) {
+  using event_t = std::shared_ptr<Event>;
+
+  sim::coroutine::collector<event_t, EventComperator> collector{{nicSerPar, nicCliPar, gem5ServerPar, gem5ClientPar}};
+
+  sim::coroutine::pipeline<event_t> pipeline{collector, {timestampFilter, eventFilter, statistics}};
+
+  if (!sim::coroutine::awaiter<event_t>::await_termination(pipeline, eventPrinter)) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }
 
   std::cout << statistics << std::endl;
-
-  */
 
   exit(EXIT_SUCCESS);
 }

@@ -34,7 +34,6 @@
 #include <type_traits>
 
 #include "lib/utils/log.h"
-#include "trace/corobelt/belt.h"
 
 #define DEBUG_EVENT_ ;
 
@@ -100,6 +99,8 @@ class Event {
   explicit Event(uint64_t ts, LogParser *src, EventType type, std::string name)
       : type_(type), name_(std::move(name)), timestamp_(ts), src_(src) {
   }
+
+  virtual ~Event() = default;
 };
 
 /* Simbricks Events */
@@ -109,6 +110,8 @@ class SimSendSync : public Event {
       : Event(ts, src, EventType::SimSendSync_t, "SimSendSyncSimSendSync") {
   }
 
+  ~SimSendSync() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -117,6 +120,8 @@ class SimProcInEvent : public Event {
   explicit SimProcInEvent(uint64_t ts, LogParser *src)
       : Event(ts, src, EventType::SimProcInEvent_t, "SimProcInEvent") {
   }
+
+  ~SimProcInEvent() = default;
 
   void display(std::ostream &os) override;
 };
@@ -136,6 +141,8 @@ class HostInstr : public Event {
       : Event(ts, src, type, name), pc_(pc) {
   }
 
+  virtual ~HostInstr() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -149,6 +156,8 @@ class HostCall : public HostInstr {
         func_(std::move(func)) {
   }
 
+  ~HostCall() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -157,6 +166,8 @@ class HostMmioImRespPoW : public Event {
   explicit HostMmioImRespPoW(uint64_t ts, LogParser *src)
       : Event(ts, src, EventType::HostMmioImRespPoW_t, "HostMmioImRespPoW") {
   }
+
+  ~HostMmioImRespPoW() = default;
 
   void display(std::ostream &os) override;
 };
@@ -172,6 +183,8 @@ class HostIdOp : public Event {
                     std::string name, uint64_t id)
       : Event(ts, src, type, std::move(name)), id_(id) {
   }
+
+  virtual ~HostIdOp() = default;
 };
 
 class HostMmioCR : public HostIdOp {
@@ -180,6 +193,8 @@ class HostMmioCR : public HostIdOp {
       : HostIdOp(ts, src, EventType::HostMmioCR_t, "HostMmioCR", id) {
   }
 
+  ~HostMmioCR() = default;
+
   void display(std::ostream &os) override;
 };
 class HostMmioCW : public HostIdOp {
@@ -187,6 +202,8 @@ class HostMmioCW : public HostIdOp {
   explicit HostMmioCW(uint64_t ts, LogParser *src, uint64_t id)
       : HostIdOp(ts, src, EventType::HostMmioCW_t, "HostMmioCW", id) {
   }
+
+  ~HostMmioCW() = default;
 
   void display(std::ostream &os) override;
 };
@@ -204,6 +221,8 @@ class HostAddrSizeOp : public HostIdOp {
                           uint64_t size)
       : HostIdOp(ts, src, type, std::move(name), id), addr_(addr), size_(size) {
   }
+
+  virtual ~HostAddrSizeOp() = default;
 };
 
 class HostMmioR : public HostAddrSizeOp {
@@ -213,6 +232,8 @@ class HostMmioR : public HostAddrSizeOp {
       : HostAddrSizeOp(ts, src, EventType::HostMmioR_t, "HostMmioR", id, addr,
                        size) {
   }
+
+  ~HostMmioR() = default;
 
   void display(std::ostream &os) override;
 };
@@ -225,6 +246,8 @@ class HostMmioW : public HostAddrSizeOp {
                        size) {
   }
 
+  ~HostMmioW() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -233,6 +256,8 @@ class HostDmaC : public HostIdOp {
   explicit HostDmaC(uint64_t ts, LogParser *src, uint64_t id)
       : HostIdOp(ts, src, EventType::HostDmaC_t, "HostDmaC", id) {
   }
+
+  ~HostDmaC() = default;
 
   void display(std::ostream &os) override;
 };
@@ -245,6 +270,8 @@ class HostDmaR : public HostAddrSizeOp {
                        size) {
   }
 
+  ~HostDmaR() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -256,6 +283,8 @@ class HostDmaW : public HostAddrSizeOp {
                        size) {
   }
 
+  ~HostDmaW() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -266,6 +295,8 @@ class HostMsiX : public Event {
   explicit HostMsiX(uint64_t ts, LogParser *src, uint64_t vec)
       : Event(ts, src, EventType::HostMsiX_t, "HostMsiX"), vec_(vec) {
   }
+
+  ~HostMsiX() = default;
 
   void display(std::ostream &os) override;
 };
@@ -291,6 +322,8 @@ class HostConf : public Event {
         is_read_(is_read) {
   }
 
+  ~HostConf() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -300,6 +333,8 @@ class HostClearInt : public Event {
       : Event(ts, src, EventType::HostClearInt_t, "HostClearInt") {
   }
 
+  ~HostClearInt() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -308,6 +343,8 @@ class HostPostInt : public Event {
   explicit HostPostInt(uint64_t ts, LogParser *src)
       : Event(ts, src, EventType::HostPostInt_t, "HostPostInt") {
   }
+
+  ~HostPostInt() = default;
 
   void display(std::ostream &os) override;
 };
@@ -327,6 +364,8 @@ class HostPciRW : public Event {
         is_read_(is_read) {
   }
 
+  ~HostPciRW() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -341,6 +380,8 @@ class NicMsix : public Event {
         vec_(vec),
         isX_(isX) {
   }
+
+  ~NicMsix() = default;
 
   void display(std::ostream &os) override;
 };
@@ -358,6 +399,8 @@ class NicDma : public Event {
          uint64_t id, uint64_t addr, uint64_t len)
       : Event(ts, src, type, std::move(name)), id_(id), addr_(addr), len_(len) {
   }
+
+  virtual ~NicDma() = default;
 };
 
 class SetIX : public Event {
@@ -368,6 +411,8 @@ class SetIX : public Event {
       : Event(ts, src, EventType::SetIX_t, "SetIX"), intr_(intr) {
   }
 
+  ~SetIX() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -376,6 +421,8 @@ class NicDmaI : public NicDma {
   NicDmaI(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr, uint64_t len)
       : NicDma(ts, src, EventType::NicDmaI_t, "NicDmaI", id, addr, len) {
   }
+
+  ~NicDmaI() = default;
 
   void display(std::ostream &os) override;
 };
@@ -387,6 +434,8 @@ class NicDmaEx : public NicDma {
       : NicDma(ts, src, EventType::NicDmaEx_t, "NicDmaEx", id, addr, len) {
   }
 
+  ~NicDmaEx() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -396,6 +445,8 @@ class NicDmaEn : public NicDma {
            uint64_t len)
       : NicDma(ts, src, EventType::NicDmaEn_t, "NicDmaEn", id, addr, len) {
   }
+
+  ~NicDmaEn() = default;
 
   void display(std::ostream &os) override;
 };
@@ -407,6 +458,8 @@ class NicDmaCR : public NicDma {
       : NicDma(ts, src, EventType::NicDmaCR_t, "NicDmaCR", id, addr, len) {
   }
 
+  ~NicDmaCR() = default;
+
   void display(std::ostream &os) override;
 };
 
@@ -416,6 +469,8 @@ class NicDmaCW : public NicDma {
            uint64_t len)
       : NicDma(ts, src, EventType::NicDmaCW_t, "NicDmaCW", id, addr, len) {
   }
+
+  ~NicDmaCW() = default;
 
   void display(std::ostream &os) override;
 };
@@ -433,6 +488,8 @@ class NicMmio : public Event {
           uint64_t off, uint64_t len, uint64_t val)
       : Event(ts, src, type, std::move(name)), off_(off), len_(len), val_(val) {
   }
+
+  virtual ~NicMmio() = default;
 };
 
 class NicMmioR : public NicMmio {
@@ -441,6 +498,8 @@ class NicMmioR : public NicMmio {
            uint64_t val)
       : NicMmio(ts, src, EventType::NicMmioR_t, "NicMmioR", off, len, val) {
   }
+
+  ~NicMmioR() = default;
 
   void display(std::ostream &os) override;
 };
@@ -451,6 +510,8 @@ class NicMmioW : public NicMmio {
            uint64_t val)
       : NicMmio(ts, src, EventType::NicMmioW_t, "NicMmioW", off, len, val) {
   }
+
+  ~NicMmioW() = default;
 
   void display(std::ostream &os) override;
 };
@@ -466,6 +527,8 @@ class NicTrx : public Event {
          uint16_t len)
       : Event(ts, src, type, std::move(name)), len_(len) {
   }
+
+  virtual ~NicTrx() = default;
 };
 
 class NicTx : public NicTrx {
@@ -473,6 +536,8 @@ class NicTx : public NicTrx {
   NicTx(uint64_t ts, LogParser *src, uint16_t len)
       : NicTrx(ts, src, EventType::NicTx_t, "NicTx", len) {
   }
+
+  ~NicTx() = default;
 
   void display(std::ostream &os) override;
 };
@@ -484,6 +549,8 @@ class NicRx : public NicTrx {
   NicRx(uint64_t ts, LogParser *src, uint64_t port, uint16_t len)
       : NicTrx(ts, src, EventType::NicRx_t, "NicRx", len), port_(port) {
   }
+
+  ~NicRx() = default;
 
   void display(std::ostream &os) override;
 };

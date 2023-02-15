@@ -97,12 +97,12 @@ class Logger {
 
   template <typename... Args>
   inline void log_internal(FILE *out, const char *format, Args... args) {
-    fprintf(out, prefix_);
+    fprintf(out, "%s", prefix_);
     fprintf(out, format, args...);
   }
 
   inline void log_internal(FILE *out, const char *to_print) {
-    fprintf(out, prefix_);
+    fprintf(out, "%s", prefix_);
     fprintf(out, "%s", to_print);
   }
 

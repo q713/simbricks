@@ -22,6 +22,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <iostream>
+#include <string>
+
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
 #include "trace/parser/parser.h"

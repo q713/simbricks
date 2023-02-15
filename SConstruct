@@ -30,7 +30,18 @@ Type: 'scons' to build the trace production program,
 """)
 
 # compiler flags + compiler dependend flags
-cxx_flags = '-Wall -Wextra -Wno-unused-parameter'
+cxx_flags = '-Wall -Wextra -Wno-unused-parameter -fPIC'
+
+# define external libraries needed for the built
+libraries = Split('')
+linkcom = '$LINK -o $TARGET $LINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS'
+libpath = []
+# linker debugging flags
+link_flags = []
+verbose_link = ARGUMENTS.get('verbose_link', 0)
+if int(verbose_link):
+    link_flags = ['-Xlinker', '--verbose']
+
 use_clang = ARGUMENTS.get('use_clang', 0)
 if int(use_clang):
     cxx = 'clang++'
@@ -38,24 +49,15 @@ if int(use_clang):
 else:
     cxx = 'g++'
     cxx_flags += ' -std=gnu++20 -fcoroutines'
+    linkcom += ' -Wl,--start-group $_LIBFLAGS -Wl,--end-group'
 
 # create the construction environment
 env = Environment(CXX=cxx, CXXFLAGS=cxx_flags, CPPPATH = ['.'])
 # debug build without optimizations
 debug = ARGUMENTS.get('debug', 0)
 if not int(debug):
-    env.Append(CXXFLAGS = ' -O1')
-    #env.Append(CXXFLAGS = ' -O3')
-    
-# define external libraries needed for the built
-libraries = Split('')
-linkcom = '$LINK -o $TARGET $LINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS -Wl,--start-group $_LIBFLAGS -Wl,--end-group'
-libpath = []
-# linker debugging flags
-link_flags = []
-verbose_link = ARGUMENTS.get('verbose_link', 0)
-if int(verbose_link):
-    link_flags = ['-Xlinker', '--verbose']
+    env.Append(CXXFLAGS = ' -O2')
+    #env.Append(CXXFLAGS = ' -O1')
 
 # all source files that shall/need to be compiled
 src_files = ['trace/trace.cc', Glob('trace/events/*.cc'), Glob('trace/filter/*.cc'), 

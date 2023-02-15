@@ -36,6 +36,7 @@
 #include <queue>
 #include <set>
 #include <thread>
+#include <optional>
 
 #if defined(__clang__) // clang is compiler
   #include <experimental/coroutine>
@@ -622,9 +623,9 @@ struct pipeline : public producer<T> {
   std::vector<task<void>> tasks_;
  
  public:
-  explicit pipeline(producer<T>& producer,
+  pipeline(producer<T>& producer,
                     std::vector<std::reference_wrapper<pipe<T>>> pipes)
-      : producer<T>(), producer_(producer), pipes_(std::move(pipes)) {
+      : sim::coroutine::producer<T>(), producer_(producer), pipes_(std::move(pipes)) {
   }
 
   ~pipeline() {
@@ -710,7 +711,7 @@ struct collector : public producer<T> {
 
  public:
   explicit collector(std::vector<std::reference_wrapper<producer<T>>> producer)
-      : producer<T>(), producer_(std::move(producer)) {
+      : sim::coroutine::producer<T>(), producer_(std::move(producer)) {
   }
 
   task<void> produce(unbuffered_single_chan<T>* tar_chan) override {

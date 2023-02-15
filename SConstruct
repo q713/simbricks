@@ -36,14 +36,17 @@ cxx_flags = '-Wall -Wextra -Wno-unused-parameter -fPIC'
 libraries = Split('')
 linkcom = '$LINK -o $TARGET $LINKFLAGS $__RPATH $SOURCES $_LIBDIRFLAGS'
 libpath = []
+
 # linker debugging flags
 link_flags = []
 verbose_link = ARGUMENTS.get('verbose_link', 0)
 if int(verbose_link):
     link_flags = ['-Xlinker', '--verbose']
 
+# compiler dependent cli flags for coroutines
 use_clang = ARGUMENTS.get('use_clang', 0)
 if int(use_clang):
+    link_flags.append('-stdlib=libc++')
     cxx = 'clang++'
     cxx_flags += ' -std=c++20 -fcoroutines-ts -stdlib=libc++'
 else:
@@ -53,11 +56,11 @@ else:
 
 # create the construction environment
 env = Environment(CXX=cxx, CXXFLAGS=cxx_flags, CPPPATH = ['.'])
+
 # debug build without optimizations
 debug = ARGUMENTS.get('debug', 0)
 if not int(debug):
-    env.Append(CXXFLAGS = ' -O2')
-    #env.Append(CXXFLAGS = ' -O1')
+    env.Append(CXXFLAGS = ' -O3')
 
 # all source files that shall/need to be compiled
 src_files = ['trace/trace.cc', Glob('trace/events/*.cc'), Glob('trace/filter/*.cc'), 

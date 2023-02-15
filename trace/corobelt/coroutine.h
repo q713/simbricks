@@ -28,7 +28,6 @@
 #include <atomic>
 #include <concepts>
 #include <condition_variable>
-#include <coroutine>
 #include <exception>
 #include <iostream>
 #include <list>
@@ -37,6 +36,20 @@
 #include <queue>
 #include <set>
 #include <thread>
+
+#if defined(__clang__) // clang is compiler
+  #include <experimental/coroutine>
+  using std::experimental::coroutine_handle;
+  using std::experimental::suspend_always;
+  using std::experimental::suspend_never;
+  using std::experimental::noop_coroutine;
+#else // g++ is compiler
+  #include <coroutine>
+  using std::coroutine_handle;
+  using std::suspend_always;
+  using std::suspend_never;
+  using std::noop_coroutine;
+#endif
 
 #include "lib/utils/log.h"
 
@@ -297,19 +310,19 @@ struct value_task_promise {
 
   inline task<value_type> get_return_object() noexcept {
     return task<value_type>{
-        std::coroutine_handle<value_task_promise<value_type>>::from_promise(
+        coroutine_handle<value_task_promise<value_type>>::from_promise(
             *this)};
   };
 
-  std::suspend_never initial_suspend() const noexcept {
+  suspend_never initial_suspend() const noexcept {
     return {};
   }
 
-  std::suspend_always final_suspend() const noexcept {
+  suspend_always final_suspend() const noexcept {
     return {};
   }
 
-  std::suspend_always return_value(value_type value) noexcept {
+  suspend_always return_value(value_type value) noexcept {
     value_ = value;
     has_value_ = true;
     return {};
@@ -324,11 +337,11 @@ struct value_task_promise {
 struct void_task_promise {
   task<void> get_return_object() noexcept;
 
-  std::suspend_never initial_suspend() const noexcept {
+  suspend_never initial_suspend() const noexcept {
     return {};
   }
 
-  std::suspend_always final_suspend() const noexcept {
+  suspend_always final_suspend() const noexcept {
     return {};
   }
 
@@ -366,13 +379,13 @@ struct task_base {
     }
   }
 
-  explicit task_base(std::coroutine_handle<promise_type> handle)
+  explicit task_base(coroutine_handle<promise_type> handle)
       : handle_(handle) {
   }
 
  protected:
   bool destroyed_ = false;
-  std::coroutine_handle<promise_type> handle_;
+  coroutine_handle<promise_type> handle_;
 };
 
 template <typename value_type>
@@ -381,21 +394,21 @@ struct task : public task_base<value_task_promise<value_type>> {
     return this->handle_.promise().value_;
   }
 
-  explicit task(std::coroutine_handle<value_task_promise<value_type>> handle)
+  explicit task(coroutine_handle<value_task_promise<value_type>> handle)
       : task_base<value_task_promise<value_type>>(handle) {
   }
 };
 
 template <>
 struct task<void> : public task_base<void_task_promise> {
-  explicit task(std::coroutine_handle<void_task_promise> handle)
+  explicit task(coroutine_handle<void_task_promise> handle)
       : task_base<void_task_promise>(handle) {
   }
 };
 
 inline task<void> void_task_promise::get_return_object() noexcept {
   return task<void>{
-      std::coroutine_handle<void_task_promise>::from_promise(*this)};
+      coroutine_handle<void_task_promise>::from_promise(*this)};
 };
 
 // TODO: adapt for multithreading + buffered version + multi consumer/producer
@@ -414,11 +427,11 @@ struct unbuffered_single_chan {
       return true;
     }
 
-    std::coroutine_handle<> await_suspend(std::coroutine_handle<void> coro) const noexcept {
+    coroutine_handle<> await_suspend(coroutine_handle<void> coro) const noexcept {
       COROBELT_LOG_INF_("enter await_suspend chan_reader\n");
       if (!chan_) {
         COROBELT_LOG_ERR_("await_suspend chan_reader channel is gone\n");
-        return std::noop_coroutine();
+        return noop_coroutine();
       }
       chan_->reader_resumable_ = coro;
       if (!chan_->has_val_ && chan_->writer_resumable_) {
@@ -432,7 +445,7 @@ struct unbuffered_single_chan {
           return chan_->reader_resumable_;
         }
       }
-      return std::noop_coroutine();
+      return noop_coroutine();
     }
 
     std::optional<T> await_resume() const noexcept {
@@ -474,15 +487,15 @@ struct unbuffered_single_chan {
       return true;
     }
 
-    std::coroutine_handle<> await_suspend(std::coroutine_handle<void> coro) const noexcept {
+    coroutine_handle<> await_suspend(coroutine_handle<void> coro) const noexcept {
       COROBELT_LOG_INF_("enter await_suspend chan_writer\n");
       if (!chan_) {
         COROBELT_LOG_ERR_("await_suspend chan_writer channel is null\n");
-        return std::noop_coroutine();
+        return noop_coroutine();
       }
       chan_->writer_resumable_ = coro;
       COROBELT_LOG_INF_("exit await_suspend chan_writer\n");
-      return std::noop_coroutine();
+      return noop_coroutine();
     }
 
     bool await_resume() const noexcept {
@@ -521,8 +534,8 @@ struct unbuffered_single_chan {
   chan_writer writer_;
   chan_reader reader_;
 
-  std::coroutine_handle<void> reader_resumable_;
-  std::coroutine_handle<void> writer_resumable_;
+  coroutine_handle<void> reader_resumable_;
+  coroutine_handle<void> writer_resumable_;
 
   bool is_closed_ = false;
   bool has_val_ = false;

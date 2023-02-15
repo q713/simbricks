@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
   // symbol filter to translate hex address to function-name/label
   LineReader ssymsLr;
   SSyms syms_filter{"SymbolTable-Client-Server",
-                    ssymsLr,
+                    ssymsLr};/*,
                      {"entry_SYSCALL_64",
                       "__sys_sendto",
                       "__sys_recvfrom",
@@ -328,7 +328,7 @@ int main(int argc, char *argv[]) {
                       "skb_release_data",
                       "skb_free_head",
                       "kfree_skbmem",
-                      "syscall_exit_work"}};
+                      "syscall_exit_work"}};*/
 
   if ((result.count("linux-dump-server-client") &&
        !syms_filter.load_file(

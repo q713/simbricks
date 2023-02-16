@@ -46,7 +46,7 @@ void HostInstr::display(std::ostream &os) {
 
 void HostCall::display(std::ostream &os) {
   HostInstr::display(os);
-  os << ", func=" << func_;
+  os << ", func=" << func_ << ", comp=" << comp_;
 }
 
 void HostMmioImRespPoW::display(std::ostream &os) {

@@ -51,7 +51,7 @@ bool LineReader::next_line() {
 
     ++line_number_;
   
-    if (cur_line_.empty()) {
+    if (skip_empty_lines_ and cur_line_.empty()) {
       continue;
     } else {
       found = true;

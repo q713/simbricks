@@ -56,6 +56,10 @@ class SymsFilter {
         symbol_filter_(std::move(symbol_filter)),
         line_reader_(line_reader){};
 
+  inline const std::string &get_ident() {
+    return identifier_;
+  }
+
   inline const std::map<uint64_t, std::string> &get_sym_table() {
     return symbol_table_;
   }

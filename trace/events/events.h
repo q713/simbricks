@@ -149,11 +149,12 @@ class HostInstr : public Event {
 class HostCall : public HostInstr {
  public:
   const std::string func_;
+  const std::string comp_;
 
   explicit HostCall(uint64_t ts, LogParser *src, uint64_t pc,
-                    const std::string func)
+                    const std::string func, const std::string comp)
       : HostInstr(ts, src, pc, EventType::HostCall_t, "HostCall"),
-        func_(std::move(func)) {
+        func_(std::move(func)), comp_(std::move(comp)) {
   }
 
   ~HostCall() = default;

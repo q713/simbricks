@@ -412,9 +412,13 @@ inline task<void> void_task_promise::get_return_object() noexcept {
       coroutine_handle<void_task_promise>::from_promise(*this)};
 };
 
-// TODO: adapt for multithreading + buffered version + multi consumer/producer
 template <typename T>
 struct unbuffered_single_chan {
+
+  // TODO: add a pointer a.k.a list of readers and writers which are waiting and write the 
+  //       value to a reader instead of the channel or into a ringbuffer/linked list (depending on template arg)
+  //       within the channel. Additionally adapt for multithreading
+
   struct chan_reader {
     unbuffered_single_chan<T>* chan_;
 

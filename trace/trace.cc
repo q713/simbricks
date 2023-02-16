@@ -76,14 +76,17 @@ int main(int argc, char *argv[]) {
 
   // symbol filter to translate hex address to function-name/label
   LineReader ssymsLr;
-  SSyms syms_filter{"SymbolTable-Client-Server",
+  SSyms linuxvm_symbols{"Linuxvm-Symbols",
                     ssymsLr};
 
+  LineReader nicdslr;
+  SSyms nicdriver_symbols{"Nicdriver-Symbols", nicdslr};
+
   if ((result.count("linux-dump-server-client") &&
-       !syms_filter.load_file(
+       !linuxvm_symbols.load_file(
            result["linux-dump-server-client"].as<std::string>(), 0)) ||
       (result.count("nic-i40e-dump") &&
-       !syms_filter.load_file(result["nic-i40e-dump"].as<std::string>(),
+       !nicdriver_symbols.load_file(result["nic-i40e-dump"].as<std::string>(),
                               0xffffffffa0000000ULL))) {
     std::cerr << "could not initialize symbol table" << std::endl;
     exit(EXIT_FAILURE);
@@ -100,12 +103,12 @@ int main(int argc, char *argv[]) {
   LineReader serverLr;
   Gem5Parser gem5ServerPar{"Gem5ServerParser",
                            result["gem5-log-server"].as<std::string>(),
-                           syms_filter, compF, serverLr};
+                           {linuxvm_symbols, nicdriver_symbols}, compF, serverLr};
 
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
                            result["gem5-log-client"].as<std::string>(),
-                           syms_filter, compF, clientLr};
+                           {linuxvm_symbols, nicdriver_symbols}, compF, clientLr};
 
   // nicbm log parser that generates events
   LineReader nicSerLr;

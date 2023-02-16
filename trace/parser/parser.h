@@ -25,15 +25,16 @@
 #ifndef SIMBRICKS_TRACE_PARSER_H_
 #define SIMBRICKS_TRACE_PARSER_H_
 
+#include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "trace/corobelt/coroutine.h"
 #include "trace/events/events.h"
 #include "trace/filter/componenttable.h"
 #include "trace/filter/symtable.h"
 #include "trace/reader/reader.h"
-#include "trace/filter/symtable.h"
 
 using event_t = std::shared_ptr<Event>;
 using task_t = sim::coroutine::task<void>;
@@ -66,8 +67,8 @@ class LogParser : public sim::coroutine::producer<event_t> {
 };
 
 class Gem5Parser : public LogParser {
-  SymsFilter &symbol_table_;
   ComponentFilter &component_table_;
+  std::vector<std::reference_wrapper<SymsFilter>> symbol_tables_;
 
  protected:
   event_t parse_global_event(uint64_t timestamp);
@@ -87,8 +88,17 @@ class Gem5Parser : public LogParser {
                       const std::string log_file_path, SymsFilter &symbol_table,
                       ComponentFilter &component_table, LineReader &line_reader)
       : LogParser(std::move(identifier), std::move(log_file_path), line_reader),
-        symbol_table_(symbol_table),
         component_table_(component_table) {
+    symbol_tables_.push_back(std::ref(symbol_table));
+  }
+
+  explicit Gem5Parser(const std::string identifier,
+                      const std::string log_file_path,
+                      std::vector<std::reference_wrapper<SymsFilter>>
+                          symbol_tables,
+                      ComponentFilter &component_table, LineReader &line_reader)
+      : LogParser(std::move(identifier), std::move(log_file_path), line_reader),
+        component_table_(component_table), symbol_tables_(std::move(symbol_tables)) {
   }
 
   task_t produce(chan_t *tar_chan) override;

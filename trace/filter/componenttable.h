@@ -53,6 +53,10 @@ class ComponentFilter {
     auto found = component_table_.find(comp);
     return found != component_table_.end();
   }
+ 
+  inline const std::string &get_ident() {
+    return identifier_;
+  }
 };
 
 #endif  // SIMBRICKS_TRACE_COMP_H_

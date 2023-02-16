@@ -46,53 +46,62 @@ class EventPrinter : public sim::coroutine::consumer<event_t> {
   }
 };
 
-class EventFilter : public sim::coroutine::pipe<event_t> {
- public:
-  virtual bool is_to_sink(event_t event) {
+/* general operator to act on an event stream */
+struct event_stream_actor : public sim::coroutine::pipe<event_t> {
+
+  /* this method acts on an event within the stream, 
+   * if true is returned, the event is after acting on
+   * it pased on, in case false is returned, the event 
+   * is filtered */
+  virtual bool act_on(event_t event) {
     return true;
   }
-
-  explicit EventFilter() : sim::coroutine::pipe<event_t>() {
-  }
-
+  
   task_t process(chan_t *src_chan, chan_t *tar_chan) override {
-    if (!src_chan || !tar_chan) {
+    if (not src_chan or not tar_chan) {
       co_return;
     }
 
+    bool pass_on;
     event_t event;
     std::optional<event_t> msg;
     for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
       event = msg.value();
-      bool sink = is_to_sink(event); 
-      if (sink && !co_await tar_chan->write(event)) {
-        co_return;
+      pass_on = act_on(event);
+      if (pass_on and not co_await tar_chan->write(event)) {
+        break;
       }
     }
+
     co_return;
   }
+  
+  explicit event_stream_actor() : sim::coroutine::pipe<event_t>() {}
+
+  ~event_stream_actor() = default;
+
 };
 
-class GenericEventFilter : public EventFilter {
+class GenericEventFilter : public event_stream_actor {
   std::function<bool(event_t event)> &to_filter_;
 
  public:
-  inline bool is_to_sink(event_t event) override {
+  bool act_on(event_t event) override {
     return to_filter_(event);
   }
 
   GenericEventFilter(
       std::function<bool(event_t event)> &to_filter)
-      : EventFilter(), to_filter_(to_filter) {
+      : event_stream_actor(), to_filter_(to_filter) {
   }
 };
 
-class EventTypeFilter : public EventFilter {
+class EventTypeFilter : public event_stream_actor {
   std::set<EventType> types_to_filter_;
   bool inverted_;
 
  public:
-  virtual bool is_to_sink(event_t event) override {
+  bool act_on(event_t event) override  {
     auto search = types_to_filter_.find(event->getType());
     bool is_to_sink = inverted_ ? search == types_to_filter_.end()
                                 : search != types_to_filter_.end();
@@ -100,17 +109,17 @@ class EventTypeFilter : public EventFilter {
   }
 
   EventTypeFilter(std::set<EventType> types_to_filter, bool invert_filter)
-      : EventFilter(),
+      : event_stream_actor(),
         types_to_filter_(std::move(types_to_filter)),
         inverted_(invert_filter) {
   }
 
   EventTypeFilter(std::set<EventType> types_to_filter)
-      : EventFilter(), types_to_filter_(std::move(types_to_filter)), inverted_(false) {
+      : event_stream_actor(), types_to_filter_(std::move(types_to_filter)), inverted_(false) {
   }
 };
 
-class EventTimestampFilter : public EventFilter {
+class EventTimestampFilter : public event_stream_actor {
  public:
   struct EventTimeBoundary {
     uint64_t lower_bound_;
@@ -128,7 +137,7 @@ class EventTimestampFilter : public EventFilter {
   std::vector<EventTimeBoundary> event_time_boundaries_;
 
  public:
-  virtual bool is_to_sink(event_t event) override {
+  bool act_on(event_t event) override {
     uint64_t ts = event->timestamp_;
     for (auto &boundary : event_time_boundaries_) {
       if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
@@ -138,29 +147,17 @@ class EventTimestampFilter : public EventFilter {
     return false;
   }
 
-  EventTimestampFilter(EventTimeBoundary boundary) : EventFilter() {
+  EventTimestampFilter(EventTimeBoundary boundary) : event_stream_actor() {
     event_time_boundaries_.push_back(std::move(boundary));
   }
 
   EventTimestampFilter(std::vector<EventTimeBoundary> event_time_boundaries)
-      : EventFilter(),
+      : event_stream_actor(),
         event_time_boundaries_(std::move(event_time_boundaries)) {
   }
 };
 
-// TODO
-//class HostMmioTimeStatistics : public corobelt::Pipe<std::shared_ptr<Event>> {
-// public:
-//  explicit HostMmioTimeStatistics() : corobelt::Pipe<std::shared_ptr<Event>>() {
-//  }
-//
-//  virtual void act_on(
-//      std::shared_ptr<Event> event_ptr,
-//      corobelt::coro_push_t<std::shared_ptr<Event>> &sink) override {
-//  }
-//};
-
-class EventTypeStatistics : public sim::coroutine::pipe<event_t> {
+class EventTypeStatistics : public event_stream_actor {
  public:
   struct EventStat {
     uint64_t last_ts_;
@@ -224,46 +221,31 @@ class EventTypeStatistics : public sim::coroutine::pipe<event_t> {
 
  public:
   explicit EventTypeStatistics()
-      : sim::coroutine::pipe<event_t>(), total_event_count_(0) {
+      : event_stream_actor(), total_event_count_(0) {
   }
 
   explicit EventTypeStatistics(std::set<EventType> types_to_gather_statistic)
-      : sim::coroutine::pipe<event_t>(),
+      : event_stream_actor(),
         types_to_gather_statistic_(std::move(types_to_gather_statistic)),
         total_event_count_(0) {
   }
 
   ~EventTypeStatistics() = default;
 
-  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
-    if (!src_chan || !tar_chan) {
-      co_return;
-    }
-
-    event_t event;
-    std::optional<event_t> msg;
-    for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
-      event = msg.value();
-
-      auto search = types_to_gather_statistic_.find(event->getType());
-      if (types_to_gather_statistic_.empty() ||
-        search != types_to_gather_statistic_.end()) {
-        if (!update_statistics(event)) {
-          #ifdef DEBUG_EVENT_
-          DFLOGWARN("statistics for event with name %s could not be updated\n",
-                  event->getName().c_str());
-          #endif
-        }
-      }
-      total_event_count_ = total_event_count_ + 1;
-    
-      if (!co_await tar_chan->write(event)) {
-        co_return;
+   bool act_on(event_t event) override {
+    auto search = types_to_gather_statistic_.find(event->getType());
+    if (types_to_gather_statistic_.empty() or
+      search != types_to_gather_statistic_.end()) {
+      if (not update_statistics(event)) {
+        #ifdef DEBUG_EVENT_
+        DFLOGWARN("statistics for event with name %s could not be updated\n",
+                event->getName().c_str());
+        #endif
       }
     }
-
-    co_return;
-  }
+    total_event_count_ = total_event_count_ + 1;
+    return true;
+   }
 
   friend std::ostream &operator<<(std::ostream &out,
                                   EventTypeStatistics &eventTypeStatistics) {
@@ -300,6 +282,44 @@ class EventTypeStatistics : public sim::coroutine::pipe<event_t> {
     }
     return std::nullopt;
   }
+};
+
+/* Indicator where in the events/calls are happening */
+enum stack_stat_comp {
+  KERNEL_NET_STACK,
+  NIC_DRIVER,
+  NIC_DEVICE
+};
+
+struct stack_statistics : public event_stream_actor {
+
+  struct stack_task { // TODO: change naming
+    std::vector<event_t> contributors_;
+
+    friend std::ostream &operator<<(std::ostream &out, stack_task &task) {
+      return out;
+    }
+  };
+
+  // the statistics accumulated for a stack e.g. kernel network stack
+  struct stack_stat { 
+    std::vector<stack_task> contributing_tasks_;
+  };
+
+  bool act_on(event_t event) override {
+    // TODO: implement
+    return true;
+  }
+
+  explicit stack_statistics() : event_stream_actor() {} 
+
+  ~stack_statistics() = default;
+
+  friend std::ostream &operator<<(std::ostream &out, stack_statistics &stats) {
+    // TODO: implement me
+    return out;
+  }
+
 };
 
 #endif  // SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_

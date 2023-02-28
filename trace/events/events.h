@@ -34,6 +34,7 @@
 #include <type_traits>
 
 #include "lib/utils/log.h"
+#include "trace/corobelt/coroutine.h"
 
 #define DEBUG_EVENT_ ;
 
@@ -154,7 +155,8 @@ class HostCall : public HostInstr {
   explicit HostCall(uint64_t ts, LogParser *src, uint64_t pc,
                     const std::string func, const std::string comp)
       : HostInstr(ts, src, pc, EventType::HostCall_t, "HostCall"),
-        func_(std::move(func)), comp_(std::move(comp)) {
+        func_(std::move(func)),
+        comp_(std::move(comp)) {
   }
 
   ~HostCall() = default;
@@ -561,11 +563,40 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
   return os;
 }
 
+class EventPrinter : public sim::coroutine::consumer<std::shared_ptr<Event>> {
+ public:
+  sim::coroutine::task<void> consume(
+      sim::coroutine::unbuffered_single_chan<std::shared_ptr<Event>> *src_chan)
+      override {
+    if (!src_chan) {
+      co_return;
+    }
+    std::optional<std::shared_ptr<Event>> msg;
+    for (msg = co_await src_chan->read(); msg;
+         msg = co_await src_chan->read()) {
+      std::cout << *(msg.value()) << std::endl;
+    }
+    co_return;
+  }
+};
+
 struct EventComperator {
   bool operator()(const std::shared_ptr<Event> &e1,
                   const std::shared_ptr<Event> &e2) const {
     return e1->timestamp_ > e2->timestamp_;
   }
 };
+
+bool is_type(std::shared_ptr<Event> event_ptr, EventType type);
+
+bool is_host_issued_mmio_event(std::shared_ptr<Event> event_ptr);
+
+bool is_host_received_mmio_event(std::shared_ptr<Event> event_ptr);
+
+bool is_host_mmio_event(std::shared_ptr<Event> event_ptr);
+
+bool is_host_event(std::shared_ptr<Event> event_ptr);
+
+bool is_nic_event(std::shared_ptr<Event> event_ptr);
 
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

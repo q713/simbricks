@@ -28,6 +28,7 @@
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
 #include "trace/parser/parser.h"
+#include "trace/events/event-filter.h"
 #include "trace/events/eventStreamOperators.h"
 
 int main(int argc, char *argv[]) {
@@ -100,10 +101,10 @@ int main(int argc, char *argv[]) {
   ComponentFilter compF("ComponentFilter-Client-Server");
 
   // gem5 log parser that generates events
-  LineReader serverLr;
-  Gem5Parser gem5ServerPar{"Gem5ServerParser",
-                           result["gem5-log-server"].as<std::string>(),
-                           {linuxvm_symbols, nicdriver_symbols}, compF, serverLr};
+  //LineReader serverLr;
+  //Gem5Parser gem5ServerPar{"Gem5ServerParser",
+  //                         result["gem5-log-server"].as<std::string>(),
+  //                         {linuxvm_symbols, nicdriver_symbols}, compF, serverLr};
 
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
@@ -111,17 +112,24 @@ int main(int argc, char *argv[]) {
                            {linuxvm_symbols, nicdriver_symbols}, compF, clientLr};
 
   // nicbm log parser that generates events
-  LineReader nicSerLr;
-  NicBmParser nicSerPar{"NicbmServerParser",
-                        result["nicbm-log-server"].as<std::string>(), nicSerLr};
+  //LineReader nicSerLr;
+  //NicBmParser nicSerPar{"NicbmServerParser",
+  //                      result["nicbm-log-server"].as<std::string>(), nicSerLr};
   LineReader nicCliLr;
   NicBmParser nicCliPar{"NicbmClientParser",
                         result["nicbm-log-client"].as<std::string>(), nicCliLr};
   
+
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  // TODO:
+  // write an string internalizer for function and component names and thereof...
+  // this will enable string singeltons and hence comparison through pointer 
+  // comparison to check for specific function boundaries etc.
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
   /*
    * Filter and operators
    */
-
   // 1475802058125
   // 1596059510250
   uint64_t lower_bound =
@@ -140,9 +148,11 @@ int main(int argc, char *argv[]) {
   EventTimestampFilter timestampFilter{
       EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
-  EventTypeStatistics statistics{};
+  //EventTypeStatistics statistics{};
 
-  // filter events out of stream
+  event_stream_tracer tracer;
+
+  // filter uninteresting events out of stream
   EventTypeFilter eventFilter{
       {EventType::HostInstr_t, EventType::SimProcInEvent_t,
        EventType::SimSendSync_t},
@@ -153,16 +163,16 @@ int main(int argc, char *argv[]) {
 
   using event_t = std::shared_ptr<Event>;
 
-  sim::coroutine::collector<event_t, EventComperator> collector{{nicSerPar, nicCliPar, gem5ServerPar, gem5ClientPar}};
+  sim::coroutine::collector<event_t, EventComperator> collector{{nicCliPar, gem5ClientPar}};
 
-  sim::coroutine::pipeline<event_t> pipeline{collector, {timestampFilter, eventFilter, statistics}};
+  sim::coroutine::pipeline<event_t> pipeline{collector, {timestampFilter, eventFilter, tracer}};
 
   if (!sim::coroutine::awaiter<event_t>::await_termination(pipeline, eventPrinter)) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  std::cout << statistics << std::endl;
+  std::cout << tracer << std::endl;
 
   exit(EXIT_SUCCESS);
 }

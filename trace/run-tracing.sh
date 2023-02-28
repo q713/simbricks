@@ -17,6 +17,9 @@ echo gem5_client_log_arg: $gem5_client_log_arg
 echo nic_client_log_arg: $nic_client_log_arg
 
 
+min_timestamp_arg='--ts-lower-bound 1578632883625'
+echo min_timestamp_arg: $min_timestamp_arg
+
 echo start running the program:
-echo ./trace $linux_dump_arg $nic_i40e_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg
-./trace $linux_dump_arg $nic_i40e_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg
+echo ./trace $linux_dump_arg $nic_i40e_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg $min_timestamp_arg
+./trace $linux_dump_arg $nic_i40e_dump_arg $gem5_server_log_arg $nic_server_log_arg $gem5_client_log_arg $nic_client_log_arg $min_timestamp_arg

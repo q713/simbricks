@@ -418,6 +418,10 @@ struct unbuffered_single_chan {
   // TODO: add a pointer a.k.a list of readers and writers which are waiting and write the 
   //       value to a reader instead of the channel or into a ringbuffer/linked list (depending on template arg)
   //       within the channel. Additionally adapt for multithreading
+  //
+  // One possible implementation to allow for multithreading might be to first create a Thread pool and push suspending
+  // readers/writers as tasks into the thread pool which uses a fifo queue. When combined with a buffering channel this 
+  // might not be to bad context switching wise.
 
   struct chan_reader {
     unbuffered_single_chan<T>* chan_;
@@ -829,6 +833,7 @@ struct awaiter {
     task<void> consumer_task = consumer_.consume(target_chan_);
     task<void> producer_task = producer_.produce(target_chan_);
 
+    // TODO: change this to an awaitable or something
     while (producer_task.is_not_done()) {
       producer_task.resume_handle();
       //if (is_prod_only)

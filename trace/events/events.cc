@@ -177,3 +177,54 @@ void NicRx::display(std::ostream &os) {
   NicTrx::display(os);
   os << ", port=" << port_;
 };
+
+bool is_type(std::shared_ptr<Event> event_ptr, EventType type) {
+  return event_ptr && event_ptr->getType() == type;
+}
+
+bool is_host_issued_mmio_event(std::shared_ptr<Event> event_ptr) {
+  const static std::set<EventType> mmio_events{EventType::HostMmioR_t,
+                                               EventType::HostMmioW_t,
+                                               EventType::HostMmioImRespPoW_t};
+
+  return event_ptr && mmio_events.contains(event_ptr->getType());
+}
+
+bool is_host_received_mmio_event(std::shared_ptr<Event> event_ptr) {
+  const static std::set<EventType> mmio_events{EventType::HostMmioCR_t,
+                                               EventType::HostMmioCW_t};
+
+  return event_ptr && mmio_events.contains(event_ptr->getType());
+}
+
+bool is_host_mmio_event(std::shared_ptr<Event> event_ptr) {
+  return is_host_issued_mmio_event(event_ptr) or
+         is_host_received_mmio_event(event_ptr);
+}
+
+bool is_host_event(std::shared_ptr<Event> event_ptr) {
+  const static std::set<EventType> host_events{
+      EventType::HostInstr_t,         EventType::HostCall_t,
+      EventType::HostMmioImRespPoW_t, EventType::HostIdOp_t,
+      EventType::HostMmioCR_t,        EventType::HostMmioCW_t,
+      EventType::HostAddrSizeOp_t,    EventType::HostMmioR_t,
+      EventType::HostMmioW_t,         EventType::HostDmaC_t,
+      EventType::HostDmaR_t,          EventType::HostDmaW_t,
+      EventType::HostMsiX_t,          EventType::HostConf_t,
+      EventType::HostClearInt_t,      EventType::HostPostInt_t,
+      EventType::HostPciRW_t,
+  };
+
+  return event_ptr && host_events.contains(event_ptr->getType());
+}
+
+bool is_nic_event(std::shared_ptr<Event> event_ptr) {
+  const static std::set<EventType> nic_events{
+      EventType::NicMsix_t,  EventType::NicDma_t,   EventType::SetIX_t,
+      EventType::NicDmaI_t,  EventType::NicDmaEx_t, EventType::NicDmaEn_t,
+      EventType::NicDmaCR_t, EventType::NicDmaCW_t, EventType::NicMmio_t,
+      EventType::NicMmioR_t, EventType::NicMmioW_t, EventType::NicTrx_t,
+      EventType::NicTx_t,    EventType::NicRx_t};
+
+  return event_ptr && nic_events.contains(event_ptr->getType());
+}

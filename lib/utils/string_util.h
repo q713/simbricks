@@ -191,6 +191,16 @@ inline bool parse_uint_trim_copy(std::string s, int base, uint64_t *target) {
   return parse_uint_trim(s, base, target);
 }
 
+inline bool ends_with(std::string src, std::string match) {
+  size_t src_l = src.length();
+  size_t match_l = match.length();
+  if (src_l < match_l) {
+    return false;
+  }
+
+  return 0 == src.compare(src_l - match_l, match_l, match);
+}
+
 }  // namespace sim_string_utils
 
 #endif  // SIMBRICKS_STRING_UTILS_H_

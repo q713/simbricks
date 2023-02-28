@@ -25,139 +25,25 @@
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_
 
-#include "trace/events/events.h"
+#include <vector>
+#include <set>
+#include <map>
+#include <optional>
+#include <memory>
+#include <list>
+
+#include "trace/config.h"
 #include "trace/corobelt/coroutine.h"
+#include "trace/events/events.h"
+#include "lib/utils/log.h"
+#include "lib/utils/string_util.h"
 
 using event_t = std::shared_ptr<Event>;
 using task_t = sim::coroutine::task<void>;
 using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+using msg_t = std::optional<event_t>;
 
-class EventPrinter : public sim::coroutine::consumer<event_t> {
- public:
-  task_t consume(chan_t *src_chan) override {
-    if (!src_chan) {
-      co_return;
-    }
-    std::optional<event_t> msg;
-    for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
-      std::cout << *(msg.value()) << std::endl;
-    }
-    co_return;
-  }
-};
-
-/* general operator to act on an event stream */
-struct event_stream_actor : public sim::coroutine::pipe<event_t> {
-
-  /* this method acts on an event within the stream, 
-   * if true is returned, the event is after acting on
-   * it pased on, in case false is returned, the event 
-   * is filtered */
-  virtual bool act_on(event_t event) {
-    return true;
-  }
-  
-  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
-    if (not src_chan or not tar_chan) {
-      co_return;
-    }
-
-    bool pass_on;
-    event_t event;
-    std::optional<event_t> msg;
-    for (msg = co_await src_chan->read(); msg; msg = co_await src_chan->read()) {
-      event = msg.value();
-      pass_on = act_on(event);
-      if (pass_on and not co_await tar_chan->write(event)) {
-        break;
-      }
-    }
-
-    co_return;
-  }
-  
-  explicit event_stream_actor() : sim::coroutine::pipe<event_t>() {}
-
-  ~event_stream_actor() = default;
-
-};
-
-class GenericEventFilter : public event_stream_actor {
-  std::function<bool(event_t event)> &to_filter_;
-
- public:
-  bool act_on(event_t event) override {
-    return to_filter_(event);
-  }
-
-  GenericEventFilter(
-      std::function<bool(event_t event)> &to_filter)
-      : event_stream_actor(), to_filter_(to_filter) {
-  }
-};
-
-class EventTypeFilter : public event_stream_actor {
-  std::set<EventType> types_to_filter_;
-  bool inverted_;
-
- public:
-  bool act_on(event_t event) override  {
-    auto search = types_to_filter_.find(event->getType());
-    bool is_to_sink = inverted_ ? search == types_to_filter_.end()
-                                : search != types_to_filter_.end();
-    return is_to_sink;
-  }
-
-  EventTypeFilter(std::set<EventType> types_to_filter, bool invert_filter)
-      : event_stream_actor(),
-        types_to_filter_(std::move(types_to_filter)),
-        inverted_(invert_filter) {
-  }
-
-  EventTypeFilter(std::set<EventType> types_to_filter)
-      : event_stream_actor(), types_to_filter_(std::move(types_to_filter)), inverted_(false) {
-  }
-};
-
-class EventTimestampFilter : public event_stream_actor {
- public:
-  struct EventTimeBoundary {
-    uint64_t lower_bound_;
-    uint64_t upper_bound_;
-
-    const static uint64_t MIN_LOWER_BOUND = 0;
-    const static uint64_t MAX_UPPER_BOUND = UINT64_MAX;
-
-    explicit EventTimeBoundary(uint64_t lower_bound, uint64_t upper_bound)
-        : lower_bound_(lower_bound), upper_bound_(upper_bound) {
-    }
-  };
-
- private:
-  std::vector<EventTimeBoundary> event_time_boundaries_;
-
- public:
-  bool act_on(event_t event) override {
-    uint64_t ts = event->timestamp_;
-    for (auto &boundary : event_time_boundaries_) {
-      if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  EventTimestampFilter(EventTimeBoundary boundary) : event_stream_actor() {
-    event_time_boundaries_.push_back(std::move(boundary));
-  }
-
-  EventTimestampFilter(std::vector<EventTimeBoundary> event_time_boundaries)
-      : event_stream_actor(),
-        event_time_boundaries_(std::move(event_time_boundaries)) {
-  }
-};
-
-class EventTypeStatistics : public event_stream_actor {
+class EventTypeStatistics : public sim::coroutine::pipe<event_t> {
  public:
   struct EventStat {
     uint64_t last_ts_;
@@ -221,31 +107,42 @@ class EventTypeStatistics : public event_stream_actor {
 
  public:
   explicit EventTypeStatistics()
-      : event_stream_actor(), total_event_count_(0) {
+      : sim::coroutine::pipe<event_t>(), total_event_count_(0) {
   }
 
   explicit EventTypeStatistics(std::set<EventType> types_to_gather_statistic)
-      : event_stream_actor(),
+      : sim::coroutine::pipe<event_t>(),
         types_to_gather_statistic_(std::move(types_to_gather_statistic)),
         total_event_count_(0) {
   }
 
   ~EventTypeStatistics() = default;
 
-   bool act_on(event_t event) override {
-    auto search = types_to_gather_statistic_.find(event->getType());
-    if (types_to_gather_statistic_.empty() or
-      search != types_to_gather_statistic_.end()) {
-      if (not update_statistics(event)) {
-        #ifdef DEBUG_EVENT_
-        DFLOGWARN("statistics for event with name %s could not be updated\n",
-                event->getName().c_str());
-        #endif
-      }
+  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
+    if (!src_chan || !tar_chan) {
+      co_return;
     }
-    total_event_count_ = total_event_count_ + 1;
-    return true;
-   }
+
+    event_t event;
+    msg_t msg;
+    for (msg = co_await src_chan->read(); msg;
+         msg = co_await src_chan->read()) {
+      event = msg.value();
+      auto search = types_to_gather_statistic_.find(event->getType());
+      if (types_to_gather_statistic_.empty() or
+          search != types_to_gather_statistic_.end()) {
+        if (not update_statistics(event)) {
+#ifdef DEBUG_EVENT_
+          DFLOGWARN("statistics for event with name %s could not be updated\n",
+                    event->getName().c_str());
+#endif
+        }
+      }
+      total_event_count_ = total_event_count_ + 1;
+    }
+
+    co_return;
+  }
 
   friend std::ostream &operator<<(std::ostream &out,
                                   EventTypeStatistics &eventTypeStatistics) {
@@ -284,42 +181,384 @@ class EventTypeStatistics : public event_stream_actor {
   }
 };
 
-/* Indicator where in the events/calls are happening */
-enum stack_stat_comp {
-  KERNEL_NET_STACK,
-  NIC_DRIVER,
-  NIC_DEVICE
-};
+enum Stacks { KERNEL, NIC, SWITCH, NETWORK };
 
-struct stack_statistics : public event_stream_actor {
+std::ostream &operator<<(std::ostream &out, Stacks s) {
+  switch (s) {
+    case KERNEL:
+      out << "KERNEL";
+      break;
+    case NIC:
+      out << "NIC";
+      break;
+    case SWITCH:
+      out << "SWITCH";
+      break;
+    case NETWORK:
+      out << "NETWORK";
+      break;
+    default:
+      out << "UNDEFINED";
+      break;
+  }
+  return out;
+}
 
-  struct stack_task { // TODO: change naming
-    std::vector<event_t> contributors_;
+struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
+  struct event_pack;        // forward declaration
+  struct event_pack_stack;  // forward declaration
+  using pack_t = std::shared_ptr<event_pack>;
+  using stack_t = std::shared_ptr<event_pack_stack>;
+  using hostc_t = std::shared_ptr<HostCall>;
+  using hostmmiow_t = std::shared_ptr<HostMmioW>;
 
-    friend std::ostream &operator<<(std::ostream &out, stack_task &task) {
+  struct event_pack {
+    std::vector<event_t> events_;
+
+    event_pack() = default;
+
+    friend std::ostream &operator<<(std::ostream &out, event_pack &pack) {
+      out << std::endl;
+      out << "Event-Pack: " << std::endl;
+      for (event_t event : pack.events_) {
+        out << *event;
+      }
+      out << std::endl;
       return out;
     }
   };
 
-  // the statistics accumulated for a stack e.g. kernel network stack
-  struct stack_stat { 
-    std::vector<stack_task> contributing_tasks_;
+  struct event_pack_stack {
+    
+    friend std::ostream &operator<<(std::ostream &out,
+                                    event_pack_stack &stack) {
+      out << std::endl;
+      out << std::endl;
+      out << "Event-Pack-Stack:" << std::endl;
+      for (auto pack : stack.event_packs_) {
+        out << "From Stack: " << pack.first << std::endl;
+        out << pack.second;
+      }
+      out << std::endl;
+      out << std::endl;
+      return out;
+    }
+
+    bool add_to_pack(Stacks stack, event_t event_ptr) {
+      if (!event_ptr) {
+        return false;
+      }
+
+      pack_t pack = nullptr;
+      auto it = event_packs_.find(stack);
+      if (it != event_packs_.end()) {
+        pack = it->second;
+      } else {
+        pack = std::make_shared<event_pack>();
+        if (!pack) {
+          return false;
+        }
+      }
+
+      pack->events_.push_back(event_ptr);
+      return true;
+    }
+
+    private:
+      std::unordered_map<Stacks, pack_t> event_packs_;
   };
 
-  bool act_on(event_t event) override {
-    // TODO: implement
-    return true;
+  std::vector<stack_t> event_pack_stacks_;
+
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  // TODO: add dump for yet unmatched events!!!!!!!!!!!!!!!!!!!!!
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  std::list<event_t> unmatched_events;
+
+  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
+    if (not src_chan or not tar_chan) {
+      co_return;
+    }
+    msg_t msg;
+    event_t event_ptr = nullptr;
+    stack_t cur_stack = nullptr;
+    hostc_t host_call = nullptr;
+
+
+    bool is_trace = false;
+    bool exited_kernel = false;
+    bool found_nic_driver_sym = false;
+    bool is_netstack_related = false;
+    std::vector<event_t> pending_host_mmio_actions;
+    std::vector<event_t> pending_nic_dma_actions;
+    while(src_chan->is_open() || !unmatched_events.empty()) {
+      event_ptr = nullptr;
+      if (!unmatched_events.empty()) {
+        // we are in this case when we are not longer within a trace
+        event_ptr = unmatched_events.front();
+        unmatched_events.pop_front();
+      } else {
+        msg = co_await src_chan->read();
+        if (msg) {
+          event_ptr = msg.value();
+        }
+      }
+
+      if (!event_ptr) {
+        DLOGERR("no event left but one would be expected\n");
+        co_return;
+      }
+
+      // find syscall entry entry point of a trace
+      host_call = std::dynamic_pointer_cast<HostCall>(msg.value());
+      // check if this is a syscall
+      if (!is_trace and host_call and 0 == host_call->func_.compare("entry_SYSCALL_64")) {
+        is_trace = true;
+        cur_stack = std::make_shared<event_pack_stack>();
+        if (!cur_stack or 
+          !cur_stack->add_to_pack(Stacks::KERNEL, host_call)) {
+          DLOGERR("could not add syscall entry event to current stack\n");  
+          co_return;
+        }
+        continue;
+      } 
+
+      // when we are currently not in a trace we just pass the event on
+      if (!is_trace) {
+        DLOGWARN("found orpahend event\n");
+        if (!co_await tar_chan->write(event_ptr)) {
+          co_return;
+        }
+        continue;
+      }
+
+      // we are in a trace, now we built the trace
+      if (is_type(event_ptr, EventType::HostCall_t)) {
+        if (exited_kernel) {
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        host_call = std::static_pointer_cast<HostCall>(event_ptr);
+        
+        found_nic_driver_sym = found_nic_driver_sym or
+          sim::trace::conf::I40E_DRIVER_FUNC_INDICATOR.contains(host_call->func_);
+        
+        is_netstack_related = is_netstack_related or found_nic_driver_sym or 
+          sim::trace::conf::LINUX_NET_STACK_FUNC_INDICATOR.contains(host_call->func_);
+
+        host_call = std::static_pointer_cast<HostCall>(event_ptr);
+        exited_kernel = exited_kernel or (0 == host_call->func_.compare("syscall_return_via_sysret"));
+        cur_stack->add_to_pack(Stacks::KERNEL, event_ptr);
+        continue;
+      }
+
+      if (!is_netstack_related or !found_nic_driver_sym) {
+        DLOGWARN("found non host call outside of networking stack\n");
+        unmatched_events.push_back(event_ptr);
+        continue;
+      }
+
+      if (is_type(event_ptr, EventType::HostMmioW_t)) {
+        // mmio access to the nic to issue action
+        if (not pending_host_mmio_actions.empty()) {
+          DLOGWARN("Non yet completed host mmio actions to issue nic action\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_host_mmio_actions.push_back(event_ptr);
+
+      }
+      else if (is_type(event_ptr, EventType::HostMmioImRespPoW_t)) {
+        if (pending_host_mmio_actions.size() != 1) {
+          DLOGWARN("Non yet expected HostMmioImRespPoW_t found\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        auto mmiow = std::static_pointer_cast<HostMmioW>(pending_host_mmio_actions.front());
+        if (event_ptr->timestamp_ != mmiow->timestamp_) {
+          DLOGWARN("On mmiow_t did not follow immediate response\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_host_mmio_actions.push_back(event_ptr);
+ 
+      }
+      else if (is_type(event_ptr, EventType::NicMmioW_t)) {
+        auto ne = std::static_pointer_cast<NicMmioW>(event_ptr);
+        if (pending_host_mmio_actions.size() != 2) {
+          DLOGWARN("found NicMmioW_t but not two mmio events beforehand\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        auto he = std::dynamic_pointer_cast<HostMmioW>(pending_host_mmio_actions.front());
+        if (!he) {
+          DLOGWARN("found NicMmioW_t but first pending is no HostMmioW\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        
+        // TODO: optimize this
+        std::stringstream he_adrr;
+        he_adrr << std::hex << he->addr_;
+        std::stringstream ne_off;
+        ne_off << std::hex << ne->off_;
+        if (!sim_string_utils::ends_with(he_adrr.str(), ne_off.str()) or he->size_ != ne->len_) {
+          DLOGWARN("NicMmioW_t does not match preceding HostMmioW\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_host_mmio_actions.push_back(event_ptr);
+
+      } 
+      else if (is_type(event_ptr, EventType::HostMmioCW_t)) {
+        auto he = std::static_pointer_cast<HostMmioCW>(event_ptr);
+        if (pending_host_mmio_actions.size() != 3) {
+          DLOGWARN("found HostMmioCW_t but not three mmio (two host one nic) events beforehand\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        auto fhe = std::dynamic_pointer_cast<HostMmioW>(pending_host_mmio_actions.front());
+        if (!fhe || he->id_ != fhe->id_) {
+          DLOGWARN("found HostMmioCW_t with an unexpected id\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        
+        pending_host_mmio_actions.push_back(he);
+
+      }
+      else if (is_type(event_ptr, EventType::NicDmaI_t)) {
+        if (pending_host_mmio_actions.size() != 3) {
+          DLOGWARN("found NicDmaI_t but no mmio register write to device captured\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_nic_dma_actions.push_back(event_ptr);
+
+      }
+      else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
+        if (pending_nic_dma_actions.size() != 1) {
+          DLOGWARN("found NicDmaEx_t before issuing this operation\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        auto i = std::static_pointer_cast<NicDmaI>(pending_nic_dma_actions.front());
+        auto e = std::static_pointer_cast<NicDmaEx>(event_ptr);
+        if (i->id_ != e->id_) {
+          DLOGWARN("found NicDmaEx_t that doesnt match issue id\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_nic_dma_actions.push_back(event_ptr);
+
+      }
+      else if (is_type(event_ptr, EventType::HostDmaR_t)) {
+        if (pending_nic_dma_actions.size() != 2) {
+          DLOGWARN("found HostDmaR_t before nic site execution of this operation\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        auto e = std::static_pointer_cast<NicDmaEx>(pending_nic_dma_actions.back());
+        auto r = std::static_pointer_cast<HostDmaR>(event_ptr);
+        if (r->addr_ != e->addr_) {
+          DLOGWARN("found HostDmaR_t with wrong address\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_nic_dma_actions.push_back(event_ptr);
+
+      }
+      else if (is_type(event_ptr, EventType::HostDmaC_t)) {
+        if (pending_nic_dma_actions.size() != 3) {
+          DLOGWARN("found HostDmaC_t before HostDmaR_t\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        auto r = std::static_pointer_cast<HostDmaR>(pending_nic_dma_actions.back());
+        auto c = std::static_pointer_cast<HostDmaC>(event_ptr);
+        if (c->id_ != r->id_) {
+          DLOGWARN("found HostDmaC_t with non matching id\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_nic_dma_actions.push_back(event_ptr);
+
+      }
+      else if (is_type(event_ptr, EventType::NicDmaCR_t)) {
+        if (pending_nic_dma_actions.size() != 4) {
+          DLOGWARN("found NicDmaCR_t before HostDmaC_t\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+
+        auto i = std::static_pointer_cast<NicDmaI>(pending_nic_dma_actions.front());
+        auto c = std::static_pointer_cast<NicDmaCR>(event_ptr);
+        if (c->id_ != i->id_) {
+          DLOGWARN("found NicDmaCR with non matching id\n");
+          unmatched_events.push_back(event_ptr);
+          continue;
+        }
+        pending_nic_dma_actions.push_back(event_ptr);
+
+      } 
+      else {
+        DLOGWARN("found orphaned event for which it is unclear what to do, it is passed\n");
+        if (!co_await tar_chan->write(event_ptr)) {
+          DLOGERR("couldnt write evnt to target channel\n");
+          co_return;
+        }
+        continue;
+      }
+
+      if (pending_host_mmio_actions.size() == 4) {
+          for (auto e : pending_host_mmio_actions) {
+            cur_stack->add_to_pack(Stacks::KERNEL, e);
+          }
+          pending_host_mmio_actions.clear();
+      }
+      if (pending_nic_dma_actions.size() == 5) {
+        for (auto e : pending_nic_dma_actions) {
+          cur_stack->add_to_pack(Stacks::NIC, e);
+        }
+        pending_nic_dma_actions.clear();
+      }
+
+      if (exited_kernel 
+          and pending_host_mmio_actions.size() == 4
+          and pending_nic_dma_actions.size() == 5) {
+        // finish up this stack
+        is_trace = false;
+        exited_kernel = false;
+        found_nic_driver_sym = false;
+        event_pack_stacks_.push_back(cur_stack);
+        cur_stack = nullptr;
+      }
+    }
   }
 
-  explicit stack_statistics() : event_stream_actor() {} 
+  explicit event_stream_tracer() : sim::coroutine::pipe<event_t>() {
+  }
 
-  ~stack_statistics() = default;
+  ~event_stream_tracer() = default;
 
-  friend std::ostream &operator<<(std::ostream &out, stack_statistics &stats) {
-    // TODO: implement me
+  friend std::ostream &operator<<(std::ostream &out,
+                                  event_stream_tracer &tracer) {
+    out << std::endl;
+    out << std::endl;
+    out << "event_stream_tracer" << std::endl;
+    for (stack_t stack : tracer.event_pack_stacks_) {
+      out << *stack;
+    }
+    out << std::endl;
+    out << std::endl;
     return out;
   }
-
 };
 
 #endif  // SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_

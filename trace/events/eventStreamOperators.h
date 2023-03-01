@@ -289,6 +289,7 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
     bool exited_kernel = false;
     bool found_nic_driver_sym = false;
     bool is_netstack_related = false;
+    bool is_yet_unmatched_event = false;
     std::vector<event_t> pending_host_mmio_actions;
     std::vector<event_t> pending_nic_dma_actions;
     while(src_chan->is_open() || !unmatched_events.empty()) {
@@ -297,11 +298,13 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         // we are in this case when we are not longer within a trace
         event_ptr = unmatched_events.front();
         unmatched_events.pop_front();
+        is_yet_unmatched_event = true;
       } else {
         msg = co_await src_chan->read();
         if (msg) {
           event_ptr = msg.value();
         }
+        is_yet_unmatched_event = false;
       }
 
       if (!event_ptr) {
@@ -335,7 +338,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       // we are in a trace, now we built the trace
       if (is_type(event_ptr, EventType::HostCall_t)) {
         if (exited_kernel) {
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
@@ -355,7 +360,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
 
       if (!is_netstack_related or !found_nic_driver_sym) {
         DLOGWARN("found non host call outside of networking stack\n");
-        unmatched_events.push_back(event_ptr);
+        if (not is_yet_unmatched_event) {
+          unmatched_events.push_back(event_ptr);
+        }
         continue;
       }
 
@@ -363,7 +370,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         // mmio access to the nic to issue action
         if (not pending_host_mmio_actions.empty()) {
           DLOGWARN("Non yet completed host mmio actions to issue nic action\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_host_mmio_actions.push_back(event_ptr);
@@ -372,14 +381,18 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       else if (is_type(event_ptr, EventType::HostMmioImRespPoW_t)) {
         if (pending_host_mmio_actions.size() != 1) {
           DLOGWARN("Non yet expected HostMmioImRespPoW_t found\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
         auto mmiow = std::static_pointer_cast<HostMmioW>(pending_host_mmio_actions.front());
         if (event_ptr->timestamp_ != mmiow->timestamp_) {
           DLOGWARN("On mmiow_t did not follow immediate response\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_host_mmio_actions.push_back(event_ptr);
@@ -389,13 +402,17 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         auto ne = std::static_pointer_cast<NicMmioW>(event_ptr);
         if (pending_host_mmio_actions.size() != 2) {
           DLOGWARN("found NicMmioW_t but not two mmio events beforehand\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         auto he = std::dynamic_pointer_cast<HostMmioW>(pending_host_mmio_actions.front());
         if (!he) {
           DLOGWARN("found NicMmioW_t but first pending is no HostMmioW\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         
@@ -406,7 +423,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         ne_off << std::hex << ne->off_;
         if (!sim_string_utils::ends_with(he_adrr.str(), ne_off.str()) or he->size_ != ne->len_) {
           DLOGWARN("NicMmioW_t does not match preceding HostMmioW\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_host_mmio_actions.push_back(event_ptr);
@@ -416,14 +435,18 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         auto he = std::static_pointer_cast<HostMmioCW>(event_ptr);
         if (pending_host_mmio_actions.size() != 3) {
           DLOGWARN("found HostMmioCW_t but not three mmio (two host one nic) events beforehand\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
         auto fhe = std::dynamic_pointer_cast<HostMmioW>(pending_host_mmio_actions.front());
         if (!fhe || he->id_ != fhe->id_) {
           DLOGWARN("found HostMmioCW_t with an unexpected id\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         
@@ -433,7 +456,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       else if (is_type(event_ptr, EventType::NicDmaI_t)) {
         if (pending_host_mmio_actions.size() != 3) {
           DLOGWARN("found NicDmaI_t but no mmio register write to device captured\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_nic_dma_actions.push_back(event_ptr);
@@ -442,7 +467,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
         if (pending_nic_dma_actions.size() != 1) {
           DLOGWARN("found NicDmaEx_t before issuing this operation\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
@@ -450,7 +477,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         auto e = std::static_pointer_cast<NicDmaEx>(event_ptr);
         if (i->id_ != e->id_) {
           DLOGWARN("found NicDmaEx_t that doesnt match issue id\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_nic_dma_actions.push_back(event_ptr);
@@ -459,7 +488,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       else if (is_type(event_ptr, EventType::HostDmaR_t)) {
         if (pending_nic_dma_actions.size() != 2) {
           DLOGWARN("found HostDmaR_t before nic site execution of this operation\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
@@ -467,7 +498,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         auto r = std::static_pointer_cast<HostDmaR>(event_ptr);
         if (r->addr_ != e->addr_) {
           DLOGWARN("found HostDmaR_t with wrong address\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_nic_dma_actions.push_back(event_ptr);
@@ -476,7 +509,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       else if (is_type(event_ptr, EventType::HostDmaC_t)) {
         if (pending_nic_dma_actions.size() != 3) {
           DLOGWARN("found HostDmaC_t before HostDmaR_t\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
@@ -484,7 +519,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         auto c = std::static_pointer_cast<HostDmaC>(event_ptr);
         if (c->id_ != r->id_) {
           DLOGWARN("found HostDmaC_t with non matching id\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_nic_dma_actions.push_back(event_ptr);
@@ -493,7 +530,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       else if (is_type(event_ptr, EventType::NicDmaCR_t)) {
         if (pending_nic_dma_actions.size() != 4) {
           DLOGWARN("found NicDmaCR_t before HostDmaC_t\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
 
@@ -501,7 +540,9 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
         auto c = std::static_pointer_cast<NicDmaCR>(event_ptr);
         if (c->id_ != i->id_) {
           DLOGWARN("found NicDmaCR with non matching id\n");
-          unmatched_events.push_back(event_ptr);
+          if (not is_yet_unmatched_event) {
+            unmatched_events.push_back(event_ptr);
+          }
           continue;
         }
         pending_nic_dma_actions.push_back(event_ptr);
@@ -532,6 +573,7 @@ struct event_stream_tracer : public sim::coroutine::pipe<event_t> {
       if (exited_kernel 
           and pending_host_mmio_actions.size() == 4
           and pending_nic_dma_actions.size() == 5) {
+        DLOGIN("found one stack to finish\n");
         // finish up this stack
         is_trace = false;
         exited_kernel = false;

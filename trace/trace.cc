@@ -27,9 +27,10 @@
 
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
-#include "trace/parser/parser.h"
 #include "trace/events/event-filter.h"
 #include "trace/events/eventStreamOperators.h"
+#include "trace/events/eventStreamParser.h"
+#include "trace/parser/parser.h"
 
 int main(int argc, char *argv[]) {
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
@@ -51,6 +52,8 @@ int main(int argc, char *argv[]) {
                                      "lower timestamp bound for events",
                                      cxxopts::value<std::string>())(
       "ts-upper-bound", "upper timestamp bound for events",
+      cxxopts::value<std::string>())(
+      "event-stream-log", "file path to file that stores an event stream",
       cxxopts::value<std::string>());
 
   cxxopts::ParseResult result;
@@ -67,6 +70,25 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+  // printer to consume pipeline and to print events
+  EventPrinter eventPrinter(std::cout);
+
+  if (result.count("event-stream-log")) {
+    LineReader streamLr;
+    event_stream_parser streamParser(
+        result["event-stream-log"].as<std::string>(), streamLr);
+
+    //sim::coroutine::pipeline<event_t> tracePipeline{
+    //  streamParser, {}};
+
+    if (!sim::coroutine::awaiter<event_t>::await_termination(streamParser, eventPrinter)) {
+    std::cerr << "could not await termination of the pipeline" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+    exit(EXIT_SUCCESS);
+  }
+
   if (!result.count("linux-dump-server-client") ||
       !result.count("gem5-log-server") || !result.count("nicbm-log-server") ||
       !result.count("gem5-log-client") || !result.count("nicbm-log-client")) {
@@ -77,8 +99,7 @@ int main(int argc, char *argv[]) {
 
   // symbol filter to translate hex address to function-name/label
   LineReader ssymsLr;
-  SSyms linuxvm_symbols{"Linuxvm-Symbols",
-                    ssymsLr};
+  SSyms linuxvm_symbols{"Linuxvm-Symbols", ssymsLr};
 
   LineReader nicdslr;
   SSyms nicdriver_symbols{"Nicdriver-Symbols", nicdslr};
@@ -88,7 +109,7 @@ int main(int argc, char *argv[]) {
            result["linux-dump-server-client"].as<std::string>(), 0)) ||
       (result.count("nic-i40e-dump") &&
        !nicdriver_symbols.load_file(result["nic-i40e-dump"].as<std::string>(),
-                              0xffffffffa0000000ULL))) {
+                                    0xffffffffa0000000ULL))) {
     std::cerr << "could not initialize symbol table" << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -101,30 +122,33 @@ int main(int argc, char *argv[]) {
   ComponentFilter compF("ComponentFilter-Client-Server");
 
   // gem5 log parser that generates events
-  //LineReader serverLr;
-  //Gem5Parser gem5ServerPar{"Gem5ServerParser",
+  // LineReader serverLr;
+  // Gem5Parser gem5ServerPar{"Gem5ServerParser",
   //                         result["gem5-log-server"].as<std::string>(),
-  //                         {linuxvm_symbols, nicdriver_symbols}, compF, serverLr};
+  //                         {linuxvm_symbols, nicdriver_symbols}, compF,
+  //                         serverLr};
 
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
                            result["gem5-log-client"].as<std::string>(),
-                           {linuxvm_symbols, nicdriver_symbols}, compF, clientLr};
+                           {linuxvm_symbols, nicdriver_symbols},
+                           compF,
+                           clientLr};
 
   // nicbm log parser that generates events
-  //LineReader nicSerLr;
-  //NicBmParser nicSerPar{"NicbmServerParser",
-  //                      result["nicbm-log-server"].as<std::string>(), nicSerLr};
+  // LineReader nicSerLr;
+  // NicBmParser nicSerPar{"NicbmServerParser",
+  //                      result["nicbm-log-server"].as<std::string>(),
+  //                      nicSerLr};
   LineReader nicCliLr;
   NicBmParser nicCliPar{"NicbmClientParser",
                         result["nicbm-log-client"].as<std::string>(), nicCliLr};
-  
 
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // TODO:
-  // write an string internalizer for function and component names and thereof...
-  // this will enable string singeltons and hence comparison through pointer 
-  // comparison to check for specific function boundaries etc.
+  // write an string internalizer for function and component names and
+  // thereof... this will enable string singeltons and hence comparison through
+  // pointer comparison to check for specific function boundaries etc.
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   /*
@@ -148,26 +172,31 @@ int main(int argc, char *argv[]) {
   EventTimestampFilter timestampFilter{
       EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
-  //EventTypeStatistics statistics{};
+  // EventTypeStatistics statistics{};
 
   event_stream_tracer tracer;
 
   // filter uninteresting events out of stream
-  EventTypeFilter eventFilter{
-      {EventType::HostInstr_t, EventType::SimProcInEvent_t,
-       EventType::SimSendSync_t},
-      true};
-
-  // printer to consume pipeline and to print events
-  EventPrinter eventPrinter;
+  EventTypeFilter eventFilter{{
+                                  EventType::HostInstr_t,
+                                  EventType::SimProcInEvent_t,
+                                  EventType::SimSendSync_t,
+                                  EventType::HostMsiX_t,
+                                  EventType::HostClearInt_t,
+                                  EventType::HostPostInt_t,
+                              },
+                              true};
 
   using event_t = std::shared_ptr<Event>;
 
-  sim::coroutine::collector<event_t, EventComperator> collector{{nicCliPar, gem5ClientPar}};
+  sim::coroutine::collector<event_t, EventComperator> collector{
+      {nicCliPar, gem5ClientPar}};
 
-  sim::coroutine::pipeline<event_t> pipeline{collector, {timestampFilter, eventFilter, tracer}};
+  sim::coroutine::pipeline<event_t> pipeline{
+      collector, {timestampFilter, eventFilter, tracer}};
 
-  if (!sim::coroutine::awaiter<event_t>::await_termination(pipeline, eventPrinter)) {
+  if (!sim::coroutine::awaiter<event_t>::await_termination(pipeline,
+                                                           eventPrinter)) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }

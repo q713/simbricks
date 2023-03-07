@@ -23,11 +23,10 @@
  */
 
 #include "trace/events/events.h"
-
 #include "trace/parser/parser.h"
 
 void Event::display(std::ostream &os) {
-  os << getName() << ": source=" << src_->getIdent()
+  os << getName() << ": source=" << (src_ ? src_->getIdent() : "null")
      << ", timestamp=" << timestamp_;
 }
 

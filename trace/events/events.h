@@ -4,8 +4,8 @@
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
- * "Software"), to deal in the Software withos restriction, including
- * withos limitation the rights to use, copy, modify, merge, publish,
+ * "Software"), to deal in the Software without restriction, including
+ * without limitation the rights to use, copy, modify, merge, publish,
  * distribute, sublicense, and/or sell copies of the Software, and to
  * permit persons to whom the Software is furnished to do so, subject to
  * the following conditions:
@@ -13,12 +13,12 @@
  * The above copyright notice and this permission notice shall be
  * included in all copies or substantial portions of the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHos WARRANTY OF ANY KIND,
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
  * IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
  * CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
- * TORT OR OTHERWISE, ARISING FROM, os OF OR IN CONNECTION WITH THE
+ * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
@@ -564,7 +564,11 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
 }
 
 class EventPrinter : public sim::coroutine::consumer<std::shared_ptr<Event>> {
+  std::ostream &out_;
+
  public:
+  EventPrinter(std::ostream &out) : out_(out) {}
+
   sim::coroutine::task<void> consume(
       sim::coroutine::unbuffered_single_chan<std::shared_ptr<Event>> *src_chan)
       override {
@@ -574,7 +578,7 @@ class EventPrinter : public sim::coroutine::consumer<std::shared_ptr<Event>> {
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->read(); msg;
          msg = co_await src_chan->read()) {
-      std::cout << *(msg.value()) << std::endl;
+      out_ << *(msg.value()) << std::endl;
     }
     co_return;
   }

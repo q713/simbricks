@@ -36,20 +36,19 @@
 #include <queue>
 #include <set>
 #include <thread>
-#include <optional>
 
-#if defined(__clang__) // clang is compiler
-  #include <experimental/coroutine>
-  using std::experimental::coroutine_handle;
-  using std::experimental::suspend_always;
-  using std::experimental::suspend_never;
-  using std::experimental::noop_coroutine;
-#else // g++ is compiler
-  #include <coroutine>
-  using std::coroutine_handle;
-  using std::suspend_always;
-  using std::suspend_never;
-  using std::noop_coroutine;
+#if defined(__clang__)  // clang is compiler
+#include <experimental/coroutine>
+using std::experimental::coroutine_handle;
+using std::experimental::noop_coroutine;
+using std::experimental::suspend_always;
+using std::experimental::suspend_never;
+#else  // g++ is compiler
+#include <coroutine>
+using std::coroutine_handle;
+using std::noop_coroutine;
+using std::suspend_always;
+using std::suspend_never;
 #endif
 
 #include "lib/utils/log.h"
@@ -58,7 +57,7 @@ namespace sim {
 
 namespace coroutine {
 
-//#define SIM_COROUTINE_DEBUG_ 1
+#define SIM_COROUTINE_DEBUG_ 1
 
 #ifdef SIM_COROUTINE_DEBUG_
 
@@ -311,8 +310,7 @@ struct value_task_promise {
 
   inline task<value_type> get_return_object() noexcept {
     return task<value_type>{
-        coroutine_handle<value_task_promise<value_type>>::from_promise(
-            *this)};
+        coroutine_handle<value_task_promise<value_type>>::from_promise(*this)};
   };
 
   suspend_never initial_suspend() const noexcept {
@@ -380,9 +378,13 @@ struct task_base {
     }
   }
 
-  explicit task_base(coroutine_handle<promise_type> handle)
-      : handle_(handle) {
+  task_base(coroutine_handle<promise_type> handle) : handle_(handle) {
   }
+
+  //task_base(task_base && tb) = default;
+  //task_base &operator=(task_base && tb) = default;
+  //task_base ( const task_base & ) = delete;
+  //task_base & operator= ( const task_base & ) = delete;
 
  protected:
   bool destroyed_ = false;
@@ -408,20 +410,35 @@ struct task<void> : public task_base<void_task_promise> {
 };
 
 inline task<void> void_task_promise::get_return_object() noexcept {
-  return task<void>{
-      coroutine_handle<void_task_promise>::from_promise(*this)};
+  return task<void>{coroutine_handle<void_task_promise>::from_promise(*this)};
 };
+
+template<typename T>
+inline void retrieve(task<T> &task) {
+  while (task.is_not_done()) {
+    task.resume_handle();
+  }
+}
+
+template <typename T, typename = typename std::enable_if<
+                          !std::is_same<T, void>::value>::type>
+inline T retrieve_val(task<T>& task) {
+  retrieve<T>(task);
+  return task.return_value();
+}
 
 template <typename T>
 struct unbuffered_single_chan {
-
-  // TODO: add a pointer a.k.a list of readers and writers which are waiting and write the 
-  //       value to a reader instead of the channel or into a ringbuffer/linked list (depending on template arg)
-  //       within the channel. Additionally adapt for multithreading
+  // TODO: add a pointer a.k.a list of readers and writers which are waiting and
+  // write the
+  //       value to a reader instead of the channel or into a ringbuffer/linked
+  //       list (depending on template arg) within the channel. Additionally
+  //       adapt for multithreading
   //
-  // One possible implementation to allow for multithreading might be to first create a Thread pool and push suspending
-  // readers/writers as tasks into the thread pool which uses a fifo queue. When combined with a buffering channel this 
-  // might not be to bad context switching wise.
+  // One possible implementation to allow for multithreading might be to first
+  // create a Thread pool and push suspending readers/writers as tasks into the
+  // thread pool which uses a fifo queue. When combined with a buffering channel
+  // this might not be to bad context switching wise.
 
   struct chan_reader {
     unbuffered_single_chan<T>* chan_;
@@ -431,12 +448,13 @@ struct unbuffered_single_chan {
       if (!chan_->has_val_ || !chan_->writer_resumable_) {
         return false;
       }
-      std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
+      //std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
       COROBELT_LOG_INF_("exit await_ready chan_reader\n");
       return true;
     }
 
-    coroutine_handle<> await_suspend(coroutine_handle<void> coro) const noexcept {
+    coroutine_handle<> await_suspend(
+        coroutine_handle<void> coro) const noexcept {
       COROBELT_LOG_INF_("enter await_suspend chan_reader\n");
       if (!chan_) {
         COROBELT_LOG_ERR_("await_suspend chan_reader channel is gone\n");
@@ -449,10 +467,10 @@ struct unbuffered_single_chan {
         if (resumable && !resumable.done()) {
           return resumable;
         }
-        if (chan_ && chan_->reader_resumable_ &&
-            !chan_->reader_resumable_.done()) {
-          return chan_->reader_resumable_;
-        }
+        //if (chan_ && chan_->reader_resumable_ &&
+        //    !chan_->reader_resumable_.done()) {
+        //  return chan_->reader_resumable_;
+        //}
       }
       return noop_coroutine();
     }
@@ -473,9 +491,10 @@ struct unbuffered_single_chan {
         COROBELT_LOG_WARN_("await resume, but no value in channel\n");
         return std::nullopt;
       }
+      auto value = chan_->value_;
       chan_->has_val_ = false;
       COROBELT_LOG_INF_("exit await_resume chan_reader\n");
-      return std::optional<T>{chan_->value_};
+      return std::optional<T>{value};
     }
 
     explicit chan_reader(unbuffered_single_chan<T>* chan) : chan_(chan) {
@@ -491,18 +510,26 @@ struct unbuffered_single_chan {
       if (chan_->has_val_ || !chan_->reader_resumable_) {
         return false;
       }
-      std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
+      //std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
       COROBELT_LOG_INF_("exit await_ready chan_writer\n");
       return true;
     }
 
-    coroutine_handle<> await_suspend(coroutine_handle<void> coro) const noexcept {
+    coroutine_handle<> await_suspend(
+        coroutine_handle<void> coro) const noexcept {
       COROBELT_LOG_INF_("enter await_suspend chan_writer\n");
       if (!chan_) {
         COROBELT_LOG_ERR_("await_suspend chan_writer channel is null\n");
         return noop_coroutine();
       }
       chan_->writer_resumable_ = coro;
+      if (chan_->has_val_ && chan_->reader_resumable_) {
+        auto resumable = chan_->reader_resumable_;
+        chan_->reader_resumable_ = nullptr;
+        if (resumable && !resumable.done()) {
+          return resumable;
+        }
+      }
       COROBELT_LOG_INF_("exit await_suspend chan_writer\n");
       return noop_coroutine();
     }
@@ -519,15 +546,20 @@ struct unbuffered_single_chan {
         return false;
       }
 
+      if (chan_->has_val_) {
+        COROBELT_LOG_WARN_("await resume, but value in channel\n");
+        return false;
+      }
+
       chan_->has_val_ = true;
       chan_->value_ = value_to_write_;
-      if (chan_->writer_resumable_ && !chan_->is_closed_) {
-        auto resumable = chan_->writer_resumable_;
-        chan_->writer_resumable_ = nullptr;
-        if (resumable && !resumable.done()) {
-          resumable.resume();
-        }
-      }
+      //if (chan_->writer_resumable_ && !chan_->is_closed_) {
+      //  auto resumable = chan_->writer_resumable_;
+      //  chan_->writer_resumable_ = nullptr;
+      //  if (resumable && !resumable.done()) {
+      //    resumable.resume();
+      //  }
+      //}
       COROBELT_LOG_INF_("exit await_resume chan_writer\n");
       return true;
     }
@@ -584,13 +616,13 @@ struct unbuffered_single_chan {
   }
 };
 
-template<typename T>
+template <typename T>
 struct pipeline;
 
 template <typename T, typename compare>
 struct collector;
 
-template<typename T>
+template <typename T>
 struct awaiter;
 
 template <typename T>
@@ -621,6 +653,113 @@ struct pipe {
   }
 };
 
+template <typename T, typename compare = std::greater<T>>
+struct collector : public producer<T> {
+ private:
+  struct comperator {
+   private:
+    compare compare_;
+
+   public:
+    inline bool operator()(
+        const std::pair<T, unbuffered_single_chan<T>*>& le,
+        const std::pair<T, unbuffered_single_chan<T>*>& re) const {
+      return compare_(le.first, re.first);
+    }
+  };
+
+  std::vector<std::reference_wrapper<producer<T>>> producer_;
+  std::vector<unbuffered_single_chan<T>*> channel_;
+  std::vector<task<void>> tasks_;
+  std::priority_queue<std::pair<T, unbuffered_single_chan<T>*>,
+                        std::vector<std::pair<T, unbuffered_single_chan<T>*>>,
+                        comperator> sources_;;
+
+ public:
+  explicit collector(std::vector<std::reference_wrapper<producer<T>>> producer)
+      : sim::coroutine::producer<T>(), producer_(std::move(producer)) {
+  }
+
+  ~collector() {
+    COROBELT_LOG_INF_("start destruction of collector\n");
+    for (unbuffered_single_chan<T>* chan : channel_) {
+      if (chan) {
+        delete chan;
+      }
+    }
+
+    for (auto& t : tasks_) {
+      t.destroy();
+    }
+    COROBELT_LOG_INF_("finished destruction of collector\n");
+  }
+
+  task<void> consume(unbuffered_single_chan<T>* tar_chan) {
+    std::optional<T> msg;
+    unbuffered_single_chan<T>* src_chan = nullptr;
+    std::pair<T, unbuffered_single_chan<T>*> next_task;
+    while (!sources_.empty()) {
+      next_task = sources_.top();
+      sources_.pop();
+      src_chan = next_task.second;
+      T m = next_task.first;
+
+      if (!tar_chan || !co_await tar_chan->write(m)) {
+        COROBELT_LOG_ERR_("writing within collector went wrong\n");
+        co_return;
+      }
+
+      if (!src_chan || !src_chan->is_open()) {
+        COROBELT_LOG_ERR_("null or closed, one producer finished\n");
+        src_chan = nullptr;
+        continue;
+      }
+
+      msg = co_await src_chan->read();
+      if (msg) {
+        sources_.push(std::make_pair(msg.value(), src_chan));
+      }
+      src_chan = nullptr;
+    }
+  }
+
+  task<void> produce(unbuffered_single_chan<T>* tar_chan) override {
+    COROBELT_LOG_INF_("collector starts production\n");
+
+    if (producer_.size() < 2) {
+      COROBELT_LOG_ERR_("must pass at least two producers\n");
+      co_return;
+    }
+
+    std::optional<T> msg;
+    unbuffered_single_chan<T>* src_chan;
+    for (auto it = producer_.begin(); it != producer_.end(); it++) {
+      src_chan = new unbuffered_single_chan<T>{};
+      if (!src_chan) {
+        COROBELT_LOG_ERR_("initializing colelctor went wrong\n");
+        co_return;
+      }
+      channel_.push_back(src_chan);
+      producer<T>& prod = *it;
+      task<void> producer_res = prod.produce(src_chan);
+      tasks_.push_back(std::move(producer_res));
+      msg = co_await src_chan->read();
+      if (!msg) {
+        COROBELT_LOG_ERR_("collector initial read went wrong\n");
+        co_return;
+      }
+      sources_.push(std::make_pair(msg.value(), src_chan));
+    }
+
+    auto ending = consume(tar_chan);
+    tasks_.push_back(ending);
+    retrieve<void>(ending);
+
+    COROBELT_LOG_INF_("leaf collector\n");
+    co_return;
+  }
+};
+
 template <typename T>
 struct pipeline : public producer<T> {
  private:
@@ -629,11 +768,13 @@ struct pipeline : public producer<T> {
 
   std::vector<unbuffered_single_chan<T>*> channels_;
   std::vector<task<void>> tasks_;
- 
+
  public:
   pipeline(producer<T>& producer,
-                    std::vector<std::reference_wrapper<pipe<T>>> pipes)
-      : sim::coroutine::producer<T>(), producer_(producer), pipes_(std::move(pipes)) {
+           std::vector<std::reference_wrapper<pipe<T>>> pipes)
+      : sim::coroutine::producer<T>(),
+        producer_(producer),
+        pipes_(std::move(pipes)) {
   }
 
   ~pipeline() {
@@ -672,132 +813,97 @@ struct pipeline : public producer<T> {
       tar_chan = src_chan;
     }
 
-    unbuffered_single_chan<T>* pipe_end = new unbuffered_single_chan<T>{};
-    if (!pipe_end) {
-      COROBELT_LOG_ERR_("pipeline allocation error\n");
-      co_return;
-    }
-    channels_.push_back(pipe_end);
-    task<void> t = producer_.produce(pipe_end);
+    auto ending = tasks_.front();
+    //unbuffered_single_chan<T>* pipe_end = new unbuffered_single_chan<T>{};
+    //if (!pipe_end) {
+    //  COROBELT_LOG_ERR_("pipeline allocation error\n");
+    //  co_return;
+    //}
+    //channels_.push_back(pipe_end);
+    //task<void> t = producer_.produce(pipe_end);
+    task<void> t = producer_.produce(tar_chan);
     tasks_.push_back(t);
 
-    std::optional<T> msg;
-    
-    do {
-      for (msg = co_await pipe_end->read(); msg; msg = co_await pipe_end->read()) {
-        if (!tar_chan || !co_await tar_chan->write(msg.value())) {
-          COROBELT_LOG_ERR_("pipeline write failure\n");
-          break;
-        }
-      }
+    //std::optional<T> msg;
+    //do {
+      //for (msg = co_await pipe_end->read(); msg;
+      //     msg = co_await pipe_end->read()) {
+      //  if (!tar_chan || !co_await tar_chan->write(msg.value())) {
+      //    COROBELT_LOG_ERR_("pipeline write failure\n");
+      //    break;
+      //  }
+      //}
 
-      if (t.is_not_done())
-        t.resume_handle();
-    } while(t.is_not_done());
+    retrieve<void>(ending); // TODO: fix this
 
     COROBELT_LOG_INF_("leave pipeline\n");
     co_return;
   };
 };
 
-template <typename T, typename compare = std::greater<T>>
-struct collector : public producer<T> {
- private:
-  struct comperator {
-   private:
-    compare compare_;
-
-   public:
-    inline bool operator()(
-        const std::pair<T, unbuffered_single_chan<T>*>& le,
-        const std::pair<T, unbuffered_single_chan<T>*>& re) const {
-      return compare_(le.first, re.first);
-    }
-  };
-
-  std::vector<std::reference_wrapper<producer<T>>> producer_;
-
- public:
-  explicit collector(std::vector<std::reference_wrapper<producer<T>>> producer)
-      : sim::coroutine::producer<T>(), producer_(std::move(producer)) {
+template <typename T, typename E>
+struct transformer : public producer<E> {
+  producer<T>& producer_;
+  unbuffered_single_chan<T>* src_chan;
+  std::vector<task<void>> tasks_;
+ 
+  explicit transformer(producer<T>& p) : producer<E>(), producer_(p) {
   }
 
-  task<void> produce(unbuffered_single_chan<T>* tar_chan) override {
-    COROBELT_LOG_INF_("collector starts production\n");
+  ~transformer() {
+    if (src_chan) {
+      delete src_chan;
+    }
+    for (auto t : tasks_) {
+      t.destroy();
+    }
+  }
 
-    if (producer_.size() < 2) {
-      COROBELT_LOG_ERR_("must pass at least two producers\n");
+  virtual std::optional<E> transform(T value) {
+    return {};
+  }
+
+  task<void> produce(unbuffered_single_chan<E>* tar_chan) override {
+    if (not tar_chan) {
+      COROBELT_LOG_ERR_("could not allocate src channel in transformer\n");
       co_return;
     }
 
-    std::priority_queue<std::pair<T, unbuffered_single_chan<T>*>,
-                        std::vector<std::pair<T, unbuffered_single_chan<T>*>>,
-                        comperator>
-        sources_;
-    std::vector<unbuffered_single_chan<T>*> channel_;
-    std::vector<task<void>> tasks_;
-
-    std::optional<T> msg;
-    unbuffered_single_chan<T>* src_chan;
-    for (auto it = producer_.begin(); it != producer_.end(); it++) {
-      src_chan = new unbuffered_single_chan<T>{};
-      if (!src_chan) {
-        COROBELT_LOG_ERR_("initializing colelctor went wrong\n");
-        co_return;
-      }
-      channel_.push_back(src_chan);
-      producer<T>& prod = *it;
-      task<void> producer_res = prod.produce(src_chan);
-      tasks_.push_back(std::move(producer_res));
-      msg = co_await src_chan->read();
-      if (!msg) {
-        COROBELT_LOG_ERR_("collector initial read went wrong\n");
-        co_return;
-      }
-      sources_.push(std::make_pair(msg.value(), src_chan));
+    src_chan = new unbuffered_single_chan<T>{};
+    if (not src_chan) {
+      COROBELT_LOG_ERR_("could not allocate src channel in transformer\n");
+      co_return;
     }
-    src_chan = nullptr;
+    auto ending = consume(src_chan, tar_chan);
+    auto prod = producer_.produce(src_chan);
+    tasks_.push_back(ending);
+    tasks_.push_back(prod);
 
-    std::pair<T, unbuffered_single_chan<T>*> next_task;
-    while (!sources_.empty()) {
-      next_task = sources_.top();
-      sources_.pop();
-      src_chan = next_task.second;
-      T m = next_task.first;
+    retrieve<void>(ending);
 
-      if (!tar_chan || !co_await tar_chan->write(m)) {
-        COROBELT_LOG_ERR_("writing within collector went wrong\n");
-        co_return;
-      }
-
-      if (!src_chan || !src_chan->is_open()) {
-        COROBELT_LOG_ERR_("null or closed, one producer finished\n");
-        src_chan = nullptr;
-        continue;
-      }
-
-      msg = co_await src_chan->read();
-      if (msg) {
-        sources_.push(std::make_pair(msg.value(), src_chan));
-      } else {
-        src_chan->close_chan();
-      }
-      src_chan = nullptr;
-    }
-
-    for (unbuffered_single_chan<T>* chan : channel_) {
-      if (chan) {
-        delete chan;
-      }
-    }
-
-    for (auto& t : tasks_) {
-      t.destroy();
-    }
-
-    COROBELT_LOG_INF_("leaf collector\n");
     co_return;
   }
+
+  private:
+    task<void> consume(unbuffered_single_chan<T>* src_chan, 
+                       unbuffered_single_chan<E>* tar_chan) {
+      std::optional<T> msg;
+      std::optional<E> t;
+      for (msg = co_await src_chan->read(); msg;
+           msg = co_await src_chan->read()) {
+        t = transform(msg.value());
+        if (not t) {
+          COROBELT_LOG_ERR_("transformer could not transform value\n");
+          co_return;
+        } 
+
+        if (!co_await tar_chan->write(t.value())) {
+          COROBELT_LOG_ERR_("transformer could not write to target channel\n");
+          co_return;
+        }
+      }
+      co_return;
+    }
 };
 
 template <typename T>
@@ -827,18 +933,23 @@ struct awaiter {
       return false;
     }
 
-    //bool is_prod_only = std::dynamic_cast<collector<T> *>(&producer_):
-    //is_prod_only = std::dynamic_cast<pipeline<T> *>(&producer_);
+    // bool is_prod_only = std::dynamic_cast<collector<T> *>(&producer_):
+    // is_prod_only = std::dynamic_cast<pipeline<T> *>(&producer_);
 
     task<void> consumer_task = consumer_.consume(target_chan_);
     task<void> producer_task = producer_.produce(target_chan_);
 
     // TODO: change this to an awaitable or something
-    while (producer_task.is_not_done()) {
-      producer_task.resume_handle();
-      //if (is_prod_only)
-      //  consumer_task.resume_handle();
-    }
+    //while (producer_task.is_not_done()) {
+    //  producer_task.resume_handle();
+      // if (is_prod_only)
+      //   consumer_task.resume_handle();
+    //}
+    retrieve<void>(consumer_task);
+    //while(consumer_task.is_not_done() or producer_task.is_not_done()) {
+    //  retrieve<void>(consumer_task);
+    //  retrieve<void>(producer_task);
+    //}
 
     producer_task.destroy();
     consumer_task.destroy();
@@ -864,6 +975,6 @@ struct awaiter {
 
 };  // namespace coroutine
 
-}; // namespace sim
+};  // namespace sim
 
-#endif // SIM_COROUTINE_H_
+#endif  // SIM_COROUTINE_H_

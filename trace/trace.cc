@@ -73,18 +73,20 @@ int main(int argc, char *argv[]) {
   // printer to consume pipeline and to print events
   EventPrinter eventPrinter(std::cout);
 
+  // analyse event stream
+  event_stream_tracer tracer;
+
   if (result.count("event-stream-log")) {
     LineReader streamLr;
     event_stream_parser streamParser(
         result["event-stream-log"].as<std::string>(), streamLr);
 
-    //sim::coroutine::pipeline<event_t> tracePipeline{
-    //  streamParser, {}};
+    sim::coroutine::pipeline<event_t> tracePipeline{streamParser, {tracer}};
 
-    if (!sim::coroutine::awaiter<event_t>::await_termination(streamParser, eventPrinter)) {
-    std::cerr << "could not await termination of the pipeline" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+    if (!sim::coroutine::awaiter<event_t>::await_termination(tracePipeline)) {
+      std::cerr << "could not await termination of the pipeline" << std::endl;
+      exit(EXIT_FAILURE);
+    }
 
     exit(EXIT_SUCCESS);
   }
@@ -171,10 +173,6 @@ int main(int argc, char *argv[]) {
 
   EventTimestampFilter timestampFilter{
       EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-
-  // EventTypeStatistics statistics{};
-
-  event_stream_tracer tracer;
 
   // filter uninteresting events out of stream
   EventTypeFilter eventFilter{{

@@ -149,7 +149,7 @@ bool LineReader::consume_and_trim_char(const char to_consume) {
 }
 
 bool LineReader::parse_uint_trim(int base, uint64_t &target) {
-  if (is_empty()) {
+  if (is_empty() or (base != 10 and base != 16)) {
     return false;
   }
   auto pred =

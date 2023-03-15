@@ -575,10 +575,12 @@ class EventPrinter : public sim::coroutine::consumer<std::shared_ptr<Event>> {
     if (!src_chan) {
       co_return;
     }
+    std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->read(); msg;
          msg = co_await src_chan->read()) {
-      out_ << *(msg.value()) << std::endl;
+      event = msg.value();
+      out_ << *event << std::endl;
     }
     co_return;
   }

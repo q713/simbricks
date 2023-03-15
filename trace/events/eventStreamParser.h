@@ -65,17 +65,17 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
     while (line_reader_.next_line()) {
       line_reader_.trimL();
 
-      std::function<bool(unsigned char)> pred = [](unsigned char c) { return c == ':'; };
+      std::function<bool(unsigned char)> pred = [](unsigned char c) { return c != ':'; };
       std::string event_name = line_reader_.extract_and_substr_until(pred);
       if (event_name.empty()) {
-        std::cout << "could not parse event name" << std::endl;
+        std::cout << "could not parse event name: " << line_reader_.get_raw_line() << std::endl;
         continue;
       }
 
       uint64_t ts;
       std::string src;
       if (not parse_source_timestamp(src, ts)) {
-        std::cout << "could not parse timestamp or source" << std::endl;
+        std::cout << "could not parse timestamp or source: " << line_reader_.get_raw_line() << std::endl;
         continue;
       }
 
@@ -84,8 +84,9 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
        */
 
       event_t event = nullptr;
-      uint64_t pc, id, addr, size, vec, dev, func, bytes, 
-        data, reg, offset, len, intr, val;
+      uint64_t pc = 0, id = 0,addr = 0, size = 0, vec = 0, dev = 0, 
+        func = 0, bytes = 0, data = 0, reg = 0, offset = 0, len = 0, 
+        intr = 0, val = 0;
       std::string function, comp;
       if (event_name.compare("SimSendSyncSimSendSync") == 0) {
         event = std::make_shared<SimSendSync>(ts, nullptr);
@@ -269,9 +270,9 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
           or not line_reader_.parse_uint_trim(16, offset)
           or not line_reader_.consume_and_trim_string(", len=")
           or not line_reader_.parse_uint_trim(10, len)
-          or not line_reader_.consume_and_trim_string(", val=")
+          or not line_reader_.consume_and_trim_string(" val=") // TODO: fix this to ", val=""
           or not line_reader_.parse_uint_trim(16, val)) {
-          std::cout << "error parsing NicMmioR or NicMmioW" << std::endl;
+          std::cout << "error parsing NicMmioR or NicMmioW: " << line_reader_.get_raw_line() << std::endl;
           continue;
         }
 
@@ -304,8 +305,14 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
         continue;
       }
 
-      if (event and not co_await tar_chan->write(event)) {
+      if (not event) {
+        std::cout << "no event to write, there should be one" << std::endl;
+        co_return;
+      }
+
+      if (not co_await tar_chan->write(event)) {
         std::cout << "could not write event to the target channel" << std::endl;
+        co_return;
       }
     }
 

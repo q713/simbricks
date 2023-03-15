@@ -26,8 +26,8 @@
 #include "trace/parser/parser.h"
 
 void Event::display(std::ostream &os) {
-  os << getName() << ": source=" << (src_ ? src_->getIdent() : "null")
-     << ", timestamp=" << timestamp_;
+  os << getName() << ": source=" << (src_ ? src_->getIdent() : "null") 
+    << ", timestamp=" << timestamp_;
 }
 
 void SimSendSync::display(std::ostream &os) {
@@ -152,7 +152,7 @@ void NicDmaCW::display(std::ostream &os) {
 void NicMmio::display(std::ostream &os) {
   Event::display(os);
   os << ", off=" << std::hex << off_ << ", len=" << len_
-     << " val=" << std::hex << val_;
+     << ", val=" << std::hex << val_;
 }
 
 void NicMmioR::display(std::ostream &os) {

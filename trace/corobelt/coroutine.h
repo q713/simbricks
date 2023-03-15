@@ -57,7 +57,7 @@ namespace sim {
 
 namespace coroutine {
 
-#define SIM_COROUTINE_DEBUG_ 1
+//#define SIM_COROUTINE_DEBUG_ 1
 
 #ifdef SIM_COROUTINE_DEBUG_
 
@@ -378,7 +378,7 @@ struct task_base {
     }
   }
 
-  task_base(coroutine_handle<promise_type> handle) : handle_(handle) {
+  explicit task_base(coroutine_handle<promise_type> handle) : handle_(handle) {
   }
 
   //task_base(task_base && tb) = default;
@@ -448,7 +448,7 @@ struct unbuffered_single_chan {
       if (!chan_->has_val_ || !chan_->writer_resumable_) {
         return false;
       }
-      //std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
+      std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
       COROBELT_LOG_INF_("exit await_ready chan_reader\n");
       return true;
     }
@@ -467,10 +467,10 @@ struct unbuffered_single_chan {
         if (resumable && !resumable.done()) {
           return resumable;
         }
-        //if (chan_ && chan_->reader_resumable_ &&
-        //    !chan_->reader_resumable_.done()) {
-        //  return chan_->reader_resumable_;
-        //}
+        if (chan_ && chan_->reader_resumable_ &&
+            !chan_->reader_resumable_.done()) {
+          return chan_->reader_resumable_;
+        }
       }
       return noop_coroutine();
     }
@@ -491,10 +491,9 @@ struct unbuffered_single_chan {
         COROBELT_LOG_WARN_("await resume, but no value in channel\n");
         return std::nullopt;
       }
-      auto value = chan_->value_;
       chan_->has_val_ = false;
       COROBELT_LOG_INF_("exit await_resume chan_reader\n");
-      return std::optional<T>{value};
+      return std::optional<T>{chan_->value_};
     }
 
     explicit chan_reader(unbuffered_single_chan<T>* chan) : chan_(chan) {
@@ -510,7 +509,7 @@ struct unbuffered_single_chan {
       if (chan_->has_val_ || !chan_->reader_resumable_) {
         return false;
       }
-      //std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
+      std::swap(chan_->reader_resumable_, chan_->writer_resumable_);
       COROBELT_LOG_INF_("exit await_ready chan_writer\n");
       return true;
     }
@@ -553,13 +552,13 @@ struct unbuffered_single_chan {
 
       chan_->has_val_ = true;
       chan_->value_ = value_to_write_;
-      //if (chan_->writer_resumable_ && !chan_->is_closed_) {
-      //  auto resumable = chan_->writer_resumable_;
-      //  chan_->writer_resumable_ = nullptr;
-      //  if (resumable && !resumable.done()) {
-      //    resumable.resume();
-      //  }
-      //}
+      if (chan_->writer_resumable_ && !chan_->is_closed_) {
+        auto resumable = chan_->writer_resumable_;
+        chan_->writer_resumable_ = nullptr;
+        if (resumable && !resumable.done()) {
+          resumable.resume();
+        }
+      }
       COROBELT_LOG_INF_("exit await_resume chan_writer\n");
       return true;
     }
@@ -912,9 +911,10 @@ struct awaiter {
   producer<T>& producer_;
   consumer<T>& consumer_;
 
-  struct do_nothing_consumer : public consumer<int> {
-    task<void> consume(unbuffered_single_chan<T>* src_chan) override {
-      std::optional<T> msg;
+  template<typename E>
+  struct do_nothing_consumer : public consumer<E> {
+    task<void> consume(unbuffered_single_chan<E>* src_chan) override {
+      std::optional<E> msg;
       while (co_await src_chan->read()) {
         COROBELT_LOG_INF_("received an element\n");
       }
@@ -968,7 +968,7 @@ struct awaiter {
   }
 
   static bool await_termination(producer<T>& producer) {
-    do_nothing_consumer consumer;
+    do_nothing_consumer<T> consumer;
     return awaiter<T>::await_termination(producer, consumer);
   }
 };

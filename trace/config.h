@@ -41,7 +41,7 @@ static const std::set<std::string> LINUX_NET_STACK_FUNC_INDICATOR {
     "tcp_clear_retrans", "tcp_transmit_skb", "__tcp_transmit_skb", "tcp_v4_send_check", "__tcp_v4_send_check", "ip_queue_xmit",
     "__ip_queue_xmit", "ip_local_out", "__ip_local_out", "ip_output", "__ip_finish_output", "dev_queue_xmit", "__dev_queue_xmit",
     "skb_network_protocol", "eth_type_vlan", "netdev_start_xmit"
-};
+}; 
 
 static const std::set<std::string> I40E_DRIVER_FUNC_INDICATOR {
     "i40e_features_check", "i40e_lan_xmit_frame", "i40e_maybe_stop_tx", "vlan_get_protocol", "dma_map_single_attrs", "dma_map_page_attrs", 

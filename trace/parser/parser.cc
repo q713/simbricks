@@ -34,7 +34,7 @@ bool LogParser::parse_timestamp(uint64_t &timestamp) {
   if (!line_reader_.parse_uint_trim(10, timestamp)) {
 #ifdef PARSER_DEBUG_
     DFLOGERR("%s, could not parse string repr. of timestamp from line '%s'\n",
-             identifier_.c_str(), line_reader_.get_raw_line().c_str());
+             name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
     return false;
   }
@@ -45,7 +45,7 @@ bool LogParser::parse_address(uint64_t &address) {
   if (!line_reader_.parse_uint_trim(16, address)) {
 #ifdef PARSER_DEBUG_
     DFLOGERR("%s: could not parse address from line '%s'\n",
-             identifier_.c_str(), line_reader_.get_raw_line().c_str());
+             name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
     return false;
   }

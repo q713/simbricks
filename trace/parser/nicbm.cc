@@ -56,7 +56,7 @@ bool NicBmParser::parse_sync_info(bool &sync_pcie, bool &sync_eth) {
     if (!line_reader_.consume_and_trim_char('=')) {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               identifier_.c_str(), line_reader_.get_cur_string().c_str());
+               name_.c_str(), line_reader_.get_cur_string().c_str());
 #endif
       return false;
     }
@@ -68,7 +68,7 @@ bool NicBmParser::parse_sync_info(bool &sync_pcie, bool &sync_eth) {
     } else {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               identifier_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       return false;
     }
@@ -76,7 +76,7 @@ bool NicBmParser::parse_sync_info(bool &sync_pcie, bool &sync_eth) {
     if (!line_reader_.consume_and_trim_till_string("sync_eth")) {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: could not find sync_eth in line '%s'\n",
-               identifier_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       return false;
     }
@@ -84,7 +84,7 @@ bool NicBmParser::parse_sync_info(bool &sync_pcie, bool &sync_eth) {
     if (!line_reader_.consume_and_trim_char('=')) {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               identifier_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       return false;
     }
@@ -96,7 +96,7 @@ bool NicBmParser::parse_sync_info(bool &sync_pcie, bool &sync_eth) {
     } else {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               identifier_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       return false;
     }
@@ -113,7 +113,7 @@ bool NicBmParser::parse_mac_address(uint64_t &mac_address) {
   if (line_reader_.consume_and_trim_till_string("mac_addr")) {
     if (!line_reader_.consume_and_trim_char('=')) {
 #ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: mac_addr line '%s' has wrong format\n", identifier_.c_str(),
+      DFLOGERR("%s: mac_addr line '%s' has wrong format\n", name_.c_str(),
                line_reader_.get_raw_line().c_str());
 #endif
       return false;
@@ -132,7 +132,7 @@ bool NicBmParser::parse_off_len_val_comma(uint64_t &off, uint64_t &len,
   // parse off
   if (!line_reader_.consume_and_trim_till_string("off=0x")) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse off=0x in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse off=0x in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -145,7 +145,7 @@ bool NicBmParser::parse_off_len_val_comma(uint64_t &off, uint64_t &len,
   if (!line_reader_.consume_and_trim_till_string("len=") ||
       !line_reader_.parse_uint_trim(10, len)) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse len= in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse len= in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -154,7 +154,7 @@ bool NicBmParser::parse_off_len_val_comma(uint64_t &off, uint64_t &len,
   // parse val
   if (!line_reader_.consume_and_trim_till_string("val=0x")) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse off=0x in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse off=0x in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -172,7 +172,7 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   // parse op
   if (!line_reader_.consume_and_trim_till_string("op 0x")) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse op 0x in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse op 0x in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -184,7 +184,7 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   // parse addr
   if (!line_reader_.consume_and_trim_till_string("addr ")) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse addr in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse addr in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -197,7 +197,7 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   if (!line_reader_.consume_and_trim_till_string("len ") ||
       !line_reader_.parse_uint_trim(10, len)) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse len in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse len in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -211,7 +211,7 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   if (!line_reader_.consume_and_trim_till_string("pending ") ||
       !line_reader_.parse_uint_trim(10, pending)) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse pending in line '%s'\n", identifier_.c_str(),
+    DFLOGERR("%s: could not parse pending in line '%s'\n", name_.c_str(),
              line_reader_.get_raw_line().c_str());
 #endif
     return false;
@@ -227,7 +227,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
 
   if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not create reader\n", identifier_.c_str());
+    DFLOGERR("%s: could not create reader\n", name_.c_str());
 #endif
     co_return;
   }
@@ -242,7 +242,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
       co_return;
     }
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGIN("%s: found mac_addr=%lx\n", identifier_.c_str(), mac_address);
+    DFLOGIN("%s: found mac_addr=%lx\n", name_.c_str(), mac_address);
 #endif
   }
   if (line_reader_.next_line()) {
@@ -250,7 +250,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
       co_return;
     }
 #ifdef PARSER_DEBUG_NICBM_
-    DFLOGIN("%s: found sync_pcie=%d sync_eth=%d\n", identifier_.c_str(),
+    DFLOGIN("%s: found sync_pcie=%d sync_eth=%d\n", name_.c_str(),
             sync_pci, sync_eth);
 #endif
   }
@@ -264,14 +264,14 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
             "exit main_time")) {  // end of event loop
                                   // TODO: may parse nic statistics as well
 #ifdef PARSER_DEBUG_NICBM_
-      DFLOGIN("%s: found exit main_time %s\n", identifier_.c_str(),
+      DFLOGIN("%s: found exit main_time %s\n", name_.c_str(),
               line_reader_.get_raw_line().c_str());
 #endif
       continue;
     } else if (line_reader_.consume_and_trim_till_string(
                    "poll_h2d: peer terminated")) {
 #ifdef PARSER_DEBUG_NICBM_
-      DFLOGIN("%s: found poll_h2d: peer terminated\n", identifier_.c_str());
+      DFLOGIN("%s: found poll_h2d: peer terminated\n", name_.c_str());
 #endif
       continue;
     }
@@ -281,7 +281,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
             "main_time")) {  // main parsing
       if (!line_reader_.consume_and_trim_string(" = ")) {
 #ifdef PARSER_DEBUG_NICBM_
-        DFLOGERR("%s: main line '%s' has wrong format\n", identifier_.c_str(),
+        DFLOGERR("%s: main line '%s' has wrong format\n", name_.c_str(),
                  line_reader_.get_raw_line().c_str());
 #endif
         continue;
@@ -290,7 +290,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
       if (!parse_timestamp(timestamp)) {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: could not parse timestamp in line '%s'",
-                 identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         continue;
       }
@@ -298,7 +298,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
       if (!line_reader_.consume_and_trim_till_string("nicbm")) {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: line '%s' has wrong format for parsing event info",
-                 identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         continue;
       }
@@ -307,7 +307,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        event_ptr = std::make_shared<NicMmioR>(timestamp, this, off, len, val);
+        event_ptr = std::make_shared<NicMmioR>(timestamp, getIdent(), getName(), off, len, val);
         co_await tar_chan->write(event_ptr);
         continue;
 
@@ -315,7 +315,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!parse_off_len_val_comma(off, len, val)) {
           continue;
         }
-        event_ptr = std::make_shared<NicMmioW>(timestamp, this, off, len, val);
+        event_ptr = std::make_shared<NicMmioW>(timestamp, getIdent(), getName(), off, len, val);
         co_await tar_chan->write(event_ptr);
         continue;
 
@@ -323,7 +323,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        event_ptr = std::make_shared<NicDmaI>(timestamp, this, op, addr, len);
+        event_ptr = std::make_shared<NicDmaI>(timestamp, getIdent(), getName(), op, addr, len);
         co_await tar_chan->write(event_ptr);
         continue;
 
@@ -331,7 +331,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        event_ptr = std::make_shared<NicDmaEx>(timestamp, this, op, addr, len);
+        event_ptr = std::make_shared<NicDmaEx>(timestamp, getIdent(), getName(), op, addr, len);
         co_await tar_chan->write(event_ptr);
         continue;
 
@@ -339,7 +339,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!parse_op_addr_len_pending(op, addr, len, pending, true)) {
           continue;
         }
-        event_ptr = std::make_shared<NicDmaEn>(timestamp, this, op, addr, len);
+        event_ptr = std::make_shared<NicDmaEn>(timestamp, getIdent(), getName(), op, addr, len);
         co_await tar_chan->write(event_ptr);
         continue;
 
@@ -348,13 +348,13 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
-          event_ptr = std::make_shared<NicDmaCR>(timestamp, this, op, addr, len);
+          event_ptr = std::make_shared<NicDmaCR>(timestamp, getIdent(), getName(), op, addr, len);
           co_await tar_chan->write(event_ptr);
         } else if (line_reader_.consume_and_trim_till_string("write")) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
-          event_ptr = std::make_shared<NicDmaCW>(timestamp, this, op, addr, len);
+          event_ptr = std::make_shared<NicDmaCW>(timestamp, getIdent(), getName(), op, addr, len);
           co_await tar_chan->write(event_ptr);
         }
         continue;
@@ -372,7 +372,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!line_reader_.parse_uint_trim(10, vec)) {
           continue;
         }
-        event_ptr = std::make_shared<NicMsix>(timestamp, this, vec, isX);
+        event_ptr = std::make_shared<NicMsix>(timestamp, getIdent(), getName(), vec, isX);
         co_await tar_chan->write(event_ptr);
         continue;
 
@@ -381,7 +381,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           if (!line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
-          event_ptr = std::make_shared<NicTx>(timestamp, this, len);
+          event_ptr = std::make_shared<NicTx>(timestamp, getIdent(), getName(), len);
           co_await tar_chan->write(event_ptr);
           continue;
 
@@ -391,7 +391,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
             || !line_reader_.parse_uint_trim(10, len)) {
             continue;
           }
-          event_ptr = std::make_shared<NicRx>(timestamp, this, port, len);
+          event_ptr = std::make_shared<NicRx>(timestamp, getIdent(), getName(), port, len);
           co_await tar_chan->write(event_ptr);
         }
         continue;
@@ -400,7 +400,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
         if (!parse_address(addr)) {
           continue;
         }
-        event_ptr = std::make_shared<SetIX>(timestamp, this, addr);
+        event_ptr = std::make_shared<SetIX>(timestamp, getIdent(), getName(), addr);
         co_await tar_chan->write(event_ptr);
         continue;
         
@@ -411,13 +411,13 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
       } else {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: line '%s' did not match any expected main line\n",
-                 identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         continue;
       }
     } else {
 #ifdef PARSER_DEBUG_NICBM_
-      DFLOGWARN("%s: could not parse given line '%s'\n", identifier_.c_str(),
+      DFLOGWARN("%s: could not parse given line '%s'\n", name_.c_str(),
                 line_reader_.get_raw_line().c_str());
 #endif
       continue;

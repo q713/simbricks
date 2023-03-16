@@ -712,10 +712,6 @@ struct trace {
   bool has_events_ = false;
   std::list<pack_t> finished_packs_;
 
-  // TODO: at which point do we need to finish the trace?! -> no pending mmio
-  // and dma + send and received, but how many do we expect, especially when on
-  // receiver site
-  // TODO: how many dma
   std::list<callp_t> pending_call_packs_;
   bool found_host_tx_ = false;
   bool found_host_rx_ = false;
@@ -723,8 +719,7 @@ struct trace {
   std::list<mmiop_t> pending_mmio_packs_;
   size_t at_least_still_expected_mmio_ = 0;
   std::list<dmap_t> pending_dma_packs_;
-  bool found_nic_tx_ = false;  // TODO: after transimt, expect an mmio that
-                               // notices host about send
+  bool found_nic_tx_ = false; 
   bool found_nic_rx_ = false;
 
   /*
@@ -882,20 +877,6 @@ at_least_still_expected_mmio_ != 0*/
       if (pack->is_receiving()) {
         found_host_rx_ = true;
       }
-      /*
-      TODO:
-
-      nic driver func=i40e_maybe_stop_tx = transimt data
-      -> expect mmio -> expect dma register read from device
-      -> expect dma data read from device
-      -> expect dma reads till NicTx
-      -> expect Nic dma write to host to indicate data was send
-
-      NicMsix event, we have an interrupt from nic in host
-      -> expect host to handle this -> expect mmio -> these may be multiple mmio
-      events
-
-      */
 
       // remove mmio packs after pci_msix_desc_addr
       if (not call_pack::is_pci_msix_desc_addr(event_ptr)) {

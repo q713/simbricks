@@ -84,7 +84,9 @@ class Event {
 
  public:
   uint64_t timestamp_;
-  LogParser *src_;
+  const size_t parser_identifier_;
+  // TODO: optimize string name out in later versions
+  const std::string parser_name_;
 
   const std::string &getName() {
     return name_;
@@ -97,8 +99,14 @@ class Event {
   virtual void display(std::ostream &os);
 
  protected:
-  explicit Event(uint64_t ts, LogParser *src, EventType type, std::string name)
-      : type_(type), name_(std::move(name)), timestamp_(ts), src_(src) {
+  explicit Event(uint64_t ts, const size_t parser_identifier,
+                 const std::string parser_name, EventType type,
+                 std::string name)
+      : type_(type),
+        name_(std::move(name)),
+        timestamp_(ts),
+        parser_identifier_(parser_identifier),
+        parser_name_(std::move(parser_name)) {
   }
 
   virtual ~Event() = default;
@@ -107,8 +115,10 @@ class Event {
 /* Simbricks Events */
 class SimSendSync : public Event {
  public:
-  explicit SimSendSync(uint64_t ts, LogParser *src)
-      : Event(ts, src, EventType::SimSendSync_t, "SimSendSyncSimSendSync") {
+  explicit SimSendSync(uint64_t ts, const size_t parser_identifier,
+                       const std::string parser_name)
+      : Event(ts, parser_identifier, parser_name, EventType::SimSendSync_t,
+              "SimSendSyncSimSendSync") {
   }
 
   ~SimSendSync() = default;
@@ -118,8 +128,10 @@ class SimSendSync : public Event {
 
 class SimProcInEvent : public Event {
  public:
-  explicit SimProcInEvent(uint64_t ts, LogParser *src)
-      : Event(ts, src, EventType::SimProcInEvent_t, "SimProcInEvent") {
+  explicit SimProcInEvent(uint64_t ts, const size_t parser_identifier,
+                          const std::string parser_name)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::SimProcInEvent_t, "SimProcInEvent") {
   }
 
   ~SimProcInEvent() = default;
@@ -133,13 +145,17 @@ class HostInstr : public Event {
  public:
   uint64_t pc_;
 
-  HostInstr(uint64_t ts, LogParser *src, uint64_t pc)
-      : Event(ts, src, EventType::HostInstr_t, "HostInstr"), pc_(pc) {
+  HostInstr(uint64_t ts, const size_t parser_identifier,
+            const std::string parser_name, uint64_t pc)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostInstr_t, "HostInstr"),
+        pc_(pc) {
   }
 
-  HostInstr(uint64_t ts, LogParser *src, uint64_t pc, EventType type,
-            std::string name)
-      : Event(ts, src, type, name), pc_(pc) {
+  HostInstr(uint64_t ts, size_t parser_identifier, std::string parser_name,
+            uint64_t pc, EventType type, std::string name)
+      : Event(ts, parser_identifier, std::move(parser_name), type, name),
+        pc_(pc) {
   }
 
   virtual ~HostInstr() = default;
@@ -152,9 +168,11 @@ class HostCall : public HostInstr {
   const std::string func_;
   const std::string comp_;
 
-  explicit HostCall(uint64_t ts, LogParser *src, uint64_t pc,
+  explicit HostCall(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, uint64_t pc,
                     const std::string func, const std::string comp)
-      : HostInstr(ts, src, pc, EventType::HostCall_t, "HostCall"),
+      : HostInstr(ts, parser_identifier, std::move(parser_name), pc,
+                  EventType::HostCall_t, "HostCall"),
         func_(std::move(func)),
         comp_(std::move(comp)) {
   }
@@ -166,8 +184,10 @@ class HostCall : public HostInstr {
 
 class HostMmioImRespPoW : public Event {
  public:
-  explicit HostMmioImRespPoW(uint64_t ts, LogParser *src)
-      : Event(ts, src, EventType::HostMmioImRespPoW_t, "HostMmioImRespPoW") {
+  explicit HostMmioImRespPoW(uint64_t ts, const size_t parser_identifier,
+                             const std::string parser_name)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostMmioImRespPoW_t, "HostMmioImRespPoW") {
   }
 
   ~HostMmioImRespPoW() = default;
@@ -182,9 +202,12 @@ class HostIdOp : public Event {
   void display(std::ostream &os) override;
 
  protected:
-  explicit HostIdOp(uint64_t ts, LogParser *src, EventType type,
+  explicit HostIdOp(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, EventType type,
                     std::string name, uint64_t id)
-      : Event(ts, src, type, std::move(name)), id_(id) {
+      : Event(ts, parser_identifier, std::move(parser_name), type,
+              std::move(name)),
+        id_(id) {
   }
 
   virtual ~HostIdOp() = default;
@@ -192,8 +215,10 @@ class HostIdOp : public Event {
 
 class HostMmioCR : public HostIdOp {
  public:
-  explicit HostMmioCR(uint64_t ts, LogParser *src, uint64_t id)
-      : HostIdOp(ts, src, EventType::HostMmioCR_t, "HostMmioCR", id) {
+  explicit HostMmioCR(uint64_t ts, const size_t parser_identifier,
+                      const std::string parser_name, uint64_t id)
+      : HostIdOp(ts, parser_identifier, std::move(parser_name),
+                 EventType::HostMmioCR_t, "HostMmioCR", id) {
   }
 
   ~HostMmioCR() = default;
@@ -202,8 +227,10 @@ class HostMmioCR : public HostIdOp {
 };
 class HostMmioCW : public HostIdOp {
  public:
-  explicit HostMmioCW(uint64_t ts, LogParser *src, uint64_t id)
-      : HostIdOp(ts, src, EventType::HostMmioCW_t, "HostMmioCW", id) {
+  explicit HostMmioCW(uint64_t ts, const size_t parser_identifier,
+                      const std::string parser_name, uint64_t id)
+      : HostIdOp(ts, parser_identifier, std::move(parser_name),
+                 EventType::HostMmioCW_t, "HostMmioCW", id) {
   }
 
   ~HostMmioCW() = default;
@@ -219,10 +246,14 @@ class HostAddrSizeOp : public HostIdOp {
   void display(std::ostream &os) override;
 
  protected:
-  explicit HostAddrSizeOp(uint64_t ts, LogParser *src, EventType type,
+  explicit HostAddrSizeOp(uint64_t ts, const size_t parser_identifier,
+                          const std::string parser_name, EventType type,
                           std::string name, uint64_t id, uint64_t addr,
                           uint64_t size)
-      : HostIdOp(ts, src, type, std::move(name), id), addr_(addr), size_(size) {
+      : HostIdOp(ts, parser_identifier, std::move(parser_name), type,
+                 std::move(name), id),
+        addr_(addr),
+        size_(size) {
   }
 
   virtual ~HostAddrSizeOp() = default;
@@ -230,10 +261,11 @@ class HostAddrSizeOp : public HostIdOp {
 
 class HostMmioR : public HostAddrSizeOp {
  public:
-  explicit HostMmioR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  explicit HostMmioR(uint64_t ts, const size_t parser_identifier,
+                     const std::string parser_name, uint64_t id, uint64_t addr,
                      uint64_t size)
-      : HostAddrSizeOp(ts, src, EventType::HostMmioR_t, "HostMmioR", id, addr,
-                       size) {
+      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name),
+                       EventType::HostMmioR_t, "HostMmioR", id, addr, size) {
   }
 
   ~HostMmioR() = default;
@@ -243,10 +275,11 @@ class HostMmioR : public HostAddrSizeOp {
 
 class HostMmioW : public HostAddrSizeOp {
  public:
-  explicit HostMmioW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  explicit HostMmioW(uint64_t ts, const size_t parser_identifier,
+                     const std::string parser_name, uint64_t id, uint64_t addr,
                      uint64_t size)
-      : HostAddrSizeOp(ts, src, EventType::HostMmioW_t, "HostMmioW", id, addr,
-                       size) {
+      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name),
+                       EventType::HostMmioW_t, "HostMmioW", id, addr, size) {
   }
 
   ~HostMmioW() = default;
@@ -256,8 +289,10 @@ class HostMmioW : public HostAddrSizeOp {
 
 class HostDmaC : public HostIdOp {
  public:
-  explicit HostDmaC(uint64_t ts, LogParser *src, uint64_t id)
-      : HostIdOp(ts, src, EventType::HostDmaC_t, "HostDmaC", id) {
+  explicit HostDmaC(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, uint64_t id)
+      : HostIdOp(ts, parser_identifier, std::move(parser_name),
+                 EventType::HostDmaC_t, "HostDmaC", id) {
   }
 
   ~HostDmaC() = default;
@@ -267,10 +302,11 @@ class HostDmaC : public HostIdOp {
 
 class HostDmaR : public HostAddrSizeOp {
  public:
-  explicit HostDmaR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  explicit HostDmaR(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, uint64_t id, uint64_t addr,
                     uint64_t size)
-      : HostAddrSizeOp(ts, src, EventType::HostDmaR_t, "HostDmaR", id, addr,
-                       size) {
+      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name),
+                       EventType::HostDmaR_t, "HostDmaR", id, addr, size) {
   }
 
   ~HostDmaR() = default;
@@ -280,10 +316,11 @@ class HostDmaR : public HostAddrSizeOp {
 
 class HostDmaW : public HostAddrSizeOp {
  public:
-  explicit HostDmaW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  explicit HostDmaW(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, uint64_t id, uint64_t addr,
                     uint64_t size)
-      : HostAddrSizeOp(ts, src, EventType::HostDmaW_t, "HostDmaW", id, addr,
-                       size) {
+      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name),
+                       EventType::HostDmaW_t, "HostDmaW", id, addr, size) {
   }
 
   ~HostDmaW() = default;
@@ -295,8 +332,11 @@ class HostMsiX : public Event {
  public:
   uint64_t vec_;
 
-  explicit HostMsiX(uint64_t ts, LogParser *src, uint64_t vec)
-      : Event(ts, src, EventType::HostMsiX_t, "HostMsiX"), vec_(vec) {
+  explicit HostMsiX(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, uint64_t vec)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostMsiX_t, "HostMsiX"),
+        vec_(vec) {
   }
 
   ~HostMsiX() = default;
@@ -313,9 +353,11 @@ class HostConf : public Event {
   uint64_t data_;
   bool is_read_;
 
-  explicit HostConf(uint64_t ts, LogParser *src, uint64_t dev, uint64_t func,
+  explicit HostConf(uint64_t ts, const size_t parser_identifier,
+                    const std::string parser_name, uint64_t dev, uint64_t func,
                     uint64_t reg, uint64_t bytes, uint64_t data, bool is_read)
-      : Event(ts, src, EventType::HostConf_t,
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostConf_t,
               is_read ? "HostConfRead" : "HostConfWrite"),
         dev_(dev),
         func_(func),
@@ -332,8 +374,10 @@ class HostConf : public Event {
 
 class HostClearInt : public Event {
  public:
-  explicit HostClearInt(uint64_t ts, LogParser *src)
-      : Event(ts, src, EventType::HostClearInt_t, "HostClearInt") {
+  explicit HostClearInt(uint64_t ts, const size_t parser_identifier,
+                        const std::string parser_name)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostClearInt_t, "HostClearInt") {
   }
 
   ~HostClearInt() = default;
@@ -343,8 +387,10 @@ class HostClearInt : public Event {
 
 class HostPostInt : public Event {
  public:
-  explicit HostPostInt(uint64_t ts, LogParser *src)
-      : Event(ts, src, EventType::HostPostInt_t, "HostPostInt") {
+  explicit HostPostInt(uint64_t ts, const size_t parser_identifier,
+                       const std::string parser_name)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostPostInt_t, "HostPostInt") {
   }
 
   ~HostPostInt() = default;
@@ -358,10 +404,11 @@ class HostPciRW : public Event {
   uint64_t size_;
   bool is_read_;
 
-  explicit HostPciRW(uint64_t ts, LogParser *src, uint64_t offset,
+  explicit HostPciRW(uint64_t ts, const size_t parser_identifier,
+                     const std::string parser_name, uint64_t offset,
                      uint64_t size, bool is_read)
-      : Event(ts, src, EventType::HostPciRW_t,
-              is_read ? "HostPciR" : "HostPciW"),
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::HostPciRW_t, is_read ? "HostPciR" : "HostPciW"),
         offset_(offset),
         size_(size),
         is_read_(is_read) {
@@ -378,8 +425,10 @@ class NicMsix : public Event {
   uint16_t vec_;
   bool isX_;
 
-  NicMsix(uint64_t ts, LogParser *src, uint16_t vec, bool isX)
-      : Event(ts, src, EventType::NicMsix_t, isX ? "NicMsix" : "NicMsi"),
+  NicMsix(uint64_t ts, const size_t parser_identifier,
+          const std::string parser_name, uint16_t vec, bool isX)
+      : Event(ts, parser_identifier, std::move(parser_name),
+              EventType::NicMsix_t, isX ? "NicMsix" : "NicMsi"),
         vec_(vec),
         isX_(isX) {
   }
@@ -398,9 +447,14 @@ class NicDma : public Event {
   void display(std::ostream &os) override;
 
  protected:
-  NicDma(uint64_t ts, LogParser *src, EventType type, std::string name,
+  NicDma(uint64_t ts, const size_t parser_identifier,
+         const std::string parser_name, EventType type, std::string name,
          uint64_t id, uint64_t addr, uint64_t len)
-      : Event(ts, src, type, std::move(name)), id_(id), addr_(addr), len_(len) {
+      : Event(ts, parser_identifier, std::move(parser_name), type,
+              std::move(name)),
+        id_(id),
+        addr_(addr),
+        len_(len) {
   }
 
   virtual ~NicDma() = default;
@@ -410,8 +464,11 @@ class SetIX : public Event {
  public:
   uint64_t intr_;
 
-  SetIX(uint64_t ts, LogParser *src, uint64_t intr)
-      : Event(ts, src, EventType::SetIX_t, "SetIX"), intr_(intr) {
+  SetIX(uint64_t ts, const size_t parser_identifier,
+        const std::string parser_name, uint64_t intr)
+      : Event(ts, parser_identifier, std::move(parser_name), EventType::SetIX_t,
+              "SetIX"),
+        intr_(intr) {
   }
 
   ~SetIX() = default;
@@ -421,8 +478,11 @@ class SetIX : public Event {
 
 class NicDmaI : public NicDma {
  public:
-  NicDmaI(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr, uint64_t len)
-      : NicDma(ts, src, EventType::NicDmaI_t, "NicDmaI", id, addr, len) {
+  NicDmaI(uint64_t ts, const size_t parser_identifier,
+          const std::string parser_name, uint64_t id, uint64_t addr,
+          uint64_t len)
+      : NicDma(ts, parser_identifier, std::move(parser_name),
+               EventType::NicDmaI_t, "NicDmaI", id, addr, len) {
   }
 
   ~NicDmaI() = default;
@@ -432,9 +492,11 @@ class NicDmaI : public NicDma {
 
 class NicDmaEx : public NicDma {
  public:
-  NicDmaEx(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaEx(uint64_t ts, const size_t parser_identifier,
+           const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, EventType::NicDmaEx_t, "NicDmaEx", id, addr, len) {
+      : NicDma(ts, parser_identifier, std::move(parser_name),
+               EventType::NicDmaEx_t, "NicDmaEx", id, addr, len) {
   }
 
   ~NicDmaEx() = default;
@@ -444,9 +506,11 @@ class NicDmaEx : public NicDma {
 
 class NicDmaEn : public NicDma {
  public:
-  NicDmaEn(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaEn(uint64_t ts, const size_t parser_identifier,
+           const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, EventType::NicDmaEn_t, "NicDmaEn", id, addr, len) {
+      : NicDma(ts, parser_identifier, std::move(parser_name),
+               EventType::NicDmaEn_t, "NicDmaEn", id, addr, len) {
   }
 
   ~NicDmaEn() = default;
@@ -456,9 +520,11 @@ class NicDmaEn : public NicDma {
 
 class NicDmaCR : public NicDma {
  public:
-  NicDmaCR(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaCR(uint64_t ts, const size_t parser_identifier,
+           const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, EventType::NicDmaCR_t, "NicDmaCR", id, addr, len) {
+      : NicDma(ts, parser_identifier, std::move(parser_name),
+               EventType::NicDmaCR_t, "NicDmaCR", id, addr, len) {
   }
 
   ~NicDmaCR() = default;
@@ -468,9 +534,11 @@ class NicDmaCR : public NicDma {
 
 class NicDmaCW : public NicDma {
  public:
-  NicDmaCW(uint64_t ts, LogParser *src, uint64_t id, uint64_t addr,
+  NicDmaCW(uint64_t ts, const size_t parser_identifier,
+           const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
-      : NicDma(ts, src, EventType::NicDmaCW_t, "NicDmaCW", id, addr, len) {
+      : NicDma(ts, parser_identifier, std::move(parser_name),
+               EventType::NicDmaCW_t, "NicDmaCW", id, addr, len) {
   }
 
   ~NicDmaCW() = default;
@@ -487,9 +555,14 @@ class NicMmio : public Event {
   virtual void display(std::ostream &os) override;
 
  protected:
-  NicMmio(uint64_t ts, LogParser *src, EventType type, std::string name,
+  NicMmio(uint64_t ts, const size_t parser_identifier,
+          const std::string parser_name, EventType type, std::string name,
           uint64_t off, uint64_t len, uint64_t val)
-      : Event(ts, src, type, std::move(name)), off_(off), len_(len), val_(val) {
+      : Event(ts, parser_identifier, std::move(parser_name), type,
+              std::move(name)),
+        off_(off),
+        len_(len),
+        val_(val) {
   }
 
   virtual ~NicMmio() = default;
@@ -497,9 +570,11 @@ class NicMmio : public Event {
 
 class NicMmioR : public NicMmio {
  public:
-  NicMmioR(uint64_t ts, LogParser *src, uint64_t off, uint64_t len,
+  NicMmioR(uint64_t ts, const size_t parser_identifier,
+           const std::string parser_name, uint64_t off, uint64_t len,
            uint64_t val)
-      : NicMmio(ts, src, EventType::NicMmioR_t, "NicMmioR", off, len, val) {
+      : NicMmio(ts, parser_identifier, std::move(parser_name),
+                EventType::NicMmioR_t, "NicMmioR", off, len, val) {
   }
 
   ~NicMmioR() = default;
@@ -509,9 +584,11 @@ class NicMmioR : public NicMmio {
 
 class NicMmioW : public NicMmio {
  public:
-  NicMmioW(uint64_t ts, LogParser *src, uint64_t off, uint64_t len,
+  NicMmioW(uint64_t ts, const size_t parser_identifier,
+           const std::string parser_name, uint64_t off, uint64_t len,
            uint64_t val)
-      : NicMmio(ts, src, EventType::NicMmioW_t, "NicMmioW", off, len, val) {
+      : NicMmio(ts, parser_identifier, std::move(parser_name),
+                EventType::NicMmioW_t, "NicMmioW", off, len, val) {
   }
 
   ~NicMmioW() = default;
@@ -526,9 +603,12 @@ class NicTrx : public Event {
   void display(std::ostream &os) override;
 
  protected:
-  NicTrx(uint64_t ts, LogParser *src, EventType type, std::string name,
+  NicTrx(uint64_t ts, const size_t parser_identifier,
+         const std::string parser_name, EventType type, std::string name,
          uint16_t len)
-      : Event(ts, src, type, std::move(name)), len_(len) {
+      : Event(ts, parser_identifier, std::move(parser_name), type,
+              std::move(name)),
+        len_(len) {
   }
 
   virtual ~NicTrx() = default;
@@ -536,8 +616,10 @@ class NicTrx : public Event {
 
 class NicTx : public NicTrx {
  public:
-  NicTx(uint64_t ts, LogParser *src, uint16_t len)
-      : NicTrx(ts, src, EventType::NicTx_t, "NicTx", len) {
+  NicTx(uint64_t ts, const size_t parser_identifier,
+        const std::string parser_name, uint16_t len)
+      : NicTrx(ts, parser_identifier, std::move(parser_name),
+               EventType::NicTx_t, "NicTx", len) {
   }
 
   ~NicTx() = default;
@@ -549,8 +631,11 @@ class NicRx : public NicTrx {
   uint64_t port_;
 
  public:
-  NicRx(uint64_t ts, LogParser *src, uint64_t port, uint16_t len)
-      : NicTrx(ts, src, EventType::NicRx_t, "NicRx", len), port_(port) {
+  NicRx(uint64_t ts, const size_t parser_identifier,
+        const std::string parser_name, uint64_t port, uint16_t len)
+      : NicTrx(ts, parser_identifier, std::move(parser_name),
+               EventType::NicRx_t, "NicRx", len),
+        port_(port) {
   }
 
   ~NicRx() = default;
@@ -567,7 +652,8 @@ class EventPrinter : public sim::coroutine::consumer<std::shared_ptr<Event>> {
   std::ostream &out_;
 
  public:
-  EventPrinter(std::ostream &out) : out_(out) {}
+  EventPrinter(std::ostream &out) : out_(out) {
+  }
 
   sim::coroutine::task<void> consume(
       sim::coroutine::unbuffered_single_chan<std::shared_ptr<Event>> *src_chan)

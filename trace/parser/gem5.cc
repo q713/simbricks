@@ -34,9 +34,9 @@ event_t Gem5Parser::parse_global_event(uint64_t timestamp) {
   if (line_reader_.consume_and_trim_till_string("simbricks:")) {
     line_reader_.trimL();
     if (line_reader_.consume_and_trim_string("processInEvent")) {
-      return std::make_shared<SimProcInEvent>(timestamp, this);
+      return std::make_shared<SimProcInEvent>(timestamp, getIdent(), getName());
     } else if (line_reader_.consume_and_trim_string("sending sync message")) {
-      return std::make_shared<SimSendSync>(timestamp, this);
+      return std::make_shared<SimSendSync>(timestamp, getIdent(), getName());
     }
   }
   return nullptr;
@@ -52,7 +52,7 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
       !line_reader_.parse_uint_trim(16, addr)) {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGWARN("%s: could not parse address from line '%s'\n",
-              identifier_.c_str(), line_reader_.get_raw_line().c_str());
+              name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
     return nullptr;
   }
@@ -83,9 +83,9 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
 
   if (line_reader_.consume_and_trim_char('.')) {
     // TODO: gather micro operation information? if yes, which informations?
-    return std::make_shared<HostInstr>(timestamp, this, addr);
+    return std::make_shared<HostInstr>(timestamp, getIdent(), getName(), addr);
   } else if (not symbol.empty()) {
-    return std::make_shared<HostCall>(timestamp, this, addr, symbol, comp);
+    return std::make_shared<HostCall>(timestamp, getIdent(), getName(), addr, symbol, comp);
   }
   
   return nullptr;
@@ -102,7 +102,7 @@ event_t Gem5Parser::parse_system_pc_pci_host(uint64_t timestamp) {
     if (line_reader_.parse_uint_trim(16, offset) &&
         line_reader_.consume_and_trim_string(", size=0x") &&
         line_reader_.parse_uint_trim(16, size)) {
-      return std::make_shared<HostPciRW>(timestamp, this, offset, size, is_read);
+      return std::make_shared<HostPciRW>(timestamp, getIdent(), getName(), offset, size, is_read);
     }
   }
 
@@ -120,9 +120,9 @@ event_t Gem5Parser::parse_system_pc_pci_host_interface(uint64_t timestamp) {
   line_reader_.trimL();
 
   if (line_reader_.consume_and_trim_string("clearInt")) {
-    return std::make_shared<HostClearInt>(timestamp, this);
+    return std::make_shared<HostClearInt>(timestamp, getIdent(), getName());
   } else if (line_reader_.consume_and_trim_string("postInt")) {
-    return std::make_shared<HostPostInt>(timestamp, this);
+    return std::make_shared<HostPostInt>(timestamp, getIdent(), getName());
   }
 
   return nullptr;
@@ -158,10 +158,10 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
         line_reader_.consume_and_trim_string(" bytes: data = ")) {
       if (line_reader_.consume_and_trim_string("0x") &&
           line_reader_.parse_uint_trim(16, data)) {
-        return std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes,
+        return std::make_shared<HostConf>(timestamp, getIdent(), getName(), dev, func, reg, bytes,
                                         data, is_readConf);
       } else if (line_reader_.consume_and_trim_char('0')) {
-        return std::make_shared<HostConf>(timestamp, this, dev, func, reg, bytes,
+        return std::make_shared<HostConf>(timestamp, getIdent(), getName(), dev, func, reg, bytes,
                                         0, is_readConf);
       }
     }
@@ -172,11 +172,11 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
       if (line_reader_.consume_and_trim_string("write ") &&
           line_reader_.consume_and_trim_string("completion id ") &&
           line_reader_.parse_uint_trim(10, id)) {
-        return std::make_shared<HostMmioCW>(timestamp, this, id);
+        return std::make_shared<HostMmioCW>(timestamp, getIdent(), getName(), id);
       } else if (line_reader_.consume_and_trim_string("read ") &&
                  line_reader_.consume_and_trim_string("completion id ") &&
                  line_reader_.parse_uint_trim(10, id)) {
-        return std::make_shared<HostMmioCR>(timestamp, this, id);
+        return std::make_shared<HostMmioCR>(timestamp, getIdent(), getName(), id);
       } else if (line_reader_.consume_and_trim_string("DMA ")) {
         if (line_reader_.consume_and_trim_string("write id ") &&
             line_reader_.parse_uint_trim(10, id) &&
@@ -184,18 +184,18 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
             line_reader_.parse_uint_trim(16, addr) &&
             line_reader_.consume_and_trim_string(" size ") &&
             line_reader_.parse_uint_trim(10, size)) {
-          return std::make_shared<HostDmaW>(timestamp, this, id, addr, size);
+          return std::make_shared<HostDmaW>(timestamp, getIdent(), getName(), id, addr, size);
         } else if (line_reader_.consume_and_trim_string("read id ") &&
                    line_reader_.parse_uint_trim(10, id) &&
                    line_reader_.consume_and_trim_string(" addr ") &&
                    line_reader_.parse_uint_trim(16, addr) &&
                    line_reader_.consume_and_trim_string(" size ") &&
                    line_reader_.parse_uint_trim(10, size)) {
-          return std::make_shared<HostDmaR>(timestamp, this, id, addr, size);
+          return std::make_shared<HostDmaR>(timestamp, getIdent(), getName(), id, addr, size);
         }
       } else if (line_reader_.consume_and_trim_till_string("MSI-X intr vec ") &&
                  line_reader_.parse_uint_trim(10, vec)) {
-        return std::make_shared<HostMsiX>(timestamp, this, vec);
+        return std::make_shared<HostMsiX>(timestamp, getIdent(), getName(), vec);
       }
 
     } else if (line_reader_.consume_and_trim_string("sending ")) {
@@ -206,7 +206,7 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
         isReadWrite = -1;
       } else if (line_reader_.consume_and_trim_string(
                      "immediate response for posted write")) {
-        return std::make_shared<HostMmioImRespPoW>(timestamp, this);
+        return std::make_shared<HostMmioImRespPoW>(timestamp, getIdent(), getName());
       }
 
       if (isReadWrite != 0 && line_reader_.parse_uint_trim(16, addr) &&
@@ -215,14 +215,14 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
           line_reader_.consume_and_trim_string(" id ") &&
           line_reader_.parse_uint_trim(10, id)) {
         if (isReadWrite == 1) {
-          return std::make_shared<HostMmioR>(timestamp, this, id, addr, size);
+          return std::make_shared<HostMmioR>(timestamp, getIdent(), getName(), id, addr, size);
         } else {
-          return std::make_shared<HostMmioW>(timestamp, this, id, addr, size);
+          return std::make_shared<HostMmioW>(timestamp, getIdent(), getName(), id, addr, size);
         }
       }
     } else if (line_reader_.consume_and_trim_string("completed DMA id ") &&
                line_reader_.parse_uint_trim(10, id)) {
-      return std::make_shared<HostDmaC>(timestamp, this, id);
+      return std::make_shared<HostDmaC>(timestamp, getIdent(), getName(), id);
     }
     // sending immediate response for posted write
   }
@@ -234,9 +234,9 @@ event_t Gem5Parser::parse_simbricks_event(uint64_t timestamp) {
   if (line_reader_.consume_and_trim_char(':')) {
     line_reader_.trimL();
     if (line_reader_.consume_and_trim_string("processInEvent")) {
-      return std::make_shared<SimProcInEvent>(timestamp, this);
+      return std::make_shared<SimProcInEvent>(timestamp, getIdent(), getName());
     } else if (line_reader_.consume_and_trim_string("sending sync message")) {
-      return std::make_shared<SimSendSync>(timestamp, this);
+      return std::make_shared<SimSendSync>(timestamp, getIdent(), getName());
     }
   }
 
@@ -251,7 +251,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
 
   if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_GEM5_
-    DFLOGERR("%s: could not create reader\n", identifier_.c_str());
+    DFLOGERR("%s: could not create reader\n", name_.c_str());
 #endif
     co_return;
   }
@@ -263,7 +263,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
     if (!parse_timestamp(timestamp)) {
 #ifdef PARSER_DEBUG_GEM5_
       DFLOGWARN("%s: could not parse timestamp from line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -279,7 +279,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
       if (!event_ptr || !co_await tar_chan->write(event_ptr)) {
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN("%s: could not parse global event from line '%s'\n",
-                  identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                  name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       }
       continue;
@@ -290,7 +290,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN(
             "%s: could not parse system.switch_cpus event from line '%s'\n",
-            identifier_.c_str(), line_reader_.get_raw_line().c_str());
+            name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       }
       continue;
@@ -305,7 +305,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
             DFLOGWARN(
                 "%s: could not parse system.pc.pci_host.interface event from "
                 "line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
           }
           continue;
@@ -316,7 +316,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
             DFLOGWARN(
                 "%s: could not parse system.pc.pci_host event from "
                 "line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
           }
           continue;
@@ -329,7 +329,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
           DFLOGWARN(
               "%s: could not parse system.pc.simbricks event from line "
               "'%s'\n",
-              identifier_.c_str(), line_reader_.get_raw_line().c_str());
+              name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         }
         continue;
@@ -337,7 +337,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
     }
 
 #ifdef PARSER_DEBUG_GEM5_
-    DFLOGWARN("%s: could not parse event in line '%s'\n", identifier_.c_str(),
+    DFLOGWARN("%s: could not parse event in line '%s'\n", name_.c_str(),
               line_reader_.get_raw_line().c_str());
 #endif
   }

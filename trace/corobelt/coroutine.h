@@ -1336,6 +1336,20 @@ inline task<void> void_task_promise::get_return_object() noexcept {
       coroutine_handle<void_task_promise>::from_promise(*this)};
 };
 
+template<typename T>
+inline void retrieve(task<T> &task) {
+  while (task.is_not_done()) {
+    task.resume_handle();
+  }
+}
+
+template <typename T, typename = typename std::enable_if<
+                          !std::is_same<T, void>::value>::type>
+inline T retrieve_val(task<T>& task) {
+  retrieve<T>(task);
+  return task.return_value();
+}
+
 template <typename T>
 struct unbuffered_single_chan {
 
@@ -1718,18 +1732,10 @@ struct awaiter {
       return false;
     }
 
-    //bool is_prod_only = std::dynamic_cast<collector<T> *>(&producer_):
-    //is_prod_only = std::dynamic_cast<pipeline<T> *>(&producer_);
-
     task<void> consumer_task = consumer_.consume(target_chan_);
     task<void> producer_task = producer_.produce(target_chan_);
 
-    // TODO: change this to an awaitable or something
-    while (producer_task.is_not_done()) {
-      producer_task.resume_handle();
-      //if (is_prod_only)
-      //  consumer_task.resume_handle();
-    }
+    retrieve<void>(producer_task);
 
     producer_task.destroy();
     consumer_task.destroy();

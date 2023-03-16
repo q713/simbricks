@@ -231,6 +231,7 @@ struct event_pack {
   std::string kind_;
   Stacks stack_;
   std::vector<event_t> events_;
+  size_t source_ident;
 
   virtual void display(std::ostream &out, unsigned ident) {
     write_ident(out, ident);
@@ -260,7 +261,12 @@ struct event_pack {
   }
 
   void add_to_pack(event_t event_ptr) {
-    events_.push_back(event_ptr);
+    if (event_ptr) {
+      if (events_.empty()) {
+        source_ident = event_ptr->getIdent();
+      }
+      events_.push_back(event_ptr);
+    }
   }
 
   bool ends_with_offset(uint64_t addr, uint64_t off) {
@@ -268,6 +274,18 @@ struct event_pack {
     uint64_t mask = lz == 64 ? 0xffffffffffffffff : (1 << (64 - lz)) - 1;
     uint64_t check = addr & mask;
     return check == off;
+  }
+
+  bool is_same_source(event_t event_ptr) {
+    if (not event_ptr) {
+      return false;
+    }
+
+    if (events_.empty()) {
+      return true;
+    }
+
+    return event_ptr->getIdent() == source_ident;
   }
 };
 
@@ -338,7 +356,7 @@ struct call_pack : public event_pack {
      *       events must be from the same
      *       host within one pack!
      */
-    if (not event_ptr) {
+    if (not event_ptr or not is_same_source(event_ptr)) {
       return false;
     }
 
@@ -428,7 +446,7 @@ struct mmio_pack : public event_pack {
   }
 
   bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr) {
+    if (not event_ptr or not is_same_source(event_ptr)) {
       return false;
     }
 
@@ -578,7 +596,7 @@ struct dma_pack : public event_pack {
   ~dma_pack() = default;
 
   bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr) {
+    if (not event_ptr or not is_same_source(event_ptr)) {
       return false;
     }
 
@@ -689,7 +707,7 @@ struct eth_pack : public event_pack {
   }
 
   bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr) {
+    if (not event_ptr or not is_same_source(event_ptr)) {
       return false;
     }
 
@@ -707,6 +725,15 @@ struct eth_pack : public event_pack {
     return true;
   }
 };
+
+
+/*
+TODO: handle the following events as well:
+
+EventType::HostMsiX_t,
+EventType::HostClearInt_t,
+EventType::HostPostInt_t
+*/
 
 struct trace {
   bool has_events_ = false;

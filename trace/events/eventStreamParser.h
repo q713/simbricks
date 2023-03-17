@@ -41,8 +41,8 @@ using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
 struct event_stream_parser : public sim::coroutine::producer<event_t> {
   bool parse_ident_name_ts(size_t &parser_ident, std::string &parser_name,
                            uint64_t &ts) {
-    if (!line_reader_.consume_and_trim_string(": source_id=") or
-        !line_reader_.parse_uint_trim(10, parser_ident)) {
+    if (not line_reader_.consume_and_trim_string(": source_id=") or
+        not line_reader_.parse_uint_trim(10, parser_ident)) {
       return false;
     }
 
@@ -308,7 +308,7 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
             not line_reader_.consume_and_trim_string(", len=") or
             not line_reader_.parse_uint_trim(10, len) or
             not line_reader_.consume_and_trim_string(
-                " val=")  // TODO: fix this to ", val=""
+                ", val=")  // TODO: fix this to ", val=""
             or not line_reader_.parse_uint_trim(16, val)) {
           std::cout << "error parsing NicMmioR or NicMmioW: "
                     << line_reader_.get_raw_line() << std::endl;

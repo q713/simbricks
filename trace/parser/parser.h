@@ -39,6 +39,12 @@
 using event_t = std::shared_ptr<Event>;
 using task_t = sim::coroutine::task<void>;
 using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+
+size_t get_Id() {
+  static size_t next_id = 0;
+  return next_id++;
+}
+
 class LogParser : public sim::coroutine::producer<event_t> {
  protected:
   const std::string name_;
@@ -55,7 +61,7 @@ class LogParser : public sim::coroutine::producer<event_t> {
                      const std::string log_file_path, LineReader &line_reader)
       : sim::coroutine::producer<event_t>(),
         name_(std::move(name)),
-        identifier_(std::hash<std::string>{}(name)),
+        identifier_(get_Id()),
         log_file_path_(std::move(log_file_path)),
         line_reader_(line_reader){};
 

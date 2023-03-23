@@ -22,9 +22,14 @@
 
 include mk/subdir_pre.mk
 
-$(eval $(call subdir,external))
-$(eval $(call subdir,mem))
-$(eval $(call subdir,net))
-$(eval $(call subdir,nic))
+bin_memswitch := $(d)memswitch
 
+OBJS := $(d)memswitch.o
+
+$(OBJS): CPPFLAGS := $(CPPFLAGS) -I$(d)include/
+
+$(bin_memswitch): $(OBJS) $(lib_netif) $(lib_nicif)  $(lib_base) -lpcap
+
+CLEAN := $(bin_memswitch) $(OBJS)
+ALL := $(bin_memswitch)
 include mk/subdir_post.mk

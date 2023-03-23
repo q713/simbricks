@@ -20,11 +20,49 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-include mk/subdir_pre.mk
+import simbricks.orchestration.experiments as exp
+import simbricks.orchestration.nodeconfig as nodec
+import simbricks.orchestration.simulators as sim
 
-$(eval $(call subdir,external))
-$(eval $(call subdir,mem))
-$(eval $(call subdir,net))
-$(eval $(call subdir,nic))
+experiments = []
 
-include mk/subdir_post.mk
+
+class MemTest(nodec.AppConfig):
+
+    def __init__(self, addr):
+        self.addr = addr
+
+    def run_cmds(self, node):
+        return [
+            f'busybox devmem 0x{self.addr:x} 64 0x42',
+            f'busybox devmem 0x{self.addr:x} 64'
+        ]
+
+
+for h in ['gk']:
+    e = exp.Experiment('basicmem-' + h)
+    e.checkpoint = False
+
+    mem = sim.BasicMemDev()
+    mem.name = 'mem0'
+    mem.addr = 0x2000000000  #0x2000000000000000
+
+    node_config = nodec.NodeConfig()
+    node_config.nockp = True
+    node_config.app = MemTest(mem.addr)
+
+    if h == 'gk':
+        host = sim.Gem5Host(node_config)
+        host.cpu_type = 'X86KvmCPU'
+        host.variant = 'opt'
+    elif h == 'qk':
+        host = sim.QemuHost(node_config)
+    host.name = 'host.0'
+    e.add_host(host)
+    host.wait = True
+
+    e.add_memdev(mem)
+
+    host.add_memdev(mem)
+
+    experiments.append(e)

@@ -8,6 +8,10 @@
 .sconsign.dblite
 __pycache__/
 _vimrc_local.vim
+sims/mem/basicmem/basicmem
+sims/mem/memnic/memnic
+sims/mem/memswitch/memswitch
+sims/mem/netmem/netmem
 sims/nic/corundum/corundum_verilator
 sims/nic/corundum/obj_dir
 sims/nic/e1000_gem5/e1000_gem5
@@ -20,6 +24,9 @@ sims/net/menshen/obj_dir
 sims/net/tofino/tofino
 doc/doxygen
 doc/_build
+images/farmem/Module.symvers
+images/farmem/modules.order
+images/farmem/farmem.mod*
 images/kernel/kheaders/
 images/mqnic/Module.symvers
 images/mqnic/modules.order

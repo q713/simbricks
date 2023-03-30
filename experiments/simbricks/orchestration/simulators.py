@@ -208,6 +208,57 @@ class NetSim(Simulator):
         return [s for (_, s) in self.listen_sockets(env)]
 
 
+# FIXME: Class hierarchy is broken here as an ugly hack
+class MemDevSim(NICSim):
+    """Base class for memory device simulators."""
+
+    def __init__(self):
+        super().__init__()
+
+        self.name = ''
+        self.sync_mode = 0
+        self.start_tick = 0
+        self.sync_period = 500
+        self.mem_latency = 500
+        self.addr = 0xe000000000000000
+        self.size = 1024 * 1024 * 1024  # 1GB
+        self.as_id = 0
+
+    def full_name(self):
+        return 'mem.' + self.name
+
+    def sockets_cleanup(self, env):
+        return [env.dev_mem_path(self), env.dev_shm_path(self)]
+
+    def sockets_wait(self, env):
+        return [env.dev_mem_path(self)]
+
+
+class NetMemSim(NICSim):
+    """Base class for netork memory simulators."""
+
+    def __init__(self):
+        super().__init__()
+
+        self.name = ''
+        self.sync_mode = 0
+        self.start_tick = 0
+        self.sync_period = 500
+        self.eth_latency = 500
+        self.addr = 0xe000000000000000
+        self.size = 1024 * 1024 * 1024  # 1GB
+        self.as_id = 0
+
+    def full_name(self):
+        return 'netmem.' + self.name
+
+    def sockets_cleanup(self, env):
+        return [env.nic_eth_path(self), env.dev_shm_path(self)]
+
+    def sockets_wait(self, env):
+        return [env.nic_eth_path(self)]
+
+
 class HostSim(Simulator):
     """Base class for host simulators."""
 
@@ -227,9 +278,11 @@ class HostSim(Simulator):
         self.sync_mode = 0
         self.sync_period = 500
         self.pci_latency = 500
+        self.mem_latency = 500
 
         self.pcidevs: tp.List[PCIDevSim] = []
         self.net_directs: tp.List[NetSim] = []
+        self.memdevs: tp.List[MemDevSim] = []
 
     @property
     def nics(self):
@@ -247,6 +300,10 @@ class HostSim(Simulator):
         dev.name = self.name + '.' + dev.name
         self.pcidevs.append(dev)
 
+    def add_memdev(self, dev: MemDevSim):
+        dev.name = self.name + '.' + dev.name
+        self.memdevs.append(dev)
+
     def add_netdirect(self, net: NetSim):
         """Add a direct connection to a network to this host."""
         net.hosts_direct.append(self)
@@ -258,6 +315,8 @@ class HostSim(Simulator):
             deps.append(dev)
             if isinstance(dev, NICSim):
                 deps.append(dev.network)
+        for dev in self.memdevs:
+            deps.append(dev)
         return deps
 
     def wait_terminate(self):
@@ -291,6 +350,11 @@ class QemuHost(HostSim):
 
     def run_cmd(self, env):
         accel = ',accel=kvm:tcg' if not self.sync else ''
+        if self.node_config.kcmd_append:
+            kcmd_append = ' ' + self.node_config.kcmd_append
+        else:
+            kcmd_append = ''
+
         cmd = (
             f'{env.qemu_path} -machine q35{accel} -serial mon:stdio '
             '-cpu Skylake-Server -display none -nic none '
@@ -299,7 +363,7 @@ class QemuHost(HostSim):
             f'-drive file={env.cfgtar_path(self)},if=ide,index=1,media=disk,'
             'driver=raw '
             '-append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 '
-            'init=/home/ubuntu/guestinit.sh rw" '
+            f'init=/home/ubuntu/guestinit.sh rw{kcmd_append}" '
             f'-m {self.node_config.memory} -smp {self.node_config.cores} '
         )
 
@@ -310,7 +374,7 @@ class QemuHost(HostSim):
             elif unit.lower() == 'mhz':
                 base = 3
             else:
-                raise Exception('cpu frequency specified in unsupported unit')
+                raise ValueError('cpu frequency specified in unsupported unit')
             num = float(self.cpu_freq[:-3])
             shift = base - int(math.ceil(math.log(num, 2)))
 
@@ -328,6 +392,8 @@ class QemuHost(HostSim):
 
         # qemu does not currently support net direct ports
         assert len(self.net_directs) == 0
+        # qemu does not currently support mem device ports
+        assert len(self.memdevs) == 0
         return cmd
 
 
@@ -375,6 +441,9 @@ class Gem5Host(HostSim):
             '--ddio-enabled --ddio-way-part=8 --mem-type=DDR4_2400_16x4 '
         )
 
+        if self.node_config.kcmd_append:
+            cmd += f'--command-line-append="{self.node_config.kcmd_append}" '
+
         if env.create_cp:
             cmd += '--max-checkpoints=1 '
 
@@ -385,6 +454,17 @@ class Gem5Host(HostSim):
             cmd += (
                 f'--simbricks-pci=connect:{env.dev_pci_path(dev)}'
                 f':latency={self.pci_latency}ns'
+                f':sync_interval={self.sync_period}ns'
+            )
+            if cpu_type == 'TimingSimpleCPU':
+                cmd += ':sync'
+            cmd += ' '
+
+        for dev in self.memdevs:
+            cmd += (
+                f'--simbricks-mem={dev.size}@{dev.addr}@{dev.as_id}@'
+                f'connect:{env.dev_mem_path(dev)}'
+                f':latency={self.mem_latency}ns'
                 f':sync_interval={self.sync_period}ns'
             )
             if cpu_type == 'TimingSimpleCPU':
@@ -547,6 +627,43 @@ class SwitchNet(NetSim):
         return cleanup
 
 
+class MemSwitchNet(NetSim):
+
+    def __init__(self):
+        super().__init__()
+        self.sync = True
+        """ AS_ID,VADDR_START,VADDR_END,MEMNODE_MAC,PHYS_START """
+        self.mem_map = []
+
+    def run_cmd(self, env):
+        cmd = env.repodir + '/sims/mem/memswitch/memswitch'
+        cmd += f' -S {self.sync_period} -E {self.eth_latency}'
+
+        if not self.sync:
+            cmd += ' -u'
+
+        if len(env.pcap_file) > 0:
+            cmd += ' -p ' + env.pcap_file
+        for (_, n) in self.connect_sockets(env):
+            cmd += ' -s ' + n
+        for (_, n) in self.listen_sockets(env):
+            cmd += ' -h ' + n
+        for m in self.mem_map:
+            cmd += ' -m ' + f' {m[0]},{m[1]},{m[2]},'
+            cmd += (''.join(reversed(m[3].split(':'))))
+            cmd += f',{m[4]}'
+        return cmd
+
+    def sockets_cleanup(self, env):
+        # cleanup here will just have listening eth sockets, switch also creates
+        # shm regions for each with a "-shm" suffix
+        cleanup = []
+        for s in super().sockets_cleanup(env):
+            cleanup.append(s)
+            cleanup.append(s + '-shm')
+        return cleanup
+
+
 class TofinoNet(NetSim):
 
     def __init__(self):
@@ -614,7 +731,7 @@ class NS3SequencerNet(NetSim):
             elif 'sequencer' in n.name:
                 ports += '--ServerPort=' + s + ' '
             else:
-                raise Exception('Wrong NIC type')
+                raise KeyError('Wrong NIC type')
         cmd = (
             f'{env.repodir}/sims/external/ns-3'
             f'/cosim-run.sh sequencer sequencer-single-switch-example'
@@ -630,4 +747,59 @@ class FEMUDev(PCIDevSim):
             f'{env.repodir}/sims/external/femu/femu-simbricks'
             f' {env.dev_pci_path(self)} {env.dev_shm_path(self)}'
         )
+        return cmd
+
+
+class BasicMemDev(MemDevSim):
+
+    def run_cmd(self, env):
+        cmd = (
+            f'{env.repodir}/sims/mem/basicmem/basicmem'
+            f' {self.size} {self.addr} {self.as_id}'
+            f' {env.dev_mem_path(self)} {env.dev_shm_path(self)}'
+            f' {self.sync_mode} {self.start_tick} {self.sync_period}'
+            f' {self.mem_latency}'
+        )
+        return cmd
+
+
+class MemNIC(MemDevSim):
+
+    def run_cmd(self, env):
+        cmd = (
+            f'{env.repodir}/sims/mem/memnic/memnic'
+            f' {env.dev_mem_path(self)} {env.nic_eth_path(self)}'
+            f' {env.dev_shm_path(self)}'
+        )
+
+        if self.mac is not None:
+            cmd += ' ' + (''.join(reversed(self.mac.split(':'))))
+
+        cmd += f' {self.sync_mode} {self.start_tick} {self.sync_period}'
+        cmd += f' {self.mem_latency} {self.eth_latency}'
+
+        return cmd
+
+    def sockets_cleanup(self, env):
+        return super().sockets_cleanup(env) + [env.nic_eth_path(self)]
+
+    def sockets_wait(self, env):
+        return super().sockets_wait(env) + [env.nic_eth_path(self)]
+
+
+class NetMem(NetMemSim):
+
+    def run_cmd(self, env):
+        cmd = (
+            f'{env.repodir}/sims/mem/netmem/netmem'
+            f' {self.size} {self.addr} {self.as_id}'
+            f' {env.nic_eth_path(self)}'
+            f' {env.dev_shm_path(self)}'
+        )
+        if self.mac is not None:
+            cmd += ' ' + (''.join(reversed(self.mac.split(':'))))
+
+        cmd += f' {self.sync_mode} {self.start_tick} {self.sync_period}'
+        cmd += f' {self.eth_latency}'
+
         return cmd

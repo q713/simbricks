@@ -23,7 +23,7 @@
 include mk/subdir_pre.mk
 
 PACKER_VERSION := 1.7.0
-KERNEL_VERSION := 5.4.46
+KERNEL_VERSION := 5.15.93
 
 BASE_IMAGE := $(d)output-base/base
 MEMCACHED_IMAGE := $(d)output-memcached/memcached
@@ -50,13 +50,16 @@ kheader_dir := $(d)kernel/kheaders
 kheader_tar := $(d)kheaders.tar.bz2
 mqnic_dir := $(d)mqnic
 mqnic_mod := $(mqnic_dir)/mqnic.ko
+farmem_dir := $(d)farmem
+farmem_mod := $(farmem_dir)/farmem.ko
 m5_bin := $(d)m5
 guest_init := $(d)/scripts/guestinit.sh
 
-build-images: $(IMAGES) $(RAW_IMAGES) $(vmlinux) $(bz_image) $(mqnic_mod)
+build-images: $(IMAGES) $(RAW_IMAGES) $(vmlinux) $(bz_image) $(mqnic_mod) \
+  $(farmem_mod)
 
 build-images-min: $(IMAGES_MIN) $(RAW_IMAGES_MIN) $(vmlinux) $(bz_image) \
-    $(mqnic_mod)
+    $(mqnic_mod) $(farmem_mod)
 
 # only converts existing images to raw
 convert-images-raw:
@@ -171,7 +174,6 @@ $(kernel_dir)/.config: $(kernel_pardir)/config-$(KERNEL_VERSION)
 	wget -O - https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-$(KERNEL_VERSION).tar.xz | \
 	    tar xJf - -C $(kernel_pardir)
 	cd $(kernel_dir) && patch -p1 < ../linux-$(KERNEL_VERSION)-timers-gem5.patch
-	cd $(kernel_dir) && patch -p1 < ../linux-$(KERNEL_VERSION)-new-binutils.patch
 	cp $< $@
 
 ################################################
@@ -181,10 +183,17 @@ $(mqnic_mod): $(vmlinux)
 	$(MAKE) -C $(kernel_dir) M=$(abspath $(mqnic_dir)) modules
 	touch $@
 
+################################################
+# farmem kernel module
+
+$(farmem_mod): $(vmlinux)
+	$(MAKE) -C $(kernel_dir) M=$(abspath $(farmem_dir)) modules
+	touch $@
 
 CLEAN := $(addprefix $(d), mqnic/mqnic.ko mqnic/*.o mqnic/.*.cmd mqnic/*.mod \
-    mqnic/mqnic.mod.c mqnic/Module.symvers mqnic/modules.order)
-
+    mqnic/mqnic.mod.c mqnic/Module.symvers mqnic/modules.order \
+    farmem/farmem.ko farmem/*.o farmem/.*.cmd farmem/*.mod \
+    farmem/farmem.mod.c farmem/Module.symvers farmem/modules.order)
 DISTCLEAN := $(kernel_dir) $(packer) $(bz_image) $(vmlinux) $(kheader_dir) \
     $(foreach i,$(IMAGES),$(dir $(i)) $(subst output-,input-,$(dir $(i)))) \
     $(d)packer_cache $(d)kheaders.tar.bz2

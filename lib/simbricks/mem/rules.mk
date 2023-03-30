@@ -1,4 +1,4 @@
-# Copyright 2021 Max Planck Institute for Software Systems, and
+# Copyright 2022 Max Planck Institute for Software Systems, and
 # National University of Singapore
 #
 # Permission is hereby granted, free of charge, to any person obtaining
@@ -22,9 +22,13 @@
 
 include mk/subdir_pre.mk
 
-$(eval $(call subdir,external))
-$(eval $(call subdir,mem))
-$(eval $(call subdir,net))
-$(eval $(call subdir,nic))
+lib_mem := $(d)libmem.a
 
+OBJS := $(addprefix $(d),if.o)
+
+libsimbricks_objs += $(OBJS)
+
+$(lib_mem): $(OBJS)
+
+CLEAN := $(lib_mem) $(OBJS)
 include mk/subdir_post.mk

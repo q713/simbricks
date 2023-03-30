@@ -40,11 +40,6 @@ using event_t = std::shared_ptr<Event>;
 using task_t = sim::coroutine::task<void>;
 using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
 
-size_t get_Id() {
-  static size_t next_id = 0;
-  return next_id++;
-}
-
 class LogParser : public sim::coroutine::producer<event_t> {
  protected:
   const std::string name_;
@@ -56,12 +51,17 @@ class LogParser : public sim::coroutine::producer<event_t> {
 
   bool parse_address(uint64_t &address);
 
+  static size_t get_Id() {
+    static size_t next_id = 0;
+    return next_id++;
+  }
+
  public:
-  explicit LogParser(const std::string name,
-                     const std::string log_file_path, LineReader &line_reader)
+  explicit LogParser(const std::string name, const std::string log_file_path,
+                     LineReader &line_reader)
       : sim::coroutine::producer<event_t>(),
         name_(std::move(name)),
-        identifier_(get_Id()),
+        identifier_(LogParser::get_Id()),
         log_file_path_(std::move(log_file_path)),
         line_reader_(line_reader){};
 
@@ -96,21 +96,21 @@ class Gem5Parser : public LogParser {
   event_t parse_simbricks_event(uint64_t timestamp);
 
  public:
-  explicit Gem5Parser(const std::string name,
-                      const std::string log_file_path, SymsFilter &symbol_table,
+  explicit Gem5Parser(const std::string name, const std::string log_file_path,
+                      SymsFilter &symbol_table,
                       ComponentFilter &component_table, LineReader &line_reader)
       : LogParser(std::move(name), std::move(log_file_path), line_reader),
         component_table_(component_table) {
     symbol_tables_.push_back(std::ref(symbol_table));
   }
 
-  explicit Gem5Parser(const std::string name,
-                      const std::string log_file_path,
-                      std::vector<std::reference_wrapper<SymsFilter>>
-                          symbol_tables,
-                      ComponentFilter &component_table, LineReader &line_reader)
+  explicit Gem5Parser(
+      const std::string name, const std::string log_file_path,
+      std::vector<std::reference_wrapper<SymsFilter>> symbol_tables,
+      ComponentFilter &component_table, LineReader &line_reader)
       : LogParser(std::move(name), std::move(log_file_path), line_reader),
-        component_table_(component_table), symbol_tables_(std::move(symbol_tables)) {
+        component_table_(component_table),
+        symbol_tables_(std::move(symbol_tables)) {
   }
 
   task_t produce(chan_t *tar_chan) override;
@@ -128,10 +128,9 @@ class NicBmParser : public LogParser {
   bool parse_sync_info(bool &sync_pcie, bool &sync_eth);
 
  public:
-  explicit NicBmParser(const std::string name,
-                       const std::string log_file_path, LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path),
-                  line_reader) {
+  explicit NicBmParser(const std::string name, const std::string log_file_path,
+                       LineReader &line_reader)
+      : LogParser(std::move(name), std::move(log_file_path), line_reader) {
   }
 
   task_t produce(chan_t *tar_chan) override;

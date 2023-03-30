@@ -24,6 +24,9 @@
 
 #include <iostream>
 #include <string>
+#include <functional>
+#include <memory>
+#include <set>
 
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
@@ -81,6 +84,12 @@ int main(int argc, char *argv[]) {
     event_stream_parser streamParser(
         result["event-stream-log"].as<std::string>(), streamLr);
 
+    //std::function<bool(std::shared_ptr<Event>)> pred = [](std::shared_ptr<Event> event_ptr) {
+    //  static const std::set<size_t> allowed_ids{0, 1};
+    //  return event_ptr and allowed_ids.contains(event_ptr->getIdent());
+    //};
+    //GenericEventFilter sourceFilter{pred};
+
     sim::coroutine::pipeline<event_t> tracePipeline{streamParser, {tracer}};
 
     if (!sim::coroutine::awaiter<event_t>::await_termination(tracePipeline)) {
@@ -124,11 +133,11 @@ int main(int argc, char *argv[]) {
   ComponentFilter compF("ComponentFilter-Client-Server");
 
   // gem5 log parser that generates events
-  // LineReader serverLr;
-  // Gem5Parser gem5ServerPar{"Gem5ServerParser",
-  //                         result["gem5-log-server"].as<std::string>(),
-  //                         {linuxvm_symbols, nicdriver_symbols}, compF,
-  //                         serverLr};
+  LineReader serverLr;
+  Gem5Parser gem5ServerPar{"Gem5ServerParser",
+                          result["gem5-log-server"].as<std::string>(),
+                          {linuxvm_symbols, nicdriver_symbols}, compF,
+                          serverLr};
 
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
@@ -138,10 +147,9 @@ int main(int argc, char *argv[]) {
                            clientLr};
 
   // nicbm log parser that generates events
-  // LineReader nicSerLr;
-  // NicBmParser nicSerPar{"NicbmServerParser",
-  //                      result["nicbm-log-server"].as<std::string>(),
-  //                      nicSerLr};
+  LineReader nicSerLr;
+  NicBmParser nicSerPar{"NicbmServerParser",
+                        result["nicbm-log-server"].as<std::string>(), nicSerLr};
   LineReader nicCliLr;
   NicBmParser nicCliPar{"NicbmClientParser",
                         result["nicbm-log-client"].as<std::string>(), nicCliLr};
@@ -175,20 +183,15 @@ int main(int argc, char *argv[]) {
       EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
   // filter uninteresting events out of stream
-  EventTypeFilter eventFilter{{
-                                  EventType::HostInstr_t,
-                                  EventType::SimProcInEvent_t,
-                                  EventType::SimSendSync_t,
-                                  EventType::HostMsiX_t,
-                                  EventType::HostClearInt_t,
-                                  EventType::HostPostInt_t,
-                              },
-                              true};
+  EventTypeFilter eventFilter{
+      {EventType::HostInstr_t, EventType::SimProcInEvent_t,
+       EventType::SimSendSync_t},
+      true};
 
   using event_t = std::shared_ptr<Event>;
 
   sim::coroutine::collector<event_t, EventComperator> collector{
-      {nicCliPar, gem5ClientPar}};
+      {nicCliPar, gem5ClientPar, nicSerPar, gem5ServerPar}};
 
   sim::coroutine::pipeline<event_t> pipeline{
       collector, {timestampFilter, eventFilter, tracer}};

@@ -210,6 +210,8 @@ struct event_pack;
 struct call_pack;
 struct mmio_pack;
 struct dma_pack;
+struct eth_pack;
+struct single_event_pack;
 using pack_t = std::shared_ptr<event_pack>;
 using callp_t = std::shared_ptr<call_pack>;
 using mmiop_t = std::shared_ptr<mmio_pack>;
@@ -227,15 +229,59 @@ void write_ident(std::ostream &out, unsigned ident) {
   }
 }
 
+inline uint64_t get_pack_id() {
+  static uint64_t next_id = 0;
+  return next_id++;
+}
+
+// TODO: maybe add a trigger type
+enum pack_type { CALL_PACK, DMA_PACK, MMIO_PACK, SE_PACK, ETH_PACK };
+
+inline std::ostream &operator<<(std::ostream &os, pack_type t) {
+  switch (t) {
+    case pack_type::CALL_PACK:
+      os << "call_pack";
+      break;
+    case pack_type::DMA_PACK:
+      os << "dma_pack";
+      break;
+    case pack_type::MMIO_PACK:
+      os << "mmio_pack";
+      break;
+    case pack_type::ETH_PACK:
+      os << "eth_pack";
+      break;
+    case pack_type::SE_PACK:
+      os << "single_event_pack";
+      break;
+    default:
+      break;
+  }
+  return os;
+}
+
 struct event_pack {
-  std::string kind_;
-  Stacks stack_;
+  uint64_t id_;
+  pack_type type_;
+  // Stacks stack_; // TODO: not whole stacks is within a stack, but each event
+  // on its own
   std::vector<event_t> events_;
-  size_t source_ident;
+
+  pack_t triggered_by_ = nullptr;
+  std::vector<pack_t> triggered_;
 
   virtual void display(std::ostream &out, unsigned ident) {
     write_ident(out, ident);
-    out << kind_ << " " << stack_ << std::endl;
+    out << "id: " << (unsigned long long)id_ << ", kind: " << type_
+        << std::endl;
+    write_ident(out, ident);
+    out << "was triggered? " << (triggered_by_ != nullptr) << std::endl;
+    write_ident(out, ident);
+    out << "triggered packs? ";
+    for (auto &p : triggered_) {
+      out << (unsigned long long)p->id_ << ", ";
+    }
+    out << std::endl;
     for (event_t event : events_) {
       write_ident(out, ident);
       out << *event << std::endl;
@@ -247,25 +293,40 @@ struct event_pack {
   }
 
   virtual bool is_pending() {
-    return true;
+    return false;
+  }
+
+  virtual bool add_if_triggered(pack_t pack_ptr) {
+    return false;
   }
 
   virtual bool add_on_match(event_t event_ptr) {
     return false;
   }
 
+  bool set_triggered_by(pack_t trigger) {
+    if (not triggered_by_) {
+      triggered_by_ = trigger;
+      return true;
+    }
+    return false;
+  }
+
   virtual ~event_pack() = default;
 
  protected:
-  event_pack(std::string kind, Stacks stack) : kind_(kind), stack_(stack) {
+  event_pack(pack_type t) : id_(get_pack_id()), type_(t) {
   }
 
   void add_to_pack(event_t event_ptr) {
     if (event_ptr) {
-      if (events_.empty()) {
-        source_ident = event_ptr->getIdent();
-      }
       events_.push_back(event_ptr);
+    }
+  }
+
+  void add_triggered(pack_t pack_ptr) {
+    if (pack_ptr) {
+      triggered_.push_back(pack_ptr);
     }
   }
 
@@ -274,18 +335,6 @@ struct event_pack {
     uint64_t mask = lz == 64 ? 0xffffffffffffffff : (1 << (64 - lz)) - 1;
     uint64_t check = addr & mask;
     return check == off;
-  }
-
-  bool is_same_source(event_t event_ptr) {
-    if (not event_ptr) {
-      return false;
-    }
-
-    if (events_.empty()) {
-      return true;
-    }
-
-    return event_ptr->getIdent() == source_ident;
   }
 };
 
@@ -296,6 +345,13 @@ struct call_pack : public event_pack {
   bool is_pending_ = true;
   bool transmits_ = false;
   bool receives_ = false;
+
+  // the call pack has typically a lot of events and can trigger
+  // a multitude of stuff, hence we want to know which event triggered what
+  std::unordered_map<event_t, pack_t> triggered_;
+  // we do not always know how many events an event might trigger,
+  // hence we keep a list of potential triggers
+  std::vector<std::pair<event_t, pack_type>> potential_trigggers_;
 
   static bool is_call_pack_related(event_t event_ptr) {
     if (not event_ptr) {
@@ -337,6 +393,23 @@ struct call_pack : public event_pack {
     return is_pending_;
   }
 
+  bool add_if_triggered(pack_t pack_ptr) override {
+    if (not pack_ptr or pack_ptr.get() == this) {
+      return false;
+    }
+
+    for (auto it = potential_trigggers_.crbegin();
+         it != potential_trigggers_.crend(); it++) {
+      auto &e_pt_pair = *it;
+      if (e_pt_pair.second == pack_ptr->type_) {
+        add_triggered(pack_ptr);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   bool is_transmitting() {
     return transmits_;
   }
@@ -345,20 +418,17 @@ struct call_pack : public event_pack {
     return receives_;
   }
 
-  call_pack() : event_pack("call_pack", Stacks::KERNEL) {
+  call_pack() : event_pack(pack_type::CALL_PACK) {
   }
 
   ~call_pack() = default;
 
   bool add_on_match(event_t event_ptr) override {
-    /*
-     * TODO: when having multiple hosts,
-     *       events must be from the same
-     *       host within one pack!
-     */
-    if (not event_ptr or not is_same_source(event_ptr)) {
+    if (not event_ptr) {
       return false;
     }
+
+    /* TODO: add potential triggers!!!!!!!!!!!!! */
 
     if (not is_type(event_ptr, EventType::HostCall_t)) {
       return false;
@@ -399,6 +469,201 @@ struct call_pack : public event_pack {
     transmits_ = transmits_ || call_pack::is_transmit_call(event_ptr);
     receives_ = receives_ || call_pack::is_receive_call(event_ptr);
 
+    if (host_call->func_.compare("i40e_lan_xmit_frame") == 0) {
+      potential_trigggers_.push_back(
+          std::make_pair(host_call, pack_type::MMIO_PACK));
+    }
+
+    add_to_pack(event_ptr);
+    return true;
+  }
+};
+struct dma_pack : public event_pack {
+  // NicDmaI_t
+  event_t dma_issue_ = nullptr;
+  // NicDmaEx_t
+  event_t nic_dma_execution_ = nullptr;
+  // HostDmaW_t or HostDmaR_t
+  event_t host_dma_execution_ = nullptr;
+  bool is_read_ = true;
+  // HostDmaC_t
+  event_t host_dma_completion_ = nullptr;
+  // NicDmaCW_t or NicDmaCR_t
+  event_t nic_dma_completion_ = nullptr;
+  bool is_pending_ = true;
+
+  static bool is_dma_pack_related(event_t event_ptr) {
+    if (not event_ptr) {
+      return false;
+    }
+    const static std::set<EventType> lt{
+        EventType::NicDmaI_t,  EventType::NicDmaEx_t, EventType::HostDmaW_t,
+        EventType::HostDmaR_t, EventType::HostDmaC_t, EventType::NicDmaCW_t,
+        EventType::NicDmaCR_t};
+    return lt.contains(event_ptr->getType());
+  }
+
+  bool is_read() {
+    return is_read_;
+  }
+
+  bool is_pending() override {
+    return is_pending_;
+  }
+
+  dma_pack() : event_pack(pack_type::DMA_PACK) {
+  }
+
+  ~dma_pack() = default;
+
+  bool add_on_match(event_t event_ptr) override {
+    if (not event_ptr) {
+      return false;
+    }
+
+    switch (event_ptr->getType()) {
+      case EventType::NicDmaI_t: {
+        if (dma_issue_) {
+          return false;
+        }
+        dma_issue_ = event_ptr;
+        break;
+      }
+
+      case EventType::NicDmaEx_t: {
+        if (not dma_issue_) {
+          return false;
+        }
+        auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
+        auto exec = std::static_pointer_cast<NicDmaEx>(event_ptr);
+        if (issue->id_ != exec->id_ or issue->addr_ != exec->addr_) {
+          return false;
+        }
+        nic_dma_execution_ = event_ptr;
+        break;
+      }
+
+      case EventType::HostDmaW_t:
+      case EventType::HostDmaR_t: {
+        if (not dma_issue_ /*or not nic_dma_execution_*/) {
+          return false;
+        }
+        auto n_issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
+
+        is_read_ = is_type(event_ptr, EventType::HostDmaR_t);
+        auto h_exec = std::static_pointer_cast<HostAddrSizeOp>(event_ptr);
+        if (n_issue->addr_ != h_exec->addr_) {
+          return false;
+        }
+        host_dma_execution_ = event_ptr;
+        break;
+      }
+
+      case EventType::HostDmaC_t: {
+        if (not dma_issue_ /*or not nic_dma_execution_*/ or
+            not host_dma_execution_) {
+          return false;
+        }
+
+        auto exec =
+            std::static_pointer_cast<HostAddrSizeOp>(host_dma_execution_);
+        auto comp = std::static_pointer_cast<HostDmaC>(event_ptr);
+        if (exec->id_ != comp->id_) {
+          return false;
+        }
+
+        host_dma_completion_ = event_ptr;
+        break;
+      }
+
+      case EventType::NicDmaCW_t:
+      case EventType::NicDmaCR_t: {
+        if (not dma_issue_ /*or not nic_dma_execution_*/ or
+            not host_dma_execution_ or not host_dma_completion_) {
+          return false;
+        }
+
+        auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
+        auto comp = std::static_pointer_cast<NicDma>(event_ptr);
+        if (issue->id_ != comp->id_ or issue->addr_ != comp->addr_) {
+          return false;
+        }
+
+        nic_dma_completion_ = event_ptr;
+        is_pending_ = false;
+        break;
+      }
+
+      default:
+        return false;
+    }
+
+    add_to_pack(event_ptr);
+    return true;
+  }
+};
+
+struct eth_pack : public event_pack {
+  // NicTx or NicRx
+  event_t tx_rx_ = nullptr;
+  bool is_send_ = false;
+  bool is_pending_ = true;
+
+  eth_pack() : event_pack(pack_type::ETH_PACK) {
+  }
+
+  ~eth_pack() = default;
+
+  static bool is_eth_pack_related(event_t event_ptr) {
+    if (not event_ptr) {
+      return false;
+    }
+
+    return is_type(event_ptr, EventType::NicTx_t) or
+           is_type(event_ptr, EventType::NicRx_t);
+  }
+
+  bool is_pending() override {
+    return is_pending_;
+  }
+
+  bool add_if_triggered(pack_t pack_ptr) override {
+    if (not pack_ptr or pack_ptr.get() == this) {
+      return false;
+    }
+
+    if (not tx_rx_ or not is_send_) {
+      return false;
+    }
+
+    if (pack_ptr->type_ != pack_type::ETH_PACK) {
+      return false;
+    }
+
+    std::shared_ptr<eth_pack> np = std::static_pointer_cast<eth_pack>(pack_ptr);
+    if (not np->tx_rx_ or np->is_send_) {
+      return false;
+    }
+
+    add_triggered(pack_ptr);
+    return true;
+  }
+
+  bool add_on_match(event_t event_ptr) override {
+    if (not event_ptr) {
+      return false;
+    }
+
+    if (is_type(event_ptr, EventType::NicTx_t)) {
+      is_send_ = true;
+    } else if (is_type(event_ptr, EventType::NicRx_t)) {
+      is_send_ = false;
+    } else {
+      return false;
+    }
+
+    is_pending_ = false;
+    tx_rx_ = event_ptr;
     add_to_pack(event_ptr);
     return true;
   }
@@ -418,7 +683,7 @@ struct mmio_pack : public event_pack {
   bool is_pending_ = true;
 
   explicit mmio_pack(bool pci_msix_desc_addr_before)
-      : event_pack("mmio_pack", Stacks::KERNEL),
+      : event_pack(pack_type::MMIO_PACK),
         pci_msix_desc_addr_before_(pci_msix_desc_addr_before) {
   }
 
@@ -445,8 +710,33 @@ struct mmio_pack : public event_pack {
     return is_pending_;
   }
 
+  bool add_if_triggered(pack_t pack_ptr) override {
+    if (not pack_ptr or pack_ptr.get() == this) {
+      return false;
+    }
+
+    if (is_read_ or not host_mmio_issue_) {
+      return false;
+    }
+
+    if (pack_ptr->type_ != pack_type::DMA_PACK and
+        pack_ptr->type_ != pack_type::ETH_PACK) {
+      return false;
+    }
+
+    if (pack_ptr->type_ == pack_type::ETH_PACK) {
+      auto p = std::static_pointer_cast<eth_pack>(pack_ptr);
+      if (not p->tx_rx_ or not p->is_send_) {
+        return false;
+      }
+    }
+
+    add_triggered(pack_ptr);
+    return true;
+  }
+
   bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr or not is_same_source(event_ptr)) {
+    if (not event_ptr) {
       return false;
     }
 
@@ -556,197 +846,50 @@ struct mmio_pack : public event_pack {
     return true;
   }
 };
+struct single_event_pack : public event_pack {
+  event_t event_p_ = nullptr;
 
-struct dma_pack : public event_pack {
-  // NicDmaI_t
-  event_t dma_issue_ = nullptr;
-  // NicDmaEx_t
-  event_t nic_dma_execution_ = nullptr;
-  // HostDmaW_t or HostDmaR_t
-  event_t host_dma_execution_ = nullptr;
-  bool is_read_ = true;
-  // HostDmaC_t
-  event_t host_dma_completion_ = nullptr;
-  // NicDmaCW_t or NicDmaCR_t
-  event_t nic_dma_completion_ = nullptr;
-  bool is_pending_ = true;
+  single_event_pack() : event_pack(pack_type::SE_PACK) {
+  }
 
-  static bool is_dma_pack_related(event_t event_ptr) {
+  virtual bool is_pending() {
+    return event_p_ == nullptr;
+  }
+
+  virtual bool add_on_match(event_t event_ptr) {
     if (not event_ptr) {
       return false;
     }
-    const static std::set<EventType> lt{
-        EventType::NicDmaI_t,  EventType::NicDmaEx_t, EventType::HostDmaW_t,
-        EventType::HostDmaR_t, EventType::HostDmaC_t, EventType::NicDmaCW_t,
-        EventType::NicDmaCR_t};
-    return lt.contains(event_ptr->getType());
-  }
 
-  bool is_read() {
-    return is_read_;
-  }
-
-  bool is_pending() override {
-    return is_pending_;
-  }
-
-  dma_pack() : event_pack("dma_pack", Stacks::NIC) {
-  }
-
-  ~dma_pack() = default;
-
-  bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr or not is_same_source(event_ptr)) {
+    if (event_p_) {
       return false;
     }
 
-    switch (event_ptr->getType()) {
-      case EventType::NicDmaI_t: {
-        if (dma_issue_) {
-          return false;
-        }
-        dma_issue_ = event_ptr;
-        break;
-      }
-
-      case EventType::NicDmaEx_t: {
-        if (not dma_issue_) {
-          return false;
-        }
-        auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
-        auto exec = std::static_pointer_cast<NicDmaEx>(event_ptr);
-        if (issue->id_ != exec->id_ or issue->addr_ != exec->addr_) {
-          return false;
-        }
-        nic_dma_execution_ = event_ptr;
-        break;
-      }
-
-      case EventType::HostDmaW_t:
-      case EventType::HostDmaR_t: {
-        if (not dma_issue_ /*or not nic_dma_execution_*/) {
-          return false;
-        }
-        auto n_issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
-
-        is_read_ = is_type(event_ptr, EventType::HostDmaR_t);
-        auto h_exec = std::static_pointer_cast<HostAddrSizeOp>(event_ptr);
-        if (n_issue->addr_ != h_exec->addr_) {
-          return false;
-        }
-        host_dma_execution_ = event_ptr;
-        break;
-      }
-
-      case EventType::HostDmaC_t: {
-        if (not dma_issue_ /*or not nic_dma_execution_*/ or
-            not host_dma_execution_) {
-          return false;
-        }
-
-        auto exec =
-            std::static_pointer_cast<HostAddrSizeOp>(host_dma_execution_);
-        auto comp = std::static_pointer_cast<HostDmaC>(event_ptr);
-        if (exec->id_ != comp->id_) {
-          return false;
-        }
-
-        host_dma_completion_ = event_ptr;
-        break;
-      }
-
-      case EventType::NicDmaCW_t:
-      case EventType::NicDmaCR_t: {
-        if (not dma_issue_ /*or not nic_dma_execution_*/ or
-            not host_dma_execution_ or not host_dma_completion_) {
-          return false;
-        }
-
-        auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
-        auto comp = std::static_pointer_cast<NicDma>(event_ptr);
-        if (issue->id_ != comp->id_ or issue->addr_ != comp->addr_) {
-          return false;
-        }
-
-        nic_dma_completion_ = event_ptr;
-        is_pending_ = false;
-        break;
-      }
-
-      default:
-        return false;
-    }
-
+    event_p_ = event_ptr;
     add_to_pack(event_ptr);
     return true;
   }
 };
 
-struct eth_pack : public event_pack {
-  // NicTx or NicRx
-  event_t tx_rx_ = nullptr;
-  bool is_send_ = false;
-  bool is_pending_ = true;
-
-  eth_pack() : event_pack("eth_pack", Stacks::NIC) {
-  }
-
-  ~eth_pack() = default;
-
-  static bool is_eth_pack_related(event_t event_ptr) {
-    if (not event_ptr) {
-      return false;
-    }
-
-    return is_type(event_ptr, EventType::NicTx_t) or
-           is_type(event_ptr, EventType::NicRx_t);
-  }
-
-  bool is_pending() override {
-    return is_pending_;
-  }
-
-  bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr or not is_same_source(event_ptr)) {
-      return false;
-    }
-
-    if (is_type(event_ptr, EventType::NicTx_t)) {
-      is_send_ = true;
-    } else if (is_type(event_ptr, EventType::NicRx_t)) {
-      is_send_ = false;
-    } else {
-      return false;
-    }
-
-    is_pending_ = false;
-    tx_rx_ = event_ptr;
-    add_to_pack(event_ptr);
-    return true;
-  }
-};
-
-
-/*
-TODO: handle the following events as well:
-
-EventType::HostMsiX_t,
-EventType::HostClearInt_t,
-EventType::HostPostInt_t
-*/
-
+// NOTE: currently analyzing a whole topology is not supported. only the
+// analysis of a
+//       nic/host pair is supported at the moment
+// --> when extending: make sure that events in a pack belong to same source!!!
 struct trace {
   bool has_events_ = false;
-  std::list<pack_t> finished_packs_;
+  std::list<pack_t> finished_packs_;  // TODO: print a trace in order
 
   std::list<callp_t> pending_call_packs_;
   bool found_host_tx_ = false;
   bool found_host_rx_ = false;
   bool last_call_pci_msix_desc_addr_ = false;
+
   std::list<mmiop_t> pending_mmio_packs_;
   size_t at_least_still_expected_mmio_ = 0;
+
   std::list<dmap_t> pending_dma_packs_;
-  bool found_nic_tx_ = false; 
+
+  bool found_nic_tx_ = false;
   bool found_nic_rx_ = false;
 
   /*
@@ -775,15 +918,15 @@ at_least_still_expected_mmio_ != 0*/
         ;
   }
 
-  bool has_pending_call() {
+  inline bool has_pending_call() {
     return not pending_call_packs_.empty();
   }
 
-  bool has_pending_mmio() {
+  inline bool has_pending_mmio() {
     return not pending_mmio_packs_.empty();
   }
 
-  bool has_pending_dma() {
+  inline bool has_pending_dma() {
     return not pending_dma_packs_.empty();
   }
 
@@ -801,8 +944,12 @@ at_least_still_expected_mmio_ != 0*/
 
     } else if (dma_pack::is_dma_pack_related(event_ptr)) {
       added = add_dma(event_ptr);
+
     } else if (eth_pack::is_eth_pack_related(event_ptr)) {
       added = add_eth(event_ptr);
+
+    } else {
+      added = add_generic_single(event_ptr);
     }
 
     has_events_ = has_events_ || added;
@@ -870,15 +1017,54 @@ at_least_still_expected_mmio_ != 0*/
     return nullptr;
   }
 
-  template <typename pack_type>
-  std::shared_ptr<pack_type> create_add(
-      std::list<std::shared_ptr<pack_type>> &pending, event_t event_ptr) {
-    auto pending_stack = std::make_shared<pack_type>();
+  template <typename pt>
+  std::shared_ptr<pt> create_add(
+      std::list<std::shared_ptr<pt>> &pending, event_t event_ptr) {
+    auto pending_stack = std::make_shared<pt>();
     if (pending_stack and pending_stack->add_on_match(event_ptr)) {
       pending.push_back(pending_stack);
       return pending_stack;
     }
     return nullptr;
+  }
+
+  template <typename pt>
+  bool add_set_triggered_pending(std::list<std::shared_ptr<pt>> &pending,
+                         pack_t pack_ptr) {
+    if (not pack_ptr or pack_ptr->is_pending()) {
+      return false;
+    }
+
+    for (std::shared_ptr<pt> pack : pending) {
+      if (pack->add_if_triggered(pack_ptr)) {
+        pack_ptr->set_triggered_by(pack);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  template <typename pt>
+  bool add_set_triggered_trace(pack_type type, pack_t pack_ptr) {
+    if (not pack_ptr or pack_ptr->is_pending()) {
+      return false;
+    }
+
+    for (auto it = finished_packs_.rbegin(); it != finished_packs_.rend(); it++) {
+      pack_t pack = *it;
+      if (pack->type_ != type) {
+        continue;
+      }
+
+      auto casted_pack = std::static_pointer_cast<pt>(pack);
+      if (casted_pack->add_if_triggered(pack_ptr)) {
+        pack_ptr->set_triggered_by(casted_pack);
+        return true;
+      }
+    }
+
+    return false;
   }
 
   bool add_call(event_t event_ptr) {
@@ -897,13 +1083,19 @@ at_least_still_expected_mmio_ != 0*/
 
     if (pack) {
       if (pack->is_transmitting()) {
-        //++at_least_still_expected_mmio_;
         found_host_tx_ = true;
       }
 
       if (pack->is_receiving()) {
         found_host_rx_ = true;
       }
+      // when receiving, was it triggered by an hardware interrupt
+      // in case yes, this call stack was triggered by this interrupt
+
+      // this capp pack is transmitting, hence we must trigger some sort of
+      // mmio or there like, which will eventually cause the nic to send
+      // packets, thus we neeed to check if this event is a trigger and create
+      // a new pending trigger in that case
 
       // remove mmio packs after pci_msix_desc_addr
       if (not call_pack::is_pci_msix_desc_addr(event_ptr)) {
@@ -938,30 +1130,43 @@ at_least_still_expected_mmio_ != 0*/
       return false;
     }
 
+    std::shared_ptr<mmio_pack> pack = nullptr;
     if (has_pending_mmio()) {
-      auto p = iterate_add_erase<mmio_pack>(pending_mmio_packs_, event_ptr);
-      if (nullptr != p) {
-        if (not p->is_pending()) {
-          //--at_least_still_expected_mmio_; // TODO: expect dma? --> this is
-          // a
-          // hard and not general true case
-        }
-        return true;
+      pack = iterate_add_erase<mmio_pack>(pending_mmio_packs_, event_ptr);
+      // if (pack) {
+      // if (not pack->is_pending()) {
+      //--at_least_still_expected_mmio_; // TODO: expect dma? --> this is
+      //  a
+      //  hard and not general true case
+      //}
+      //  return true;
+      //}
+
+      // TODO: as the mmio pack must have been triggered somewhere else,
+      // look for yet pending triggers that caused this event (host call or
+      // device "interrupt"?)
+      if (pack and not pack->is_read_) {
+        // TODO: only if is not pending anymore
+        add_set_triggered_pending<call_pack>(pending_call_packs_, pack);
       }
     }
 
+    // found everything of this trace, hence do not create a new event
+    // as it must have been issued by another trace
     if (found_nic_rx_ and found_nic_tx_ and found_host_rx_ and
         found_host_tx_ and not has_pending_call()) {
       return false;
     }
 
-    auto pack = std::make_shared<mmio_pack>(last_call_pci_msix_desc_addr_);
-    if (pack and pack->add_on_match(event_ptr)) {
+    if (not pack) {
+      pack = std::make_shared<mmio_pack>(last_call_pci_msix_desc_addr_);
+      if (not pack or not pack->add_on_match(event_ptr)) {
+        return false;
+      }
       pending_mmio_packs_.push_back(pack);
-      return true;
     }
 
-    return false;
+    return true;
   }
 
   bool add_dma(event_t event_ptr) {
@@ -969,19 +1174,30 @@ at_least_still_expected_mmio_ != 0*/
       return false;
     }
 
+    std::shared_ptr<dma_pack> pack = nullptr;
     if (has_pending_dma()) {
-      if (nullptr !=
-          iterate_add_erase<dma_pack>(pending_dma_packs_, event_ptr)) {
-        return true;
-      }
+      pack = iterate_add_erase<dma_pack>(pending_dma_packs_, event_ptr);
+      // TODO: only if is not pending anymore
+      if (pack) {
+        add_set_triggered_trace<mmio_pack>(pack_type::MMIO_PACK, pack);
+      } 
     }
 
+    // found everything of this trace, hence do not create a new event
+    // as it must have been issued by another trace
     if (found_nic_rx_ and found_nic_tx_ and found_host_rx_ and
         found_host_tx_ and not has_pending_call()) {
       return false;
     }
 
-    return nullptr != create_add<dma_pack>(pending_dma_packs_, event_ptr);
+    if (not pack) {
+      pack = create_add<dma_pack>(pending_dma_packs_, event_ptr);
+      if (nullptr == pack) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   bool add_eth(event_t event_ptr) {
@@ -999,6 +1215,32 @@ at_least_still_expected_mmio_ != 0*/
       } else if (is_type(event_ptr, EventType::NicRx_t)) {
         found_nic_rx_ = true;  // TODO: expect dma
       }
+
+      // TODO: a transmit must have been triggered, hence find trigger
+      //       a receive might have been triggered by a transmit but must not be
+      // (event though we currently expect this in general)
+      if (p->is_send_) {
+        add_set_triggered_trace<mmio_pack>(pack_type::MMIO_PACK, p);
+      } else {
+        add_set_triggered_trace<eth_pack>(pack_type::ETH_PACK, p);
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  bool add_generic_single(event_t event_ptr) {
+    if (not event_ptr or (found_nic_rx_ and found_nic_tx_ and found_host_rx_ and
+                          found_host_tx_ and not has_pending_call())) {
+      return false;
+    }
+
+    auto pack = std::make_shared<single_event_pack>();
+    if (pack and pack->add_on_match(event_ptr)) {
+      add_pack(pack);
+
+      // TODO: any triggers?!?!?!
 
       return true;
     }

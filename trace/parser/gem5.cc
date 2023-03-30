@@ -143,7 +143,7 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
   // 0x1 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4
   // 2 bytes: data = 0x6
 
-  uint64_t dev, func, reg, bytes, data;
+  uint64_t dev, func, reg, bytes, data, bar, offset;
   bool is_readConf = line_reader_.consume_and_trim_string("readConfig:");
   if (is_readConf || line_reader_.consume_and_trim_string("writeConfig:")) {
     line_reader_.trimL();
@@ -213,11 +213,15 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
           line_reader_.consume_and_trim_string(" size ") &&
           line_reader_.parse_uint_trim(10, size) &&
           line_reader_.consume_and_trim_string(" id ") &&
-          line_reader_.parse_uint_trim(10, id)) {
+          line_reader_.parse_uint_trim(10, id) && 
+          line_reader_.consume_and_trim_string(" bar ") &&
+          line_reader_.parse_uint_trim(10, bar) &&
+          line_reader_.consume_and_trim_string(" offs ") &&
+          line_reader_.parse_uint_trim(16, offset)) {
         if (isReadWrite == 1) {
-          return std::make_shared<HostMmioR>(timestamp, getIdent(), getName(), id, addr, size);
+          return std::make_shared<HostMmioR>(timestamp, getIdent(), getName(), id, addr, size, bar, offset);
         } else {
-          return std::make_shared<HostMmioW>(timestamp, getIdent(), getName(), id, addr, size);
+          return std::make_shared<HostMmioW>(timestamp, getIdent(), getName(), id, addr, size, bar, offset);
         }
       }
     } else if (line_reader_.consume_and_trim_string("completed DMA id ") &&

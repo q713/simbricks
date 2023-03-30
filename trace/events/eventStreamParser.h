@@ -101,7 +101,7 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
       event_t event = nullptr;
       uint64_t pc = 0, id = 0, addr = 0, size = 0, vec = 0, dev = 0, func = 0,
                bytes = 0, data = 0, reg = 0, offset = 0, len = 0, intr = 0,
-               val = 0;
+               val = 0, bar = 0;
       std::string function, comp;
       if (event_name.compare("SimSendSyncSimSendSync") == 0) {
         event = std::make_shared<SimSendSync>(ts, parser_ident, parser_name);
@@ -172,12 +172,28 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("HostMmioR") == 0) {
-          event = std::make_shared<HostMmioR>(ts, parser_ident, parser_name, id,
-                                              addr, size);
-        } else if (event_name.compare("HostMmioW") == 0) {
-          event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name, id,
-                                              addr, size);
+        if (event_name.compare("HostMmioR") == 0 or event_name.compare("HostMmioW") == 0) {
+          //if (not line_reader_.consume_and_trim_string(", bar=") or
+          //    not line_reader_.parse_uint_trim(10, bar) or
+          //    not line_reader_.consume_and_trim_string(", offset=") or
+          //    not line_reader_.parse_uint_trim(16, offset) ){
+          //  std::cout
+          //    << "error parsing HostMmioR, HostMmioW bar or offset"
+          //    << std::endl;
+          //  continue;
+          //}
+
+          // TODO: comment this in!!!!!!!!!!!!!!!!!!!
+          bar = 0;
+          offset = 0;
+
+          if (event_name.compare("HostMmioW") == 0) {
+            event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name, id,
+                                              addr, size, bar, offset);
+          } else {
+            event = std::make_shared<HostMmioR>(ts, parser_ident, parser_name, id,
+                                              addr, size, bar, offset);
+          }
         } else if (event_name.compare("HostDmaR") == 0) {
           event = std::make_shared<HostDmaR>(ts, parser_ident, parser_name, id,
                                              addr, size);

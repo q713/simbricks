@@ -68,15 +68,20 @@ void HostMmioCW::display(std::ostream &os) {
 
 void HostAddrSizeOp::display(std::ostream &os) {
   HostIdOp::display(os);
-  os << ", addr=" << std::hex << addr_ << ", size=" << size_ << " ";
+  os << ", addr=" << std::hex << addr_ << ", size=" << size_;
+}
+
+void HostMmioOp::display(std::ostream &os) {
+  HostAddrSizeOp::display(os);
+  os << ", bar=" << bar_ << std::hex << ", offset=" << offset_;
 }
 
 void HostMmioR::display(std::ostream &os) {
-  HostAddrSizeOp::display(os);
+  HostMmioOp::display(os);
 }
 
 void HostMmioW::display(std::ostream &os) {
-  HostAddrSizeOp::display(os);
+  HostMmioOp::display(os);
 }
 
 void HostDmaC::display(std::ostream &os) {

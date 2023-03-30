@@ -88,7 +88,7 @@ class Event {
   // TODO: optimize string name out in later versions
   const std::string parser_name_;
 
-  inline const size_t getIdent() {
+  inline size_t getIdent() {
     return parser_identifier_;
   }
 
@@ -263,13 +263,31 @@ class HostAddrSizeOp : public HostIdOp {
   virtual ~HostAddrSizeOp() = default;
 };
 
-class HostMmioR : public HostAddrSizeOp {
+class HostMmioOp : public HostAddrSizeOp {
+ public:
+  uint64_t bar_;
+  uint64_t offset_;
+
+  void display(std::ostream &os) override;
+
+ protected:
+  explicit HostMmioOp(uint64_t ts, const size_t parser_identifier,
+                      const std::string parser_name, EventType type,
+                      std::string name, uint64_t id, uint64_t addr,
+                      uint64_t size, uint64_t bar, uint64_t offset)
+      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name), type,
+                       std::move(name), id, addr, size) {
+  }
+};
+
+class HostMmioR : public HostMmioOp {
  public:
   explicit HostMmioR(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t id, uint64_t addr,
-                     uint64_t size)
-      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name),
-                       EventType::HostMmioR_t, "HostMmioR", id, addr, size) {
+                     uint64_t size, uint64_t bar, uint64_t offset)
+      : HostMmioOp(ts, parser_identifier, std::move(parser_name),
+                   EventType::HostMmioR_t, "HostMmioR", id, addr, size, bar,
+                   offset) {
   }
 
   ~HostMmioR() = default;
@@ -277,13 +295,14 @@ class HostMmioR : public HostAddrSizeOp {
   void display(std::ostream &os) override;
 };
 
-class HostMmioW : public HostAddrSizeOp {
+class HostMmioW : public HostMmioOp {
  public:
   explicit HostMmioW(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t id, uint64_t addr,
-                     uint64_t size)
-      : HostAddrSizeOp(ts, parser_identifier, std::move(parser_name),
-                       EventType::HostMmioW_t, "HostMmioW", id, addr, size) {
+                     uint64_t size, uint64_t bar, uint64_t offset)
+      : HostMmioOp(ts, parser_identifier, std::move(parser_name),
+                   EventType::HostMmioW_t, "HostMmioW", id, addr, size, bar,
+                   offset) {
   }
 
   ~HostMmioW() = default;

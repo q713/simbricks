@@ -25,7 +25,7 @@ Help("""
 Type: 'scons' to build the trace production program,
       'scons debug=1' to build the trace debug program without optimizations turned on
       'scons verbose_link=1' to link the trace program with verbose linker flags
-      'scons use_clang=1' to use clang++ for building, the default is g++ (the other flags also apply for this).
+      'scons use_gcc=1' to use g++ for building, the default is clang++ (the other flags also apply for this).
       'scons -c/--clean' to cleanup the trace build.
 """)
 
@@ -44,15 +44,15 @@ if int(verbose_link):
     link_flags = ['-Xlinker', '--verbose']
 
 # compiler dependent cli flags for coroutines
-use_clang = ARGUMENTS.get('use_clang', 0)
-if int(use_clang):
-    link_flags.append('-stdlib=libc++')
-    cxx = 'clang++'
-    cxx_flags += ' -std=c++20 -fcoroutines-ts -stdlib=libc++'
-else:
+use_gcc = ARGUMENTS.get('use_gcc', 0)
+if int(use_gcc):
     cxx = 'g++'
     cxx_flags += ' -std=gnu++20 -fcoroutines'
     linkcom += ' -Wl,--start-group $_LIBFLAGS -Wl,--end-group'
+else:
+    link_flags.append('-stdlib=libc++')
+    cxx = 'clang++'
+    cxx_flags += ' -std=c++20 -fcoroutines-ts -stdlib=libc++'
 
 # create the construction environment
 env = Environment(CXX=cxx, CXXFLAGS=cxx_flags, CPPPATH = ['.'])

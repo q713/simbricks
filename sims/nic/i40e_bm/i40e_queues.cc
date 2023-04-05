@@ -37,7 +37,7 @@ namespace i40e {
 queue_base::queue_base(const std::string &qname_, uint32_t &reg_head_,
                        uint32_t &reg_tail_, i40e_bm &dev_)
     : qname(qname_),
-      log(qname_, dev_.runner_),
+      log(qname_, dev_),
       dev(dev_),
       active_first_pos(0),
       active_first_idx(0),
@@ -276,10 +276,11 @@ queue_base::desc_ctx::desc_ctx(queue_base &queue_)
     : queue(queue_),
       state(DESC_EMPTY),
       index(0),
+      desc_len(queue_.desc_len),
       data(nullptr),
       data_len(0),
       data_capacity(0) {
-  desc = new uint8_t[queue_.desc_len];
+  desc = new uint8_t[desc_len];
 }
 
 queue_base::desc_ctx::~desc_ctx() {

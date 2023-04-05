@@ -68,11 +68,12 @@ class logger : public std::ostream {
 
  protected:
   std::string label;
+  nicbm::Runner::Device &dev;
   nicbm::Runner *runner;
   std::stringstream ss;
 
  public:
-  explicit logger(const std::string &label_, nicbm::Runner *runner_);
+  explicit logger(const std::string &label_, nicbm::Runner::Device &dev_);
   logger &operator<<(char c);
   logger &operator<<(int32_t c);
   logger &operator<<(uint8_t i);
@@ -132,6 +133,7 @@ class queue_base {
     enum state state;
     uint32_t index;
     void *desc;
+    size_t desc_len;
     void *data;
     size_t data_len;
     size_t data_capacity;

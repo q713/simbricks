@@ -30,17 +30,17 @@
 #include <string>
 #include <vector>
 
-#include "trace/corobelt/coroutine.h"
+#include "trace/corobelt/corobelt.h"
 #include "trace/events/events.h"
-#include "trace/filter/componenttable.h"
-#include "trace/filter/symtable.h"
+#include "trace/util/componenttable.h"
+#include "trace/util/symtable.h"
 #include "trace/reader/reader.h"
 
 using event_t = std::shared_ptr<Event>;
-using task_t = sim::coroutine::task<void>;
-using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+using ytask_t = sim::corobelt::yield_task<event_t>;
+//using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
 
-class LogParser : public sim::coroutine::producer<event_t> {
+class LogParser : public sim::corobelt::producer<event_t> {
  protected:
   const std::string name_;
   const size_t identifier_;
@@ -59,7 +59,7 @@ class LogParser : public sim::coroutine::producer<event_t> {
  public:
   explicit LogParser(const std::string name, const std::string log_file_path,
                      LineReader &line_reader)
-      : sim::coroutine::producer<event_t>(),
+      : sim::corobelt::producer<event_t>(),
         name_(std::move(name)),
         identifier_(LogParser::get_Id()),
         log_file_path_(std::move(log_file_path)),
@@ -73,7 +73,7 @@ class LogParser : public sim::coroutine::producer<event_t> {
     return name_;
   }
 
-  virtual task_t produce(chan_t *tar_chan) override {
+  virtual ytask_t produce() override {
     co_return;
   }
 };
@@ -113,7 +113,7 @@ class Gem5Parser : public LogParser {
         symbol_tables_(std::move(symbol_tables)) {
   }
 
-  task_t produce(chan_t *tar_chan) override;
+  ytask_t produce() override;
 };
 
 class NicBmParser : public LogParser {
@@ -133,7 +133,7 @@ class NicBmParser : public LogParser {
       : LogParser(std::move(name), std::move(log_file_path), line_reader) {
   }
 
-  task_t produce(chan_t *tar_chan) override;
+  ytask_t produce() override;
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

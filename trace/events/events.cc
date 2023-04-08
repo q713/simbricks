@@ -187,6 +187,7 @@ bool is_type(std::shared_ptr<Event> event_ptr, EventType type) {
   return event_ptr && event_ptr->getType() == type;
 }
 
+/*
 bool is_host_issued_mmio_event(std::shared_ptr<Event> event_ptr) {
   const static std::set<EventType> mmio_events{EventType::HostMmioR_t,
                                                EventType::HostMmioW_t,
@@ -233,3 +234,4 @@ bool is_nic_event(std::shared_ptr<Event> event_ptr) {
 
   return event_ptr && nic_events.contains(event_ptr->getType());
 }
+*/

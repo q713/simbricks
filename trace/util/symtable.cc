@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "trace/filter/symtable.h"
+#include "trace/util/symtable.h"
 
 #include <functional>
 

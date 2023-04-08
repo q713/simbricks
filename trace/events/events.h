@@ -34,7 +34,7 @@
 #include <type_traits>
 
 #include "lib/utils/log.h"
-#include "trace/corobelt/coroutine.h"
+#include "trace/corobelt/corobelt.h"
 
 #define DEBUG_EVENT_ ;
 
@@ -671,24 +671,23 @@ inline std::ostream &operator<<(std::ostream &os, Event &e) {
   return os;
 }
 
-class EventPrinter : public sim::coroutine::consumer<std::shared_ptr<Event>> {
+class EventPrinter : public sim::corobelt::consumer<std::shared_ptr<Event>> {
   std::ostream &out_;
 
  public:
   EventPrinter(std::ostream &out) : out_(out) {
   }
 
-  sim::coroutine::task<void> consume(
-      sim::coroutine::unbuffered_single_chan<std::shared_ptr<Event>> *src_chan)
-      override {
-    if (!src_chan) {
+  sim::corobelt::task<void> consume(
+      sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task) override {
+    if (!producer_task) {
       co_return;
     }
+
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
-    for (msg = co_await src_chan->read(); msg;
-         msg = co_await src_chan->read()) {
-      event = msg.value();
+    while(*producer_task) {
+      event = producer_task->get();
       out_ << *event << std::endl;
     }
     co_return;
@@ -704,6 +703,7 @@ struct EventComperator {
 
 bool is_type(std::shared_ptr<Event> event_ptr, EventType type);
 
+/*
 bool is_host_issued_mmio_event(std::shared_ptr<Event> event_ptr);
 
 bool is_host_received_mmio_event(std::shared_ptr<Event> event_ptr);
@@ -713,5 +713,6 @@ bool is_host_mmio_event(std::shared_ptr<Event> event_ptr);
 bool is_host_event(std::shared_ptr<Event> event_ptr);
 
 bool is_nic_event(std::shared_ptr<Event> event_ptr);
+*/ 
 
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

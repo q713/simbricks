@@ -25,15 +25,14 @@
 #ifndef SIMBRICKS_TRACE_EVENT_FILTER_H_
 #define SIMBRICKS_TRACE_EVENT_FILTER_H_
 
-#include "trace/corobelt/coroutine.h"
+#include "trace/corobelt/corobelt.h"
 #include "trace/events/events.h"
 
 using event_t = std::shared_ptr<Event>;
-using task_t = sim::coroutine::task<void>;
-using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+using ytask_t = sim::corobelt::yield_task<event_t>;
 
 /* general operator to act on an event stream */
-struct event_stream_actor : public sim::coroutine::pipe<event_t> {
+struct event_stream_actor : public sim::corobelt::pipe<event_t> {
   /* this method acts on an event within the stream,
    * if true is returned, the event is after acting on
    * it pased on, in case false is returned, the event
@@ -42,27 +41,25 @@ struct event_stream_actor : public sim::coroutine::pipe<event_t> {
     return true;
   }
 
-  task_t process(chan_t *src_chan, chan_t *tar_chan) override {
-    if (not src_chan or not tar_chan) {
+  ytask_t process(ytask_t *producer_task) override {
+    if (not producer_task) {
       co_return;
     }
 
     bool pass_on;
     event_t event;
     std::optional<event_t> msg;
-    for (msg = co_await src_chan->read(); msg;
-         msg = co_await src_chan->read()) {
-      event = msg.value();
+    while(*producer_task) {
+      event = producer_task->get();
       pass_on = act_on(event);
-      if (pass_on and not co_await tar_chan->write(event)) {
-        break;
+      if (pass_on) {
+        co_yield event;
       }
     }
-
     co_return;
   }
 
-  explicit event_stream_actor() : sim::coroutine::pipe<event_t>() {
+  explicit event_stream_actor() : sim::corobelt::pipe<event_t>() {
   }
 
   ~event_stream_actor() = default;

@@ -22,20 +22,25 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <iostream>
-#include <string>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <set>
+#include <string>
 
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
+#include "trace/analytics/eventStreamTracer.h"
+#include "trace/corobelt/corobelt.h"
 #include "trace/events/event-filter.h"
-#include "trace/events/eventStreamOperators.h"
 #include "trace/events/eventStreamParser.h"
 #include "trace/parser/parser.h"
+#include "trace/events/events.h"
 
 int main(int argc, char *argv[]) {
+  using event_t = std::shared_ptr<Event>;
+  using trace_t = std::shared_ptr<trace>;
+
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")(
       "linux-dump-server-client",
@@ -76,23 +81,22 @@ int main(int argc, char *argv[]) {
   // printer to consume pipeline and to print events
   EventPrinter eventPrinter(std::cout);
 
-  // analyse event stream
-  event_stream_tracer tracer;
-
   if (result.count("event-stream-log")) {
     LineReader streamLr;
     event_stream_parser streamParser(
         result["event-stream-log"].as<std::string>(), streamLr);
 
-    //std::function<bool(std::shared_ptr<Event>)> pred = [](std::shared_ptr<Event> event_ptr) {
-    //  static const std::set<size_t> allowed_ids{0, 1};
-    //  return event_ptr and allowed_ids.contains(event_ptr->getIdent());
-    //};
-    //GenericEventFilter sourceFilter{pred};
+    trace_printer t_printer;
+    //EventTypeFilter filt{{EventType::HostCall_t, EventType::HostMmioCR_t,
+    //                      EventType::HostMmioCW_t, EventType::HostMmioR_t,
+    //                      EventType::HostMmioW_t,
+    //                      EventType::HostMmioImRespPoW_t, EventType::NicMmioW_t,
+    //                      EventType::NicMmioR_t}};
+    //sim::corobelt::pipeline<event_t> pipel{streamParser, {filt}};
+    event_stream_tracer tracer{streamParser};
 
-    sim::coroutine::pipeline<event_t> tracePipeline{streamParser, {tracer}};
-
-    if (!sim::coroutine::awaiter<event_t>::await_termination(tracePipeline)) {
+    if (!sim::corobelt::awaiter<trace_t>::await_termination(tracer,
+                                                            t_printer)) {
       std::cerr << "could not await termination of the pipeline" << std::endl;
       exit(EXIT_FAILURE);
     }
@@ -135,9 +139,10 @@ int main(int argc, char *argv[]) {
   // gem5 log parser that generates events
   LineReader serverLr;
   Gem5Parser gem5ServerPar{"Gem5ServerParser",
-                          result["gem5-log-server"].as<std::string>(),
-                          {linuxvm_symbols, nicdriver_symbols}, compF,
-                          serverLr};
+                           result["gem5-log-server"].as<std::string>(),
+                           {linuxvm_symbols, nicdriver_symbols},
+                           compF,
+                           serverLr};
 
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
@@ -190,19 +195,17 @@ int main(int argc, char *argv[]) {
 
   using event_t = std::shared_ptr<Event>;
 
-  sim::coroutine::collector<event_t, EventComperator> collector{
+  sim::corobelt::collector<event_t, EventComperator> collector{
       {nicCliPar, gem5ClientPar, nicSerPar, gem5ServerPar}};
 
-  sim::coroutine::pipeline<event_t> pipeline{
-      collector, {timestampFilter, eventFilter, tracer}};
+  sim::corobelt::pipeline<event_t> pipeline{collector,
+                                            {timestampFilter, eventFilter}};
 
-  if (!sim::coroutine::awaiter<event_t>::await_termination(pipeline,
-                                                           eventPrinter)) {
+  if (!sim::corobelt::awaiter<event_t>::await_termination(pipeline,
+                                                          eventPrinter)) {
     std::cerr << "could not await termination of the pipeline" << std::endl;
     exit(EXIT_FAILURE);
   }
-
-  std::cout << tracer << std::endl;
 
   exit(EXIT_SUCCESS);
 }

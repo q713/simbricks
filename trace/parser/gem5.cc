@@ -248,11 +248,7 @@ event_t Gem5Parser::parse_simbricks_event(uint64_t timestamp) {
 }
 
 
-task_t Gem5Parser::produce(chan_t *tar_chan) {
-  if (!tar_chan) {
-    co_return;
-  }
-
+ytask_t Gem5Parser::produce() {
   if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGERR("%s: could not create reader\n", name_.c_str());
@@ -280,23 +276,25 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
     if (line_reader_.consume_and_trim_string("global:") &&
         component_table_.filter("global")) {
       event_ptr = parse_global_event(timestamp);
-      if (!event_ptr || !co_await tar_chan->write(event_ptr)) {
+      if (!event_ptr) {
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN("%s: could not parse global event from line '%s'\n",
                   name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       }
+      co_yield event_ptr;
       continue;
     } else if (line_reader_.consume_and_trim_string("system.switch_cpus:") &&
                component_table_.filter("system.switch_cpus")) {
       event_ptr = parse_system_switch_cpus(timestamp); 
-      if (!event_ptr || !co_await tar_chan->write(event_ptr)) {
+      if (!event_ptr) {
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN(
             "%s: could not parse system.switch_cpus event from line '%s'\n",
             name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       }
+      co_yield event_ptr;
       continue;
 
     } else if (line_reader_.consume_and_trim_string("system.pc")) {
@@ -304,7 +302,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
         if (line_reader_.consume_and_trim_string(".interface") &&
             component_table_.filter("system.pc.pci_host.interface")) {
           event_ptr = parse_system_pc_pci_host_interface(timestamp);
-          if (!event_ptr || !co_await tar_chan->write(event_ptr)) {
+          if (!event_ptr) {
 #ifdef PARSER_DEBUG_GEM5_
             DFLOGWARN(
                 "%s: could not parse system.pc.pci_host.interface event from "
@@ -312,10 +310,11 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
           }
+          co_yield event_ptr;
           continue;
         } else if (component_table_.filter("system.pc.pci_host")) {
           event_ptr = parse_system_pc_pci_host(timestamp);
-          if (!event_ptr || !co_await tar_chan->write(event_ptr)) {
+          if (!event_ptr) {
 #ifdef PARSER_DEBUG_GEM5_
             DFLOGWARN(
                 "%s: could not parse system.pc.pci_host event from "
@@ -323,12 +322,13 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
           }
+          co_yield event_ptr;
           continue;
         }
       } else if (line_reader_.consume_and_trim_string(".simbricks") &&
                  component_table_.filter("system.pc.simbricks")) {
         event_ptr = parse_system_pc_simbricks(timestamp);
-        if (!event_ptr || !co_await tar_chan->write(event_ptr)) {
+        if (!event_ptr) {
 #ifdef PARSER_DEBUG_GEM5_
           DFLOGWARN(
               "%s: could not parse system.pc.simbricks event from line "
@@ -336,6 +336,7 @@ task_t Gem5Parser::produce(chan_t *tar_chan) {
               name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
         }
+        co_yield event_ptr;
         continue;
       }
     }

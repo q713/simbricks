@@ -28,17 +28,16 @@
 #include <string>
 
 #include "lib/utils/string_util.h"
-#include "trace/corobelt/coroutine.h"
+#include "trace/corobelt/corobelt.h"
 #include "trace/reader/reader.h"
 
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 
 using event_t = std::shared_ptr<Event>;
-using task_t = sim::coroutine::task<void>;
-using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+using ytask_t = sim::corobelt::yield_task<event_t>;
 
-struct event_stream_parser : public sim::coroutine::producer<event_t> {
+struct event_stream_parser : public sim::corobelt::producer<event_t> {
   bool parse_ident_name_ts(size_t &parser_ident, std::string &parser_name,
                            uint64_t &ts) {
     if (not line_reader_.consume_and_trim_string(": source_id=") or
@@ -61,12 +60,7 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
     return line_reader_.parse_uint_trim(10, ts);
   }
 
-  task_t produce(chan_t *tar_chan) override {
-    if (not tar_chan) {
-      std::cout << "no target channel given" << std::endl;
-      co_return;
-    }
-
+  ytask_t produce() override {
     if (not line_reader_.open_file(log_file_path_)) {
       std::cout << "could not open log file path" << std::endl;
       co_return;
@@ -310,10 +304,10 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
           event = std::make_shared<NicDmaEn>(ts, parser_ident, parser_name, id,
                                              addr, len);
         } else if (event_name.compare("NicDmaCW") == 0) {
-          event = std::make_shared<NicDmaCR>(ts, parser_ident, parser_name, id,
+          event = std::make_shared<NicDmaCW>(ts, parser_ident, parser_name, id,
                                              addr, len);
         } else {
-          event = std::make_shared<NicDmaCW>(ts, parser_ident, parser_name, id,
+          event = std::make_shared<NicDmaCR>(ts, parser_ident, parser_name, id,
                                              addr, len);
         }
 
@@ -368,10 +362,7 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
         co_return;
       }
 
-      if (not co_await tar_chan->write(event)) {
-        std::cout << "could not write event to the target channel" << std::endl;
-        co_return;
-      }
+      co_yield event;
     }
 
     co_return;
@@ -379,7 +370,7 @@ struct event_stream_parser : public sim::coroutine::producer<event_t> {
 
   explicit event_stream_parser(const std::string log_file_path,
                                LineReader &line_reader)
-      : sim::coroutine::producer<event_t>(),
+      : sim::corobelt::producer<event_t>(),
         log_file_path_(std::move(log_file_path)),
         line_reader_(line_reader) {
   }

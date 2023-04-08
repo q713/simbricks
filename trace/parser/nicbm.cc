@@ -220,11 +220,7 @@ bool NicBmParser::parse_op_addr_len_pending(uint64_t &op, uint64_t &addr,
   return true;
 }
 
-task_t NicBmParser::produce(chan_t *tar_chan) {
-  if (!tar_chan) {
-    co_return;
-  }
-
+ytask_t NicBmParser::produce() {
   if (!line_reader_.open_file(log_file_path_)) {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not create reader\n", name_.c_str());
@@ -308,7 +304,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<NicMmioR>(timestamp, getIdent(), getName(), off, len, val);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("write(")) {
@@ -316,7 +312,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<NicMmioW>(timestamp, getIdent(), getName(), off, len, val);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("issuing dma")) {
@@ -324,7 +320,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<NicDmaI>(timestamp, getIdent(), getName(), op, addr, len);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("executing dma")) {
@@ -332,7 +328,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<NicDmaEx>(timestamp, getIdent(), getName(), op, addr, len);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("enqueuing dma")) {
@@ -340,7 +336,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<NicDmaEn>(timestamp, getIdent(), getName(), op, addr, len);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("completed dma")) {
@@ -349,13 +345,14 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
             continue;
           }
           event_ptr = std::make_shared<NicDmaCR>(timestamp, getIdent(), getName(), op, addr, len);
-          co_await tar_chan->write(event_ptr);
+          co_yield event_ptr;
+
         } else if (line_reader_.consume_and_trim_till_string("write")) {
           if (!parse_op_addr_len_pending(op, addr, len, pending, false)) {
             continue;
           }
           event_ptr = std::make_shared<NicDmaCW>(timestamp, getIdent(), getName(), op, addr, len);
-          co_await tar_chan->write(event_ptr);
+          co_yield event_ptr;
         }
         continue;
 
@@ -373,7 +370,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<NicMsix>(timestamp, getIdent(), getName(), vec, isX);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string("eth")) {
@@ -382,7 +379,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
             continue;
           }
           event_ptr = std::make_shared<NicTx>(timestamp, getIdent(), getName(), len);
-          co_await tar_chan->write(event_ptr);
+          co_yield event_ptr;
           continue;
 
         } else if (line_reader_.consume_and_trim_till_string("rx: port ")) {
@@ -392,7 +389,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
             continue;
           }
           event_ptr = std::make_shared<NicRx>(timestamp, getIdent(), getName(), port, len);
-          co_await tar_chan->write(event_ptr);
+          co_yield event_ptr;
         }
         continue;
 
@@ -401,7 +398,7 @@ task_t NicBmParser::produce(chan_t *tar_chan) {
           continue;
         }
         event_ptr = std::make_shared<SetIX>(timestamp, getIdent(), getName(), addr);
-        co_await tar_chan->write(event_ptr);
+        co_yield event_ptr;
         continue;
         
       } else if (line_reader_.consume_and_trim_till_string("dma write data")) {

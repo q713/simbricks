@@ -148,7 +148,8 @@ struct tcp_trace {
   }
 
   bool is_new_call_needed() {
-    return has_expected_transmits_or_receives();
+    return expected_tx_ <= 0 or expected_rx_ <= 0 or
+           has_expected_transmits_or_receives();
   }
 
   inline bool has_pending_mmio() {
@@ -287,7 +288,7 @@ struct tcp_trace {
       auto cp = std::static_pointer_cast<call_pack>(pack);
       // in case a call pack is non networking related we filter it out
       if (not cp->is_relevant_) {
-        // std::cout << "filtered out non relevant call pack:" << std::endl;
+        //std::cout << "filtered out non relevant call pack:" << std::endl;
         // cp->display(std::cout);
         // std::cout << std::endl;
         return;
@@ -415,15 +416,20 @@ struct tcp_trace {
       if (env_.is_socket_connect(event_ptr)) {
         expected_tx_ += 3;
         expected_rx_ += 2;
+        pack->mark_as_relevant();
       } else if (env_.is_nw_interface_send(event_ptr)) {
         ++expected_tx_;
+        pack->mark_as_relevant();
       } else if (env_.is_nw_interface_receive(event_ptr)) {
         ++expected_rx_;
+        pack->mark_as_relevant();
       } else if (env_.is_driver_tx(event_ptr)) {
         ++driver_tx_;
+        pack->mark_as_relevant();
       } else if (env_.is_driver_rx(event_ptr)) {
         // TODO
         ++driver_rx_;
+        pack->mark_as_relevant();
       }
 
       return true;

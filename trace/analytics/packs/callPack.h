@@ -83,6 +83,13 @@ struct call_pack : public event_pack {
     return false;
   }
 
+  uint64_t get_smallest_cimpletion_ts() override {
+    if (not call_pack_entry_) {
+      return 0xFFFFFFFFFFFFFFFF;
+    }
+    return events_.back()->timestamp_;
+  }
+
   void mark_as_relevant() {
     is_relevant_ = true;
   }

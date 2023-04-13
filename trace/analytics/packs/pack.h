@@ -147,6 +147,13 @@ struct event_pack {
     return false;
   }
 
+  virtual uint64_t get_smallest_cimpletion_ts() {
+    if (is_pending()) {
+      return 0xFFFFFFFFFFFFFFFF;
+    }
+    return events_.back()->timestamp_;
+  }
+
   bool set_triggered_by(pack_t trigger) {
     if (not triggered_by_) {
       triggered_by_ = trigger;
@@ -176,6 +183,10 @@ struct event_pack {
 
   bool potentially_triggered(pack_t pack_ptr) {
     if (not pack_ptr /*or pack_ptr->is_pending()*/ or pack_ptr.get() == this) {
+      return false;
+    }
+
+    if (get_smallest_cimpletion_ts() > pack_ptr->get_smallest_cimpletion_ts()) {
       return false;
     }
 

@@ -32,14 +32,16 @@
 #include "lib/utils/log.h"
 #include "trace/analytics/eventStreamTracer.h"
 #include "trace/corobelt/corobelt.h"
+#include "trace/env/symtable.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/event-filter.h"
 #include "trace/events/eventStreamParser.h"
-#include "trace/parser/parser.h"
 #include "trace/events/events.h"
+#include "trace/parser/parser.h"
 
 int main(int argc, char *argv[]) {
   using event_t = std::shared_ptr<Event>;
-  using trace_t = std::shared_ptr<trace>;
+  using trace_t = std::shared_ptr<tcp_trace>;
 
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")(
@@ -78,22 +80,24 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+  sim::trace::env::trace_environment env;
+
   // printer to consume pipeline and to print events
   EventPrinter eventPrinter(std::cout);
 
   if (result.count("event-stream-log")) {
     LineReader streamLr;
     event_stream_parser streamParser(
-        result["event-stream-log"].as<std::string>(), streamLr);
+        result["event-stream-log"].as<std::string>(), streamLr, env);
 
     trace_printer t_printer;
-    //EventTypeFilter filt{{EventType::HostCall_t, EventType::HostMmioCR_t,
-    //                      EventType::HostMmioCW_t, EventType::HostMmioR_t,
-    //                      EventType::HostMmioW_t,
-    //                      EventType::HostMmioImRespPoW_t, EventType::NicMmioW_t,
-    //                      EventType::NicMmioR_t}};
-    //sim::corobelt::pipeline<event_t> pipel{streamParser, {filt}};
-    event_stream_tracer tracer{streamParser};
+    // EventTypeFilter filt{{EventType::HostCall_t, EventType::HostMmioCR_t,
+    //                       EventType::HostMmioCW_t, EventType::HostMmioR_t,
+    //                       EventType::HostMmioW_t,
+    //                       EventType::HostMmioImRespPoW_t,
+    //                       EventType::NicMmioW_t, EventType::NicMmioR_t}};
+    // sim::corobelt::pipeline<event_t> pipel{streamParser, {filt}};
+    event_stream_tracer_tcp tracer{streamParser, env};
 
     if (!sim::corobelt::awaiter<trace_t>::await_termination(tracer,
                                                             t_printer)) {
@@ -113,18 +117,15 @@ int main(int argc, char *argv[]) {
   }
 
   // symbol filter to translate hex address to function-name/label
-  LineReader ssymsLr;
-  SSyms linuxvm_symbols{"Linuxvm-Symbols", ssymsLr};
-
-  LineReader nicdslr;
-  SSyms nicdriver_symbols{"Nicdriver-Symbols", nicdslr};
-
   if ((result.count("linux-dump-server-client") &&
-       !linuxvm_symbols.load_file(
-           result["linux-dump-server-client"].as<std::string>(), 0)) ||
+       !env.add_symbol_table(
+           "Linuxvm-Symbols",
+           result["linux-dump-server-client"].as<std::string>(), 0,
+           FilterType::Syms)) ||
       (result.count("nic-i40e-dump") &&
-       !nicdriver_symbols.load_file(result["nic-i40e-dump"].as<std::string>(),
-                                    0xffffffffa0000000ULL))) {
+       !env.add_symbol_table("Nicdriver-Symbols",
+                             result["nic-i40e-dump"].as<std::string>(),
+                             0xffffffffa0000000ULL, FilterType::Syms))) {
     std::cerr << "could not initialize symbol table" << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -139,25 +140,23 @@ int main(int argc, char *argv[]) {
   // gem5 log parser that generates events
   LineReader serverLr;
   Gem5Parser gem5ServerPar{"Gem5ServerParser",
-                           result["gem5-log-server"].as<std::string>(),
-                           {linuxvm_symbols, nicdriver_symbols},
-                           compF,
-                           serverLr};
+                           result["gem5-log-server"].as<std::string>(), env,
+                           compF, serverLr};
 
   LineReader clientLr;
   Gem5Parser gem5ClientPar{"Gem5ClientParser",
-                           result["gem5-log-client"].as<std::string>(),
-                           {linuxvm_symbols, nicdriver_symbols},
-                           compF,
-                           clientLr};
+                           result["gem5-log-client"].as<std::string>(), env,
+                           compF, clientLr};
 
   // nicbm log parser that generates events
   LineReader nicSerLr;
   NicBmParser nicSerPar{"NicbmServerParser",
-                        result["nicbm-log-server"].as<std::string>(), nicSerLr};
+                        result["nicbm-log-server"].as<std::string>(), nicSerLr,
+                        env};
   LineReader nicCliLr;
   NicBmParser nicCliPar{"NicbmClientParser",
-                        result["nicbm-log-client"].as<std::string>(), nicCliLr};
+                        result["nicbm-log-client"].as<std::string>(), nicCliLr,
+                        env};
 
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // TODO:

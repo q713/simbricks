@@ -31,14 +31,14 @@
 #include <vector>
 
 #include "trace/corobelt/corobelt.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
-#include "trace/util/componenttable.h"
-#include "trace/util/symtable.h"
 #include "trace/reader/reader.h"
+#include "trace/util/componenttable.h"
 
 using event_t = std::shared_ptr<Event>;
 using ytask_t = sim::corobelt::yield_task<event_t>;
-//using chan_t = sim::coroutine::unbuffered_single_chan<event_t>;
+using sim::trace::env::trace_environment;
 
 class LogParser : public sim::corobelt::producer<event_t> {
  protected:
@@ -46,6 +46,7 @@ class LogParser : public sim::corobelt::producer<event_t> {
   const size_t identifier_;
   const std::string log_file_path_;
   LineReader &line_reader_;
+  trace_environment &env_;
 
   bool parse_timestamp(uint64_t &timestamp);
 
@@ -58,12 +59,13 @@ class LogParser : public sim::corobelt::producer<event_t> {
 
  public:
   explicit LogParser(const std::string name, const std::string log_file_path,
-                     LineReader &line_reader)
+                     LineReader &line_reader, trace_environment &env)
       : sim::corobelt::producer<event_t>(),
         name_(std::move(name)),
         identifier_(LogParser::get_Id()),
         log_file_path_(std::move(log_file_path)),
-        line_reader_(line_reader){};
+        line_reader_(line_reader),
+        env_(env){};
 
   inline size_t getIdent() {
     return identifier_;
@@ -80,7 +82,6 @@ class LogParser : public sim::corobelt::producer<event_t> {
 
 class Gem5Parser : public LogParser {
   ComponentFilter &component_table_;
-  std::vector<std::reference_wrapper<SymsFilter>> symbol_tables_;
 
  protected:
   event_t parse_global_event(uint64_t timestamp);
@@ -97,20 +98,10 @@ class Gem5Parser : public LogParser {
 
  public:
   explicit Gem5Parser(const std::string name, const std::string log_file_path,
-                      SymsFilter &symbol_table,
-                      ComponentFilter &component_table, LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader),
+                      trace_environment &env, ComponentFilter &component_table,
+                      LineReader &line_reader)
+      : LogParser(std::move(name), std::move(log_file_path), line_reader, env),
         component_table_(component_table) {
-    symbol_tables_.push_back(std::ref(symbol_table));
-  }
-
-  explicit Gem5Parser(
-      const std::string name, const std::string log_file_path,
-      std::vector<std::reference_wrapper<SymsFilter>> symbol_tables,
-      ComponentFilter &component_table, LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader),
-        component_table_(component_table),
-        symbol_tables_(std::move(symbol_tables)) {
   }
 
   ytask_t produce() override;
@@ -129,8 +120,8 @@ class NicBmParser : public LogParser {
 
  public:
   explicit NicBmParser(const std::string name, const std::string log_file_path,
-                       LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader) {
+                       LineReader &line_reader, trace_environment &env)
+      : LogParser(std::move(name), std::move(log_file_path), line_reader, env) {
   }
 
   ytask_t produce() override;

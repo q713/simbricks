@@ -35,7 +35,6 @@
 
 #include "lib/utils/log.h"
 #include "lib/utils/string_util.h"
-#include "trace/analytics/config.h"
 #include "trace/analytics/packs/callPack.h"
 #include "trace/analytics/packs/dmaPack.h"
 #include "trace/analytics/packs/ethPack.h"
@@ -45,6 +44,7 @@
 #include "trace/analytics/packs/msixPack.h"
 #include "trace/analytics/packs/pack.h"
 #include "trace/corobelt/corobelt.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
 
 enum Stacks { KERNEL, NIC, SWITCH, NETWORK };
@@ -74,7 +74,7 @@ std::ostream &operator<<(std::ostream &out, Stacks s) {
 // analysis of a
 //       nic/host pair is supported at the moment
 // --> when extending: make sure that events in a pack belong to same source!!!
-struct trace {
+struct tcp_trace {
   using event_t = std::shared_ptr<Event>;
   using msg_t = std::optional<event_t>;
   using pack_t = std::shared_ptr<event_pack>;
@@ -83,43 +83,60 @@ struct trace {
   using dmap_t = std::shared_ptr<dma_pack>;
   using msix_t = std::shared_ptr<msix_pack>;
   using hostint_t = std::shared_ptr<host_int_pack>;
-  using trace_t = std::shared_ptr<trace>;
+  using trace_t = std::shared_ptr<tcp_trace>;
+
+  sim::trace::env::trace_environment &env_;
 
   std::list<pack_t> finished_packs_;  // TODO: print a trace in order
 
   std::list<callp_t> pending_call_packs_;
-  bool found_host_tx_ = false;
-  bool found_host_rx_ = false;
-  bool last_call_pci_msix_desc_addr_ = false;
-  size_t expected_transmits_ = 0;
-  size_t expected_receives_ = 0;
-
   std::list<mmiop_t> pending_mmio_packs_;
-
   std::list<dmap_t> pending_dma_packs_;
-
-  bool found_nic_tx_ = false;
-  bool found_nic_rx_ = false;
-
   std::list<msix_t> pending_msix_packs_;
-
   std::list<hostint_t> pending_hostint_packs_;
+
+  bool is_tcp_handshake_ = false;
+  bool is_tcp_tx_rx_ = false;
+  bool last_call_pci_msix_desc_addr_ = false;
+  size_t expected_tx_ = 0;
+  size_t expected_rx_ = 0;
+  size_t driver_tx_ = 0;
+  size_t driver_rx_ = 0;
+  size_t nic_tx_ = 0;
+  size_t nic_rx_ = 0;
 
   // state to decide what dam operations belong to
   pack_t last_finished_dma_causing_pack_ = nullptr;
 
-  trace() = default;
+  tcp_trace(sim::trace::env::trace_environment &env) : env_(env){};
 
-  ~trace() = default;
+  ~tcp_trace() = default;
 
   bool is_trace_pending() {
     return not has_finished_packs() or has_pending_call() or
-           has_pending_mmio() or has_pending_msix() or not found_host_tx_ or
-           not found_host_rx_;
+           has_pending_mmio() or has_pending_msix() or has_pending_dma() or
+           has_expected_transmits_or_receives();
+    // not found_host_tx_ or not found_host_rx_;
     // return not has_finished_packs() or has_pending_call() or
     // has_pending_mmio() or
     //        has_pending_dma() or not found_host_tx_ or not found_host_rx_ or
     //        not found_nic_tx_ or not found_nic_rx_;
+  }
+
+  inline bool is_trace_done() {
+    return not is_trace_pending();
+  }
+
+  inline bool has_expected_transmits() {
+    return expected_tx_ < driver_tx_ and expected_tx_ < nic_tx_;
+  }
+
+  inline bool has_expected_receives() {
+    return expected_rx_ < driver_rx_ and expected_rx_ < nic_rx_;
+  }
+
+  inline bool has_expected_transmits_or_receives() {
+    return has_expected_transmits() or has_expected_receives();
   }
 
   inline bool has_finished_packs() {
@@ -131,8 +148,7 @@ struct trace {
   }
 
   bool is_new_call_needed() {
-    return not found_nic_rx_ or not found_nic_tx_ or not found_host_rx_ or
-           not found_host_tx_;
+    return has_expected_transmits_or_receives();
   }
 
   inline bool has_pending_mmio() {
@@ -140,9 +156,7 @@ struct trace {
   }
 
   bool is_new_mmio_needed() {
-    return (not found_nic_rx_ or not found_nic_tx_ or not found_host_rx_ or
-            not found_host_tx_ or has_pending_call()) and
-           (expected_transmits_ != 0 or expected_receives_ != 0);
+    return has_expected_transmits() or has_pending_call();
   }
 
   inline bool has_pending_dma() {
@@ -150,8 +164,7 @@ struct trace {
   }
 
   bool is_new_dma_needed() {
-    return not found_nic_rx_ or not found_nic_tx_ or not found_host_rx_ or
-           not found_host_tx_ or has_pending_call();
+    return has_expected_transmits_or_receives() or has_pending_call();
   }
 
   inline bool has_pending_msix() {
@@ -160,6 +173,18 @@ struct trace {
 
   inline bool has_pending_hostint() {
     return not pending_hostint_packs_.empty();
+  }
+
+  bool is_tcp_handshake() {
+    return is_tcp_handshake_;
+  }
+
+  bool is_tcp_tx_rx() {
+    return is_tcp_tx_rx_;
+  }
+
+  inline bool is_handshake_or_tx_rx() {
+    return is_tcp_handshake() or is_tcp_tx_rx();
   }
 
   bool add_to_trace(event_t event_ptr) {
@@ -220,8 +245,8 @@ struct trace {
     out << std::endl;
     out << std::endl;
     out << "Event Trace:" << std::endl;
-    out << "\t expected transmits: " << expected_transmits_ << std::endl;
-    out << "\t expected receives: " << expected_receives_ << std::endl;
+    out << "\t expected transmits: " << expected_tx_ << std::endl;
+    out << "\t expected receives: " << expected_rx_ << std::endl;
     out << "\tFinished Packs:" << std::endl;
     for (auto pack : finished_packs_) {
       pack->display(out, 2);
@@ -300,7 +325,7 @@ struct trace {
   template <typename pt>
   std::shared_ptr<pt> create_add(std::list<std::shared_ptr<pt>> &pending,
                                  event_t event_ptr) {
-    auto pending_stack = std::make_shared<pt>();
+    auto pending_stack = std::make_shared<pt>(env_);
     if (pending_stack and pending_stack->add_on_match(event_ptr)) {
       pending.push_back(pending_stack);
       return pending_stack;
@@ -363,18 +388,8 @@ struct trace {
     }
 
     if (pack) {
-      if (pack->is_transmitting()) {
-        found_host_tx_ = true;
-      }
-
-      if (pack->is_receiving()) {
-        found_host_rx_ = true;
-      }
-      // when receiving, was it triggered by an hardware interrupt
-      // in case yes, this call stack was triggered by this interrupt
-
       // remove mmio packs after pci_msix_desc_addr
-      if (not sim::analytics::conf::is_pci_msix_desc_addr(event_ptr)) {
+      if (not env_.is_pci_msix_desc_addr(event_ptr)) {
         if (last_call_pci_msix_desc_addr_) {
           auto it = pending_mmio_packs_.begin();
           while (it != pending_mmio_packs_.end()) {
@@ -397,8 +412,18 @@ struct trace {
         last_call_pci_msix_desc_addr_ = true;
       }
 
-      if (sim::analytics::conf::is_transmit_call(event_ptr)) {
-        ++expected_transmits_;
+      if (env_.is_socket_connect(event_ptr)) {
+        expected_tx_ += 3;
+        expected_rx_ += 2;
+      } else if (env_.is_nw_interface_send(event_ptr)) {
+        ++expected_tx_;
+      } else if (env_.is_nw_interface_receive(event_ptr)) {
+        ++expected_rx_;
+      } else if (env_.is_driver_tx(event_ptr)) {
+        ++driver_tx_;
+      } else if (env_.is_driver_rx(event_ptr)) {
+        // TODO
+        ++driver_rx_;
       }
 
       return true;
@@ -433,7 +458,7 @@ struct trace {
     }
 
     if (not pack) {
-      pack = std::make_shared<mmio_pack>(last_call_pci_msix_desc_addr_);
+      pack = std::make_shared<mmio_pack>(last_call_pci_msix_desc_addr_, env_);
       if (not pack or not pack->add_on_match(event_ptr)) {
         return false;
       }
@@ -455,13 +480,11 @@ struct trace {
       if (pack and pack->is_complete() and last_finished_dma_causing_pack_) {
         if (last_finished_dma_causing_pack_->get_type() ==
             pack_type::MMIO_PACK) {
-
           // TODO: after Mmio write, we expect Dma Reads
           add_set_triggered_trace<mmio_pack>(pack_type::MMIO_PACK, pack);
 
         } else if (last_finished_dma_causing_pack_->get_type() ==
                    pack_type::ETH_PACK) {
-
           // TODO: after Rx/Tx, we expect Dma Writes/Write
           add_set_triggered_trace<eth_pack>(pack_type::ETH_PACK, pack);
         }
@@ -489,23 +512,18 @@ struct trace {
 
   bool add_eth(event_t event_ptr) {
     if (not event_ptr or
-        (found_nic_rx_ and found_nic_tx_ and found_host_rx_ and
-         found_host_tx_ and not has_pending_call()) or
-        (expected_transmits_ == 0 and expected_receives_ == 0)) {
+        (not has_expected_transmits_or_receives() and not has_pending_call())) {
       return false;
     }
 
-    auto p = std::make_shared<eth_pack>();
+    auto p = std::make_shared<eth_pack>(env_);
     if (p and p->add_on_match(event_ptr) and p->is_complete()) {
       add_pack(p);
 
       if (is_type(event_ptr, EventType::NicTx_t)) {
-        found_nic_tx_ = true;
-        expected_transmits_--;
-        expected_receives_++;
+        nic_tx_++;
       } else if (is_type(event_ptr, EventType::NicRx_t)) {
-        found_nic_rx_ = true;
-        expected_receives_--;
+        nic_rx_++;
       }
 
       if (p->is_transmit()) {
@@ -562,12 +580,11 @@ struct trace {
   }
 
   bool add_generic_single(event_t event_ptr) {
-    if (not event_ptr or (found_nic_rx_ and found_nic_tx_ and found_host_rx_ and
-                          found_host_tx_ and not has_pending_call())) {
+    if (not event_ptr or not is_trace_pending()) {
       return false;
     }
 
-    auto pack = std::make_shared<single_event_pack>();
+    auto pack = std::make_shared<single_event_pack>(env_);
     if (pack and pack->add_on_match(event_ptr)) {
       add_pack(pack);
 
@@ -579,14 +596,15 @@ struct trace {
   }
 };
 
-struct trace_printer : public sim::corobelt::consumer<std::shared_ptr<trace>> {
+struct trace_printer
+    : public sim::corobelt::consumer<std::shared_ptr<tcp_trace>> {
   sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<trace>> *producer_task) {
+      sim::corobelt::yield_task<std::shared_ptr<tcp_trace>> *producer_task) {
     if (not producer_task) {
       co_return;
     }
 
-    std::shared_ptr<trace> t;
+    std::shared_ptr<tcp_trace> t;
     while (*producer_task) {
       t = producer_task->get();
       t->display(std::cout);
@@ -595,7 +613,7 @@ struct trace_printer : public sim::corobelt::consumer<std::shared_ptr<trace>> {
     co_return;
   };
 
-  trace_printer() : sim::corobelt::consumer<std::shared_ptr<trace>>() {
+  trace_printer() : sim::corobelt::consumer<std::shared_ptr<tcp_trace>>() {
   }
 };
 

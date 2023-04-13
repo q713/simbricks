@@ -27,17 +27,15 @@
 
 #include <memory>
 
-#include "trace/analytics/packs/pack.h"
 #include "trace/analytics/packs/ethPack.h"
+#include "trace/analytics/packs/pack.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
-#include "trace/analytics/config.h"
-
-using event_t = std::shared_ptr<Event>;
-
-struct event_pack;
-using pack_t = std::shared_ptr<event_pack>;
 
 struct mmio_pack : public event_pack {
+  using event_t = std::shared_ptr<Event>;
+  using pack_t = std::shared_ptr<event_pack>;
+
   // issue, either host_mmio_w_ or host_mmio_r_
   event_t host_mmio_issue_ = nullptr;
   bool is_read_ = false;
@@ -49,8 +47,9 @@ struct mmio_pack : public event_pack {
   // completion, either host_mmio_cw_ or host_mmio_cr_
   event_t completion_ = nullptr;
 
-  explicit mmio_pack(bool pci_msix_desc_addr_before)
-      : event_pack(pack_type::MMIO_PACK),
+  explicit mmio_pack(bool pci_msix_desc_addr_before,
+                     sim::trace::env::trace_environment &env)
+      : event_pack(pack_type::MMIO_PACK, env),
         pci_msix_desc_addr_before_(pci_msix_desc_addr_before) {
   }
 
@@ -203,4 +202,4 @@ struct mmio_pack : public event_pack {
   }
 };
 
-#endif // SIMBRICKS_TRACE_EVENT_MMIO_PACK_H_
+#endif  // SIMBRICKS_TRACE_EVENT_MMIO_PACK_H_

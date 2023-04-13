@@ -28,7 +28,7 @@
 #include "trace/analytics/packs/pack.h"
 #include "trace/analytics/packs/callPack.h"
 #include "trace/events/events.h"
-#include "trace/analytics/config.h"
+#include "trace/env/traceEnvironment.h"
 
 struct eth_pack : public event_pack {
   using event_t = std::shared_ptr<Event>;
@@ -38,7 +38,7 @@ struct eth_pack : public event_pack {
   event_t tx_rx_ = nullptr;
   bool is_send_ = false;
 
-  eth_pack() : event_pack(pack_type::ETH_PACK) {
+  eth_pack(sim::trace::env::trace_environment &env) : event_pack(pack_type::ETH_PACK, env) {
   }
 
   ~eth_pack() = default;

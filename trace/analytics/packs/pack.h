@@ -29,6 +29,7 @@
 #include <memory>
 #include <vector>
 
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
 
 using event_t = std::shared_ptr<Event>;
@@ -90,6 +91,8 @@ inline std::ostream &operator<<(std::ostream &os, pack_type t) {
 
 struct event_pack {
   using pack_t = std::shared_ptr<event_pack>;
+
+  sim::trace::env::trace_environment &env_;
 
   uint64_t id_;
   pack_type type_;
@@ -155,7 +158,8 @@ struct event_pack {
   virtual ~event_pack() = default;
 
  protected:
-  event_pack(pack_type t) : id_(get_pack_id()), type_(t) {
+  event_pack(pack_type t, sim::trace::env::trace_environment &env)
+      : env_(env), id_(get_pack_id()), type_(t) {
   }
 
   void add_to_pack(event_t event_ptr) {

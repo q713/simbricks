@@ -26,15 +26,17 @@
 #define SIMBRICKS_TRACE_EVENT_GENERIC_PACK_H_
 
 #include "trace/analytics/packs/pack.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
 
 struct single_event_pack : public event_pack {
   using event_t = std::shared_ptr<Event>;
   using pack_t = std::shared_ptr<event_pack>;
-
+  
   event_t event_p_ = nullptr;
 
-  single_event_pack() : event_pack(pack_type::SE_PACK) {
+  single_event_pack(sim::trace::env::trace_environment &env)
+      : event_pack(pack_type::SE_PACK, env) {
   }
 
   virtual bool add_on_match(event_t event_ptr) {
@@ -53,4 +55,4 @@ struct single_event_pack : public event_pack {
   }
 };
 
-#endif // SIMBRICKS_TRACE_EVENT_GENERIC_PACK_H_
+#endif  // SIMBRICKS_TRACE_EVENT_GENERIC_PACK_H_

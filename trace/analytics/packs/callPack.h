@@ -30,9 +30,9 @@
 #include <memory>
 #include <vector>
 
-#include "trace/analytics/packs/pack.h"
 #include "trace/analytics/packs/mmioPack.h"
-#include "trace/analytics/config.h"
+#include "trace/analytics/packs/pack.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
 
 using event_t = std::shared_ptr<Event>;
@@ -62,7 +62,7 @@ struct call_pack : public event_pack {
       auto mmio_p = std::static_pointer_cast<mmio_pack>(pack_ptr);
       event_t trigger = nullptr;
       auto it = send_trigger_.crbegin();
-      for ( ; it != send_trigger_.crend(); it++) {
+      for (; it != send_trigger_.crend(); it++) {
         event_t p = *it;
         if (p->timestamp_ < mmio_p->host_mmio_issue_->timestamp_) {
           trigger = p;
@@ -83,15 +83,16 @@ struct call_pack : public event_pack {
     return false;
   }
 
-  bool is_transmitting() {
-    return transmits_;
+  void mark_as_relevant() {
+    is_relevant_ = true;
   }
 
-  bool is_receiving() {
-    return receives_;
+  void mark_as_non_relevant() {
+    is_relevant_ = false;
   }
 
-  call_pack() : event_pack(pack_type::CALL_PACK) {
+  call_pack(sim::trace::env::trace_environment &env)
+      : event_pack(pack_type::CALL_PACK, env) {
   }
 
   ~call_pack() = default;
@@ -105,54 +106,52 @@ struct call_pack : public event_pack {
       return false;
     }
 
-    auto host_call = std::static_pointer_cast<HostCall>(event_ptr);
-    const std::string &func_name = host_call->func_; 
-    if (0 == func_name.compare("entry_SYSCALL_64")) {
+    if (env_.is_sys_entry(event_ptr)) {
       if (call_pack_entry_) {
         is_pending_ = false;
         syscall_return_ = events_.back();
-        //std::cout << "found call stack end" << std::endl;
-        //this->display(std::cout);
-        //std::cout << std::endl;
+        // std::cout << "found call stack end" << std::endl;
+        // this->display(std::cout);
+        // std::cout << std::endl;
         return false;
       }
       is_pending_ = true;
       call_pack_entry_ = event_ptr;
       add_to_pack(event_ptr);
       return true;
-    } 
+    }
 
     if (not call_pack_entry_) {
       return false;
     }
-    
-    if (sim::analytics::conf::is_transmit_call(event_ptr)) {
+
+    if (env_.is_driver_tx(event_ptr)) {
       transmits_ = true;
       send_trigger_.push_back(event_ptr);
 
-    // TODO: where does the kernel actually "receive" the packet
-    } else if (sim::analytics::conf::is_receive_call(event_ptr)) {
+      // TODO: where does the kernel actually "receive" the packet
+    } else if (env_.is_driver_rx(event_ptr)) {
       receives_ = true;
       receiver_.push_back(event_ptr);
     }
 
-    is_relevant_ = is_relevant_ || transmits_ || receives_;
-                  //sim::analytics::conf::LINUX_NET_STACK_FUNC_INDICATOR.contains(
-                  //     host_call->func_);
+    // is_relevant_ = is_relevant_ || transmits_ || receives_;
+    // sim::analytics::conf::LINUX_NET_STACK_FUNC_INDICATOR.contains(
+    //      host_call->func_);
 
     add_to_pack(event_ptr);
     return true;
   }
 };
 
-//static const std::set<std::string> return_indicator{
-//        "syscall_return_via_sysret",
-//        "switch_fpu_return",
-//        "native_irq_return_iret",
-//        "fpregs_assert_state_consistent",
-//        "prepare_exit_to_usermode",
-//        "syscall_return_slowpath",
-//        "native_iret",
-//        "atomic_try_cmpxchg"};
+// static const std::set<std::string> return_indicator{
+//         "syscall_return_via_sysret",
+//         "switch_fpu_return",
+//         "native_irq_return_iret",
+//         "fpregs_assert_state_consistent",
+//         "prepare_exit_to_usermode",
+//         "syscall_return_slowpath",
+//         "native_iret",
+//         "atomic_try_cmpxchg"};
 
 #endif  // SIMBRICKS_TRACE_EVENT_CALL_PACK_H_

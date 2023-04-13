@@ -64,7 +64,8 @@ if not int(debug):
 
 # all source files that shall/need to be compiled
 src_files = ['trace/trace.cc', Glob('trace/events/*.cc'), Glob('trace/util/*.cc'), 
-    Glob('trace/parser/*.cc'), Glob('trace/reader/*.cc')] 
+    Glob('trace/parser/*.cc'), Glob('trace/reader/*.cc'), Glob('trace/env/*.cc'), 
+    Glob('trace/analytics/*.cc')] 
 
 # the program that shall be built
 env.Program(target='trace/trace', source=src_files, LIBS=libraries, LIBPATH=libpath, LINKFLAGS=link_flags, LINKCOM = linkcom)

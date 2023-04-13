@@ -70,21 +70,14 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
 
   // in case the given instruction is a call we expect to be able to 
   // translate the address to a symbol name
-  std::string symbol = "";
-  std::string comp = "";
-  for (SymsFilter &sym_table : symbol_tables_) {
-    if (sym_table.filter(addr, symbol)) {
-      comp = std::move(sym_table.get_ident());
-      break;
-    }
-    symbol = "";
-    comp = "";
-  } 
+  std::string *symbol = nullptr;
+  const std::string *comp = nullptr;
+  bool found_symbol = env_.symtable_filter(addr, symbol, comp);
 
   if (line_reader_.consume_and_trim_char('.')) {
     // TODO: gather micro operation information? if yes, which informations?
     return std::make_shared<HostInstr>(timestamp, getIdent(), getName(), addr);
-  } else if (not symbol.empty()) {
+  } else if (found_symbol) {
     return std::make_shared<HostCall>(timestamp, getIdent(), getName(), addr, symbol, comp);
   }
   

@@ -166,18 +166,17 @@ class HostInstr : public Event {
 
   void display(std::ostream &os) override;
 };
-
 class HostCall : public HostInstr {
  public:
-  const std::string func_;
-  const std::string comp_;
+  const std::string *func_; // TODO: internalize function name
+  const std::string *comp_;
 
   explicit HostCall(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t pc,
-                    const std::string func, const std::string comp)
+                    const std::string *func, const std::string *comp)
       : HostInstr(ts, parser_identifier, std::move(parser_name), pc,
                   EventType::HostCall_t, "HostCall"),
-        func_(std::move(func)),
+        func_(func),
         comp_(std::move(comp)) {
   }
 
@@ -702,17 +701,5 @@ struct EventComperator {
 };
 
 bool is_type(std::shared_ptr<Event> event_ptr, EventType type);
-
-/*
-bool is_host_issued_mmio_event(std::shared_ptr<Event> event_ptr);
-
-bool is_host_received_mmio_event(std::shared_ptr<Event> event_ptr);
-
-bool is_host_mmio_event(std::shared_ptr<Event> event_ptr);
-
-bool is_host_event(std::shared_ptr<Event> event_ptr);
-
-bool is_nic_event(std::shared_ptr<Event> event_ptr);
-*/ 
 
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

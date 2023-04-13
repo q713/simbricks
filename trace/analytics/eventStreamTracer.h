@@ -37,21 +37,25 @@
 #include "lib/utils/string_util.h"
 #include "trace/analytics/trace.h"
 #include "trace/corobelt/corobelt.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
 
-// forward declarations + type aliases
-using event_t = std::shared_ptr<Event>;
-using msg_t = std::optional<event_t>;
-using trace_t = std::shared_ptr<trace>;
-using src_task = sim::corobelt::yield_task<event_t>;
-using tar_task = sim::corobelt::yield_task<trace_t>;
+using trace_t = std::shared_ptr<tcp_trace>;
 
-struct event_stream_tracer
+struct event_stream_tracer_tcp
     : public sim::corobelt::transformer<event_t, trace_t> {
+  using event_t = std::shared_ptr<Event>;
+  using msg_t = std::optional<event_t>;
+  using src_task = sim::corobelt::yield_task<event_t>;
+  using tar_task = sim::corobelt::yield_task<trace_t>;  
+
+  sim::trace::env::trace_environment &env_;
+
   trace_t cur_trace_ = nullptr;
 
   // handling of yet unmatched events
   std::list<event_t> unmatched_events;
+
   bool has_unmatched() {
     return not unmatched_events.empty();
   }
@@ -122,7 +126,7 @@ struct event_stream_tracer
       }
 
       if (!cur_trace_) {
-        cur_trace_ = std::make_shared<trace>();
+        cur_trace_ = std::make_shared<tcp_trace>(env_);
         if (!cur_trace_) {
           DLOGERR("could not allocate new trace\n");
           co_return;
@@ -140,26 +144,12 @@ struct event_stream_tracer
     }
   }
 
-  explicit event_stream_tracer(sim::corobelt::producer<event_t> &prod)
-      : sim::corobelt::transformer<event_t, trace_t>(prod) {
+  explicit event_stream_tracer_tcp(sim::corobelt::producer<event_t> &prod,
+                                   sim::trace::env::trace_environment &env)
+      : sim::corobelt::transformer<event_t, trace_t>(prod), env_(env) {
   }
 
-  ~event_stream_tracer() = default;
-
-  // TODO: obsolete
-  // friend std::ostream &operator<<(std::ostream &out,
-  //                                event_stream_tracer &tracer) {
-  //  out << std::endl;
-  //  out << std::endl;
-  //  out << "event_stream_tracer traces:" << std::endl;
-  //  if (tracer.cur_trace_) {
-  //    out << "yet unfinished trace:" << std::endl;
-  //    tracer.cur_trace_->display(out);
-  //  }
-  //  out << std::endl;
-  //  out << std::endl;
-  //  return out;
-  //}
+  ~event_stream_tracer_tcp() = default;
 };
 
 #endif  // SIMBRICKS_TRACE_EVENT_STREAM_OPERATOR_H_

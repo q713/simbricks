@@ -22,51 +22,29 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SIMBRICKS_TRACE_EVENT_HOSTINT_PACK_H_
-#define SIMBRICKS_TRACE_EVENT_HOSTINT_PACK_H_
+#ifndef SIM_TRACE_STRING_INTERNALIZER_H_
+#define SIM_TRACE_STRING_INTERNALIZER_H_
 
-#include "trace/analytics/packs/pack.h"
-#include "trace/events/events.h"
-#include "trace/env/traceEnvironment.h"
+#include <string>
+#include <unordered_set>
 
-struct host_int_pack : public event_pack {
-  using event_t = std::shared_ptr<Event>;
-  using pack_t = std::shared_ptr<event_pack>;
+class string_internalizer {
+  std::unordered_set<std::string> symbol_set_;
 
-  event_t host_post_int_ = nullptr;
-  event_t host_clear_int_ = nullptr;
+ public:
+  string_internalizer() = default;
+  
+  ~string_internalizer() = default;
 
-  host_int_pack(sim::trace::env::trace_environment &env)
-      : event_pack(pack_type::HOST_INT_PACK, env) {
+  const std::string * internalize(const std::string& symbol) {
+    const auto& it_b = symbol_set_.emplace(symbol);
+    return std::addressof(*it_b.first);
   }
 
-  ~host_int_pack() = default;
-
-  bool add_on_match(event_t event_ptr) override {
-    if (not event_ptr) {
-      return false;
-    }
-
-    if (is_type(event_ptr, EventType::HostPostInt_t)) {
-      if (host_post_int_) {
-        return false;
-      }
-      host_post_int_ = event_ptr;
-
-    } else if (is_type(event_ptr, EventType::HostClearInt_t)) {
-      if (not host_post_int_ or host_clear_int_) {
-        return false;
-      }
-      host_clear_int_ = event_ptr;
-      is_pending_ = false;
-
-    } else {
-      return false;
-    }
-
-    add_to_pack(event_ptr);
-    return true;
+  const std::string * internalize(const char *symbol) {
+    const auto& it_b = symbol_set_.emplace(symbol);
+    return std::addressof(*it_b.first);
   }
 };
 
-#endif  // SIMBRICKS_TRACE_EVENT_HOSTINT_PACK_H_
+#endif // SIM_TRACE_STRING_INTERNALIZER_H_

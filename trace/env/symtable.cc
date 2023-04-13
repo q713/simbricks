@@ -22,14 +22,14 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "trace/util/symtable.h"
+#include "trace/env/symtable.h"
 
 #include <functional>
 
 #include "lib/utils/string_util.h"
 #include "trace/reader/reader.h"
 
-//#define SYMS_DEBUG_ 1
+// #define SYMS_DEBUG_ 1
 
 bool SymsFilter::parse_address(uint64_t &address) {
   line_reader_.trimL();
@@ -69,8 +69,9 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
     return false;
   }
 
+  const std::string *sym_ptr = i_.internalize(name);
   auto pair =
-      symbol_table_.insert(std::make_pair(address_offset + address, name));
+      symbol_table_.insert(std::make_pair(address_offset + address, sym_ptr));
   if (!pair.second) {
 #ifdef SYMS_DEBUG_
     DFLOGWARN("%s: could not insert new symbol table value at address '%u'\n",
@@ -82,7 +83,7 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
   return true;
 }
 
-bool SymsFilter::filter(uint64_t address, std::string &sym_name_target) {
+bool SymsFilter::filter(uint64_t address, const std::string *sym_name_target) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
     sym_name_target = symbol->second;
@@ -92,7 +93,7 @@ bool SymsFilter::filter(uint64_t address, std::string &sym_name_target) {
   return false;
 }
 
-bool SymsSyms::skip_fags() {
+bool SymsFilter::skip_syms_fags() {
   line_reader_.trimL();
   // flags are devided into 7 groups
   if (line_reader_.cur_length() < 8) {
@@ -108,20 +109,20 @@ bool SymsSyms::skip_fags() {
   return true;
 }
 
-bool SymsSyms::skip_section() {
+bool SymsFilter::skip_syms_section() {
   line_reader_.trimL();
   line_reader_.trimTillWhitespace();
   return true;
 }
 
-bool SymsSyms::skip_alignment() {
+bool SymsFilter::skip_syms_alignment() {
   line_reader_.trimL();
   line_reader_.trimTillWhitespace();
   return true;
 }
 
-bool SymsSyms::load_file(const std::string &file_path,
-                         uint64_t address_offset) {
+bool SymsFilter::load_syms(const std::string &file_path,
+                           uint64_t address_offset) {
   if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
@@ -144,7 +145,7 @@ bool SymsSyms::load_file(const std::string &file_path,
     }
 
     // skip yet uninteresting values of ELF format
-    if (!skip_fags() || !skip_section() || !skip_alignment()) {
+    if (!skip_syms_fags() || !skip_syms_section() || !skip_syms_alignment()) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN(
           "%s: line '%s' seems to have wrong format regarding flags, section "
@@ -178,7 +179,7 @@ bool SymsSyms::load_file(const std::string &file_path,
   return true;
 }
 
-bool SSyms::load_file(const std::string &file_path, uint64_t address_offset) {
+bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
   if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
@@ -230,8 +231,8 @@ Num:    Value             Size  Type      Bind    Vis      Ndx  Name
 0:      0000000000000000     0  NOTYPE    LOCAL   DEFAULT  UND
 1:      ffffffff81000000     0  SECTION   LOCAL   DEFAULT    1
 */
-bool ReadElfSyms::load_file(const std::string &file_path,
-                            uint64_t address_offset) {
+bool SymsFilter::load_elf(const std::string &file_path,
+                          uint64_t address_offset) {
   if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", identifier_.c_str());
@@ -301,4 +302,36 @@ bool ReadElfSyms::load_file(const std::string &file_path,
     }
   }
   return true;
+}
+
+std::shared_ptr<SymsFilter> SymsFilter::create(
+    const std::string identifier, const std::string &file_path,
+    uint64_t address_offset, FilterType type,
+    std::set<std::string> symbol_filter, string_internalizer &i) {
+  std::shared_ptr<SymsFilter> filter{
+      new SymsFilter{std::move(identifier), std::move(symbol_filter), i}};
+  if (not filter) {
+    return nullptr;
+  }
+
+  switch (type) {
+    case S:
+      if (not filter->load_s(file_path, address_offset)) {
+        return nullptr;
+      }
+      break;
+    case Elf:
+      if (not filter->load_elf(file_path, address_offset)) {
+        return nullptr;
+      }
+      break;
+    case Syms:
+    default:
+      if (not filter->load_syms(file_path, address_offset)) {
+        return nullptr;
+      }
+      break;
+  }
+
+  return filter;
 }

@@ -29,6 +29,7 @@
 
 #include "lib/utils/string_util.h"
 #include "trace/corobelt/corobelt.h"
+#include "trace/env/traceEnvironment.h"
 #include "trace/reader/reader.h"
 
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
@@ -96,7 +97,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
       uint64_t pc = 0, id = 0, addr = 0, size = 0, vec = 0, dev = 0, func = 0,
                bytes = 0, data = 0, reg = 0, offset = 0, len = 0, intr = 0,
                val = 0, bar = 0;
-      std::string function, comp;
+      std::string function, component;
       if (event_name.compare("SimSendSyncSimSendSync") == 0) {
         event = std::make_shared<SimSendSync>(ts, parser_ident, parser_name);
 
@@ -119,12 +120,15 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                 function, sim_string_utils::is_alnum_dot_bar) or
             not line_reader_.consume_and_trim_string(", comp=") or
             not line_reader_.extract_and_substr_until_into(
-                comp, sim_string_utils::is_alnum_dot_bar)) {
+                component, sim_string_utils::is_alnum_dot_bar)) {
           std::cout << "error parsing HostInstr" << std::endl;
           continue;
         }
+        const std::string *func = env_.internalize_additional(function);
+        const std::string *comp = env_.internalize_additional(component);
+
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
-                                           function, comp);
+                                           func, comp);
 
       } else if (event_name.compare("HostMmioImRespPoW") == 0) {
         event =
@@ -166,27 +170,28 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("HostMmioR") == 0 or event_name.compare("HostMmioW") == 0) {
-          //if (not line_reader_.consume_and_trim_string(", bar=") or
-          //    not line_reader_.parse_uint_trim(10, bar) or
-          //    not line_reader_.consume_and_trim_string(", offset=") or
-          //    not line_reader_.parse_uint_trim(16, offset) ){
-          //  std::cout
-          //    << "error parsing HostMmioR, HostMmioW bar or offset"
-          //    << std::endl;
-          //  continue;
-          //}
+        if (event_name.compare("HostMmioR") == 0 or
+            event_name.compare("HostMmioW") == 0) {
+          // if (not line_reader_.consume_and_trim_string(", bar=") or
+          //     not line_reader_.parse_uint_trim(10, bar) or
+          //     not line_reader_.consume_and_trim_string(", offset=") or
+          //     not line_reader_.parse_uint_trim(16, offset) ){
+          //   std::cout
+          //     << "error parsing HostMmioR, HostMmioW bar or offset"
+          //     << std::endl;
+          //   continue;
+          // }
 
           // TODO: comment this in!!!!!!!!!!!!!!!!!!!
           bar = 0;
           offset = 0;
 
           if (event_name.compare("HostMmioW") == 0) {
-            event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name, id,
-                                              addr, size, bar, offset);
+            event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name,
+                                                id, addr, size, bar, offset);
           } else {
-            event = std::make_shared<HostMmioR>(ts, parser_ident, parser_name, id,
-                                              addr, size, bar, offset);
+            event = std::make_shared<HostMmioR>(ts, parser_ident, parser_name,
+                                                id, addr, size, bar, offset);
           }
         } else if (event_name.compare("HostDmaR") == 0) {
           event = std::make_shared<HostDmaR>(ts, parser_ident, parser_name, id,
@@ -369,15 +374,18 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
   };
 
   explicit event_stream_parser(const std::string log_file_path,
-                               LineReader &line_reader)
+                               LineReader &line_reader,
+                               sim::trace::env::trace_environment &env)
       : sim::corobelt::producer<event_t>(),
         log_file_path_(std::move(log_file_path)),
-        line_reader_(line_reader) {
+        line_reader_(line_reader),
+        env_(env) {
   }
 
  private:
   const std::string log_file_path_;
   LineReader &line_reader_;
+  sim::trace::env::trace_environment &env_;
 };
 
 #endif  // SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_

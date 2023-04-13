@@ -27,9 +27,9 @@
 
 #include <memory>
 
-#include "trace/analytics/config.h"
 #include "trace/analytics/packs/pack.h"
 #include "trace/events/events.h"
+#include "trace/env/traceEnvironment.h"
 
 struct msix_pack : public event_pack {
   using event_t = std::shared_ptr<Event>;
@@ -38,7 +38,7 @@ struct msix_pack : public event_pack {
   event_t nic_msix_ = nullptr;
   event_t host_msix_ = nullptr;
 
-  msix_pack() : event_pack(pack_type::MSIX_PACK) {
+  msix_pack(sim::trace::env::trace_environment &env) : event_pack(pack_type::MSIX_PACK, env) {
   }
 
   ~msix_pack() = default;
@@ -57,7 +57,7 @@ struct msix_pack : public event_pack {
         return false;
       }
       nic_msix_ = event_ptr;
-    
+
     } else if (is_type(event_ptr, EventType::HostMsiX_t)) {
       if (not nic_msix_ or host_msix_) {
         return false;
@@ -67,7 +67,7 @@ struct msix_pack : public event_pack {
       }
       host_msix_ = event_ptr;
       is_pending_ = false;
-    
+
     } else {
       return false;
     }

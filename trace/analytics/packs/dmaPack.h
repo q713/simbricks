@@ -31,14 +31,12 @@
 
 #include "trace/analytics/packs/pack.h"
 #include "trace/events/events.h"
-#include "trace/analytics/config.h"
-
-using event_t = std::shared_ptr<Event>;
-
-struct event_pack;
-using pack_t = std::shared_ptr<event_pack>;
+#include "trace/env/traceEnvironment.h"
 
 struct dma_pack : public event_pack {
+  using event_t = std::shared_ptr<Event>;
+  using pack_t = std::shared_ptr<event_pack>;
+
   // NicDmaI_t
   event_t dma_issue_ = nullptr;
   // NicDmaEx_t
@@ -61,7 +59,7 @@ struct dma_pack : public event_pack {
     return not is_read();
   }
 
-  dma_pack() : event_pack(pack_type::DMA_PACK) {
+  dma_pack(sim::trace::env::trace_environment &env) : event_pack(pack_type::DMA_PACK, env) {
   }
 
   ~dma_pack() = default;

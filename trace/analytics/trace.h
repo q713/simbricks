@@ -246,8 +246,12 @@ struct tcp_trace {
     out << std::endl;
     out << std::endl;
     out << "Event Trace:" << std::endl;
-    out << "\t expected transmits: " << expected_tx_ << std::endl;
+    out << "\t expected transmits: " << expected_tx_ << std::endl;  
     out << "\t expected receives: " << expected_rx_ << std::endl;
+    out << "\t driver transmits: " << driver_tx_ << std::endl;  
+    out << "\t driver receives: " << driver_rx_ << std::endl;  
+    out << "\t nic transmits: " << nic_tx_ << std::endl;  
+    out << "\t nic receives: " << nic_rx_ << std::endl;
     out << "\tFinished Packs:" << std::endl;
     for (auto pack : finished_packs_) {
       pack->display(out, 2);

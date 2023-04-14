@@ -47,6 +47,7 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
   // verw_Mw_or_Rv (unimplemented) : No_OpClass :system.switch_cpus:
   // 1472990805875: system.switch_cpus: A0 T0 : 0xffffffff81107470    :   NOP :
   // IntAlu :
+
   uint64_t addr;
   if (!line_reader_.consume_and_trim_till_string("0x") ||
       !line_reader_.parse_uint_trim(16, addr)) {
@@ -274,6 +275,7 @@ ytask_t Gem5Parser::produce() {
         DFLOGWARN("%s: could not parse global event from line '%s'\n",
                   name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
+        continue;
       }
       co_yield event_ptr;
       continue;
@@ -286,6 +288,7 @@ ytask_t Gem5Parser::produce() {
             "%s: could not parse system.switch_cpus event from line '%s'\n",
             name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
+        continue;
       }
       co_yield event_ptr;
       continue;
@@ -302,6 +305,7 @@ ytask_t Gem5Parser::produce() {
                 "line '%s'\n",
                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
+            continue;
           }
           co_yield event_ptr;
           continue;
@@ -314,6 +318,7 @@ ytask_t Gem5Parser::produce() {
                 "line '%s'\n",
                 name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
+            continue;
           }
           co_yield event_ptr;
           continue;
@@ -328,6 +333,7 @@ ytask_t Gem5Parser::produce() {
               "'%s'\n",
               name_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
+          continue;
         }
         co_yield event_ptr;
         continue;

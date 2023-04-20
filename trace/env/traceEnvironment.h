@@ -185,6 +185,21 @@ class trace_environment {
 
   ~trace_environment() = default;
 
+  uint64_t get_next_parser_id() {
+    static uint64_t next_id = 0;
+    return next_id++;
+  }
+
+  uint64_t get_next_pack_id() {
+    static uint64_t next_id = 0;
+    return next_id++;
+  }
+
+  uint64_t get_next_packer_id() {
+    static uint64_t next_id = 0;
+    return next_id++;
+  }
+
   const std::string *internalize_additional(const std::string &symbol) {
     return internalizer_.internalize(symbol);
   }
@@ -210,20 +225,20 @@ class trace_environment {
                             type, {});
   }
 
-  bool symtable_filter(uint64_t address, std::string *sym_name_target,
-                       const std::string *sym_tab_ident_target) {
+  std::pair<const std::string *, const std::string *> symtable_filter(
+      uint64_t address) {
     if (symbol_tables_.empty()) {
-      return false;
+      return std::make_pair(nullptr, nullptr);
     }
 
     for (std::shared_ptr<SymsFilter> symt : symbol_tables_) {
-      if (symt->filter(address, sym_name_target)) {
-        sym_tab_ident_target = symt->get_ident();
-        return true;
+      const std::string *symbol = symt->filter(address);
+      if (symbol) {
+        return std::make_pair(symbol, symt->get_ident());
       }
     }
 
-    return false;
+    return std::make_pair(nullptr, nullptr);
   }
 
   bool is_call_pack_related(std::shared_ptr<Event> event_ptr) {

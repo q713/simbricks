@@ -74,6 +74,15 @@ std::ostream &operator<<(std::ostream &out, Stacks s) {
 // analysis of a
 //       nic/host pair is supported at the moment
 // --> when extending: make sure that events in a pack belong to same source!!!
+
+/*
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+TODO: INCOOPERATE NEW GEM 5 INFOS (BAR OFFSET) INTO THIS ANALYSIS!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+*/
+
+
+
 struct tcp_trace {
   using event_t = std::shared_ptr<Event>;
   using msg_t = std::optional<event_t>;

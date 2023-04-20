@@ -29,10 +29,11 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <tuple>
 
 #include "lib/utils/log.h"
-#include "trace/reader/reader.h"
 #include "trace/env/stringInternalizer.h"
+#include "trace/reader/reader.h"
 
 enum FilterType { Syms, S, Elf };
 
@@ -50,7 +51,7 @@ class SymsFilter {
       : identifier_(std::move(identifier)),
         line_reader_(true),
         symbol_filter_(std::move(symbol_filter)),
-        i_(i) {};
+        i_(i){};
 
   bool parse_address(uint64_t &address);
 
@@ -102,20 +103,23 @@ class SymsFilter {
    * Filter function for later usage in parser.
    * Get in address and receive label for address.
    */
-  bool filter(uint64_t address, const std::string *sym_name_target);
+  const std::string *filter(uint64_t address);
 
   static std::shared_ptr<SymsFilter> create(const std::string identifier,
                                             const std::string &file_path,
                                             uint64_t address_offset,
-                                            FilterType type, string_internalizer &i) {
+                                            FilterType type,
+                                            string_internalizer &i) {
     return SymsFilter::create(std::move(identifier), file_path, address_offset,
                               type, {}, i);
   }
 
-  static std::shared_ptr<SymsFilter> create(
-      const std::string identifier, const std::string &file_path,
-      uint64_t address_offset, FilterType type,
-      std::set<std::string> symbol_filter, string_internalizer &i);
+  static std::shared_ptr<SymsFilter> create(const std::string identifier,
+                                            const std::string &file_path,
+                                            uint64_t address_offset,
+                                            FilterType type,
+                                            std::set<std::string> symbol_filter,
+                                            string_internalizer &i);
 
   friend std::ostream &operator<<(std::ostream &os, SymsFilter &filter) {
     os << std::endl << std::endl;

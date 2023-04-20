@@ -83,14 +83,13 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
   return true;
 }
 
-bool SymsFilter::filter(uint64_t address, const std::string *sym_name_target) {
+const std::string *SymsFilter::filter(uint64_t address) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
-    sym_name_target = symbol->second;
-    return true;
+    return symbol->second;
   }
 
-  return false;
+  return nullptr;
 }
 
 bool SymsFilter::skip_syms_fags() {

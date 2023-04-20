@@ -26,6 +26,8 @@
 
 #include "trace/parser/parser.h"
 
+#include <tuple>
+
 #include "lib/utils/log.h"
 #include "lib/utils/string_util.h"
 
@@ -71,14 +73,14 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
 
   // in case the given instruction is a call we expect to be able to 
   // translate the address to a symbol name
-  std::string *symbol = nullptr;
-  const std::string *comp = nullptr;
-  bool found_symbol = env_.symtable_filter(addr, symbol, comp);
+  auto sym_comp = env_.symtable_filter(addr);
+  const std::string *symbol = sym_comp.first;
+  const std::string *comp = sym_comp.second;
 
   if (line_reader_.consume_and_trim_char('.')) {
     // TODO: gather micro operation information? if yes, which informations?
     return std::make_shared<HostInstr>(timestamp, getIdent(), getName(), addr);
-  } else if (found_symbol) {
+  } else if (symbol and comp) {
     return std::make_shared<HostCall>(timestamp, getIdent(), getName(), addr, symbol, comp);
   }
   

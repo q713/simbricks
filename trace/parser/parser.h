@@ -43,7 +43,7 @@ using sim::trace::env::trace_environment;
 class LogParser : public sim::corobelt::producer<event_t> {
  protected:
   const std::string name_;
-  const size_t identifier_;
+  const uint64_t identifier_;
   const std::string log_file_path_;
   LineReader &line_reader_;
   trace_environment &env_;
@@ -52,22 +52,17 @@ class LogParser : public sim::corobelt::producer<event_t> {
 
   bool parse_address(uint64_t &address);
 
-  static size_t get_Id() {
-    static size_t next_id = 0;
-    return next_id++;
-  }
-
  public:
   explicit LogParser(const std::string name, const std::string log_file_path,
                      LineReader &line_reader, trace_environment &env)
       : sim::corobelt::producer<event_t>(),
         name_(std::move(name)),
-        identifier_(LogParser::get_Id()),
+        identifier_(env.get_next_parser_id()),
         log_file_path_(std::move(log_file_path)),
         line_reader_(line_reader),
         env_(env){};
 
-  inline size_t getIdent() {
+  inline uint64_t getIdent() {
     return identifier_;
   }
 

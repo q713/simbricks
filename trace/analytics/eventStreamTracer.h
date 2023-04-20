@@ -41,10 +41,10 @@
 #include "trace/events/events.h"
 
 using trace_t = std::shared_ptr<tcp_trace>;
+using event_t = std::shared_ptr<Event>;
 
 struct event_stream_tracer_tcp
     : public sim::corobelt::transformer<event_t, trace_t> {
-  using event_t = std::shared_ptr<Event>;
   using msg_t = std::optional<event_t>;
   using src_task = sim::corobelt::yield_task<event_t>;
   using tar_task = sim::corobelt::yield_task<trace_t>;  

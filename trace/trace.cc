@@ -30,7 +30,7 @@
 
 #include "lib/utils/cxxopts.hpp"
 #include "lib/utils/log.h"
-#include "trace/analytics/eventStreamTracer.h"
+#include "trace/analytics/packer.h"
 #include "trace/corobelt/corobelt.h"
 #include "trace/env/symtable.h"
 #include "trace/env/traceEnvironment.h"
@@ -41,7 +41,8 @@
 
 int main(int argc, char *argv[]) {
   using event_t = std::shared_ptr<Event>;
-  using trace_t = std::shared_ptr<tcp_trace>;
+  using pack_t = std::shared_ptr<event_pack>;
+  // using trace_t = std::shared_ptr<tcp_trace>;
 
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")(
@@ -90,17 +91,36 @@ int main(int argc, char *argv[]) {
     event_stream_parser streamParser(
         result["event-stream-log"].as<std::string>(), streamLr, env);
 
-    trace_printer t_printer;
-    // EventTypeFilter filt{{EventType::HostCall_t, EventType::HostMmioCR_t,
-    //                       EventType::HostMmioCW_t, EventType::HostMmioR_t,
-    //                       EventType::HostMmioW_t,
-    //                       EventType::HostMmioImRespPoW_t,
-    //                       EventType::NicMmioW_t, EventType::NicMmioR_t}};
-    // sim::corobelt::pipeline<event_t> pipel{streamParser, {filt}};
-    event_stream_tracer_tcp tracer{streamParser, env};
+    pack_printer p_printer;
+    EventTypeFilter filter{
+        {// EventType::HostCall_t, 
+         // EventType::HostMmioW_t,
+         // EventType::HostMmioR_t,
+         // EventType::HostMmioImRespPoW_t,
+         // EventType::HostMmioCW_t,
+         // EventType::HostMmioCR_t,
+         EventType::HostDmaW_t, 
+         EventType::HostDmaR_t, 
+         EventType::HostDmaC_t,
+         // EventType::NicMmioW_t,
+         // EventType::NicMmioR_t,
+         // EventType::NicDmaI_t,
+         // EventType::NicDmaEx_t,
+         // EventType::NicDmaCW_t,
+         // EventType::NicDmaCR_t,
+         // EventType::NicTx_t,
+         // EventType::NicRx_t,
+         // EventType::NicMsix_t,
+         // EventType::HostMsiX_t, 
+         // EventType::HostPostInt_t,
+         // EventType::HostClearInt_t
+         }};
+    sim::corobelt::pipeline<event_t> pipel{streamParser, {filter}};
+    host_packer packer{pipel, env};
+    //nic_packer packer{pipel, env};
 
-    if (!sim::corobelt::awaiter<trace_t>::await_termination(tracer,
-                                                            t_printer)) {
+    if (!sim::corobelt::awaiter<pack_t>::await_termination(packer,
+                                                            p_printer)) {
       std::cerr << "could not await termination of the pipeline" << std::endl;
       exit(EXIT_FAILURE);
     }

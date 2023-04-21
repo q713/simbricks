@@ -27,6 +27,7 @@
 
 #include <string>
 #include <unordered_set>
+#include <iostream>
 
 class string_internalizer {
   std::unordered_set<std::string> symbol_set_;
@@ -45,6 +46,20 @@ class string_internalizer {
     const auto& it_b = symbol_set_.emplace(symbol);
     return std::addressof(*it_b.first);
   }
+
+  void display(std::ostream &os) {
+    os << std::endl;
+    os << std::endl;
+    os << "string_internalizer: " << std::endl;
+    for (const std::string &internal : symbol_set_) {
+      os <<  internal << std::endl;
+    }
+  }
 };
+
+inline std::ostream &operator<<(std::ostream &os, string_internalizer &internalizer) {
+  internalizer.display(os);
+  return os;
+}
 
 #endif // SIM_TRACE_STRING_INTERNALIZER_H_

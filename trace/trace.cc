@@ -137,16 +137,20 @@ int main(int argc, char *argv[]) {
   }
 
   // symbol filter to translate hex address to function-name/label
-  if ((result.count("linux-dump-server-client") &&
+  if (result.count("linux-dump-server-client") &&
        !env.add_symbol_table(
            "Linuxvm-Symbols",
            result["linux-dump-server-client"].as<std::string>(), 0,
-           FilterType::Syms)) ||
-      (result.count("nic-i40e-dump") &&
+           FilterType::S)) {
+    std::cerr << "could not initialize symbol table linux-dump-server-client" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  if (result.count("nic-i40e-dump") &&
        !env.add_symbol_table("Nicdriver-Symbols",
                              result["nic-i40e-dump"].as<std::string>(),
-                             0xffffffffa0000000ULL, FilterType::Syms))) {
-    std::cerr << "could not initialize symbol table" << std::endl;
+                             0xffffffffa0000000ULL, FilterType::S)) {
+    std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
   }
 

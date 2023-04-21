@@ -185,6 +185,14 @@ class trace_environment {
 
   ~trace_environment() = default;
 
+  string_internalizer &get_internalizer() {
+    return internalizer_;
+  }
+
+  std::vector<std::shared_ptr<SymsFilter>> &get_symtables() {
+    return symbol_tables_;
+  } 
+
   uint64_t get_next_parser_id() {
     static uint64_t next_id = 0;
     return next_id++;
@@ -196,6 +204,11 @@ class trace_environment {
   }
 
   uint64_t get_next_packer_id() {
+    static uint64_t next_id = 0;
+    return next_id++;
+  }
+
+  uint64_t get_next_trace_id() {
     static uint64_t next_id = 0;
     return next_id++;
   }

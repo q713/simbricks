@@ -122,22 +122,13 @@ tar_task nic_packer::produce() {
       }
 
       default: {
-        std::cout
-            << "add generic single pack for yet non specially treated event"
-            << std::endl;
-        std::shared_ptr<generic_single_pack> gen_sin_pack = nullptr;
-        if (not obtain_pack_ptr<generic_single_pack>(gen_sin_pack, env_)) {
-          std::cerr << "could not allocate gen_sin_pack" << std::endl;
-          break;
+        std::cout << "encountered non expected event ";
+        if (event_ptr) {
+          std::cout << *event_ptr << std::endl;
+        } else {
+          std::cout <<  "null" << std::endl;
         }
-
-        if (gen_sin_pack->add_to_pack(event_ptr)) {
-          added = true;
-          if (gen_sin_pack->is_complete()) {
-            co_yield gen_sin_pack;
-            gen_sin_pack = nullptr;
-          }
-        }
+        added = false;
         break;
       }
     }

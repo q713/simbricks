@@ -129,8 +129,8 @@ class SymsFilter {
     os << "There were " << table.size() << " many entries found";
     os << std::endl << std::endl;
     for (auto &entry : table) {
-      os << "[" << std::hex << entry.first << "] = " << entry.second
-         << std::endl;
+      os << "[" << std::hex << entry.first
+         << "] = " << (entry.second ? *entry.second : "null") << std::endl;
     }
     os << std::endl;
     return os;

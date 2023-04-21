@@ -27,10 +27,10 @@
 #include <memory>
 #include <string>
 
-#include "lib/utils/string_util.h"
-#include "trace/corobelt/corobelt.h"
-#include "trace/env/traceEnvironment.h"
-#include "trace/reader/reader.h"
+#include "string_util.h"
+#include "corobelt.h"
+#include "traceEnvironment.h"
+#include "reader.h"
 
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_

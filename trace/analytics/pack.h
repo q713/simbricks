@@ -29,9 +29,9 @@
 #include <memory>
 #include <vector>
 
-#include "trace/corobelt/corobelt.h"
-#include "trace/env/traceEnvironment.h"
-#include "trace/events/events.h"
+#include "corobelt.h"
+#include "traceEnvironment.h"
+#include "events.h"
 
 using event_t = std::shared_ptr<Event>;
 struct event_pack;

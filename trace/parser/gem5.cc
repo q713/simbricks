@@ -26,9 +26,9 @@
 
 #include <tuple>
 
-#include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
-#include "trace/parser/parser.h"
+#include "log.h"
+#include "string_util.h"
+#include "parser.h"
 
 event_t Gem5Parser::parse_global_event(uint64_t timestamp) {
   // 1473190510000: global: simbricks: processInEvent

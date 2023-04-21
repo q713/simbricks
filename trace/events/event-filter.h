@@ -25,8 +25,8 @@
 #ifndef SIMBRICKS_TRACE_EVENT_FILTER_H_
 #define SIMBRICKS_TRACE_EVENT_FILTER_H_
 
-#include "trace/corobelt/corobelt.h"
-#include "trace/events/events.h"
+#include "corobelt.h"
+#include "events.h"
 
 using event_t = std::shared_ptr<Event>;
 using ytask_t = sim::corobelt::yield_task<event_t>;

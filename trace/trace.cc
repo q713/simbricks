@@ -28,16 +28,16 @@
 #include <set>
 #include <string>
 
-#include "lib/utils/cxxopts.hpp"
-#include "lib/utils/log.h"
-#include "trace/analytics/packer.h"
-#include "trace/corobelt/corobelt.h"
-#include "trace/env/symtable.h"
-#include "trace/env/traceEnvironment.h"
-#include "trace/events/event-filter.h"
-#include "trace/events/eventStreamParser.h"
-#include "trace/events/events.h"
-#include "trace/parser/parser.h"
+#include "util/cxxopts.hpp"
+#include "util/log.h"
+#include "analytics/packer.h"
+#include "corobelt/corobelt.h"
+#include "env/symtable.h"
+#include "env/traceEnvironment.h"
+#include "events/event-filter.h"
+#include "events/eventStreamParser.h"
+#include "events/events.h"
+#include "parser/parser.h"
 
 int main(int argc, char *argv[]) {
   using event_t = std::shared_ptr<Event>;

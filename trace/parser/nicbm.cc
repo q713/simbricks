@@ -24,9 +24,9 @@
 
 #define PARSER_DEBUG_NICBM_ 1
 
-#include "trace/parser/parser.h"
+#include "parser.h"
 
-#include "lib/utils/log.h"
+#include "log.h"
 
 /*
  * NOTE: in the following is a list of prints from the nicbm which are currently

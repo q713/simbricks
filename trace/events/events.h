@@ -33,8 +33,8 @@
 #include <string>
 #include <type_traits>
 
-#include "lib/utils/log.h"
-#include "trace/corobelt/corobelt.h"
+#include "log.h"
+#include "corobelt.h"
 
 #define DEBUG_EVENT_ ;
 

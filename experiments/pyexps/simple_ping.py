@@ -36,7 +36,7 @@ e = Experiment(name='simple_ping')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
 gem5DebugStart = '--debug-start=1468431070625'
-gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMacro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMacro,ExecMicro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
 
 # create client
 client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
@@ -46,7 +46,8 @@ client = Gem5Host(client_config)
 client.name = 'client'
 client.wait = True  # wait for client simulator to finish execution
 gem5_client_log = '--debug-file /local/jakobg/simbricks-tracing-experiments/wrkdir/gem5-client-log.log' 
-client.extra_main_args = [gem5_client_log, gem5DebugStart, gem5DebugFlags]
+#client.extra_main_args = [gem5_client_log, gem5DebugStart, gem5DebugFlags]
+client.extra_main_args = [gem5_client_log, gem5DebugFlags]
 client.variant = 'opt'
 e.add_host(client)
 
@@ -63,7 +64,8 @@ server_config.app = IdleHost()
 server = Gem5Host(server_config)
 server.name = 'server'
 gem5_server_log = '--debug-file /local/jakobg/simbricks-tracing-experiments/wrkdir/gem5-server-log.log'
-server.extra_main_args = [gem5_server_log, gem5DebugFlags, gem5DebugStart]
+#server.extra_main_args = [gem5_server_log, gem5DebugFlags, gem5DebugStart]
+server.extra_main_args = [gem5_server_log, gem5DebugFlags]
 server.variant = 'opt'
 e.add_host(server)
 

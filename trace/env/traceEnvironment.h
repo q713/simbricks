@@ -30,9 +30,9 @@
 #include <string>
 #include <vector>
 
-#include "trace/env/stringInternalizer.h"
-#include "trace/env/symtable.h"
-#include "trace/events/events.h"
+#include "stringInternalizer.h"
+#include "symtable.h"
+#include "events.h"
 
 namespace sim {
 

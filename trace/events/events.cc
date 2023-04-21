@@ -22,9 +22,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "trace/events/events.h"
+#include "events.h"
 
-#include "trace/parser/parser.h"
+#include "parser.h"
 
 void Event::display(std::ostream &os) {
   os << getName() << ": source_id=" << parser_identifier_

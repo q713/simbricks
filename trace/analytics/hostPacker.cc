@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "trace/analytics/packer.h"
+#include "packer.h"
 
 using pack_t = std::shared_ptr<event_pack>;
 using event_t = std::shared_ptr<Event>;

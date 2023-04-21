@@ -25,7 +25,7 @@
 #include <iostream>
 #include <optional>
 
-#include "trace/corobelt/corobelt.h"
+#include "corobelt.h"
 
 struct int_prod : public sim::corobelt::producer<int> {
   int start = 0;

@@ -22,12 +22,12 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "trace/env/symtable.h"
+#include "symtable.h"
 
 #include <functional>
 
-#include "lib/utils/string_util.h"
-#include "trace/reader/reader.h"
+#include "string_util.h"
+#include "reader.h"
 
 // #define SYMS_DEBUG_ 1
 

@@ -30,11 +30,11 @@
 #include <string>
 #include <vector>
 
-#include "trace/corobelt/corobelt.h"
-#include "trace/env/traceEnvironment.h"
-#include "trace/events/events.h"
-#include "trace/reader/reader.h"
-#include "trace/util/componenttable.h"
+#include "corobelt.h"
+#include "traceEnvironment.h"
+#include "events.h"
+#include "reader.h"
+#include "componenttable.h"
 
 using event_t = std::shared_ptr<Event>;
 using ytask_t = sim::corobelt::yield_task<event_t>;

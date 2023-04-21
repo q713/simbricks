@@ -24,10 +24,10 @@
 
 #define PARSER_DEBUG_ 1
 
-#include "trace/parser/parser.h"
+#include "parser.h"
 
-#include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
+#include "log.h"
+#include "string_util.h"
 
 bool LogParser::parse_timestamp(uint64_t &timestamp) {
   line_reader_.trimL();

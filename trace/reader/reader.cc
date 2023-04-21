@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "trace/reader/reader.h"
+#include "reader.h"
 
 bool LineReader::open_file(const std::string &file_path) {
   close_input();

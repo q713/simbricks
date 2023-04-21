@@ -31,8 +31,8 @@
 #include <iostream>
 #include <string>
 
-#include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
+#include "log.h"
+#include "string_util.h"
 
 class LineReader {
   std::ifstream input_stream_;

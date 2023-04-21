@@ -31,9 +31,9 @@
 #include <string>
 #include <tuple>
 
-#include "lib/utils/log.h"
-#include "trace/env/stringInternalizer.h"
-#include "trace/reader/reader.h"
+#include "log.h"
+#include "stringInternalizer.h"
+#include "reader.h"
 
 enum FilterType { Syms, S, Elf };
 

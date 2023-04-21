@@ -25,10 +25,10 @@
 #include <list>
 #include <memory>
 
-#include "trace/analytics/pack.h"
-#include "trace/corobelt/corobelt.h"
-#include "trace/env/traceEnvironment.h"
-#include "trace/events/events.h"
+#include "pack.h"
+#include "corobelt.h"
+#include "traceEnvironment.h"
+#include "events.h"
 
 #ifndef SIMBRICKS_TRACE_PACKER_H_
 #define SIMBRICKS_TRACE_PACKER_H_

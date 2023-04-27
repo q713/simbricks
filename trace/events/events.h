@@ -100,6 +100,10 @@ class Event {
     return type_;
   }
 
+  inline uint64_t get_ts() {
+    return timestamp_;
+  }
+
   virtual void display(std::ostream &os);
 
  protected:

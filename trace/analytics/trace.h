@@ -25,6 +25,81 @@
 #ifndef SIMBRICKS_TRACE_EVENT_TRACE_H_
 #define SIMBRICKS_TRACE_EVENT_TRACE_H_
 
+#include <iostream>
+#include <memory>
+#include <vector>
+
+#include "pack.h"
+#include "corobelt.h"
+#include "traceEnvironment.h"
+
+struct trace {
+  uint64_t id_;
+  std::shared_ptr<event_pack> parent_pack_;
+  std::vector<std::shared_ptr<event_pack>> packs_;
+
+  bool add_pack(std::shared_ptr<event_pack> pack) {
+    if (not pack) {
+      return false;
+    }
+
+    pack->set_trace_id(id_);
+    packs_.push_back(pack);
+  }
+
+  void display(std::ostream &out) {
+    out << std::endl;
+    out << "trace: id=" << id_ << std::endl;
+    for (auto pack : packs_) {
+      if (pack) {
+        if (pack.get() == parent_pack_.get()) {
+          out << "\t parent_pack:" << std::endl; 
+        }
+        pack->display(out, 1);
+      }
+    }
+    out << std::endl;
+  }
+
+  static std::shared_ptr<trace> create_trace(
+      uint64_t id, std::shared_ptr<event_pack> parent_pack) {
+
+    if (not parent_pack) {
+      return {};
+    }
+
+    auto t = std::shared_ptr<trace>{new trace{id, parent_pack}};
+    return t;
+  }
+
+ private:
+  trace(uint64_t id, std::shared_ptr<event_pack> parent_pack)
+      : id_(id), parent_pack_(parent_pack) {
+    this->add_pack(parent_pack);
+  }
+};
+
+struct trace_printer : public sim::corobelt::consumer<std::shared_ptr<trace>> {
+  sim::corobelt::task<void> consume(
+      sim::corobelt::yield_task<std::shared_ptr<trace>> *producer_task) {
+    if (not producer_task) {
+      co_return;
+    }
+
+    std::shared_ptr<trace> t;
+    while (*producer_task) {
+      t = producer_task->get();
+      t->display(std::cout);
+    }
+
+    co_return;
+  };
+
+  trace_printer() : sim::corobelt::consumer<std::shared_ptr<trace>>() {
+  }
+};
+
+/*
 #include <bit>
 #include <list>
 #include <map>
@@ -46,7 +121,20 @@
 #include "trace/corobelt/corobelt.h"
 #include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
+*/
 
+// NOTE: currently analyzing a whole topology is not supported. only the
+// analysis of a
+//       nic/host pair is supported at the moment
+// --> when extending: make sure that events in a pack belong to same source!!!
+
+/*
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+TODO: INCOOPERATE NEW GEM 5 INFOS (BAR OFFSET) INTO THIS ANALYSIS!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+*/
+
+/*
 enum Stacks { KERNEL, NIC, SWITCH, NETWORK };
 
 std::ostream &operator<<(std::ostream &out, Stacks s) {
@@ -69,19 +157,6 @@ std::ostream &operator<<(std::ostream &out, Stacks s) {
   }
   return out;
 }
-
-// NOTE: currently analyzing a whole topology is not supported. only the
-// analysis of a
-//       nic/host pair is supported at the moment
-// --> when extending: make sure that events in a pack belong to same source!!!
-
-/*
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-TODO: INCOOPERATE NEW GEM 5 INFOS (BAR OFFSET) INTO THIS ANALYSIS!
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-*/
-
-
 
 struct tcp_trace {
   using event_t = std::shared_ptr<Event>;
@@ -255,11 +330,11 @@ struct tcp_trace {
     out << std::endl;
     out << std::endl;
     out << "Event Trace:" << std::endl;
-    out << "\t expected transmits: " << expected_tx_ << std::endl;  
+    out << "\t expected transmits: " << expected_tx_ << std::endl;
     out << "\t expected receives: " << expected_rx_ << std::endl;
-    out << "\t driver transmits: " << driver_tx_ << std::endl;  
-    out << "\t driver receives: " << driver_rx_ << std::endl;  
-    out << "\t nic transmits: " << nic_tx_ << std::endl;  
+    out << "\t driver transmits: " << driver_tx_ << std::endl;
+    out << "\t driver receives: " << driver_rx_ << std::endl;
+    out << "\t nic transmits: " << nic_tx_ << std::endl;
     out << "\t nic receives: " << nic_rx_ << std::endl;
     out << "\tFinished Packs:" << std::endl;
     for (auto pack : finished_packs_) {
@@ -615,6 +690,7 @@ struct tcp_trace {
   }
 };
 
+
 struct trace_printer
     : public sim::corobelt::consumer<std::shared_ptr<tcp_trace>> {
   sim::corobelt::task<void> consume(
@@ -635,5 +711,7 @@ struct trace_printer
   trace_printer() : sim::corobelt::consumer<std::shared_ptr<tcp_trace>>() {
   }
 };
+
+*/
 
 #endif  // SIMBRICKS_TRACE_EVENT_TRACE_H_

@@ -25,10 +25,12 @@
 #include <list>
 #include <memory>
 
-#include "pack.h"
 #include "corobelt.h"
-#include "traceEnvironment.h"
 #include "events.h"
+#include "pack.h"
+#include "queue.h"
+#include "traceEnvironment.h"
+#include "tracer.h"
 
 #ifndef SIMBRICKS_TRACE_PACKER_H_
 #define SIMBRICKS_TRACE_PACKER_H_
@@ -40,17 +42,14 @@ using src_task = sim::corobelt::yield_task<event_t>;
 using tar_task = sim::corobelt::yield_task<pack_t>;
 
 struct packer : public sim::corobelt::transformer<event_t, pack_t> {
-  sim::trace::env::trace_environment &env_;
   uint64_t id_;
 
   // Override this method!
   virtual tar_task produce() override = 0;
 
-  packer(sim::corobelt::producer<event_t> &prod,
-         sim::trace::env::trace_environment &env)
+  packer(sim::corobelt::producer<event_t> &prod)
       : sim::corobelt::transformer<event_t, pack_t>(prod),
-        env_(env),
-        id_(env.get_next_packer_id()) {
+        id_(trace_environment::get_next_packer_id()) {
   }
 
   bool ends_with_offset(uint64_t addr, uint64_t off) {
@@ -96,12 +95,13 @@ struct packer : public sim::corobelt::transformer<event_t, pack_t> {
 struct host_packer : public packer {
   tar_task produce() override;
 
-  host_packer(sim::corobelt::producer<event_t> &prod,
-              sim::trace::env::trace_environment &env)
-      : packer(prod, env) {
+  host_packer(sim::corobelt::producer<event_t> &prod, context_queue &queue)
+      : packer(prod), queue_(queue) {
   }
 
  private:
+  context_queue &queue_;
+
   std::shared_ptr<host_call_pack> pending_host_call_pack_ = nullptr;
   std::shared_ptr<host_int_pack> pending_host_int_pack_ = nullptr;
   std::list<std::shared_ptr<host_dma_pack>> pending_host_dma_packs_;
@@ -111,12 +111,15 @@ struct host_packer : public packer {
 struct nic_packer : public packer {
   tar_task produce();
 
-  nic_packer(sim::corobelt::producer<event_t> &prod,
-             sim::trace::env::trace_environment &env)
-      : packer(prod, env) {
+  nic_packer(sim::corobelt::producer<event_t> &prod, context_queue &host_queue,
+             context_queue &network_queue)
+      : packer(prod), host_queue_(host_queue), network_queue_(network_queue) {
   }
 
  private:
+  context_queue &host_queue_;
+  context_queue &network_queue_;
+
   std::list<std::shared_ptr<nic_dma_pack>> pending_nic_dma_packs_;
 };
 

@@ -76,7 +76,7 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
   } else {
     // in case the given instruction is a call we expect to be able to
     // translate the address to a symbol name
-    auto sym_comp = env_.symtable_filter(addr);
+    auto sym_comp = trace_environment::symtable_filter(addr);
     const std::string *symbol = sym_comp.first;
     const std::string *comp = sym_comp.second;
 

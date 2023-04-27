@@ -124,8 +124,8 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           std::cout << "error parsing HostInstr" << std::endl;
           continue;
         }
-        const std::string *func = env_.internalize_additional(function);
-        const std::string *comp = env_.internalize_additional(component);
+        const std::string *func = trace_environment::internalize_additional(function);
+        const std::string *comp = trace_environment::internalize_additional(component);
 
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
                                            func, comp);
@@ -374,18 +374,15 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
   };
 
   explicit event_stream_parser(const std::string log_file_path,
-                               LineReader &line_reader,
-                               sim::trace::env::trace_environment &env)
+                               LineReader &line_reader)
       : sim::corobelt::producer<event_t>(),
         log_file_path_(std::move(log_file_path)),
-        line_reader_(line_reader),
-        env_(env) {
+        line_reader_(line_reader) {
   }
 
  private:
   const std::string log_file_path_;
   LineReader &line_reader_;
-  sim::trace::env::trace_environment &env_;
 };
 
 #endif  // SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_

@@ -30,6 +30,13 @@ using src_task = sim::corobelt::yield_task<event_t>;
 using tar_task = sim::corobelt::yield_task<pack_t>;
 
 tar_task nic_packer::produce() {
+  if (not host_queue_.register_packer(id_) or
+      not network_queue_.register_packer(id_)) {
+    std::cerr << "nic_packer " << id_;
+    std::cerr << " error registering for host or network queue" << std::endl;
+    co_return;
+  }
+
   src_task src = prod_.produce();
 
   event_t event_ptr = nullptr;
@@ -44,7 +51,7 @@ tar_task nic_packer::produce() {
       case EventType::NicMmioW_t:
       case EventType::NicMmioR_t: {
         std::shared_ptr<nic_mmio_pack> mmio_p = nullptr;
-        if (not obtain_pack_ptr<nic_mmio_pack>(mmio_p, env_)) {
+        if (not obtain_pack_ptr<nic_mmio_pack>(mmio_p)) {
           std::cerr << "could not allocate mmio_p" << std::endl;
           break;
         }
@@ -74,7 +81,7 @@ tar_task nic_packer::produce() {
         }
 
         pending_dma = nullptr;
-        if (not obtain_pack_ptr<nic_dma_pack>(pending_dma, env_)) {
+        if (not obtain_pack_ptr<nic_dma_pack>(pending_dma)) {
           std::cerr << "could not allocate pending_nic_dma_packs_" << std::endl;
           break;
         }
@@ -89,7 +96,7 @@ tar_task nic_packer::produce() {
       case EventType::NicTx_t:
       case EventType::NicRx_t: {
         std::shared_ptr<nic_eth_pack> eth_p = nullptr;
-        if (not obtain_pack_ptr<nic_eth_pack>(eth_p, env_)) {
+        if (not obtain_pack_ptr<nic_eth_pack>(eth_p)) {
           std::cerr << "could not allocate eth_p" << std::endl;
           break;
         }
@@ -106,7 +113,7 @@ tar_task nic_packer::produce() {
 
       case EventType::NicMsix_t: {
         std::shared_ptr<nic_msix_pack> msix_p = nullptr;
-        if (not obtain_pack_ptr<nic_msix_pack>(msix_p, env_)) {
+        if (not obtain_pack_ptr<nic_msix_pack>(msix_p)) {
           std::cerr << "could not allocate eth_p" << std::endl;
           break;
         }
@@ -126,7 +133,7 @@ tar_task nic_packer::produce() {
         if (event_ptr) {
           std::cout << *event_ptr << std::endl;
         } else {
-          std::cout <<  "null" << std::endl;
+          std::cout << "null" << std::endl;
         }
         added = false;
         break;

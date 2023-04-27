@@ -33,11 +33,11 @@
 #include <set>
 #include <vector>
 
-#include "lib/utils/log.h"
-#include "lib/utils/string_util.h"
-#include "trace/config.h"
-#include "trace/corobelt/coroutine.h"
-#include "trace/events/events.h"
+#include "log.h"
+#include "string_util.h"
+#include "config.h"
+#include "coroutine.h"
+#include "events.h"
 
 using event_t = std::shared_ptr<Event>;
 using task_t = sim::coroutine::task<void>;

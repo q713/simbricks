@@ -30,8 +30,8 @@
 #include <vector>
 
 #include "corobelt.h"
-#include "traceEnvironment.h"
 #include "events.h"
+#include "traceEnvironment.h"
 
 using event_t = std::shared_ptr<Event>;
 struct event_pack;
@@ -99,29 +99,29 @@ inline std::ostream &operator<<(std::ostream &os, pack_type t) {
 }
 
 struct event_pack {
-  sim::trace::env::trace_environment &env_;
-
   uint64_t id_;
   pack_type type_;
   // Stacks stack_; // TODO: not whole stacks is within a stack, but each event
   // on its own
   std::vector<event_t> events_;
 
-  pack_t triggered_by_ = nullptr;
-  std::vector<pack_t> triggered_;
+  pack_t parent_ = nullptr;
+  std::vector<pack_t> children_;
 
   bool is_pending_ = true;
   bool is_relevant_ = false;
+
+  uint64_t trace_id_;
 
   virtual void display(std::ostream &out, unsigned ident) {
     write_ident(out, ident);
     out << "id: " << (unsigned long long)id_ << ", kind: " << type_
         << std::endl;
     write_ident(out, ident);
-    out << "was triggered? " << (triggered_by_ != nullptr) << std::endl;
+    out << "has parent? " << (parent_ != nullptr) << std::endl;
     write_ident(out, ident);
-    out << "triggered packs? ";
-    for (auto &p : triggered_) {
+    out << "children? ";
+    for (auto &p : children_) {
       out << (unsigned long long)p->id_ << ", ";
     }
     out << std::endl;
@@ -129,6 +129,10 @@ struct event_pack {
       write_ident(out, ident);
       out << *event << std::endl;
     }
+  }
+
+  inline void set_trace_id(uint64_t trace_id) {
+    trace_id_ = trace_id;
   }
 
   inline virtual void display(std::ostream &out) {
@@ -159,25 +163,53 @@ struct event_pack {
     is_relevant_ = false;
   }
 
-  virtual uint64_t get_smallest_cimpletion_ts() {
-    if (is_pending()) {
+  uint64_t get_starting_ts() {
+    if (events_.empty()) {
       return 0xFFFFFFFFFFFFFFFF;
     }
-    return events_.back()->timestamp_;
+
+    event_t event_ptr = events_.front();
+    if (event_ptr) {
+      return event_ptr->timestamp_;
+    }
+    return 0xFFFFFFFFFFFFFFFF;
   }
 
-  bool set_triggered_by(pack_t trigger) {
-    if (not triggered_by_) {
-      triggered_by_ = trigger;
+  uint64_t get_completion_ts() {
+    if (events_.empty() or is_pending()) {
+      return 0xFFFFFFFFFFFFFFFF;
+    }
+
+    event_t event_ptr = events_.back();
+    if (event_ptr) {
+      return event_ptr->timestamp_;
+    }
+    return 0xFFFFFFFFFFFFFFFF;
+  }
+
+  bool set_parent(pack_t parent_pack) {
+    if (not parent_ and parent_pack and
+        parent_pack->get_starting_ts() < get_starting_ts()) {
+      parent_ = parent_pack;
       return true;
     }
     return false;
   }
 
+  bool add_children(pack_t child_pack) {
+    if (child_pack and child_pack.get() != this and
+        get_starting_ts() < child_pack->get_starting_ts()) {
+      children_.push_back(child_pack);
+      return true;
+    }
+
+    return false;
+  }
+
   virtual ~event_pack() = default;
 
-  event_pack(sim::trace::env::trace_environment &env, pack_type t)
-      : env_(env), id_(env.get_next_pack_id()), type_(t) {
+  event_pack(pack_type t)
+      : id_(trace_environment::get_next_pack_id()), type_(t) {
   }
 
   bool is_potential_add(event_t event_ptr) {
@@ -200,14 +232,6 @@ struct event_pack {
   }
 
   virtual bool add_to_pack(event_t event_ptr) = 0;
-
-  virtual bool add_triggered(pack_t pack_ptr) {
-    if (pack_ptr) {
-      triggered_.push_back(pack_ptr);
-      return true;
-    }
-    return false;
-  }
 };
 
 struct host_call_pack : public event_pack {
@@ -224,13 +248,7 @@ struct host_call_pack : public event_pack {
     syscall_return_ = event_ptr;
   }
 
-  // for a call pack we want to know which event exactly caused another span
-  std::unordered_map<event_t, pack_t> triggered_;
-  std::list<event_t> send_trigger_;
-  std::list<event_t> receiver_;
-
-  host_call_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::host_call) {
+  host_call_pack() : event_pack(pack_type::host_call) {
   }
 
   ~host_call_pack() = default;
@@ -245,7 +263,7 @@ struct host_call_pack : public event_pack {
       return false;
     }
 
-    if (env_.is_sys_entry(event_ptr)) {
+    if (trace_environment::is_sys_entry(event_ptr)) {
       if (call_pack_entry_) {
         is_pending_ = false;
         syscall_return_ = events_.back();
@@ -264,15 +282,15 @@ struct host_call_pack : public event_pack {
       return false;
     }
 
-    if (env_.is_driver_tx(event_ptr)) {
-      transmits_ = true;
-      send_trigger_.push_back(event_ptr);
-
-      // TODO: where does the kernel actually "receive" the packet
-    } else if (env_.is_driver_rx(event_ptr)) {
-      receives_ = true;
-      receiver_.push_back(event_ptr);
-    }
+    //if (env_.is_driver_tx(event_ptr)) {
+    //  transmits_ = true;
+    //  send_trigger_.push_back(event_ptr);
+    //
+    //  TODO: where does the kernel actually "receive" the packet
+    //} else if (env_.is_driver_rx(event_ptr)) {
+    //  receives_ = true;
+    //  receiver_.push_back(event_ptr);
+    //}
 
     // is_relevant_ = is_relevant_ || transmits_ || receives_;
     // sim::analytics::conf::LINUX_NET_STACK_FUNC_INDICATOR.contains(
@@ -287,8 +305,7 @@ struct host_int_pack : public event_pack {
   event_t host_post_int_ = nullptr;
   event_t host_clear_int_ = nullptr;
 
-  host_int_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::host_int) {
+  host_int_pack() : event_pack(pack_type::host_int) {
   }
 
   ~host_int_pack() = default;
@@ -327,8 +344,7 @@ struct host_dma_pack : public event_pack {
   // HostDmaC_t
   event_t host_dma_completion_ = nullptr;
 
-  host_dma_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::host_dma) {
+  host_dma_pack() : event_pack(pack_type::host_dma) {
   }
 
   ~host_dma_pack() = default;
@@ -386,9 +402,8 @@ struct host_mmio_pack : public event_pack {
   // completion, either host_mmio_cw_ or host_mmio_cr_
   event_t completion_ = nullptr;
 
-  explicit host_mmio_pack(sim::trace::env::trace_environment &env,
-                          bool pci_msix_desc_addr_before)
-      : event_pack(env, pack_type::host_mmio),
+  explicit host_mmio_pack(bool pci_msix_desc_addr_before)
+      : event_pack(pack_type::host_mmio),
         pci_msix_desc_addr_before_(pci_msix_desc_addr_before) {
   }
 
@@ -483,8 +498,7 @@ struct host_mmio_pack : public event_pack {
 struct host_msix_pack : public event_pack {
   event_t host_msix_ = nullptr;
 
-  host_msix_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::host_msix) {
+  host_msix_pack() : event_pack(pack_type::host_msix) {
   }
 
   ~host_msix_pack() = default;
@@ -504,8 +518,7 @@ struct host_msix_pack : public event_pack {
 struct nic_msix_pack : public event_pack {
   event_t nic_msix_ = nullptr;
 
-  nic_msix_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::nic_msix) {
+  nic_msix_pack() : event_pack(pack_type::nic_msix) {
   }
 
   ~nic_msix_pack() = default;
@@ -535,8 +548,7 @@ struct nic_mmio_pack : public event_pack {
   event_t action_ = nullptr;
   bool is_read_ = false;
 
-  nic_mmio_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::nic_mmio) {
+  nic_mmio_pack() : event_pack(pack_type::nic_mmio) {
   }
 
   ~nic_mmio_pack() = default;
@@ -570,8 +582,7 @@ struct nic_dma_pack : public event_pack {
   event_t nic_dma_completion_ = nullptr;
   bool is_read_ = true;
 
-  nic_dma_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::nic_dma) {
+  nic_dma_pack() : event_pack(pack_type::nic_dma) {
   }
 
   ~nic_dma_pack() = default;
@@ -636,8 +647,7 @@ struct nic_eth_pack : public event_pack {
   event_t tx_rx_ = nullptr;
   bool is_send_ = false;
 
-  nic_eth_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::nic_eth) {
+  nic_eth_pack() : event_pack(pack_type::nic_eth) {
   }
 
   ~nic_eth_pack() = default;
@@ -673,8 +683,7 @@ struct nic_eth_pack : public event_pack {
 struct generic_single_pack : public event_pack {
   event_t event_p_ = nullptr;
 
-  generic_single_pack(sim::trace::env::trace_environment &env)
-      : event_pack(env, pack_type::generic_single) {
+  generic_single_pack() : event_pack(pack_type::generic_single) {
   }
 
   bool add_to_pack(event_t event_ptr) override {

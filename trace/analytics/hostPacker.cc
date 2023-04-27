@@ -30,6 +30,12 @@ using src_task = sim::corobelt::yield_task<event_t>;
 using tar_task = sim::corobelt::yield_task<pack_t>;
 
 tar_task host_packer::produce() {
+  if (not queue_.register_packer(id_)) {
+    std::cerr << "host_packer " << id_;
+    std::cerr << " error registering for host or network queue" << std::endl;
+    co_return;
+  }
+
   src_task src = prod_.produce();
 
   bool pci_msix_desc_addr_before = false;
@@ -45,23 +51,22 @@ tar_task host_packer::produce() {
 
     switch (event_ptr->getType()) {
       case EventType::HostCall_t: {
-        if (not obtain_pack_ptr<host_call_pack>(pending_host_call_pack_,
-                                                env_)) {
+        if (not obtain_pack_ptr<host_call_pack>(pending_host_call_pack_)) {
           std::cerr << "could not allocate pending_host_call_pack_"
                     << std::endl;
           break;
         }
 
         if (pending_host_call_pack_->add_to_pack(event_ptr)) {
-          pci_msix_desc_addr_before = env_.is_pci_msix_desc_addr(event_ptr);
+          pci_msix_desc_addr_before =
+              trace_environment::is_pci_msix_desc_addr(event_ptr);
           added = true;
 
         } else if (pending_host_call_pack_->is_complete()) {
           co_yield pending_host_call_pack_;
           pending_host_call_pack_ = nullptr;
 
-          if (not obtain_pack_ptr<host_call_pack>(pending_host_call_pack_,
-                                                  env_)) {
+          if (not obtain_pack_ptr<host_call_pack>(pending_host_call_pack_)) {
             std::cerr << "found new syscall entry, could not allocate "
                          "pending_host_call_pack_"
                       << std::endl;
@@ -79,7 +84,7 @@ tar_task host_packer::produce() {
       case EventType::HostMmioImRespPoW_t:
       case EventType::HostMmioCW_t:
       case EventType::HostMmioCR_t: {
-        if (not obtain_pack_ptr<host_mmio_pack>(pending_host_mmio_pack_, env_,
+        if (not obtain_pack_ptr<host_mmio_pack>(pending_host_mmio_pack_,
                                                 pci_msix_desc_addr_before)) {
           std::cerr << "could not allocate pending_host_mmio_pack_"
                     << std::endl;
@@ -98,7 +103,7 @@ tar_task host_packer::produce() {
           pending_host_mmio_pack_->mark_as_done();
           co_yield pending_host_mmio_pack_;
           pending_host_mmio_pack_ = nullptr;
-          if (not obtain_pack_ptr<host_mmio_pack>(pending_host_mmio_pack_, env_,
+          if (not obtain_pack_ptr<host_mmio_pack>(pending_host_mmio_pack_,
                                                   pci_msix_desc_addr_before)) {
             std::cerr << "could not allocate pending_host_mmio_pack_"
                       << std::endl;
@@ -126,7 +131,7 @@ tar_task host_packer::produce() {
         }
 
         pending_dma = nullptr;
-        if (not obtain_pack_ptr<host_dma_pack>(pending_dma, env_)) {
+        if (not obtain_pack_ptr<host_dma_pack>(pending_dma)) {
           std::cerr << "could not allocate pending_host_dma_pack_" << std::endl;
           break;
         }
@@ -140,7 +145,7 @@ tar_task host_packer::produce() {
       }
 
       case EventType::HostMsiX_t: {
-        if (not obtain_pack_ptr<host_msix_pack>(host_msix_p, env_)) {
+        if (not obtain_pack_ptr<host_msix_pack>(host_msix_p)) {
           std::cerr << "could not allocate host_mmio_p" << std::endl;
           break;
         }
@@ -157,7 +162,7 @@ tar_task host_packer::produce() {
 
       case EventType::HostPostInt_t:
       case EventType::HostClearInt_t: {
-        if (not obtain_pack_ptr<host_int_pack>(pending_host_int_pack_, env_)) {
+        if (not obtain_pack_ptr<host_int_pack>(pending_host_int_pack_)) {
           std::cerr << "could not allocate pending_host_int_pack_" << std::endl;
           break;
         }

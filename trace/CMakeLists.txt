@@ -68,8 +68,12 @@ set(TRACE_SRC_FILES
     env/symtable.h
     env/symtable.cc
     env/traceEnvironment.h
+    env/traceEnvironment.cc
     
     analytics/pack.h
+    analytics/trace.h
+    analytics/tracer.h
+    analytics/queue.h
     analytics/packer.h
     analytics/nicPacker.cc
     analytics/hostPacker.cc
@@ -90,7 +94,7 @@ target_include_directories( ${PROJECT_NAME} PUBLIC
 # only gcc is supported at the moment
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
     # make sure that we build with necessary options for coroutines
-    target_compile_options(${PROJECT_NAME} PUBLIC -std=gnu++20 -fcoroutines)
+    target_compile_options(${PROJECT_NAME} PUBLIC -fcoroutines)
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
     message(FATAL_ERROR "Clang is currently not supported.")
 endif()

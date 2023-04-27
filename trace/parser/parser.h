@@ -30,15 +30,14 @@
 #include <string>
 #include <vector>
 
+#include "componenttable.h"
 #include "corobelt.h"
-#include "traceEnvironment.h"
 #include "events.h"
 #include "reader.h"
-#include "componenttable.h"
+#include "traceEnvironment.h"
 
 using event_t = std::shared_ptr<Event>;
 using ytask_t = sim::corobelt::yield_task<event_t>;
-using sim::trace::env::trace_environment;
 
 class LogParser : public sim::corobelt::producer<event_t> {
  protected:
@@ -46,7 +45,6 @@ class LogParser : public sim::corobelt::producer<event_t> {
   const uint64_t identifier_;
   const std::string log_file_path_;
   LineReader &line_reader_;
-  trace_environment &env_;
 
   bool parse_timestamp(uint64_t &timestamp);
 
@@ -54,13 +52,12 @@ class LogParser : public sim::corobelt::producer<event_t> {
 
  public:
   explicit LogParser(const std::string name, const std::string log_file_path,
-                     LineReader &line_reader, trace_environment &env)
+                     LineReader &line_reader)
       : sim::corobelt::producer<event_t>(),
         name_(std::move(name)),
-        identifier_(env.get_next_parser_id()),
+        identifier_(trace_environment::get_next_parser_id()),
         log_file_path_(std::move(log_file_path)),
-        line_reader_(line_reader),
-        env_(env){};
+        line_reader_(line_reader){};
 
   inline uint64_t getIdent() {
     return identifier_;
@@ -93,9 +90,8 @@ class Gem5Parser : public LogParser {
 
  public:
   explicit Gem5Parser(const std::string name, const std::string log_file_path,
-                      trace_environment &env, ComponentFilter &component_table,
-                      LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader, env),
+                      ComponentFilter &component_table, LineReader &line_reader)
+      : LogParser(std::move(name), std::move(log_file_path), line_reader),
         component_table_(component_table) {
   }
 
@@ -115,8 +111,8 @@ class NicBmParser : public LogParser {
 
  public:
   explicit NicBmParser(const std::string name, const std::string log_file_path,
-                       LineReader &line_reader, trace_environment &env)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader, env) {
+                       LineReader &line_reader)
+      : LogParser(std::move(name), std::move(log_file_path), line_reader) {
   }
 
   ytask_t produce() override;

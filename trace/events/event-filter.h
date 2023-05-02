@@ -84,7 +84,7 @@ class EventTypeFilter : public event_stream_actor {
 
  public:
   bool act_on(event_t event) override {
-    auto search = types_to_filter_.find(event->getType());
+    auto search = types_to_filter_.find(event->get_type());
     bool is_to_sink = inverted_ ? search == types_to_filter_.end()
                                 : search != types_to_filter_.end();
     return is_to_sink;

@@ -22,15 +22,135 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <cassert>
+
 #include "spanner.h"
 
-using pack_t = std::shared_ptr<event_pack>;
-using event_t = std::shared_ptr<Event>;
-using src_task = sim::corobelt::yield_task<event_t>;
-using tar_task = sim::corobelt::task<void>;
+bool nic_spanner::handel_mmio(std::shared_ptr<Event> event_ptr) {
+  assert(event_ptr and "event_ptr is null");
+
+  auto con = host_queue_.poll(this->id_);
+  if (not is_expectation(con, expectation::mmio)) {
+    std::cerr << "nic_spanner: could not poll mmio context" << std::endl;
+    return false;
+  }
+  last_host_context_ = con;
+
+  auto mmio_span = tracer_.rergister_new_span_by_parent<nic_mmio_span>(
+      last_host_context_->get_parent(), event_ptr->get_parser_ident());
+
+  if (not mmio_span) {
+    std::cerr << "could not register mmio_span" << std::endl;
+    return false;
+  }
+
+  if (mmio_span->add_to_span(event_ptr)) {
+    assert(mmio_span->is_complete() and "mmio span is not complete");
+    last_completed_ = mmio_span;
+    return true;
+  }
+
+  return false;
+}
+
+bool nic_spanner::handel_dma(std::shared_ptr<Event> event_ptr) {
+  assert(event_ptr and "event_ptr is null");
+
+  auto pending_dma =
+      iterate_add_erase<nic_dma_span>(pending_nic_dma_spans_, event_ptr);
+  if (pending_dma) {
+    if (pending_dma->is_complete()) {
+      last_completed_ = pending_dma;
+    } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
+      // indicate to host that we expect a dma action
+      host_queue_.push(this->id_, expectation::dma, pending_dma);
+    }
+
+    return true;
+  }
+
+  assert(is_type(event_ptr, EventType::NicDmaI_t) and
+         "try starting a new dma span with NON issue");
+
+  pending_dma = tracer_.rergister_new_span_by_parent<nic_dma_span>(
+      last_completed_, event_ptr->get_parser_ident());
+  if (not pending_dma) {
+    std::cerr << "could not register new pending dma action" << std::endl;
+    return false;
+  }
+
+  if (pending_dma->add_to_span(event_ptr)) {
+    pending_nic_dma_spans_.push_back(pending_dma);
+    return true;
+  }
+
+  return false;
+}
+bool nic_spanner::handel_txrx(std::shared_ptr<Event> event_ptr) {
+  assert(event_ptr and "event_ptr is null");
+
+  bool is_tx = false;
+  std::shared_ptr<event_span> parent = nullptr;
+  if (is_type(event_ptr, EventType::NicTx_t)) {
+    parent = last_completed_;
+    is_tx = true;
+
+  } else if (is_type(event_ptr, EventType::NicRx_t)) {
+    auto con = network_queue_.poll(this->id_);
+    if (is_expectation(con, expectation::rx)) {
+      std::cerr << "nic_spanner: try to create receive span, but no receive ";
+      std::cerr << "expectation from network" << std::endl;
+      return false;
+    }
+    parent = con->get_parent();
+
+  } else {
+    return false;
+  }
+  
+  auto eth_span = tracer_.rergister_new_span_by_parent<nic_eth_span>(
+      parent, event_ptr->get_parser_ident());
+  if (not eth_span) {
+    std::cerr << "could not register eth_span" << std::endl;
+    return false;
+  }
+
+  if (eth_span->add_to_span(event_ptr)) {
+    assert(eth_span->is_complete() and "eth span was not complette");
+    // indicate that somewhere a receive will be expected
+    if (is_tx and
+        not network_queue_.push(this->id_, expectation::rx, eth_span)) {
+      std::cerr << "could not indicate to network that a";
+      std::cerr << "receive is to be expected" << std::endl;
+    }
+    last_completed_ = eth_span;
+    return true;
+  }
+
+  return false;
+}
+
+bool nic_spanner::handel_msix(std::shared_ptr<Event> event_ptr) {
+  assert(event_ptr and "event_ptr is null");
+
+  auto msix_span = tracer_.rergister_new_span_by_parent<nic_msix_span>(
+      last_completed_, event_ptr->get_parser_ident());
+  if (not msix_span) {
+    std::cerr << "could not register msix span" << std::endl;
+    return false;
+  }
+
+  if (msix_span->add_to_span(event_ptr)) {
+    assert(msix_span->is_complete() and "msix span is not complete");
+    host_queue_.push(this->id_, expectation::msix, last_completed_);
+    return true;
+  }
+
+  return false;
+}
 
 sim::corobelt::task<void> nic_spanner::consume(
-    sim::corobelt::yield_task<event_t> *producer_task) {
+    sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task) {
   if (not producer_task) {
     co_return;
   }
@@ -42,30 +162,23 @@ sim::corobelt::task<void> nic_spanner::consume(
     co_return;
   }
 
-  event_t event_ptr = nullptr;
-  std::shared_ptr<nic_dma_pack> pending_dma = nullptr;
+  std::shared_ptr<Event> event_ptr = nullptr;
+  std::shared_ptr<nic_dma_span> pending_dma = nullptr;
   bool added = false;
 
   while (producer_task and *producer_task) {
     event_ptr = producer_task->get();
     added = false;
 
-    switch (event_ptr->getType()) {
+    if (not event_ptr) {
+      std::cerr << "found 'null' event" << std::endl;
+      continue;
+    }
+
+    switch (event_ptr->get_type()) {
       case EventType::NicMmioW_t:
       case EventType::NicMmioR_t: {
-        std::shared_ptr<nic_mmio_pack> mmio_p = nullptr;
-        if (not obtain_pack_ptr<nic_mmio_pack>(mmio_p)) {
-          std::cerr << "could not allocate mmio_p" << std::endl;
-          break;
-        }
-
-        if (mmio_p->add_to_pack(event_ptr)) {
-          added = true;
-          if (mmio_p->is_complete()) {
-            co_yield mmio_p;  // TODO: remove
-            mmio_p = nullptr;
-          }
-        }
+        added = handel_mmio(event_ptr);
         break;
       }
 
@@ -73,61 +186,18 @@ sim::corobelt::task<void> nic_spanner::consume(
       case EventType::NicDmaEx_t:
       case EventType::NicDmaCW_t:
       case EventType::NicDmaCR_t: {
-        pending_dma =
-            iterate_add_erase<nic_dma_pack>(pending_nic_dma_packs_, event_ptr);
-        if (pending_dma) {
-          added = true;
-          if (pending_dma->is_complete()) {
-            co_yield pending_dma;  // TODO: remove
-          }
-          break;
-        }
-
-        pending_dma = nullptr;
-        if (not obtain_pack_ptr<nic_dma_pack>(pending_dma)) {
-          std::cerr << "could not allocate pending_nic_dma_packs_" << std::endl;
-          break;
-        }
-
-        if (pending_dma->add_to_pack(event_ptr)) {
-          added = true;
-          pending_nic_dma_packs_.push_back(pending_dma);
-        }
+        added = handel_dma(event_ptr);
         break;
       }
 
       case EventType::NicTx_t:
       case EventType::NicRx_t: {
-        std::shared_ptr<nic_eth_pack> eth_p = nullptr;
-        if (not obtain_pack_ptr<nic_eth_pack>(eth_p)) {
-          std::cerr << "could not allocate eth_p" << std::endl;
-          break;
-        }
-
-        if (eth_p->add_to_pack(event_ptr)) {
-          added = true;
-          if (eth_p->is_complete()) {
-            co_yield eth_p;  // TODO: remove
-            eth_p = nullptr;
-          }
-        }
+        added = handel_dma(event_ptr);
         break;
       }
 
       case EventType::NicMsix_t: {
-        std::shared_ptr<nic_msix_pack> msix_p = nullptr;
-        if (not obtain_pack_ptr<nic_msix_pack>(msix_p)) {
-          std::cerr << "could not allocate eth_p" << std::endl;
-          break;
-        }
-
-        if (msix_p->add_to_pack(event_ptr)) {
-          added = true;
-          if (msix_p->is_complete()) {
-            co_yield msix_p;  // TODO: remove
-            msix_p = nullptr;
-          }
-        }
+        added = handel_msix(event_ptr);
         break;
       }
 

@@ -34,7 +34,7 @@
 
 #include "span.h"
 
-enum expectation { tx, rx, dma, msix };
+enum expectation { tx, rx, dma, msix, mmio };
 
 inline std::ostream &operator<<(std::ostream &os, expectation e) {
   switch (e) {
@@ -49,6 +49,10 @@ inline std::ostream &operator<<(std::ostream &os, expectation e) {
       break;
     case expectation::msix:
       os << "expectation::msix";
+      break;
+    case expectation::mmio:
+      os << "expectation::mmio";
+      break;
     default:
       os << "could not convert given 'expectation'";
       break;
@@ -60,6 +64,16 @@ struct context {
   expectation expectation_;
   std::shared_ptr<event_span> parent_span_;
 
+  std::shared_ptr<event_span> get_parent() {
+    return parent_span_;
+  }
+
+ private:
+  context(expectation expectation, std::shared_ptr<event_span> parent_span)
+      : expectation_(expectation), parent_span_(parent_span) {
+  }
+
+ public:
   static std::shared_ptr<context> create(
       expectation expectation, std::shared_ptr<event_span> parent_span) {
     if (not parent_span) {
@@ -67,17 +81,12 @@ struct context {
       return {};
     }
 
-    auto con = std::make_shared<context>(expectation, parent_span);
+    auto con = std::shared_ptr<context>{new context(expectation, parent_span)};
     return con;
-  }
-
- private:
-  context(expectation expectation, std::shared_ptr<event_span> parent_span)
-      : expectation_(expectation), parent_span_(parent_span) {
   }
 };
 
-bool is_expectation(std::shared_ptr<context> con, expectation exp) {
+inline bool is_expectation(std::shared_ptr<context> con, expectation exp) {
   if (not con or con->expectation_ != exp) {
     return false;
   }
@@ -134,6 +143,8 @@ struct queue {
     condition_v_.notify_all();
 
     lock.unlock();
+
+    return true;
   }
 };
 
@@ -189,6 +200,13 @@ struct context_queue {
  public:
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // TODO: make smaller critical sections!!
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  // TODO: remove the expectation enum, everything
+  //       is expected to happen in order, hence
+  //       we should be able to just pull whatever
+  //       context without the expectation enum
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
   bool register_spanner(uint64_t spanner_id) {

@@ -144,9 +144,22 @@ struct nic_spanner : public spanner {
       : spanner(t), host_queue_(host_queue), network_queue_(network_queue) {
   }
 
+ protected:
+
+  bool handel_mmio(std::shared_ptr<Event> event_ptr);
+
+  bool handel_dma(std::shared_ptr<Event> event_ptr);
+
+  bool handel_txrx(std::shared_ptr<Event> event_ptr);
+
+  bool handel_msix(std::shared_ptr<Event> event_ptr);
+
  private:
   context_queue &host_queue_;
   context_queue &network_queue_;
+
+  std::shared_ptr<context> last_host_context_ = nullptr;
+  std::shared_ptr<event_span> last_completed_ = nullptr;
 
   std::list<std::shared_ptr<nic_dma_span>> pending_nic_dma_spans_;
 };

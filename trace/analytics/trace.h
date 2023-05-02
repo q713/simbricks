@@ -60,6 +60,7 @@ struct trace {
 
     span->set_trace_id(id_);
     spans_.push_back(span);
+    return true;
   }
 
   void display(std::ostream &out) {

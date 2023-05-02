@@ -36,7 +36,7 @@ e = Experiment(name='simple_ping')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
 gem5DebugStart = '--debug-start=1468431070625'
-gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMacro,ExecMicro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
 
 # create client
 client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver

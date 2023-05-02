@@ -27,7 +27,7 @@
 #include "parser.h"
 
 void Event::display(std::ostream &os) {
-  os << getName() << ": source_id=" << parser_identifier_
+  os << get_name() << ": source_id=" << parser_identifier_
      << ", source_name=" << parser_name_ << ", timestamp=" << timestamp_;
 }
 
@@ -185,5 +185,5 @@ void NicRx::display(std::ostream &os) {
 };
 
 bool is_type(std::shared_ptr<Event> event_ptr, EventType type) {
-  return event_ptr && event_ptr->getType() == type;
+  return event_ptr && event_ptr->get_type() == type;
 }

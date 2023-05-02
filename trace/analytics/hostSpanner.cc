@@ -123,6 +123,17 @@ bool host_spanner::handel_mmio(std::shared_ptr<Event> event_ptr) {
   }
 
   if (pending_host_mmio_span_->add_to_span(event_ptr)) {
+    // as the nic receives his events before this span will
+    // be completed, we indicate to the nic that a mmiow a.k.a send is expected
+    if (is_type(event_ptr, EventType::HostMmioW_t) or
+        is_type(event_ptr, EventType::HostMmioR_t)) {
+      if (not queue_.push(this->id_, expectation::mmio,
+                          pending_host_mmio_span_)) {
+        std::cerr << "could not push to nic that mmio is expected" << std::endl;
+        // note: we will not return false as the span creation itself id work
+      }
+    }
+
     if (pending_host_mmio_span_->is_complete()) {
       // if it is a write after xmit, we inform the nic packer that we expect a
       // transmit

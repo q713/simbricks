@@ -230,7 +230,7 @@ bool trace_environment::is_mmio_pack_related(std::shared_ptr<Event> event_ptr) {
   if (not event_ptr) {
     return false;
   }
-  return mmio_related_event_t_.contains(event_ptr->getType());
+  return mmio_related_event_t_.contains(event_ptr->get_type());
 }
 
 bool trace_environment::is_dma_pack_related(std::shared_ptr<Event> event_ptr) {
@@ -238,7 +238,7 @@ bool trace_environment::is_dma_pack_related(std::shared_ptr<Event> event_ptr) {
   if (not event_ptr) {
     return false;
   }
-  return dma_related_event_t_.contains(event_ptr->getType());
+  return dma_related_event_t_.contains(event_ptr->get_type());
 }
 
 bool trace_environment::is_eth_pack_related(std::shared_ptr<Event> event_ptr) {

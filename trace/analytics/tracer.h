@@ -89,7 +89,7 @@ struct tracer {
       return {};
     }
 
-    if (register_span(new_span)) {
+    if (register_span(trace_id, new_span)) {
       return new_span;
     }
 

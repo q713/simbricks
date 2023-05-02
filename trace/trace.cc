@@ -65,7 +65,6 @@ bool create_open_file(std::ofstream &new_out, std::string filename) {
 
 int main(int argc, char *argv[]) {
   using event_t = std::shared_ptr<Event>;
-  using pack_t = std::shared_ptr<event_pack>;
 
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")(

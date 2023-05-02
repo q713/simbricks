@@ -217,7 +217,7 @@ struct event_span {
   virtual ~event_span() = default;
 
   event_span(uint64_t source_id, span_type t)
-      : id_(trace_environment::get_next_pack_id()),
+      : id_(trace_environment::get_next_span_id()),
         source_id_(source_id),
         type_(t) {
   }

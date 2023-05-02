@@ -28,8 +28,9 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <thread>
 
-#include "analytics/packer.h"
+#include "packer.h"
 #include "corobelt/corobelt.h"
 #include "env/symtable.h"
 #include "env/traceEnvironment.h"
@@ -41,11 +42,12 @@
 #include "util/log.h"
 
 bool create_open_file(std::ofstream &new_out, std::string filename) {
-  auto path = std::filesystem::path(filename);
   try {
-    auto targetPath = std::filesystem::canonical(path);
-    if (std::filesystem::exists(path)) {
-      std::cerr << "the file " << path
+    // TODO: later let user specify output directory 
+    // auto path = std::filesystem::path(directory);
+    // auto targetPath = std::filesystem::canonical(path);
+    if (std::filesystem::exists(filename)) {
+      std::cerr << "the file " << filename
                 << " already exists, we will not overwrite it" << std::endl;
       return false;
     }
@@ -176,7 +178,7 @@ int main(int argc, char *argv[]) {
       !trace_environment::add_symbol_table(
           "Linuxvm-Symbols",
           result["linux-dump-server-client"].as<std::string>(), 0,
-          FilterType::S)) {
+          FilterType::Elf)) {
     std::cerr << "could not initialize symbol table linux-dump-server-client"
               << std::endl;
     exit(EXIT_FAILURE);
@@ -184,7 +186,7 @@ int main(int argc, char *argv[]) {
   if (result.count("nic-i40e-dump") &&
       !trace_environment::add_symbol_table(
           "Nicdriver-Symbols", result["nic-i40e-dump"].as<std::string>(),
-          0xffffffffa0000000ULL, FilterType::S)) {
+          0xffffffffa0000000ULL, FilterType::Elf)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -206,7 +208,8 @@ int main(int argc, char *argv[]) {
         result["ts-lower-bound"].as<std::string>(), 10, &lower_bound);
   }
 
-  {  // SERVER HOST PIPELINE
+  
+  auto server_host_task = [&](){  // SERVER HOST PIPELINE
     EventTypeFilter eventFilter{
         {EventType::HostInstr_t, EventType::SimProcInEvent_t,
          EventType::SimSendSync_t},
@@ -241,9 +244,9 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not await termination of the pipeline" << std::endl;
       exit(EXIT_FAILURE);
     }
-  }
+  };
 
-  {  // CLIENT HOST PIPELINE
+  auto client_host_task = [&](){  // CLIENT HOST PIPELINE
     EventTypeFilter eventFilter{
         {EventType::HostInstr_t, EventType::SimProcInEvent_t,
          EventType::SimSendSync_t},
@@ -274,9 +277,9 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not await termination of the pipeline" << std::endl;
       exit(EXIT_FAILURE);
     }
-  }
+  };
 
-  {  // SERVER NIC PIPELINE
+  auto server_nic_task = [&]() {  // SERVER NIC PIPELINE
     EventTypeFilter eventFilter{
         {EventType::SimProcInEvent_t, EventType::SimSendSync_t}, true};
 
@@ -304,9 +307,9 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not await termination of the pipeline" << std::endl;
       exit(EXIT_FAILURE);
     }
-  }
+  };
 
-  {  // CLIENT NIC PIPELINE
+  auto client_nic_task = [&]() {  // CLIENT NIC PIPELINE
     EventTypeFilter eventFilter{
         {EventType::SimProcInEvent_t, EventType::SimSendSync_t}, true};
 
@@ -334,7 +337,17 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not await termination of the pipeline" << std::endl;
       exit(EXIT_FAILURE);
     }
-  }
+  };
+
+  std::thread server_h(server_host_task);
+  std::thread client_h(client_host_task);
+  std::thread server_n(server_nic_task);
+  std::thread client_n(client_nic_task);
+
+  server_h.join();
+  client_h.join();
+  server_n.join();
+  client_n.join();
 
   exit(EXIT_SUCCESS);
 }

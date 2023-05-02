@@ -88,15 +88,15 @@ class Event {
   // TODO: optimize string name out in later versions
   const std::string parser_name_;
 
-  inline size_t getIdent() {
+  inline size_t get_parser_ident() {
     return parser_identifier_;
   }
 
-  inline const std::string &getName() {
+  inline const std::string &get_name() {
     return name_;
   }
 
-  EventType getType() {
+  EventType get_type() {
     return type_;
   }
 

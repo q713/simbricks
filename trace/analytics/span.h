@@ -33,10 +33,6 @@
 #include "events.h"
 #include "traceEnvironment.h"
 
-using event_t = std::shared_ptr<Event>;
-struct event_pack;
-using pack_t = std::shared_ptr<event_pack>;
-
 inline void write_ident(std::ostream &out, unsigned ident) {
   if (ident == 0)
     return;
@@ -46,7 +42,7 @@ inline void write_ident(std::ostream &out, unsigned ident) {
   }
 }
 
-enum pack_type {
+enum span_type {
   host_call,
   host_msix,
   host_mmio,
@@ -59,54 +55,53 @@ enum pack_type {
   generic_single
 };
 
-inline std::ostream &operator<<(std::ostream &os, pack_type t) {
+inline std::ostream &operator<<(std::ostream &os, span_type t) {
   switch (t) {
-    case pack_type::host_call:
+    case span_type::host_call:
       os << "host_call";
       break;
-    case pack_type::host_msix:
+    case span_type::host_msix:
       os << "host_msix";
       break;
-    case pack_type::host_mmio:
+    case span_type::host_mmio:
       os << "host_mmio";
       break;
-    case pack_type::host_dma:
+    case span_type::host_dma:
       os << "host_dma";
       break;
-    case pack_type::host_int:
+    case span_type::host_int:
       os << "host_int";
       break;
-    case pack_type::nic_dma:
+    case span_type::nic_dma:
       os << "nic_dma";
       break;
-    case pack_type::nic_mmio:
+    case span_type::nic_mmio:
       os << "nic_mmio";
       break;
-    case pack_type::nic_eth:
+    case span_type::nic_eth:
       os << "nic_eth";
       break;
-    case pack_type::nic_msix:
+    case span_type::nic_msix:
       os << "nic_msix";
       break;
-    case pack_type::generic_single:
+    case span_type::generic_single:
       os << "generic_single";
       break;
     default:
-      os << "could not represent given pack type";
+      os << "could not represent given span type";
       break;
   }
   return os;
 }
 
-struct event_pack {
+struct event_span {
   uint64_t id_;
-  pack_type type_;
-  // Stacks stack_; // TODO: not whole stacks is within a stack, but each event
-  // on its own
-  std::vector<event_t> events_;
+  uint64_t source_id_;
+  span_type type_;
+  std::vector<std::shared_ptr<Event>> events_;
 
-  pack_t parent_ = nullptr;
-  std::vector<pack_t> children_;
+  std::shared_ptr<event_span> parent_ = nullptr;
+  std::vector<std::shared_ptr<event_span>> children_;
 
   bool is_pending_ = true;
   bool is_relevant_ = false;
@@ -115,8 +110,9 @@ struct event_pack {
 
   virtual void display(std::ostream &out, unsigned ident) {
     write_ident(out, ident);
-    out << "id: " << (unsigned long long)id_ << ", kind: " << type_
-        << std::endl;
+    out << "id: " << (unsigned long long)id_;
+    out << ", source_id: " << (unsigned long long)source_id_;
+    out << ", kind: " << type_ << std::endl;
     write_ident(out, ident);
     out << "has parent? " << (parent_ != nullptr) << std::endl;
     write_ident(out, ident);
@@ -125,22 +121,34 @@ struct event_pack {
       out << (unsigned long long)p->id_ << ", ";
     }
     out << std::endl;
-    for (event_t event : events_) {
+    for (std::shared_ptr<Event> event : events_) {
       write_ident(out, ident);
       out << *event << std::endl;
     }
-  }
-
-  inline void set_trace_id(uint64_t trace_id) {
-    trace_id_ = trace_id;
   }
 
   inline virtual void display(std::ostream &out) {
     display(out, 0);
   }
 
-  inline pack_type get_type() {
+  inline uint64_t get_id() {
+    return id_;
+  }
+
+  inline span_type get_type() {
     return type_;
+  }
+
+  inline uint64_t get_source_id() {
+    return source_id_;
+  }
+
+  inline uint64_t get_trace_id() {
+    return trace_id_;
+  }
+
+  inline void set_trace_id(uint64_t trace_id) {
+    trace_id_ = trace_id;
   }
 
   void mark_as_done() {
@@ -168,7 +176,7 @@ struct event_pack {
       return 0xFFFFFFFFFFFFFFFF;
     }
 
-    event_t event_ptr = events_.front();
+    std::shared_ptr<Event> event_ptr = events_.front();
     if (event_ptr) {
       return event_ptr->timestamp_;
     }
@@ -180,39 +188,41 @@ struct event_pack {
       return 0xFFFFFFFFFFFFFFFF;
     }
 
-    event_t event_ptr = events_.back();
+    std::shared_ptr<Event> event_ptr = events_.back();
     if (event_ptr) {
       return event_ptr->timestamp_;
     }
     return 0xFFFFFFFFFFFFFFFF;
   }
 
-  bool set_parent(pack_t parent_pack) {
-    if (not parent_ and parent_pack and
-        parent_pack->get_starting_ts() < get_starting_ts()) {
-      parent_ = parent_pack;
+  bool set_parent(std::shared_ptr<event_span> parent_span) {
+    if (not parent_ and parent_span and
+        parent_span->get_starting_ts() < get_starting_ts()) {
+      parent_ = parent_span;
       return true;
     }
     return false;
   }
 
-  bool add_children(pack_t child_pack) {
-    if (child_pack and child_pack.get() != this and
-        get_starting_ts() < child_pack->get_starting_ts()) {
-      children_.push_back(child_pack);
+  bool add_children(std::shared_ptr<event_span> child_span) {
+    if (child_span and child_span.get() != this and
+        get_starting_ts() < child_span->get_starting_ts()) {
+      children_.push_back(child_span);
       return true;
     }
 
     return false;
   }
 
-  virtual ~event_pack() = default;
+  virtual ~event_span() = default;
 
-  event_pack(pack_type t)
-      : id_(trace_environment::get_next_pack_id()), type_(t) {
+  event_span(uint64_t source_id, span_type t)
+      : id_(trace_environment::get_next_pack_id()),
+        source_id_(source_id),
+        type_(t) {
   }
 
-  bool is_potential_add(event_t event_ptr) {
+  bool is_potential_add(std::shared_ptr<Event> event_ptr) {
     if (not event_ptr) {
       return false;
     }
@@ -223,7 +233,7 @@ struct event_pack {
 
     if (not events_.empty()) {
       auto first = events_.front();
-      if (first->getIdent() != event_ptr->getIdent()) {
+      if (first->get_parser_ident() != event_ptr->get_parser_ident()) {
         return false;
       }
     }
@@ -231,29 +241,30 @@ struct event_pack {
     return true;
   }
 
-  virtual bool add_to_pack(event_t event_ptr) = 0;
+  virtual bool add_to_span(std::shared_ptr<Event> event_ptr) = 0;
 };
 
-struct host_call_pack : public event_pack {
-  event_t call_pack_entry_ = nullptr;
-  event_t syscall_return_ = nullptr;
+struct host_call_span : public event_span {
+  std::shared_ptr<Event> call_span_entry_ = nullptr;
+  std::shared_ptr<Event> syscall_return_ = nullptr;
   bool transmits_ = false;
   bool receives_ = false;
 
-  void set_call_pack_entry(event_t event_ptr) {
-    call_pack_entry_ = event_ptr;
+  void set_call_pack_entry(std::shared_ptr<Event> event_ptr) {
+    call_span_entry_ = event_ptr;
   }
 
-  void set_syscall_return(event_t event_ptr) {
+  void set_syscall_return(std::shared_ptr<Event> event_ptr) {
     syscall_return_ = event_ptr;
   }
 
-  host_call_pack() : event_pack(pack_type::host_call) {
+  host_call_span(uint64_t source_id)
+      : event_span(source_id, span_type::host_call) {
   }
 
-  ~host_call_pack() = default;
+  ~host_call_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       std::cout << "is not a potential add" << std::endl;
       return false;
@@ -264,7 +275,7 @@ struct host_call_pack : public event_pack {
     }
 
     if (trace_environment::is_sys_entry(event_ptr)) {
-      if (call_pack_entry_) {
+      if (call_span_entry_) {
         is_pending_ = false;
         syscall_return_ = events_.back();
         // std::cout << "found call stack end" << std::endl;
@@ -273,24 +284,24 @@ struct host_call_pack : public event_pack {
         return false;
       }
       is_pending_ = true;
-      call_pack_entry_ = event_ptr;
+      call_span_entry_ = event_ptr;
       events_.push_back(event_ptr);
       return true;
     }
 
-    if (not call_pack_entry_) {
+    if (not call_span_entry_) {
       return false;
     }
 
-    //if (env_.is_driver_tx(event_ptr)) {
-    //  transmits_ = true;
-    //  send_trigger_.push_back(event_ptr);
+    // if (env_.is_driver_tx(event_ptr)) {
+    //   transmits_ = true;
+    //   send_trigger_.push_back(event_ptr);
     //
-    //  TODO: where does the kernel actually "receive" the packet
-    //} else if (env_.is_driver_rx(event_ptr)) {
-    //  receives_ = true;
-    //  receiver_.push_back(event_ptr);
-    //}
+    //   TODO: where does the kernel actually "receive" the packet
+    // } else if (env_.is_driver_rx(event_ptr)) {
+    //   receives_ = true;
+    //   receiver_.push_back(event_ptr);
+    // }
 
     // is_relevant_ = is_relevant_ || transmits_ || receives_;
     // sim::analytics::conf::LINUX_NET_STACK_FUNC_INDICATOR.contains(
@@ -301,16 +312,17 @@ struct host_call_pack : public event_pack {
   }
 };
 
-struct host_int_pack : public event_pack {
-  event_t host_post_int_ = nullptr;
-  event_t host_clear_int_ = nullptr;
+struct host_int_span : public event_span {
+  std::shared_ptr<Event> host_post_int_ = nullptr;
+  std::shared_ptr<Event> host_clear_int_ = nullptr;
 
-  host_int_pack() : event_pack(pack_type::host_int) {
+  host_int_span(uint64_t source_id)
+      : event_span(source_id, span_type::host_int) {
   }
 
-  ~host_int_pack() = default;
+  ~host_int_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
@@ -337,24 +349,25 @@ struct host_int_pack : public event_pack {
   }
 };
 
-struct host_dma_pack : public event_pack {
+struct host_dma_span : public event_span {
   // HostDmaW_t or HostDmaR_t
-  event_t host_dma_execution_ = nullptr;
+  std::shared_ptr<Event> host_dma_execution_ = nullptr;
   bool is_read_ = true;
   // HostDmaC_t
-  event_t host_dma_completion_ = nullptr;
+  std::shared_ptr<Event> host_dma_completion_ = nullptr;
 
-  host_dma_pack() : event_pack(pack_type::host_dma) {
+  host_dma_span(uint64_t source_id)
+      : event_span(source_id, span_type::host_dma) {
   }
 
-  ~host_dma_pack() = default;
+  ~host_dma_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
 
-    switch (event_ptr->getType()) {
+    switch (event_ptr->get_type()) {
       case EventType::HostDmaW_t:
       case EventType::HostDmaR_t: {
         if (host_dma_execution_) {
@@ -392,29 +405,41 @@ struct host_dma_pack : public event_pack {
   }
 };
 
-struct host_mmio_pack : public event_pack {
+struct host_mmio_span : public event_span {
   // issue, either host_mmio_w_ or host_mmio_r_
-  event_t host_mmio_issue_ = nullptr;
+  std::shared_ptr<Event> host_mmio_issue_ = nullptr;
   bool is_read_ = false;
-  event_t host_msi_read_resp_ = nullptr;
+  std::shared_ptr<Event> host_msi_read_resp_ = nullptr;
   bool pci_msix_desc_addr_before_;
-  event_t im_mmio_resp_ = nullptr;
+  std::shared_ptr<Event> im_mmio_resp_ = nullptr;
   // completion, either host_mmio_cw_ or host_mmio_cr_
-  event_t completion_ = nullptr;
+  std::shared_ptr<Event> completion_ = nullptr;
 
-  explicit host_mmio_pack(bool pci_msix_desc_addr_before)
-      : event_pack(pack_type::host_mmio),
+  explicit host_mmio_span(uint64_t source_id, bool pci_msix_desc_addr_before)
+      : event_span(source_id, span_type::host_mmio),
         pci_msix_desc_addr_before_(pci_msix_desc_addr_before) {
   }
 
-  ~host_mmio_pack() = default;
+  ~host_mmio_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  inline bool is_after_pci_msix_desc_addr() {
+    return pci_msix_desc_addr_before_;
+  }
+
+  inline bool is_read() {
+    return is_read_;
+  }
+
+  inline bool is_write() {
+    return not is_read_;
+  }
+
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
 
-    switch (event_ptr->getType()) {
+    switch (event_ptr->get_type()) {
       case EventType::HostMmioW_t: {
         if (host_mmio_issue_) {
           return false;
@@ -495,35 +520,38 @@ struct host_mmio_pack : public event_pack {
   }
 };
 
-struct host_msix_pack : public event_pack {
-  event_t host_msix_ = nullptr;
+struct host_msix_span : public event_span {
+  std::shared_ptr<Event> host_msix_ = nullptr;
 
-  host_msix_pack() : event_pack(pack_type::host_msix) {
+  host_msix_span(uint64_t source_id)
+      : event_span(source_id, span_type::host_msix) {
   }
 
-  ~host_msix_pack() = default;
+  ~host_msix_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr) or
-        not is_type(event_ptr, EventType::HostMsiX_t)) {
+        not is_type(event_ptr, EventType::HostMsiX_t) or host_msix_) {
       return false;
     }
 
     host_msix_ = event_ptr;
     events_.push_back(event_ptr);
+    is_pending_ = false;
     return true;
   }
 };
 
-struct nic_msix_pack : public event_pack {
-  event_t nic_msix_ = nullptr;
+struct nic_msix_span : public event_span {
+  std::shared_ptr<Event> nic_msix_ = nullptr;
 
-  nic_msix_pack() : event_pack(pack_type::nic_msix) {
+  nic_msix_span(uint64_t source_id)
+      : event_span(source_id, span_type::nic_msix) {
   }
 
-  ~nic_msix_pack() = default;
+  ~nic_msix_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
@@ -539,21 +567,23 @@ struct nic_msix_pack : public event_pack {
     }
 
     events_.push_back(event_ptr);
+    is_pending_ = false;
     return true;
   }
 };
 
-struct nic_mmio_pack : public event_pack {
+struct nic_mmio_span : public event_span {
   // nic action nic_mmio_w_ or nic_mmio_r_
-  event_t action_ = nullptr;
+  std::shared_ptr<Event> action_ = nullptr;
   bool is_read_ = false;
 
-  nic_mmio_pack() : event_pack(pack_type::nic_mmio) {
+  nic_mmio_span(uint64_t source_id)
+      : event_span(source_id, span_type::nic_mmio) {
   }
 
-  ~nic_mmio_pack() = default;
+  ~nic_mmio_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
@@ -573,26 +603,26 @@ struct nic_mmio_pack : public event_pack {
   }
 };
 
-struct nic_dma_pack : public event_pack {
+struct nic_dma_span : public event_span {
   // NicDmaI_t
-  event_t dma_issue_ = nullptr;
+  std::shared_ptr<Event> dma_issue_ = nullptr;
   // NicDmaEx_t
-  event_t nic_dma_execution_ = nullptr;
+  std::shared_ptr<Event> nic_dma_execution_ = nullptr;
   // NicDmaCW_t or NicDmaCR_t
-  event_t nic_dma_completion_ = nullptr;
+  std::shared_ptr<Event> nic_dma_completion_ = nullptr;
   bool is_read_ = true;
 
-  nic_dma_pack() : event_pack(pack_type::nic_dma) {
+  nic_dma_span(uint64_t source_id) : event_span(source_id, span_type::nic_dma) {
   }
 
-  ~nic_dma_pack() = default;
+  ~nic_dma_span() = default;
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
 
-    switch (event_ptr->getType()) {
+    switch (event_ptr->get_type()) {
       case EventType::NicDmaI_t: {
         if (dma_issue_) {
           return false;
@@ -642,15 +672,15 @@ struct nic_dma_pack : public event_pack {
   }
 };
 
-struct nic_eth_pack : public event_pack {
+struct nic_eth_span : public event_span {
   // NicTx or NicRx
-  event_t tx_rx_ = nullptr;
+  std::shared_ptr<Event> tx_rx_ = nullptr;
   bool is_send_ = false;
 
-  nic_eth_pack() : event_pack(pack_type::nic_eth) {
+  nic_eth_span(uint64_t source_id) : event_span(source_id, span_type::nic_eth) {
   }
 
-  ~nic_eth_pack() = default;
+  ~nic_eth_span() = default;
 
   inline bool is_transmit() {
     return is_send_;
@@ -660,7 +690,7 @@ struct nic_eth_pack : public event_pack {
     return not is_transmit();
   }
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
@@ -680,13 +710,14 @@ struct nic_eth_pack : public event_pack {
   }
 };
 
-struct generic_single_pack : public event_pack {
-  event_t event_p_ = nullptr;
+struct generic_single_span : public event_span {
+  std::shared_ptr<Event> event_p_ = nullptr;
 
-  generic_single_pack() : event_pack(pack_type::generic_single) {
+  generic_single_span(uint64_t source_id)
+      : event_span(source_id, span_type::generic_single) {
   }
 
-  bool add_to_pack(event_t event_ptr) override {
+  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
     if (not is_potential_add(event_ptr)) {
       return false;
     }
@@ -702,30 +733,31 @@ struct generic_single_pack : public event_pack {
   }
 };
 
-inline bool is_type(std::shared_ptr<event_pack> pack, pack_type type) {
-  if (not pack) {
+inline bool is_type(std::shared_ptr<event_span> span, span_type type) {
+  if (not span) {
     return false;
   }
-  return pack->type_ == type;
+  return span->get_type() == type;
 }
 
-struct pack_printer : public sim::corobelt::consumer<pack_t> {
+struct pack_printer
+    : public sim::corobelt::consumer<std::shared_ptr<event_span>> {
   sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<pack_t> *producer_task) {
+      sim::corobelt::yield_task<std::shared_ptr<event_span>> *producer_task) {
     if (not producer_task) {
       co_return;
     }
 
-    pack_t next_pack = nullptr;
+    std::shared_ptr<event_span> next_span = nullptr;
     while (*producer_task) {
-      next_pack = producer_task->get();
-      next_pack->display(std::cout);
+      next_span = producer_task->get();
+      next_span->display(std::cout);
     }
 
     co_return;
   }
 
-  pack_printer() : sim::corobelt::consumer<pack_t>() {
+  pack_printer() : sim::corobelt::consumer<std::shared_ptr<event_span>>() {
   }
 };
 

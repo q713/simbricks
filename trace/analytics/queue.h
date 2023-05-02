@@ -25,23 +25,30 @@
 #ifndef SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
 #define SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
 
+#include <condition_variable>
 #include <iostream>
 #include <list>
 #include <memory>
+#include <optional>
 #include <unordered_map>
 
-#include "pack.h"
+#include "span.h"
 
-enum expectation { send, receive };
+enum expectation { tx, rx, dma, msix };
 
 inline std::ostream &operator<<(std::ostream &os, expectation e) {
   switch (e) {
-    case expectation::send:
-      os << "expectation::send";
+    case expectation::tx:
+      os << "expectation::tx";
       break;
-    case expectation::receive:
-      os << "expectation::receive";
+    case expectation::rx:
+      os << "expectation::rx";
       break;
+    case expectation::dma:
+      os << "expectation::dma";
+      break;
+    case expectation::msix:
+      os << "expectation::msix";
     default:
       os << "could not convert given 'expectation'";
       break;
@@ -51,10 +58,82 @@ inline std::ostream &operator<<(std::ostream &os, expectation e) {
 
 struct context {
   expectation expectation_;
-  std::shared_ptr<event_pack> parent_pack_;
+  std::shared_ptr<event_span> parent_span_;
 
-  context(expectation expectation, std::shared_ptr<event_pack> parent_pack)
-      : expectation_(expectation), parent_pack_(parent_pack) {
+  static std::shared_ptr<context> create(
+      expectation expectation, std::shared_ptr<event_span> parent_span) {
+    if (not parent_span) {
+      std::cerr << "try to create context without parent span" << std::endl;
+      return {};
+    }
+
+    auto con = std::make_shared<context>(expectation, parent_span);
+    return con;
+  }
+
+ private:
+  context(expectation expectation, std::shared_ptr<event_span> parent_span)
+      : expectation_(expectation), parent_span_(parent_span) {
+  }
+};
+
+bool is_expectation(std::shared_ptr<context> con, expectation exp) {
+  if (not con or con->expectation_ != exp) {
+    return false;
+  }
+  return true;
+}
+
+struct queue {
+  std::mutex queue_mutex_;
+  std::list<std::shared_ptr<context>> container_;
+  std::condition_variable condition_v_;
+
+  std::shared_ptr<context> poll() {
+    std::unique_lock lock(queue_mutex_);
+    lock.lock();
+
+    while (container_.empty()) {
+      condition_v_.wait(lock);
+    }
+
+    auto con = container_.front();
+    container_.pop_front();
+
+    lock.unlock();
+
+    return con;
+  }
+
+  std::shared_ptr<context> try_poll() {
+    std::unique_lock lock(queue_mutex_);
+    lock.lock();
+
+    std::shared_ptr<context> con;
+    if (container_.empty()) {
+      con = nullptr;
+    } else {
+      auto con = container_.front();
+      container_.pop_front();
+    }
+
+    lock.unlock();
+
+    return con;
+  }
+
+  bool push(std::shared_ptr<context> con) {
+    if (not con) {
+      return false;
+    }
+
+    std::unique_lock lock(queue_mutex_);
+    lock.lock();
+
+    container_.push_back(con);
+    condition_v_.notify_all();
+
+    lock.unlock();
   }
 };
 
@@ -73,71 +152,100 @@ struct context {
 // When we would do it in a different way we might end up passing 4 queues to a
 // nic packer, this should be prevented by this.
 struct context_queue {
-  std::mutex queue_mutex_;
+ private:
+  std::mutex context_queue_mutex_;
 
-  size_t registered_packers_ = 0;
-  uint64_t packer_a_key_ = 0;
-  uint64_t packer_b_key_ = 0;
+  size_t registered_spanners_ = 0;
+  uint64_t spanner_a_key_ = 0;
+  uint64_t spanner_b_key_ = 0;
 
-  // TODO: should probably use ring buffer with condition variables!!!
+  // spanner with key a will write to this queue
+  queue queue_a_;
+  // spanner with key b will write to this queue
+  queue queue_b_;
 
-  // packer with key a will write to this queue
-  std::list<std::shared_ptr<context>> queue_a_;
-  // packer with key b will write to this queue
-  std::list<std::shared_ptr<context>> queue_b_;
-
-  bool register_packer(uint64_t packer_id) {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
-
-    if (registered_packers_ == 2) {
-      return false;
-    }
-
-    if (registered_packers_ == 0) {
-      packer_a_key_ = packer_id;
+  queue *assign_write_queue(uint64_t spanner_id) {
+    if (spanner_id == spanner_a_key_) {
+      return &queue_a_;
+    } else if (spanner_id == spanner_b_key_) {
+      return &queue_b_;
     } else {
-      packer_b_key_ = packer_id;
+      return {};
     }
-    ++registered_packers_;
-    return true;
   }
 
-  std::shared_ptr<context> poll(uint64_t packer_id) {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
+  queue *assign_read_queue(uint64_t spanner_id) {
+    if (spanner_id == spanner_a_key_) {
+      return &queue_b_;
 
-    if (packer_id == packer_a_key_ and not queue_b_.empty()) {
-      auto con = queue_b_.front();
-      queue_b_.pop_front();
-      return con;
-
-    } else if (packer_id == packer_b_key_ and not queue_a_.empty()) {
-      auto con = queue_a_.front();
-      queue_a_.pop_front();
-      return con;
+    } else if (spanner_id == spanner_b_key_) {
+      return &queue_a_;
 
     } else {
       return {};
     }
   }
 
-  bool push(uint64_t packer_id, expectation expectation,
-            std::shared_ptr<event_pack> parent_pack) {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
+ public:
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  // TODO: make smaller critical sections!!
+  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    auto con = std::make_shared<context>(expectation, parent_pack);
+  bool register_spanner(uint64_t spanner_id) {
+    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+
+    if (registered_spanners_ == 2) {
+      return false;
+    }
+
+    if (registered_spanners_ == 0) {
+      spanner_a_key_ = spanner_id;
+    } else {
+      spanner_b_key_ = spanner_id;
+    }
+    ++registered_spanners_;
+    return true;
+  }
+
+  std::shared_ptr<context> poll(uint64_t spanner_id) {
+    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+
+    auto target = assign_read_queue(spanner_id);
+    if (not target) {
+      return {};
+    }
+
+    auto con = target->poll();
+    return con;
+  }
+
+  std::shared_ptr<context> try_poll(uint64_t spanner_id) {
+    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+
+    auto target = assign_read_queue(spanner_id);
+    if (not target) {
+      return {};
+    }
+
+    auto con = target->try_poll();
+    return con;
+  }
+
+  bool push(uint64_t spanner_id, expectation expectation,
+            std::shared_ptr<event_span> parent_span) {
+    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+
+    auto con = context::create(expectation, parent_span);
     if (not con) {
       return false;
     }
 
-    if (packer_id == packer_a_key_) {
-      queue_a_.push_back(con);
-      return true;
-    } else if (packer_id == packer_b_key_) {
-      queue_b_.push_back(con);
-      return true;
-    } else {
+    auto target = assign_write_queue(spanner_id);
+    if (not target) {
       return false;
     }
+
+    return target->push(con);
   }
 };
 

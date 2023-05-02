@@ -22,29 +22,32 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "packer.h"
+#include "spanner.h"
 
 using pack_t = std::shared_ptr<event_pack>;
 using event_t = std::shared_ptr<Event>;
 using src_task = sim::corobelt::yield_task<event_t>;
-using tar_task = sim::corobelt::yield_task<pack_t>;
+using tar_task = sim::corobelt::task<void>;
 
-tar_task nic_packer::produce() {
-  if (not host_queue_.register_packer(id_) or
-      not network_queue_.register_packer(id_)) {
+sim::corobelt::task<void> nic_spanner::consume(
+    sim::corobelt::yield_task<event_t> *producer_task) {
+  if (not producer_task) {
+    co_return;
+  }
+
+  if (not host_queue_.register_spanner(id_) or
+      not network_queue_.register_spanner(id_)) {
     std::cerr << "nic_packer " << id_;
     std::cerr << " error registering for host or network queue" << std::endl;
     co_return;
   }
 
-  src_task src = prod_.produce();
-
   event_t event_ptr = nullptr;
   std::shared_ptr<nic_dma_pack> pending_dma = nullptr;
   bool added = false;
 
-  while (src) {
-    event_ptr = src.get();
+  while (producer_task and *producer_task) {
+    event_ptr = producer_task->get();
     added = false;
 
     switch (event_ptr->getType()) {
@@ -59,7 +62,7 @@ tar_task nic_packer::produce() {
         if (mmio_p->add_to_pack(event_ptr)) {
           added = true;
           if (mmio_p->is_complete()) {
-            co_yield mmio_p;
+            co_yield mmio_p;  // TODO: remove
             mmio_p = nullptr;
           }
         }
@@ -75,7 +78,7 @@ tar_task nic_packer::produce() {
         if (pending_dma) {
           added = true;
           if (pending_dma->is_complete()) {
-            co_yield pending_dma;
+            co_yield pending_dma;  // TODO: remove
           }
           break;
         }
@@ -104,7 +107,7 @@ tar_task nic_packer::produce() {
         if (eth_p->add_to_pack(event_ptr)) {
           added = true;
           if (eth_p->is_complete()) {
-            co_yield eth_p;
+            co_yield eth_p;  // TODO: remove
             eth_p = nullptr;
           }
         }
@@ -121,7 +124,7 @@ tar_task nic_packer::produce() {
         if (msix_p->add_to_pack(event_ptr)) {
           added = true;
           if (msix_p->is_complete()) {
-            co_yield msix_p;
+            co_yield msix_p;  // TODO: remove
             msix_p = nullptr;
           }
         }

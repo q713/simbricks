@@ -22,7 +22,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.18)
 
 project(simbricks-trace LANGUAGES CXX DESCRIPTION "simbricks trace utility for analyzing system performance in depth")
 
@@ -70,13 +70,13 @@ set(TRACE_SRC_FILES
     env/traceEnvironment.h
     env/traceEnvironment.cc
     
-    analytics/pack.h
+    analytics/span.h
     analytics/trace.h
     analytics/tracer.h
     analytics/queue.h
-    analytics/packer.h
-    analytics/nicPacker.cc
-    analytics/hostPacker.cc
+    analytics/spanner.h
+    analytics/nicSpanner.cc
+    analytics/hostSpanner.cc
 )
 
 add_executable(${PROJECT_NAME} ${TRACE_SRC_FILES})
@@ -91,12 +91,16 @@ target_include_directories( ${PROJECT_NAME} PUBLIC
     analytics
 )
 
+message(STATUS "The used compiler id: ${CMAKE_CXX_COMPILER_ID}")
 # only gcc is supported at the moment
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
     # make sure that we build with necessary options for coroutines
-    target_compile_options(${PROJECT_NAME} PUBLIC -fcoroutines)
+    message(STATUS "The compiler is GNU, hence add -fcoroutines and -pthread")
+    target_compile_options(${PROJECT_NAME} PUBLIC -fcoroutines -pthread)
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
     message(FATAL_ERROR "Clang is currently not supported.")
+else()
+    message(FATAL_ERROR "Your compiler, whatever it is, is currently not supported.")
 endif()
 
 # TODO: replace this by using a proper coroutine library

@@ -72,12 +72,12 @@ class trace_environment {
     return next_id++;
   }
 
-  inline static uint64_t get_next_pack_id() {
+  inline static uint64_t get_next_span_id() {
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t get_next_packer_id() {
+  inline static uint64_t get_next_spanner_id() {
     static uint64_t next_id = 0;
     return next_id++;
   }

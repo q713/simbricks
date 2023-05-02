@@ -31,51 +31,107 @@
 
 #include "corobelt.h"
 #include "events.h"
-#include "pack.h"
+#include "span.h"
 #include "trace.h"
 #include "traceEnvironment.h"
 
 struct tracer {
-  std::mutex tracer_mutex_;
+  std::recursive_mutex tracer_mutex_;
 
   std::unordered_map<uint64_t, std::shared_ptr<trace>> traces_;
 
-  // add a new pack to an already existing trace
-  template <class pack_type, class... Args>
-  std::shared_ptr<pack_type> rergister_new_pack(uint64_t trace_id,
-                                                Args&&... args) {
-    // guard potential access using a lock guard
-    std::lock_guard<std::mutex> lock(tracer_mutex_);
+  std::shared_ptr<trace> get_trace(uint64_t trace_id) {
+    std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
     auto it = traces_.find(trace_id);
     if (it == traces_.end()) {
       return {};
     }
     std::shared_ptr<trace> target_trace = it->second;
+    return target_trace;
+  }
 
-    std::shared_ptr<pack_type> new_pack = std::make_shared<pack_type>(args...);
-    if (not new_pack) {
+  bool mark_trace_as_done(uint64_t trace_id) {
+    std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+
+    std::shared_ptr<trace> t = get_trace(trace_id);
+    if (t) {
+      t->mark_as_done();
+    }
+
+    return false;
+  }
+
+  bool register_span(uint64_t trace_id, std::shared_ptr<event_span> span_ptr) {
+    std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+
+    if (not span_ptr) {
+      return false;
+    }
+
+    auto target_trace = get_trace(trace_id);
+    if (not target_trace or target_trace->is_done()) {
+      return false;
+    }
+
+    return target_trace->add_span(span_ptr);
+  }
+
+  // add a new span to an already existing trace
+  template <class span_type, class... Args>
+  std::shared_ptr<span_type> rergister_new_span(uint64_t trace_id,
+                                                Args&&... args) {
+    // guard potential access using a lock guard
+    std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+
+    std::shared_ptr<span_type> new_span = std::make_shared<span_type>(args...);
+    if (not new_span) {
       return {};
     }
 
-    // in case we did not create a new trace, we add to the current trace
-    target_trace->add_pack(new_pack);
-    return new_pack;
+    if (register_span(new_span)) {
+      return new_span;
+    }
+
+    return {};
+  }
+
+  // add a new span to an already existing trace and set the parent immediately
+  template <class span_type, class... Args>
+  std::shared_ptr<span_type> rergister_new_span_by_parent(
+      std::shared_ptr<event_span> parent, Args&&... args) {
+    // guard potential access using a lock guard
+    std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+
+    if (not parent) {
+      return {};
+    }
+    auto new_span =
+        rergister_new_span<span_type>(parent->get_trace_id(), args...);
+    if (not new_span) {
+      return {};
+    }
+
+    if (not new_span->set_parent(parent)) {
+      return {};
+    }
+    return new_span;
   }
 
   // add a pack creating a completely new trace
-  template <class pack_type, class... Args>
-  std::shared_ptr<pack_type> rergister_new_pack(Args&&... args) {
+  template <class span_type, class... Args>
+  std::shared_ptr<span_type> rergister_new_trace(Args&&... args) {
     // guard potential access using a lock guard
-    std::lock_guard<std::mutex> lock(tracer_mutex_);
+    std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    std::shared_ptr<pack_type> new_pack = std::make_shared<pack_type>(args...);
-    if (not new_pack) {
+    std::shared_ptr<span_type> new_span = std::make_shared<span_type>(args...);
+    if (not new_span) {
       return {};
     }
 
+    // NOTE: this will already add the pack to the trace
     std::shared_ptr<trace> new_trace =
-        trace::create_trace(trace_environment::get_next_trace_id(), new_pack);
+        trace::create_trace(trace_environment::get_next_trace_id(), new_span);
     if (not new_trace) {
       return {};
     }
@@ -84,9 +140,7 @@ struct tracer {
     if (not it.second) {
       return {};
     }
-
-    new_trace->add_pack(new_pack);
-    return new_pack;
+    return new_span;
   }
 
   tracer() = default;

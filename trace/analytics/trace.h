@@ -29,53 +29,69 @@
 #include <memory>
 #include <vector>
 
-#include "pack.h"
+#include "span.h"
 #include "corobelt.h"
 #include "traceEnvironment.h"
 
 struct trace {
-  uint64_t id_;
-  std::shared_ptr<event_pack> parent_pack_;
-  std::vector<std::shared_ptr<event_pack>> packs_;
+  std::mutex mutex_;
 
-  bool add_pack(std::shared_ptr<event_pack> pack) {
-    if (not pack) {
+  uint64_t id_;
+  std::shared_ptr<event_span> parent_span_;
+
+  // TODO: maybe store spans by source id...
+  std::vector<std::shared_ptr<event_span>> spans_;
+
+  bool is_done_ = false;
+
+  inline bool is_done() {
+    return is_done_;
+  }
+
+  inline void mark_as_done() {
+    is_done_ = true;
+  }
+
+  bool add_span(std::shared_ptr<event_span> span) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (not span) {
       return false;
     }
 
-    pack->set_trace_id(id_);
-    packs_.push_back(pack);
+    span->set_trace_id(id_);
+    spans_.push_back(span);
   }
 
   void display(std::ostream &out) {
+    std::lock_guard<std::mutex> lock(mutex_);
     out << std::endl;
     out << "trace: id=" << id_ << std::endl;
-    for (auto pack : packs_) {
-      if (pack) {
-        if (pack.get() == parent_pack_.get()) {
-          out << "\t parent_pack:" << std::endl; 
+    for (auto span : spans_) {
+      if (span) {
+        if (span.get() == parent_span_.get()) {
+          out << "\t parent_span:" << std::endl; 
         }
-        pack->display(out, 1);
+        span->display(out, 1);
       }
     }
     out << std::endl;
   }
 
   static std::shared_ptr<trace> create_trace(
-      uint64_t id, std::shared_ptr<event_pack> parent_pack) {
+      uint64_t id, std::shared_ptr<event_span> parent_span) {
 
-    if (not parent_pack) {
+    if (not parent_span) {
       return {};
     }
 
-    auto t = std::shared_ptr<trace>{new trace{id, parent_pack}};
+    auto t = std::shared_ptr<trace>{new trace{id, parent_span}};
     return t;
   }
 
  private:
-  trace(uint64_t id, std::shared_ptr<event_pack> parent_pack)
-      : id_(id), parent_pack_(parent_pack) {
-    this->add_pack(parent_pack);
+  trace(uint64_t id, std::shared_ptr<event_span> parent_span)
+      : id_(id), parent_span_(parent_span) {
+    this->add_span(parent_span);
   }
 };
 
@@ -110,14 +126,14 @@ struct trace_printer : public sim::corobelt::consumer<std::shared_ptr<trace>> {
 
 #include "lib/utils/log.h"
 #include "lib/utils/string_util.h"
-#include "trace/analytics/packs/callPack.h"
-#include "trace/analytics/packs/dmaPack.h"
-#include "trace/analytics/packs/ethPack.h"
-#include "trace/analytics/packs/genericSinglePack.h"
-#include "trace/analytics/packs/hostIntPack.h"
-#include "trace/analytics/packs/mmioPack.h"
-#include "trace/analytics/packs/msixPack.h"
-#include "trace/analytics/packs/pack.h"
+#include "trace/analytics/spans/callspan.h"
+#include "trace/analytics/spans/dmaspan.h"
+#include "trace/analytics/spans/ethspan.h"
+#include "trace/analytics/spans/genericSinglespan.h"
+#include "trace/analytics/spans/hostIntspan.h"
+#include "trace/analytics/spans/mmiospan.h"
+#include "trace/analytics/spans/msixspan.h"
+#include "trace/analytics/spans/span.h"
 #include "trace/corobelt/corobelt.h"
 #include "trace/env/traceEnvironment.h"
 #include "trace/events/events.h"
@@ -126,7 +142,7 @@ struct trace_printer : public sim::corobelt::consumer<std::shared_ptr<trace>> {
 // NOTE: currently analyzing a whole topology is not supported. only the
 // analysis of a
 //       nic/host pair is supported at the moment
-// --> when extending: make sure that events in a pack belong to same source!!!
+// --> when extending: make sure that events in a span belong to same source!!!
 
 /*
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -161,23 +177,23 @@ std::ostream &operator<<(std::ostream &out, Stacks s) {
 struct tcp_trace {
   using event_t = std::shared_ptr<Event>;
   using msg_t = std::optional<event_t>;
-  using pack_t = std::shared_ptr<event_pack>;
-  using callp_t = std::shared_ptr<call_pack>;
-  using mmiop_t = std::shared_ptr<mmio_pack>;
-  using dmap_t = std::shared_ptr<dma_pack>;
-  using msix_t = std::shared_ptr<msix_pack>;
-  using hostint_t = std::shared_ptr<host_int_pack>;
+  using span_t = std::shared_ptr<event_span>;
+  using callp_t = std::shared_ptr<call_span>;
+  using mmiop_t = std::shared_ptr<mmio_span>;
+  using dmap_t = std::shared_ptr<dma_span>;
+  using msix_t = std::shared_ptr<msix_span>;
+  using hostint_t = std::shared_ptr<host_int_span>;
   using trace_t = std::shared_ptr<tcp_trace>;
 
   sim::trace::env::trace_environment &env_;
 
-  std::list<pack_t> finished_packs_;  // TODO: print a trace in order
+  std::list<span_t> finished_spans_;  // TODO: print a trace in order
 
-  std::list<callp_t> pending_call_packs_;
-  std::list<mmiop_t> pending_mmio_packs_;
-  std::list<dmap_t> pending_dma_packs_;
-  std::list<msix_t> pending_msix_packs_;
-  std::list<hostint_t> pending_hostint_packs_;
+  std::list<callp_t> pending_call_spans_;
+  std::list<mmiop_t> pending_mmio_spans_;
+  std::list<dmap_t> pending_dma_spans_;
+  std::list<msix_t> pending_msix_spans_;
+  std::list<hostint_t> pending_hostint_spans_;
 
   bool is_tcp_handshake_ = false;
   bool is_tcp_tx_rx_ = false;
@@ -190,18 +206,18 @@ struct tcp_trace {
   size_t nic_rx_ = 0;
 
   // state to decide what dam operations belong to
-  pack_t last_finished_dma_causing_pack_ = nullptr;
+  span_t last_finished_dma_causing_span_ = nullptr;
 
   tcp_trace(sim::trace::env::trace_environment &env) : env_(env){};
 
   ~tcp_trace() = default;
 
   bool is_trace_pending() {
-    return not has_finished_packs() or has_pending_call() or
+    return not has_finished_spans() or has_pending_call() or
            has_pending_mmio() or has_pending_msix() or has_pending_dma() or
            has_expected_transmits_or_receives();
     // not found_host_tx_ or not found_host_rx_;
-    // return not has_finished_packs() or has_pending_call() or
+    // return not has_finished_spans() or has_pending_call() or
     // has_pending_mmio() or
     //        has_pending_dma() or not found_host_tx_ or not found_host_rx_ or
     //        not found_nic_tx_ or not found_nic_rx_;
@@ -223,12 +239,12 @@ struct tcp_trace {
     return has_expected_transmits() or has_expected_receives();
   }
 
-  inline bool has_finished_packs() {
-    return not finished_packs_.empty();
+  inline bool has_finished_spans() {
+    return not finished_spans_.empty();
   }
 
   inline bool has_pending_call() {
-    return not pending_call_packs_.empty();
+    return not pending_call_spans_.empty();
   }
 
   bool is_new_call_needed() {
@@ -237,7 +253,7 @@ struct tcp_trace {
   }
 
   inline bool has_pending_mmio() {
-    return not pending_mmio_packs_.empty();
+    return not pending_mmio_spans_.empty();
   }
 
   bool is_new_mmio_needed() {
@@ -245,7 +261,7 @@ struct tcp_trace {
   }
 
   inline bool has_pending_dma() {
-    return not pending_dma_packs_.empty();
+    return not pending_dma_spans_.empty();
   }
 
   bool is_new_dma_needed() {
@@ -253,11 +269,11 @@ struct tcp_trace {
   }
 
   inline bool has_pending_msix() {
-    return not pending_msix_packs_.empty();
+    return not pending_msix_spans_.empty();
   }
 
   inline bool has_pending_hostint() {
-    return not pending_hostint_packs_.empty();
+    return not pending_hostint_spans_.empty();
   }
 
   bool is_tcp_handshake() {
@@ -336,13 +352,13 @@ struct tcp_trace {
     out << "\t driver receives: " << driver_rx_ << std::endl;
     out << "\t nic transmits: " << nic_tx_ << std::endl;
     out << "\t nic receives: " << nic_rx_ << std::endl;
-    out << "\tFinished Packs:" << std::endl;
-    for (auto pack : finished_packs_) {
-      pack->display(out, 2);
+    out << "\tFinished spans:" << std::endl;
+    for (auto span : finished_spans_) {
+      span->display(out, 2);
       out << std::endl;
     }
     out << std::endl;
-    out << "\tPendingPacks:" << std::endl;
+    out << "\tPendingspans:" << std::endl;
     if (not(has_pending_call() or has_pending_dma() or has_pending_mmio())) {
       out << "\t\tNone" << std::endl;
       out << std::endl;
@@ -350,16 +366,16 @@ struct tcp_trace {
       return;
     }
 
-    for (auto pack : pending_call_packs_) {
-      pack->display(out, 2);
+    for (auto span : pending_call_spans_) {
+      span->display(out, 2);
       out << std::endl;
     }
-    for (auto pack : pending_mmio_packs_) {
-      pack->display(out, 2);
+    for (auto span : pending_mmio_spans_) {
+      span->display(out, 2);
       out << std::endl;
     }
-    for (auto pack : pending_dma_packs_) {
-      pack->display(out, 2);
+    for (auto span : pending_dma_spans_) {
+      span->display(out, 2);
       out << std::endl;
     }
     out << std::endl;
@@ -367,43 +383,43 @@ struct tcp_trace {
   }
 
  private:
-  void add_pack(pack_t pack) {
-    if (not pack or pack->is_pending()) {
+  void add_span(span_t span) {
+    if (not span or span->is_pending()) {
       return;
     }
 
-    if (pack->type_ == pack_type::CALL_PACK) {
-      auto cp = std::static_pointer_cast<call_pack>(pack);
-      // in case a call pack is non networking related we filter it out
+    if (span->type_ == span_type::CALL_span) {
+      auto cp = std::static_pointer_cast<call_span>(span);
+      // in case a call span is non networking related we filter it out
       if (not cp->is_relevant_) {
-        //std::cout << "filtered out non relevant call pack:" << std::endl;
+        //std::cout << "filtered out non relevant call span:" << std::endl;
         // cp->display(std::cout);
         // std::cout << std::endl;
         return;
       }
     }
 
-    finished_packs_.push_back(pack);
-    // std::cout << "add a pack: " << std::endl;
-    // pack->display(std::cout, 1);
+    finished_spans_.push_back(span);
+    // std::cout << "add a span: " << std::endl;
+    // span->display(std::cout, 1);
   }
 
-  template <typename pack_type>
-  std::shared_ptr<pack_type> iterate_add_erase(
-      std::list<std::shared_ptr<pack_type>> &pending, event_t event_ptr) {
+  template <typename span_type>
+  std::shared_ptr<span_type> iterate_add_erase(
+      std::list<std::shared_ptr<span_type>> &pending, event_t event_ptr) {
     auto it = pending.begin();
     while (it != pending.end()) {
-      auto cur_pack = *it;
-      if (cur_pack->is_complete()) {
-        add_pack(cur_pack);
+      auto cur_span = *it;
+      if (cur_span->is_complete()) {
+        add_span(cur_span);
         it = pending.erase(it);
       } else {
-        if (cur_pack->add_on_match(event_ptr)) {
-          if (cur_pack->is_complete()) {
-            add_pack(cur_pack);
+        if (cur_span->add_on_match(event_ptr)) {
+          if (cur_span->is_complete()) {
+            add_span(cur_span);
             pending.erase(it);
           }
-          return cur_pack;
+          return cur_span;
         }
         it++;
       }
@@ -424,14 +440,14 @@ struct tcp_trace {
 
   template <typename pt>
   bool add_set_triggered_pending(std::list<std::shared_ptr<pt>> &pending,
-                                 pack_t pack_ptr) {
-    if (not pack_ptr or pack_ptr->is_pending()) {
+                                 span_t span_ptr) {
+    if (not span_ptr or span_ptr->is_pending()) {
       return false;
     }
 
-    for (std::shared_ptr<pt> pack : pending) {
-      if (pack->add_if_triggered(pack_ptr)) {
-        pack_ptr->set_triggered_by(pack);
+    for (std::shared_ptr<pt> span : pending) {
+      if (span->add_if_triggered(span_ptr)) {
+        span_ptr->set_triggered_by(span);
         return true;
       }
     }
@@ -440,21 +456,21 @@ struct tcp_trace {
   }
 
   template <typename pt>
-  bool add_set_triggered_trace(pack_type type, pack_t pack_ptr) {
-    if (not pack_ptr or pack_ptr->is_pending()) {
+  bool add_set_triggered_trace(span_type type, span_t span_ptr) {
+    if (not span_ptr or span_ptr->is_pending()) {
       return false;
     }
 
-    for (auto it = finished_packs_.rbegin(); it != finished_packs_.rend();
+    for (auto it = finished_spans_.rbegin(); it != finished_spans_.rend();
          it++) {
-      pack_t pack = *it;
-      if (pack->type_ != type) {
+      span_t span = *it;
+      if (span->type_ != type) {
         continue;
       }
 
-      auto casted_pack = std::static_pointer_cast<pt>(pack);
-      if (casted_pack->add_if_triggered(pack_ptr)) {
-        pack_ptr->set_triggered_by(casted_pack);
+      auto casted_span = std::static_pointer_cast<pt>(span);
+      if (casted_span->add_if_triggered(span_ptr)) {
+        span_ptr->set_triggered_by(casted_span);
         return true;
       }
     }
@@ -467,30 +483,30 @@ struct tcp_trace {
       return false;
     }
 
-    std::shared_ptr<call_pack> pack = nullptr;
+    std::shared_ptr<call_span> span = nullptr;
     if (has_pending_call()) {
-      pack = iterate_add_erase<call_pack>(pending_call_packs_, event_ptr);
+      span = iterate_add_erase<call_span>(pending_call_spans_, event_ptr);
     }
 
-    if (not pack and is_new_call_needed()) {
-      pack = create_add<call_pack>(pending_call_packs_, event_ptr);
+    if (not span and is_new_call_needed()) {
+      span = create_add<call_span>(pending_call_spans_, event_ptr);
     }
 
-    if (pack) {
-      // remove mmio packs after pci_msix_desc_addr
+    if (span) {
+      // remove mmio spans after pci_msix_desc_addr
       if (not env_.is_pci_msix_desc_addr(event_ptr)) {
         if (last_call_pci_msix_desc_addr_) {
-          auto it = pending_mmio_packs_.begin();
-          while (it != pending_mmio_packs_.end()) {
-            mmiop_t pack = *it;
-            if (not pack->is_pending()) {
-              add_pack(pack);
-              it = pending_mmio_packs_.erase(it);
-            } else if (pack->is_pending() and
-                       pack->pci_msix_desc_addr_before_ and
-                       pack->host_mmio_issue_ and pack->im_mmio_resp_) {
-              add_pack(pack);
-              it = pending_mmio_packs_.erase(it);
+          auto it = pending_mmio_spans_.begin();
+          while (it != pending_mmio_spans_.end()) {
+            mmiop_t span = *it;
+            if (not span->is_pending()) {
+              add_span(span);
+              it = pending_mmio_spans_.erase(it);
+            } else if (span->is_pending() and
+                       span->pci_msix_desc_addr_before_ and
+                       span->host_mmio_issue_ and span->im_mmio_resp_) {
+              add_span(span);
+              it = pending_mmio_spans_.erase(it);
             } else {
               ++it;
             }
@@ -504,20 +520,20 @@ struct tcp_trace {
       if (env_.is_socket_connect(event_ptr)) {
         expected_tx_ += 3;
         expected_rx_ += 2;
-        pack->mark_as_relevant();
+        span->mark_as_relevant();
       } else if (env_.is_nw_interface_send(event_ptr)) {
         ++expected_tx_;
-        pack->mark_as_relevant();
+        span->mark_as_relevant();
       } else if (env_.is_nw_interface_receive(event_ptr)) {
         ++expected_rx_;
-        pack->mark_as_relevant();
+        span->mark_as_relevant();
       } else if (env_.is_driver_tx(event_ptr)) {
         ++driver_tx_;
-        pack->mark_as_relevant();
+        span->mark_as_relevant();
       } else if (env_.is_driver_rx(event_ptr)) {
         // TODO
         ++driver_rx_;
-        pack->mark_as_relevant();
+        span->mark_as_relevant();
       }
 
       return true;
@@ -531,32 +547,32 @@ struct tcp_trace {
       return false;
     }
 
-    std::shared_ptr<mmio_pack> pack = nullptr;
+    std::shared_ptr<mmio_span> span = nullptr;
     if (has_pending_mmio()) {
-      pack = iterate_add_erase<mmio_pack>(pending_mmio_packs_, event_ptr);
+      span = iterate_add_erase<mmio_span>(pending_mmio_spans_, event_ptr);
 
-      if (pack and pack->is_complete() and pack->is_write()) {
+      if (span and span->is_complete() and span->is_write()) {
         // TODO: only if is not pending anymore
-        add_set_triggered_pending<call_pack>(pending_call_packs_, pack);
-        last_finished_dma_causing_pack_ = pack;
+        add_set_triggered_pending<call_span>(pending_call_spans_, span);
+        last_finished_dma_causing_span_ = span;
       }
     }
 
     // found everything of this trace, hence do not create a new event
     // as it must have been issued by another trace
     if (not is_new_mmio_needed()) {
-      if (pack) {
+      if (span) {
         return true;
       }
       return false;
     }
 
-    if (not pack) {
-      pack = std::make_shared<mmio_pack>(last_call_pci_msix_desc_addr_, env_);
-      if (not pack or not pack->add_on_match(event_ptr)) {
+    if (not span) {
+      span = std::make_shared<mmio_span>(last_call_pci_msix_desc_addr_, env_);
+      if (not span or not span->add_on_match(event_ptr)) {
         return false;
       }
-      pending_mmio_packs_.push_back(pack);
+      pending_mmio_spans_.push_back(span);
     }
 
     return true;
@@ -567,20 +583,20 @@ struct tcp_trace {
       return false;
     }
 
-    std::shared_ptr<dma_pack> pack = nullptr;
+    std::shared_ptr<dma_span> span = nullptr;
     if (has_pending_dma()) {
-      pack = iterate_add_erase<dma_pack>(pending_dma_packs_, event_ptr);
+      span = iterate_add_erase<dma_span>(pending_dma_spans_, event_ptr);
 
-      if (pack and pack->is_complete() and last_finished_dma_causing_pack_) {
-        if (last_finished_dma_causing_pack_->get_type() ==
-            pack_type::MMIO_PACK) {
+      if (span and span->is_complete() and last_finished_dma_causing_span_) {
+        if (last_finished_dma_causing_span_->get_type() ==
+            span_type::MMIO_span) {
           // TODO: after Mmio write, we expect Dma Reads
-          add_set_triggered_trace<mmio_pack>(pack_type::MMIO_PACK, pack);
+          add_set_triggered_trace<mmio_span>(span_type::MMIO_span, span);
 
-        } else if (last_finished_dma_causing_pack_->get_type() ==
-                   pack_type::ETH_PACK) {
+        } else if (last_finished_dma_causing_span_->get_type() ==
+                   span_type::ETH_span) {
           // TODO: after Rx/Tx, we expect Dma Writes/Write
-          add_set_triggered_trace<eth_pack>(pack_type::ETH_PACK, pack);
+          add_set_triggered_trace<eth_span>(span_type::ETH_span, span);
         }
       }
     }
@@ -588,15 +604,15 @@ struct tcp_trace {
     // found everything of this trace, hence do not create a new event
     // as it must have been issued by another trace
     if (not is_new_dma_needed()) {
-      if (pack) {
+      if (span) {
         return true;
       }
       return false;
     }
 
-    if (not pack) {
-      pack = create_add<dma_pack>(pending_dma_packs_, event_ptr);
-      if (nullptr == pack) {
+    if (not span) {
+      span = create_add<dma_span>(pending_dma_spans_, event_ptr);
+      if (nullptr == span) {
         return false;
       }
     }
@@ -610,9 +626,9 @@ struct tcp_trace {
       return false;
     }
 
-    auto p = std::make_shared<eth_pack>(env_);
+    auto p = std::make_shared<eth_span>(env_);
     if (p and p->add_on_match(event_ptr) and p->is_complete()) {
-      add_pack(p);
+      add_span(p);
 
       if (is_type(event_ptr, EventType::NicTx_t)) {
         nic_tx_++;
@@ -621,12 +637,12 @@ struct tcp_trace {
       }
 
       if (p->is_transmit()) {
-        add_set_triggered_trace<mmio_pack>(pack_type::MMIO_PACK, p);
+        add_set_triggered_trace<mmio_span>(span_type::MMIO_span, p);
       } else {
-        add_set_triggered_trace<eth_pack>(pack_type::ETH_PACK, p);
+        add_set_triggered_trace<eth_span>(span_type::ETH_span, p);
       }
 
-      last_finished_dma_causing_pack_ = p;
+      last_finished_dma_causing_span_ = p;
       return true;
     }
     return false;
@@ -637,14 +653,14 @@ struct tcp_trace {
       return false;
     }
 
-    msix_t pack = nullptr;
+    msix_t span = nullptr;
     if (has_pending_msix()) {
-      pack = iterate_add_erase<msix_pack>(pending_msix_packs_, event_ptr);
+      span = iterate_add_erase<msix_span>(pending_msix_spans_, event_ptr);
     }
 
-    if (not pack) {
-      pack = create_add<msix_pack>(pending_msix_packs_, event_ptr);
-      if (not pack) {
+    if (not span) {
+      span = create_add<msix_span>(pending_msix_spans_, event_ptr);
+      if (not span) {
         return false;
       }
     }
@@ -657,15 +673,15 @@ struct tcp_trace {
       return false;
     }
 
-    hostint_t pack = nullptr;
+    hostint_t span = nullptr;
     if (has_pending_hostint()) {
-      pack =
-          iterate_add_erase<host_int_pack>(pending_hostint_packs_, event_ptr);
+      span =
+          iterate_add_erase<host_int_span>(pending_hostint_spans_, event_ptr);
     }
 
-    if (not pack) {
-      pack = create_add<host_int_pack>(pending_hostint_packs_, event_ptr);
-      if (not pack) {
+    if (not span) {
+      span = create_add<host_int_span>(pending_hostint_spans_, event_ptr);
+      if (not span) {
         return false;
       }
     }
@@ -678,9 +694,9 @@ struct tcp_trace {
       return false;
     }
 
-    auto pack = std::make_shared<single_event_pack>(env_);
-    if (pack and pack->add_on_match(event_ptr)) {
-      add_pack(pack);
+    auto span = std::make_shared<single_event_span>(env_);
+    if (span and span->add_on_match(event_ptr)) {
+      add_span(span);
 
       // TODO: any triggers?!?!?!
 

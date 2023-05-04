@@ -26,8 +26,8 @@
 
 #include <functional>
 
-#include "string_util.h"
 #include "reader.h"
+#include "string_util.h"
 
 // #define SYMS_DEBUG_ 1
 
@@ -165,13 +165,17 @@ bool SymsFilter::load_syms(const std::string &file_path,
 
     if (!add_to_sym_table(address, name, address_offset)) {
 #ifdef SYMS_DEBUG_
-      std::string already_present_symbol{""};
-      filter(address, already_present_symbol);
-      DFLOGWARN(
+      const std::string *already_present_symbol = filter(address);
+      if (not already_present_symbol) {
+        DFLOGWARN(
+            "%s: could not insert new val '[%u] = %s' into sym table.\n",
+            identifier_.c_str(), address, name.c_str());
+      } else {
+        DFLOGWARN(
           "%s: could not insert new val '[%u] = %s' into sym table. There was "
           "alread value %s found\n",
-          identifier_.c_str(), address, name.c_str(),
-          already_present_symbol.c_str());
+          identifier_.c_str(), address, name.c_str(), already_present_symbol->c_str());
+      }  
 #endif
     }
   }
@@ -290,13 +294,17 @@ bool SymsFilter::load_elf(const std::string &file_path,
 
     if (!add_to_sym_table(address, label, address_offset)) {
 #ifdef SYMS_DEBUG_
-      std::string already_present_symbol{""};
-      filter(address, already_present_symbol);
-      DFLOGWARN(
+      const std::string *already_present_symbol = filter(address);
+      if (not already_present_symbol) {
+        DFLOGWARN(
+            "%s: could not insert new val '[%u] = %s' into sym table.\n",
+            identifier_.c_str(), address, label.c_str());
+      } else {
+        DFLOGWARN(
           "%s: could not insert new val '[%u] = %s' into sym table. There was "
           "alread value %s found\n",
-          identifier_.c_str(), address, label.c_str(),
-          already_present_symbol.c_str());
+          identifier_.c_str(), address, label.c_str(), already_present_symbol->c_str());
+      }  
 #endif
     }
   }

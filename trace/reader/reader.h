@@ -59,21 +59,21 @@ class LineReader {
     close_input();
   }
 
-  int ln() {
+  inline int ln() {
     return line_number_;
   }
 
-  bool is_valid() {
+  inline bool is_valid() {
     return input_stream_.good();
   }
 
   std::string get_cur_string() {
     if (cur_reading_pos_ >= cur_line_.length())
-      return ""; 
+      return "";
     return std::string(cur_line_.begin() + cur_reading_pos_, cur_line_.end());
   }
 
-  const std::string &get_raw_line() {
+  inline const std::string &get_raw_line() {
     return cur_line_;
   }
 
@@ -98,9 +98,8 @@ class LineReader {
   std::string extract_and_substr_until(
       std::function<bool(unsigned char)> &predicate);
 
-  bool extract_and_substr_until_into(std::string &target,
-      std::function<bool(unsigned char)> &predicate) {
-    
+  bool extract_and_substr_until_into(
+      std::string &target, std::function<bool(unsigned char)> &predicate) {
     target = extract_and_substr_until(predicate);
     return not target.empty();
   }

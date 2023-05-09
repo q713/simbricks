@@ -30,11 +30,12 @@
 #include <memory>
 #include <optional>
 #include <ostream>
+#include <set>
 #include <string>
 #include <type_traits>
 
-#include "log.h"
 #include "corobelt.h"
+#include "log.h"
 
 #define DEBUG_EVENT_ ;
 
@@ -170,14 +171,16 @@ class HostInstr : public Event {
 
   void display(std::ostream &os) override;
 };
+
 class HostCall : public HostInstr {
  public:
-  const std::string *func_; // TODO: internalize function name
+  const std::string * func_;
   const std::string *comp_;
 
   explicit HostCall(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t pc,
-                    const std::string *func, const std::string *comp)
+                    const std::string * func,
+                    const std::string *comp)
       : HostInstr(ts, parser_identifier, std::move(parser_name), pc,
                   EventType::HostCall_t, "HostCall"),
         func_(func),
@@ -682,14 +685,15 @@ class EventPrinter : public sim::corobelt::consumer<std::shared_ptr<Event>> {
   }
 
   sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task) override {
+      sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task)
+      override {
     if (!producer_task) {
       co_return;
     }
 
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
-    while(*producer_task) {
+    while (*producer_task) {
       event = producer_task->get();
       out_ << *event << std::endl;
     }

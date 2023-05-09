@@ -24,6 +24,7 @@
 
 #include "symtable.h"
 
+#include <cassert>
 #include <functional>
 
 #include "reader.h"
@@ -33,13 +34,20 @@
 
 bool SymsFilter::parse_address(uint64_t &address) {
   line_reader_.trimL();
+
   if (!line_reader_.parse_uint_trim(16, address)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not parse address out of line '%s'\n",
-             identifier_.c_str(), line_reader_.get_raw_line().c_str());
+             component_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
     return false;
   }
+
+  if (line_reader_.get_raw_line().compare("ffffffff81600000") == 0) {
+    std::cout << "found interesting line" << std::endl;
+    std::cout << "address: " << std::hex << address << std::endl;
+  }
+
   return true;
 }
 
@@ -50,7 +58,7 @@ bool SymsFilter::parse_name(std::string &name) {
 
   if (name.empty()) {
 #ifdef SYMS_DEBUG_
-    DFLOGERR("%s: could not parse non empty name\n", identifier_.c_str());
+    DFLOGERR("%s: could not parse non empty name\n", component_.c_str());
 #endif
     return false;
   }
@@ -63,7 +71,7 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
   auto in_set = symbol_filter_.find(name);
   if (!symbol_filter_.empty() && in_set == symbol_filter_.end()) {
 #ifdef SYMS_DEBUG_
-    DFLOGIN("%s: filter out symbol with name '%s'\n", identifier_.c_str(),
+    DFLOGIN("%s: filter out symbol with name '%s'\n", component_.c_str(),
             name.c_str());
 #endif
     return false;
@@ -89,7 +97,7 @@ const std::string *SymsFilter::filter(uint64_t address) {
     return symbol->second;
   }
 
-  return nullptr;
+  return {};
 }
 
 bool SymsFilter::skip_syms_fags() {
@@ -100,7 +108,7 @@ bool SymsFilter::skip_syms_fags() {
     DFLOGWARN(
         "%s: line has not more than 7 chars (flags), hence it is the wrong "
         "format",
-        identifier_.c_str());
+        component_.c_str());
 #endif
     return false;
   }
@@ -124,7 +132,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
                            uint64_t address_offset) {
   if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
-    DFLOGERR("%s: could not create reader\n", identifier_.c_str());
+    DFLOGERR("%s: could not create reader\n", component_.c_str());
 #endif
     return false;
   }
@@ -138,7 +146,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
     if (!parse_address(address)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse address from line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                component_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -149,7 +157,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
       DFLOGWARN(
           "%s: line '%s' seems to have wrong format regarding flags, section "
           "or alignment\n",
-          identifier_.c_str(), line_reader_.get_raw_line().c_str());
+          component_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -157,25 +165,16 @@ bool SymsFilter::load_syms(const std::string &file_path,
     // parse name
     if (!parse_name(name)) {
 #ifdef SYMS_DEBUG_
-      DFLOGWARN("%s: could not parse name from line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+      DFLOGWARN("%s: could not parse name from line '%s'\n", component_.c_str(),
+                line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
 
     if (!add_to_sym_table(address, name, address_offset)) {
 #ifdef SYMS_DEBUG_
-      const std::string *already_present_symbol = filter(address);
-      if (not already_present_symbol) {
-        DFLOGWARN(
-            "%s: could not insert new val '[%u] = %s' into sym table.\n",
-            identifier_.c_str(), address, name.c_str());
-      } else {
-        DFLOGWARN(
-          "%s: could not insert new val '[%u] = %s' into sym table. There was "
-          "alread value %s found\n",
-          identifier_.c_str(), address, name.c_str(), already_present_symbol->c_str());
-      }  
+      DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table.\n",
+                component_.c_str(), address, name.c_str());
 #endif
     }
   }
@@ -185,7 +184,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
 bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
   if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
-    DFLOGERR("%s: could not create reader\n", identifier_.c_str());
+    DFLOGERR("%s: could not create reader\n", component_.c_str());
 #endif
     return false;
   }
@@ -194,7 +193,7 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
   std::string symbol = "";
   while (line_reader_.next_line()) {
 #ifdef SYMS_DEBUG_
-    DFLOGIN("%s: found line: %s\n", identifier_.c_str(),
+    DFLOGIN("%s: found line: %s\n", component_.c_str(),
             line_reader_.get_raw_line().c_str());
 #endif
     line_reader_.trimL();
@@ -203,7 +202,7 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
     if (!parse_address(address)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse address from line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                component_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -212,8 +211,8 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
         !line_reader_.consume_and_trim_char('>') ||
         !line_reader_.consume_and_trim_char(':')) {
 #ifdef SYMS_DEBUG_
-      DFLOGERR("%s: could not parse label from line '%s'\n",
-               identifier_.c_str(), line_reader_.get_raw_line().c_str());
+      DFLOGERR("%s: could not parse label from line '%s'\n", component_.c_str(),
+               line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -221,7 +220,7 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
     if (!add_to_sym_table(address, symbol, address_offset)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table\n",
-                identifier_.c_str(), address, symbol.c_str());
+                component_.c_str(), address, symbol.c_str());
 #endif
     }
   }
@@ -238,7 +237,7 @@ bool SymsFilter::load_elf(const std::string &file_path,
                           uint64_t address_offset) {
   if (!line_reader_.open_file(file_path)) {
 #ifdef SYMS_DEBUG_
-    DFLOGERR("%s: could not create reader\n", identifier_.c_str());
+    DFLOGERR("%s: could not create reader\n", component_.c_str());
 #endif
     return false;
   }
@@ -259,7 +258,7 @@ bool SymsFilter::load_elf(const std::string &file_path,
     if (!parse_address(address)) {  // Value
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse address from line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+                component_.c_str(), line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
@@ -286,25 +285,16 @@ bool SymsFilter::load_elf(const std::string &file_path,
     // parse name
     if (!parse_name(label)) {  // Name
 #ifdef SYMS_DEBUG_
-      DFLOGWARN("%s: could not parse name from line '%s'\n",
-                identifier_.c_str(), line_reader_.get_raw_line().c_str());
+      DFLOGWARN("%s: could not parse name from line '%s'\n", component_.c_str(),
+                line_reader_.get_raw_line().c_str());
 #endif
       continue;
     }
 
     if (!add_to_sym_table(address, label, address_offset)) {
 #ifdef SYMS_DEBUG_
-      const std::string *already_present_symbol = filter(address);
-      if (not already_present_symbol) {
-        DFLOGWARN(
-            "%s: could not insert new val '[%u] = %s' into sym table.\n",
-            identifier_.c_str(), address, label.c_str());
-      } else {
-        DFLOGWARN(
-          "%s: could not insert new val '[%u] = %s' into sym table. There was "
-          "alread value %s found\n",
-          identifier_.c_str(), address, label.c_str(), already_present_symbol->c_str());
-      }  
+      DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table.\n",
+                component_.c_str(), address, label.c_str());
 #endif
     }
   }
@@ -312,11 +302,11 @@ bool SymsFilter::load_elf(const std::string &file_path,
 }
 
 std::shared_ptr<SymsFilter> SymsFilter::create(
-    const std::string identifier, const std::string &file_path,
+    uint64_t id, const std::string component, const std::string &file_path,
     uint64_t address_offset, FilterType type,
     std::set<std::string> symbol_filter, string_internalizer &i) {
   std::shared_ptr<SymsFilter> filter{
-      new SymsFilter{std::move(identifier), std::move(symbol_filter), i}};
+      new SymsFilter{id, std::move(component), std::move(symbol_filter), i}};
   if (not filter) {
     return nullptr;
   }

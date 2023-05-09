@@ -27,10 +27,10 @@
 #include <memory>
 #include <string>
 
-#include "string_util.h"
 #include "corobelt.h"
-#include "traceEnvironment.h"
 #include "reader.h"
+#include "string_util.h"
+#include "traceEnvironment.h"
 
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
@@ -124,8 +124,10 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           std::cout << "error parsing HostInstr" << std::endl;
           continue;
         }
-        const std::string *func = trace_environment::internalize_additional(function);
-        const std::string *comp = trace_environment::internalize_additional(component);
+        const std::string *func =
+            trace_environment::internalize_additional(function);
+        const std::string *comp =
+            trace_environment::internalize_additional(component);
 
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
                                            func, comp);

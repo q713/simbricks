@@ -24,11 +24,12 @@
 
 // #define PARSER_DEBUG_GEM5_ 1
 
+#include <set>
 #include <tuple>
 
 #include "log.h"
-#include "string_util.h"
 #include "parser.h"
+#include "string_util.h"
 
 event_t Gem5Parser::parse_global_event(uint64_t timestamp) {
   // 1473190510000: global: simbricks: processInEvent
@@ -77,15 +78,15 @@ event_t Gem5Parser::parse_system_switch_cpus(uint64_t timestamp) {
     // in case the given instruction is a call we expect to be able to
     // translate the address to a symbol name
     auto sym_comp = trace_environment::symtable_filter(addr);
-    const std::string *symbol = sym_comp.first;
+    const std::string *sym_s = sym_comp.first;
     const std::string *comp = sym_comp.second;
 
-    if (not comp or not symbol) {
+    if (not comp or not sym_s) {
       return nullptr;
     }
 
     return std::make_shared<HostCall>(timestamp, getIdent(), getName(), addr,
-                                      symbol, comp);
+                                      sym_s, comp);
   }
 
   return nullptr;
@@ -220,21 +221,17 @@ event_t Gem5Parser::parse_system_pc_simbricks(uint64_t timestamp) {
           line_reader_.consume_and_trim_string(" size ") &&
           line_reader_.parse_uint_trim(10, size) &&
           line_reader_.consume_and_trim_string(" id ") &&
-          line_reader_.parse_uint_trim(10, id) /*&&
+          line_reader_.parse_uint_trim(10, id) &&
           line_reader_.consume_and_trim_string(" bar ") &&
           line_reader_.parse_uint_trim(10, bar) &&
           line_reader_.consume_and_trim_string(" offs ") &&
-          line_reader_.parse_uint_trim(16, offset)*/) {
+          line_reader_.parse_uint_trim(16, offset)) {
         if (isReadWrite == 1) {
-          //return std::make_shared<HostMmioR>(timestamp, getIdent(), getName(),
-          //                                   id, addr, size, bar, offset);
           return std::make_shared<HostMmioR>(timestamp, getIdent(), getName(),
-                                             id, addr, size, 0, 0);
+                                             id, addr, size, bar, offset);
         } else {
-          //return std::make_shared<HostMmioW>(timestamp, getIdent(), getName(),
-          //                                   id, addr, size, bar, offset);
           return std::make_shared<HostMmioW>(timestamp, getIdent(), getName(),
-                                             id, addr, size, 0, 0);
+                                             id, addr, size, bar, offset);
         }
       }
     } else if (line_reader_.consume_and_trim_string("completed DMA id ") &&

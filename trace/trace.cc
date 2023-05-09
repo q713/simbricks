@@ -30,20 +30,20 @@
 #include <string>
 #include <thread>
 
-#include "packer.h"
-#include "corobelt/corobelt.h"
+#include "corobelt.h"
 #include "env/symtable.h"
 #include "env/traceEnvironment.h"
 #include "events/event-filter.h"
 #include "events/eventStreamParser.h"
 #include "events/events.h"
 #include "parser/parser.h"
+#include "spanner.h"
 #include "util/cxxopts.hpp"
 #include "util/log.h"
 
 bool create_open_file(std::ofstream &new_out, std::string filename) {
   try {
-    // TODO: later let user specify output directory 
+    // TODO: later let user specify output directory
     // auto path = std::filesystem::path(directory);
     // auto targetPath = std::filesystem::canonical(path);
     if (std::filesystem::exists(filename)) {
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
       !trace_environment::add_symbol_table(
           "Linuxvm-Symbols",
           result["linux-dump-server-client"].as<std::string>(), 0,
-          FilterType::Elf)) {
+          FilterType::S)) {
     std::cerr << "could not initialize symbol table linux-dump-server-client"
               << std::endl;
     exit(EXIT_FAILURE);
@@ -185,13 +185,11 @@ int main(int argc, char *argv[]) {
   if (result.count("nic-i40e-dump") &&
       !trace_environment::add_symbol_table(
           "Nicdriver-Symbols", result["nic-i40e-dump"].as<std::string>(),
-          0xffffffffa0000000ULL, FilterType::Elf)) {
+          0xffffffffa0000000ULL /*0xffffffff00000000*/, FilterType::S)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
   }
 
-  // 1475802058125
-  // 1596059510250
   uint64_t lower_bound =
       EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND;
   uint64_t upper_bound =
@@ -207,8 +205,7 @@ int main(int argc, char *argv[]) {
         result["ts-lower-bound"].as<std::string>(), 10, &lower_bound);
   }
 
-  
-  auto server_host_task = [&](){  // SERVER HOST PIPELINE
+  auto server_host_task = [&]() {  // SERVER HOST PIPELINE
     EventTypeFilter eventFilter{
         {EventType::HostInstr_t, EventType::SimProcInEvent_t,
          EventType::SimSendSync_t},
@@ -245,7 +242,7 @@ int main(int argc, char *argv[]) {
     }
   };
 
-  auto client_host_task = [&](){  // CLIENT HOST PIPELINE
+  auto client_host_task = [&]() {  // CLIENT HOST PIPELINE
     EventTypeFilter eventFilter{
         {EventType::HostInstr_t, EventType::SimProcInEvent_t,
          EventType::SimSendSync_t},

@@ -147,15 +147,16 @@ void trace_environment::initialize() {
   nw_interface_receive_.insert(internalizer_.internalize("__sys_recvmsg"));
 }
 
-bool trace_environment::add_symbol_table(const std::string identifier,
+bool trace_environment::add_symbol_table(const std::string component,
                                          const std::string &file_path,
                                          uint64_t address_offset,
                                          FilterType type,
                                          std::set<std::string> symbol_filter) {
   std::lock_guard<std::mutex> lock(trace_env_mutex_);
-  auto filter_ptr =
-      SymsFilter::create(std::move(identifier), file_path, address_offset, type,
-                         std::move(symbol_filter), internalizer_);
+  static uint64_t next_id = 0;
+  auto filter_ptr = SymsFilter::create(++next_id, std::move(component),
+                                       file_path, address_offset, type,
+                                       std::move(symbol_filter), internalizer_);
 
   if (not filter_ptr) {
     return false;
@@ -182,7 +183,7 @@ trace_environment::symtable_filter(uint64_t address) {
   for (std::shared_ptr<SymsFilter> symt : symbol_tables_) {
     const std::string *symbol = symt->filter(address);
     if (symbol) {
-      return std::make_pair(symbol, symt->get_ident());
+      return std::make_pair(symbol, &symt->get_component());
     }
   }
 

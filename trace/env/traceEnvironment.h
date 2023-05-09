@@ -21,7 +21,6 @@
  * TORT OR OTHERWISE, ARISING FROM, os OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #ifndef SIM_TRACE_CONFIG_VARS_H_
 #define SIM_TRACE_CONFIG_VARS_H_
 
@@ -68,27 +67,32 @@ class trace_environment {
   }
 
   inline static uint64_t get_next_parser_id() {
+    std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static uint64_t get_next_span_id() {
+    std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static uint64_t get_next_spanner_id() {
+    std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static uint64_t get_next_trace_id() {
+    std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static const std::string *internalize_additional(
       const std::string &symbol) {
+    std::lock_guard<std::mutex> lock(trace_env_mutex_);
     return internalizer_.internalize(symbol);
   }
 
@@ -98,9 +102,8 @@ class trace_environment {
                                std::set<std::string> symbol_filter);
 
   static bool add_symbol_table(const std::string identifier,
-                                      const std::string &file_path,
-                                      uint64_t address_offset,
-                                      FilterType type);
+                               const std::string &file_path,
+                               uint64_t address_offset, FilterType type);
 
   static std::pair<const std::string *, const std::string *> symtable_filter(
       uint64_t address);

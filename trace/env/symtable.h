@@ -25,30 +25,32 @@
 #ifndef SIMBRICKS_TRACE_SYMS_H_
 #define SIMBRICKS_TRACE_SYMS_H_
 
-#include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <tuple>
+#include <unordered_map>
 
 #include "log.h"
-#include "stringInternalizer.h"
 #include "reader.h"
+#include "stringInternalizer.h"
 
 enum FilterType { Syms, S, Elf };
 
 class SymsFilter {
  protected:
-  const std::string identifier_;
+  uint64_t id_;
+  const std::string component_;
   LineReader line_reader_;
   std::set<std::string> symbol_filter_;
-  std::map<uint64_t, const std::string *> symbol_table_;
+  std::unordered_map<uint64_t, const std::string *> symbol_table_;
   string_internalizer &i_;
 
-  explicit SymsFilter(const std::string identifier,
+  explicit SymsFilter(uint64_t id, const std::string component,
                       std::set<std::string> symbol_filter,
                       string_internalizer &i)
-      : identifier_(std::move(identifier)),
+      : id_(id),
+        component_(std::move(component)),
         line_reader_(true),
         symbol_filter_(std::move(symbol_filter)),
         i_(i){};
@@ -91,11 +93,15 @@ class SymsFilter {
   bool load_elf(const std::string &file_path, uint64_t address_offset);
 
  public:
-  inline const std::string *get_ident() {
-    return &identifier_;
+  inline uint64_t &get_ident() {
+    return id_;
   }
 
-  inline const std::map<uint64_t, const std::string *> &get_sym_table() {
+  inline const std::string &get_component() {
+    return component_;
+  }
+
+  std::unordered_map<uint64_t, const std::string *> &get_sym_table() {
     return symbol_table_;
   }
 
@@ -105,21 +111,17 @@ class SymsFilter {
    */
   const std::string *filter(uint64_t address);
 
-  static std::shared_ptr<SymsFilter> create(const std::string identifier,
-                                            const std::string &file_path,
-                                            uint64_t address_offset,
-                                            FilterType type,
-                                            string_internalizer &i) {
-    return SymsFilter::create(std::move(identifier), file_path, address_offset,
-                              type, {}, i);
+  static std::shared_ptr<SymsFilter> create(
+      uint64_t id, const std::string component, const std::string &file_path,
+      uint64_t address_offset, FilterType type, string_internalizer &i) {
+    return SymsFilter::create(id, std::move(component), file_path,
+                              address_offset, type, {}, i);
   }
 
-  static std::shared_ptr<SymsFilter> create(const std::string identifier,
-                                            const std::string &file_path,
-                                            uint64_t address_offset,
-                                            FilterType type,
-                                            std::set<std::string> symbol_filter,
-                                            string_internalizer &i);
+  static std::shared_ptr<SymsFilter> create(
+      uint64_t id, const std::string component, const std::string &file_path,
+      uint64_t address_offset, FilterType type,
+      std::set<std::string> symbol_filter, string_internalizer &i);
 
   friend std::ostream &operator<<(std::ostream &os, SymsFilter &filter) {
     os << std::endl << std::endl;
@@ -129,8 +131,9 @@ class SymsFilter {
     os << "There were " << table.size() << " many entries found";
     os << std::endl << std::endl;
     for (auto &entry : table) {
-      os << "[" << std::hex << entry.first
-         << "] = " << (entry.second ? *entry.second : "null") << std::endl;
+      os << "[" << std::hex << entry.first << "] = ";
+      os << (entry.second ? *(entry.second) : "null");
+      os << std::endl;
     }
     os << std::endl;
     return os;

@@ -29,6 +29,8 @@
 #include <set>
 #include <string>
 #include <thread>
+#include <set>
+#include <vector>
 
 #include "corobelt.h"
 #include "env/symtable.h"
@@ -117,6 +119,12 @@ int main(int argc, char *argv[]) {
 
   // Init the trace environment --> IMPORTANT
   trace_environment::initialize();
+  // Init runtime and set threads to use --> IMPORTANT
+  auto concurren_options = concurrencpp::runtime_options();
+  concurren_options.max_background_threads = 0;
+  concurren_options.max_cpu_threads = 1;
+  const concurrencpp::runtime runtime{concurren_options};
+  const auto thread_pool_executor = runtime.thread_pool_executor();
 
 #if 0
   if (result.count("event-stream-log")) {
@@ -185,7 +193,7 @@ int main(int argc, char *argv[]) {
   if (result.count("nic-i40e-dump") &&
       !trace_environment::add_symbol_table(
           "Nicdriver-Symbols", result["nic-i40e-dump"].as<std::string>(),
-          0xffffffffa0000000ULL /*0xffffffff00000000*/, FilterType::S)) {
+          0xffffffffa0000000ULL, FilterType::S)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
   }
@@ -206,19 +214,18 @@ int main(int argc, char *argv[]) {
   }
 
   auto server_host_task = [&]() {  // SERVER HOST PIPELINE
-    EventTypeFilter eventFilter{
-        {EventType::HostInstr_t, EventType::SimProcInEvent_t,
-         EventType::SimSendSync_t},
-        true};
+    std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t, EventType::SimSendSync_t};
+    auto event_filter = std::make_shared<EventTypeFilter>(to_filter, true);
 
-    EventTimestampFilter timestampFilter{
-        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
+      EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+    auto timestamp_filter = EventTimestampFilter::create(bounds);
 
-    ComponentFilter compFilterServer("ComponentFilter-Server");
-    LineReader serverLr;
-    Gem5Parser gem5ServerPar{"Gem5ServerParser",
-                             result["gem5-log-server"].as<std::string>(),
-                             compFilterServer, serverLr};
+    ComponentFilter comp_filter_server("ComponentFilter-Server");
+    LineReader server_lr;
+    auto gem5_server_par = Gem5Parser::create("Gem5ServerParser",
+                                                              result["gem5-log-server"].as<std::string>(),
+                                                              comp_filter_server, server_lr);{};
 
     std::ofstream out_file;
     if (not create_open_file(out_file,
@@ -226,36 +233,26 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not open gem5-server-events file" << std::endl;
       exit(EXIT_FAILURE);
     }
-    EventPrinter printer{out_file};
+    auto printer = EventPrinter::create(out_file);
 
-    sim::corobelt::pipeline<std::shared_ptr<Event>> pipeline{
-        gem5ServerPar,
-        {
-            timestampFilter,
-            eventFilter,
-        }};
-
-    if (!sim::corobelt::awaiter<event_t>::await_termination(pipeline,
-                                                            printer)) {
-      std::cerr << "could not await termination of the pipeline" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
+    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5_server_par, pipes, printer);
   };
 
   auto client_host_task = [&]() {  // CLIENT HOST PIPELINE
-    EventTypeFilter eventFilter{
-        {EventType::HostInstr_t, EventType::SimProcInEvent_t,
-         EventType::SimSendSync_t},
-        true};
+    std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t,
+                                     EventType::SimSendSync_t};
+    auto event_filter = EventTypeFilter::create(to_filter, true);
 
-    EventTimestampFilter timestampFilter{
+    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+    auto timestamp_filter = EventTimestampFilter::create(bounds);
 
-    ComponentFilter compFilterClient("ComponentFilter-Server");
-    LineReader clientLr;
-    Gem5Parser gem5ClientPar{"Gem5ClientParser",
+    ComponentFilter comp_filter_client("ComponentFilter-Server");
+    LineReader client_lr;
+    auto gem5_client_par = Gem5Parser::create("Gem5ClientParser",
                              result["gem5-log-client"].as<std::string>(),
-                             compFilterClient, clientLr};
+                             comp_filter_client, client_lr);
 
     std::ofstream out_file;
     if (not create_open_file(out_file,
@@ -263,29 +260,23 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not open gem5-client-events file" << std::endl;
       exit(EXIT_FAILURE);
     }
-    EventPrinter printer{out_file};
+    auto printer = EventPrinter::create(out_file);
 
-    sim::corobelt::pipeline<std::shared_ptr<Event>> pipeline{
-        gem5ClientPar, {timestampFilter, eventFilter}};
-
-    if (!sim::corobelt::awaiter<event_t>::await_termination(pipeline,
-                                                            printer)) {
-      std::cerr << "could not await termination of the pipeline" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
+    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5_client_par, pipes, printer);
   };
 
   auto server_nic_task = [&]() {  // SERVER NIC PIPELINE
-    EventTypeFilter eventFilter{
-        {EventType::SimProcInEvent_t, EventType::SimSendSync_t}, true};
+    std::set<EventType> to_filter{EventType::SimProcInEvent_t, EventType::SimSendSync_t};
+    auto event_filter = EventTypeFilter::create(to_filter, true);
 
-    EventTimestampFilter timestampFilter{
+    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+    auto timestamp_filter = EventTimestampFilter::create(bounds);
 
-    LineReader nicSerLr;
-    NicBmParser nicSerPar{"NicbmServerParser",
-                          result["nicbm-log-server"].as<std::string>(),
-                          nicSerLr};
+    LineReader nic_ser_lr;
+    auto nic_ser_par = NicBmParser::create("NicbmServerParser",
+                          result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
 
     std::ofstream out_file;
     if (not create_open_file(out_file,
@@ -293,29 +284,23 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not open nicbm-server-events file" << std::endl;
       exit(EXIT_FAILURE);
     }
-    EventPrinter printer{out_file};
+    auto printer = EventPrinter::create(out_file);
 
-    sim::corobelt::pipeline<std::shared_ptr<Event>> pipeline{
-        nicSerPar, {timestampFilter, eventFilter}};
-
-    if (!sim::corobelt::awaiter<event_t>::await_termination(pipeline,
-                                                            printer)) {
-      std::cerr << "could not await termination of the pipeline" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
+    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, nic_ser_par, pipes, printer);
   };
 
   auto client_nic_task = [&]() {  // CLIENT NIC PIPELINE
-    EventTypeFilter eventFilter{
-        {EventType::SimProcInEvent_t, EventType::SimSendSync_t}, true};
+    std::set<EventType> to_filter{EventType::SimProcInEvent_t, EventType::SimSendSync_t};
+    auto event_filter = EventTypeFilter::create(to_filter, true);
 
-    EventTimestampFilter timestampFilter{
+    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+    auto timestamp_filter = EventTimestampFilter::create(bounds);
 
-    LineReader nicCliLr;
-    NicBmParser nicCliPar{"NicbmClientParser",
-                          result["nicbm-log-client"].as<std::string>(),
-                          nicCliLr};
+    LineReader nic_cli_lr;
+    auto nic_cli_par = NicBmParser::create("NicbmClientParser",
+                          result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
 
     std::ofstream out_file;
     if (not create_open_file(out_file,
@@ -323,27 +308,16 @@ int main(int argc, char *argv[]) {
       std::cerr << "could not open nicbm-client-events file" << std::endl;
       exit(EXIT_FAILURE);
     }
-    EventPrinter printer{out_file};
+    auto printer = EventPrinter::create(out_file);
 
-    sim::corobelt::pipeline<std::shared_ptr<Event>> pipeline{
-        nicCliPar, {timestampFilter, eventFilter}};
-
-    if (!sim::corobelt::awaiter<event_t>::await_termination(pipeline,
-                                                            printer)) {
-      std::cerr << "could not await termination of the pipeline" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
+    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, nic_cli_par, pipes, printer);
   };
 
-  std::thread server_h(server_host_task);
-  std::thread client_h(client_host_task);
-  std::thread server_n(server_nic_task);
-  std::thread client_n(client_nic_task);
-
-  server_h.join();
-  client_h.join();
-  server_n.join();
-  client_n.join();
+  server_host_task();
+  client_host_task();
+  server_nic_task();
+  client_nic_task();
 
   exit(EXIT_SUCCESS);
 }

@@ -23,10 +23,12 @@
  */
 
 #include <cassert>
+#include <memory>
 
 #include "spanner.h"
+#include "exception.h"
 
-bool nic_spanner::handel_mmio(std::shared_ptr<Event> event_ptr) {
+bool NicSpanner::handel_mmio(std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   auto con = host_queue_.poll(this->id_);
@@ -53,7 +55,7 @@ bool nic_spanner::handel_mmio(std::shared_ptr<Event> event_ptr) {
   return false;
 }
 
-bool nic_spanner::handel_dma(std::shared_ptr<Event> event_ptr) {
+bool NicSpanner::handel_dma(std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   auto pending_dma =
@@ -86,7 +88,7 @@ bool nic_spanner::handel_dma(std::shared_ptr<Event> event_ptr) {
 
   return false;
 }
-bool nic_spanner::handel_txrx(std::shared_ptr<Event> event_ptr) {
+bool NicSpanner::handel_txrx(std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   bool is_tx = false;
@@ -107,7 +109,7 @@ bool nic_spanner::handel_txrx(std::shared_ptr<Event> event_ptr) {
   } else {
     return false;
   }
-  
+
   auto eth_span = tracer_.rergister_new_span_by_parent<nic_eth_span>(
       parent, event_ptr->get_parser_ident());
   if (not eth_span) {
@@ -130,7 +132,7 @@ bool nic_spanner::handel_txrx(std::shared_ptr<Event> event_ptr) {
   return false;
 }
 
-bool nic_spanner::handel_msix(std::shared_ptr<Event> event_ptr) {
+bool NicSpanner::handel_msix(std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   auto msix_span = tracer_.rergister_new_span_by_parent<nic_msix_span>(
@@ -149,11 +151,10 @@ bool nic_spanner::handel_msix(std::shared_ptr<Event> event_ptr) {
   return false;
 }
 
-sim::corobelt::task<void> nic_spanner::consume(
-    sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task) {
-  if (not producer_task) {
-    co_return;
-  }
+concurrencpp::result<void> NicSpanner::consume(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                               std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) {
+  throw_if_empty(resume_executor, resume_executor_null);
+  throw_if_empty(src_chan, channel_is_null);
 
   if (not host_queue_.register_spanner(id_) or
       not network_queue_.register_spanner(id_)) {
@@ -165,15 +166,15 @@ sim::corobelt::task<void> nic_spanner::consume(
   std::shared_ptr<Event> event_ptr = nullptr;
   std::shared_ptr<nic_dma_span> pending_dma = nullptr;
   bool added = false;
+  std::optional<std::shared_ptr<Event>> event_ptr_opt;
 
-  while (producer_task and *producer_task) {
-    event_ptr = producer_task->get();
+  for(event_ptr_opt = co_await src_chan->pop(resume_executor); event_ptr_opt.has_value();
+      event_ptr_opt = co_await src_chan->pop(resume_executor)) {
+
+    event_ptr = event_ptr_opt.value();
+    throw_if_empty(event_ptr, event_is_null);
+
     added = false;
-
-    if (not event_ptr) {
-      std::cerr << "found 'null' event" << std::endl;
-      continue;
-    }
 
     switch (event_ptr->get_type()) {
       case EventType::NicMmioW_t:
@@ -192,7 +193,7 @@ sim::corobelt::task<void> nic_spanner::consume(
 
       case EventType::NicTx_t:
       case EventType::NicRx_t: {
-        added = handel_dma(event_ptr);
+        added = handel_txrx(event_ptr);
         break;
       }
 
@@ -203,11 +204,7 @@ sim::corobelt::task<void> nic_spanner::consume(
 
       default: {
         std::cout << "encountered non expected event ";
-        if (event_ptr) {
-          std::cout << *event_ptr << std::endl;
-        } else {
-          std::cout << "null" << std::endl;
-        }
+        std::cout << *event_ptr << std::endl;
         added = false;
         break;
       }

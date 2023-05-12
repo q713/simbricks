@@ -30,92 +30,128 @@
 #include <string>
 #include <vector>
 
+#include "exception.h"
 #include "componenttable.h"
 #include "corobelt.h"
 #include "events.h"
 #include "reader.h"
 #include "traceEnvironment.h"
 
-using event_t = std::shared_ptr<Event>;
-using ytask_t = sim::corobelt::yield_task<event_t>;
 
-class LogParser : public sim::corobelt::producer<event_t> {
- protected:
-  const std::string name_;
-  const uint64_t identifier_;
-  const std::string log_file_path_;
-  LineReader &line_reader_;
+class LogParser : public producer<std::shared_ptr<Event>>
+  {
+  protected:
+    const std::string name_;
+    const uint64_t identifier_;
+    const std::string log_file_path_;
+    LineReader &line_reader_;
 
-  bool parse_timestamp(uint64_t &timestamp);
+    bool parse_timestamp (uint64_t &timestamp);
 
-  bool parse_address(uint64_t &address);
+    bool parse_address (uint64_t &address);
 
- public:
-  explicit LogParser(const std::string name, const std::string log_file_path,
-                     LineReader &line_reader)
-      : sim::corobelt::producer<event_t>(),
-        name_(std::move(name)),
-        identifier_(trace_environment::get_next_parser_id()),
-        log_file_path_(std::move(log_file_path)),
-        line_reader_(line_reader){};
+  public:
+    explicit LogParser (const std::string name,
+                        const std::string log_file_path,
+                        LineReader &line_reader)
+            : producer<std::shared_ptr<Event>> (),
+              name_ (name),
+              identifier_ (trace_environment::get_next_parser_id ()),
+              log_file_path_ (log_file_path),
+              line_reader_ (line_reader)
+    {};
 
-  inline uint64_t getIdent() {
-    return identifier_;
-  }
+    inline uint64_t get_ident () const
+    {
+      return identifier_;
+    }
 
-  inline const std::string getName() {
-    return name_;
-  }
+    inline std::string get_name ()
+    {
+      return name_;
+    }
 
-  virtual ytask_t produce() override {
-    co_return;
-  }
-};
+    virtual concurrencpp::result<void>
+    produce (std::shared_ptr<concurrencpp::executor> resume_executor,
+             std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override
+    {
+      co_return;
+    }
+  };
 
-class Gem5Parser : public LogParser {
-  ComponentFilter &component_table_;
+class Gem5Parser : public LogParser
+  {
+    ComponentFilter &component_table_;
 
- protected:
-  event_t parse_global_event(uint64_t timestamp);
+  protected:
+    std::shared_ptr<Event> parse_global_event (uint64_t timestamp);
 
-  event_t parse_system_switch_cpus(uint64_t timestamp);
+    std::shared_ptr<Event> parse_system_switch_cpus (uint64_t timestamp);
 
-  event_t parse_system_pc_pci_host(uint64_t timestamp);
+    std::shared_ptr<Event> parse_system_pc_pci_host (uint64_t timestamp);
 
-  event_t parse_system_pc_pci_host_interface(uint64_t timestamp);
+    std::shared_ptr<Event>
+    parse_system_pc_pci_host_interface (uint64_t timestamp);
 
-  event_t parse_system_pc_simbricks(uint64_t timestamp);
+    std::shared_ptr<Event> parse_system_pc_simbricks (uint64_t timestamp);
 
-  event_t parse_simbricks_event(uint64_t timestamp);
+    std::shared_ptr<Event> parse_simbricks_event (uint64_t timestamp);
 
- public:
-  explicit Gem5Parser(const std::string name, const std::string log_file_path,
-                      ComponentFilter &component_table, LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader),
-        component_table_(component_table) {
-  }
+  public:
+    static auto create(const std::string name,
+                       const std::string log_file_path,
+                       ComponentFilter &component_table,
+                       LineReader &line_reader) {
+      auto parser = std::make_shared<Gem5Parser>(name, log_file_path, component_table, line_reader);
+      throw_if_empty(parser, parser_is_null);
+      return parser;
+    }
 
-  ytask_t produce() override;
-};
+    explicit Gem5Parser (const std::string name,
+                         const std::string log_file_path,
+                         ComponentFilter &component_table,
+                         LineReader &line_reader)
+            : LogParser (name, log_file_path,
+                         line_reader),
+              component_table_ (component_table)
+    {
+    }
 
-class NicBmParser : public LogParser {
- protected:
-  bool parse_off_len_val_comma(uint64_t &off, size_t &len, uint64_t &val);
+    concurrencpp::result<void>
+    produce (std::shared_ptr<concurrencpp::executor> resume_executor,
+             std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override;
+  };
 
-  bool parse_op_addr_len_pending(uint64_t &op, uint64_t &addr, size_t &len,
-                                 size_t &pending, bool with_pending);
+class NicBmParser : public LogParser
+  {
+  protected:
+    bool parse_off_len_val_comma (uint64_t &off, size_t &len, uint64_t &val);
 
-  bool parse_mac_address(uint64_t &address);
+    bool parse_op_addr_len_pending (uint64_t &op, uint64_t &addr, size_t &len,
+                                    size_t &pending, bool with_pending);
 
-  bool parse_sync_info(bool &sync_pcie, bool &sync_eth);
+    bool parse_mac_address (uint64_t &address);
 
- public:
-  explicit NicBmParser(const std::string name, const std::string log_file_path,
-                       LineReader &line_reader)
-      : LogParser(std::move(name), std::move(log_file_path), line_reader) {
-  }
+    bool parse_sync_info (bool &sync_pcie, bool &sync_eth);
 
-  ytask_t produce() override;
-};
+  public:
+    static auto create(const std::string name, const std::string log_file_path, LineReader &line_reader) {
+      auto parser = std::make_shared<NicBmParser>(name, log_file_path, line_reader);
+      throw_if_empty(parser, parser_is_null);
+      return parser;
+    }
+
+    explicit NicBmParser (const std::string name,
+                          const std::string log_file_path,
+                          LineReader &line_reader)
+            : LogParser (name, log_file_path,
+                         line_reader)
+    {
+    }
+
+    concurrencpp::result<void>
+    produce (std::shared_ptr<concurrencpp::executor> resume_executor,
+             std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override;
+  };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

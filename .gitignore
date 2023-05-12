@@ -49,3 +49,5 @@ trace/process
 mk/local.mk
 .eggs
 .vscode
+**/.idea
+

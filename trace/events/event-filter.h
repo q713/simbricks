@@ -25,80 +25,101 @@
 #ifndef SIMBRICKS_TRACE_EVENT_FILTER_H_
 #define SIMBRICKS_TRACE_EVENT_FILTER_H_
 
+#include <bits/ranges_algo.h>
+#include <memory>
+#include <algorithm>
+
 #include "corobelt.h"
 #include "events.h"
-
-using event_t = std::shared_ptr<Event>;
-using ytask_t = sim::corobelt::yield_task<event_t>;
+#include "exception.h"
 
 /* general operator to act on an event stream */
-struct event_stream_actor : public sim::corobelt::pipe<event_t> {
+struct event_stream_actor : public cpipe<std::shared_ptr<Event>> {
   /* this method acts on an event within the stream,
    * if true is returned, the event is after acting on
    * it pased on, in case false is returned, the event
    * is filtered */
-  virtual bool act_on(event_t event) {
+  virtual bool act_on(std::shared_ptr<Event> &event) {
     return true;
   }
 
-  ytask_t process(ytask_t *producer_task) override {
-    if (not producer_task) {
-      co_return;
-    }
+  concurrencpp::result<void> process (
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan,
+      std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan)
+  override {
+    throw_if_empty(resume_executor, resume_executor_null);
+    throw_if_empty(tar_chan, channel_is_null);
+    throw_if_empty(src_chan, channel_is_null);
 
     bool pass_on;
-    event_t event;
-    std::optional<event_t> msg;
-    while(*producer_task) {
-      event = producer_task->get();
+    std::shared_ptr<Event> event;
+    std::optional<std::shared_ptr<Event>> msg;
+    for(msg = co_await src_chan->pop(resume_executor); msg.has_value();
+        msg = co_await src_chan->pop(resume_executor)) {
+      event = msg.value();
+      throw_if_empty(event, event_is_null);
+
       pass_on = act_on(event);
       if (pass_on) {
-        co_yield event;
+        tar_chan->push(resume_executor, event);
       }
     }
     co_return;
   }
 
-  explicit event_stream_actor() : sim::corobelt::pipe<event_t>() {
+  explicit event_stream_actor() : cpipe<std::shared_ptr<Event>>() {
   }
 
   ~event_stream_actor() = default;
 };
 
 class GenericEventFilter : public event_stream_actor {
-  std::function<bool(event_t event)> &to_filter_;
+  std::function<bool(std::shared_ptr<Event> event)> &to_filter_;
 
  public:
-  bool act_on(event_t event) override {
+  bool act_on(std::shared_ptr<Event> &event) override {
     return to_filter_(event);
   }
 
-  GenericEventFilter(std::function<bool(event_t event)> &to_filter)
+  GenericEventFilter(std::function<bool(std::shared_ptr<Event> event)> &to_filter)
       : event_stream_actor(), to_filter_(to_filter) {
   }
 };
 
 class EventTypeFilter : public event_stream_actor {
-  std::set<EventType> types_to_filter_;
+  std::set<EventType> &types_to_filter_;
   bool inverted_;
 
  public:
-  bool act_on(event_t event) override {
+  bool act_on(std::shared_ptr<Event> &event) override {
     auto search = types_to_filter_.find(event->get_type());
-    bool is_to_sink = inverted_ ? search == types_to_filter_.end()
-                                : search != types_to_filter_.end();
+    const bool is_to_sink = inverted_ ? search == types_to_filter_.end()
+                                      : search != types_to_filter_.end();
     return is_to_sink;
   }
 
-  EventTypeFilter(std::set<EventType> types_to_filter, bool invert_filter)
+  static auto create(std::set<EventType> &types_to_filter, bool invert_filter) {
+    auto filter = std::make_shared<EventTypeFilter>(types_to_filter, invert_filter);
+    throw_if_empty(filter, actor_is_null);
+    return filter;
+  }
+
+  static auto create(std::set<EventType> &types_to_filter) {
+    auto filter = std::make_shared<EventTypeFilter>(types_to_filter);
+    throw_if_empty(filter, actor_is_null);
+    return filter;
+  }
+
+  EventTypeFilter(std::set<EventType> &types_to_filter, bool invert_filter)
       : event_stream_actor(),
-        types_to_filter_(std::move(types_to_filter)),
+        types_to_filter_(types_to_filter),
         inverted_(invert_filter) {
   }
 
-  EventTypeFilter(std::set<EventType> types_to_filter)
+  EventTypeFilter(std::set<EventType> &types_to_filter)
       : event_stream_actor(),
-        types_to_filter_(std::move(types_to_filter)),
+        types_to_filter_(types_to_filter),
         inverted_(false) {
   }
 };
@@ -118,26 +139,26 @@ class EventTimestampFilter : public event_stream_actor {
   };
 
  private:
-  std::vector<EventTimeBoundary> event_time_boundaries_;
+  std::vector<EventTimeBoundary> &event_time_boundaries_;
 
  public:
-  bool act_on(event_t event) override {
-    uint64_t ts = event->timestamp_;
-    for (auto &boundary : event_time_boundaries_) {
-      if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
-        return true;
-      }
-    }
-    return false;
+  bool act_on(std::shared_ptr<Event> &event) override {
+    const uint64_t ts = event->timestamp_;
+
+    return std::ranges::any_of(event_time_boundaries_, [ts](EventTimeBoundary &boundary) {
+      return boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_;
+    });
   }
 
-  EventTimestampFilter(EventTimeBoundary boundary) : event_stream_actor() {
-    event_time_boundaries_.push_back(std::move(boundary));
+  static auto create(std::vector<EventTimeBoundary> &event_time_boundaries) {
+    auto filter = std::make_shared<EventTimestampFilter>(event_time_boundaries);
+    throw_if_empty(filter, actor_is_null);
+    return filter;
   }
 
-  EventTimestampFilter(std::vector<EventTimeBoundary> event_time_boundaries)
+  EventTimestampFilter(std::vector<EventTimeBoundary> &event_time_boundaries)
       : event_stream_actor(),
-        event_time_boundaries_(std::move(event_time_boundaries)) {
+        event_time_boundaries_(event_time_boundaries) {
   }
 };
 

@@ -10,3 +10,6 @@
 [submodule "sims/external/femu"]
 	path = sims/external/femu
 	url = https://github.com/simbricks/femu.git
+[submodule "trace/libs/concurrencpp"]
+	path = trace/libs/concurrencpp
+	url = git@github.com:q713/concurrencpp.git

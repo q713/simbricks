@@ -24,8 +24,6 @@
 
 #include "events.h"
 
-#include "parser.h"
-
 void Event::display(std::ostream &os) {
   os << get_name() << ": source_id=" << parser_identifier_
      << ", source_name=" << parser_name_ << ", timestamp=" << timestamp_;

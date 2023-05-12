@@ -28,7 +28,9 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <optional>
 
+#include "exception.h"
 #include "corobelt.h"
 #include "events.h"
 #include "traceEnvironment.h"
@@ -741,23 +743,25 @@ inline bool is_type(std::shared_ptr<event_span> span, span_type type) {
 }
 
 struct pack_printer
-    : public sim::corobelt::consumer<std::shared_ptr<event_span>> {
-  sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<event_span>> *producer_task) {
-    if (not producer_task) {
-      co_return;
-    }
+    : public consumer<std::shared_ptr<event_span>> {
+  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                     std::shared_ptr<Channel<std::shared_ptr<event_span>>> &src_chan) {
+    throw_if_empty(resume_executor, resume_executor_null);
+    throw_if_empty(src_chan, channel_is_null);
 
+    std::optional<std::shared_ptr<event_span>> next_span_opt;
     std::shared_ptr<event_span> next_span = nullptr;
-    while (*producer_task) {
-      next_span = producer_task->get();
+    for (next_span_opt = co_await src_chan->pop(resume_executor); next_span_opt.has_value();
+         next_span_opt = co_await src_chan->pop(resume_executor)) {
+      next_span = next_span_opt.value();
+      throw_if_empty(next_span, span_is_null);
       next_span->display(std::cout);
     }
 
     co_return;
   }
 
-  pack_printer() : sim::corobelt::consumer<std::shared_ptr<event_span>>() {
+  pack_printer() : consumer<std::shared_ptr<event_span>>() {
   }
 };
 

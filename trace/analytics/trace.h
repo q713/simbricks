@@ -28,7 +28,9 @@
 #include <iostream>
 #include <memory>
 #include <vector>
+#include <optional>
 
+#include "exception.h"
 #include "span.h"
 #include "corobelt.h"
 #include "traceEnvironment.h"
@@ -44,7 +46,7 @@ struct trace {
 
   bool is_done_ = false;
 
-  inline bool is_done() {
+  inline bool is_done() const {
     return is_done_;
   }
 
@@ -53,11 +55,9 @@ struct trace {
   }
 
   bool add_span(std::shared_ptr<event_span> span) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (not span) {
-      return false;
-    }
+    throw_if_empty(span, span_is_null);
 
+    std::lock_guard<std::mutex> lock(mutex_);
     span->set_trace_id(id_);
     spans_.push_back(span);
     return true;
@@ -68,10 +68,9 @@ struct trace {
     out << std::endl;
     out << "trace: id=" << id_ << std::endl;
     for (auto span : spans_) {
-      if (span) {
-        if (span.get() == parent_span_.get()) {
-          out << "\t parent_span:" << std::endl; 
-        }
+      throw_if_empty(span, span_is_null);
+      if (span.get() == parent_span_.get()) {
+        out << "\t parent_span:" << std::endl;
         span->display(out, 1);
       }
     }
@@ -80,10 +79,7 @@ struct trace {
 
   static std::shared_ptr<trace> create_trace(
       uint64_t id, std::shared_ptr<event_span> parent_span) {
-
-    if (not parent_span) {
-      return {};
-    }
+    throw_if_empty(parent_span, span_is_null);
 
     auto t = std::shared_ptr<trace>{new trace{id, parent_span}};
     return t;
@@ -93,26 +89,6 @@ struct trace {
   trace(uint64_t id, std::shared_ptr<event_span> parent_span)
       : id_(id), parent_span_(parent_span) {
     this->add_span(parent_span);
-  }
-};
-
-struct trace_printer : public sim::corobelt::consumer<std::shared_ptr<trace>> {
-  sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<trace>> *producer_task) {
-    if (not producer_task) {
-      co_return;
-    }
-
-    std::shared_ptr<trace> t;
-    while (*producer_task) {
-      t = producer_task->get();
-      t->display(std::cout);
-    }
-
-    co_return;
-  };
-
-  trace_printer() : sim::corobelt::consumer<std::shared_ptr<trace>>() {
   }
 };
 

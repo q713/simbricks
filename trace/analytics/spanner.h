@@ -35,133 +35,149 @@
 #ifndef SIMBRICKS_TRACE_spanER_H_
 #define SIMBRICKS_TRACE_spanER_H_
 
-struct spanner : public sim::corobelt::consumer<std::shared_ptr<Event>> {
-  uint64_t id_;
+struct Spanner : public consumer<std::shared_ptr<Event>>
+  {
+    uint64_t id_;
 
-  tracer &tracer_;
+    tracer &tracer_;
 
-  // Override this method!
-  virtual sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task)
-      override = 0;
+    // Override this method!
+    concurrencpp::result<void> consume (
+            std::shared_ptr<concurrencpp::executor> resume_executor,
+            std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan)
+    override = 0;
 
-  spanner(tracer &t)
-      : id_(trace_environment::get_next_spanner_id()), tracer_(t) {
-  }
-
-  inline uint64_t get_id() {
-    return id_;
-  }
-
-  bool ends_with_offset(uint64_t addr, uint64_t off) {
-    size_t lz = std::__countl_zero(off);
-    uint64_t mask = lz == 64 ? 0xffffffffffffffff : (1 << (64 - lz)) - 1;
-    uint64_t check = addr & mask;
-    return check == off;
-  }
-
-  // template <class st, class... Args>
-  // std::shared_ptr<st> register_span(std::shared_ptr<event_span> parent,
-  //                                   Args &&...args) {
-  //   if (not parent) {
-  //     std::cout << "try to create a new span without parent" << std::endl;
-  //     return {};
-  //   }
-  //
-  //  auto result =
-  //      tracer_.rergister_new_span<st>(parent->get_trace_id(), args...);
-  //  if (not result) {
-  //    std::cerr << "could not allocate new span" << std::endl;
-  //    return {};
-  //  }
-  //
-  //  result->set_parent(parent);
-  //  return result;
-  //}
-
-  template <class pt>
-  std::shared_ptr<pt> iterate_add_erase(std::list<std::shared_ptr<pt>> &pending,
-                                        std::shared_ptr<Event> event_ptr) {
-    std::shared_ptr<pt> pending_span = nullptr;
-
-    for (auto it = pending.begin(); it != pending.end(); it++) {
-      pending_span = *it;
-      if (pending_span and pending_span->add_to_span(event_ptr)) {
-        if (pending_span->is_complete()) {
-          pending.erase(it);
-        }
-        return pending_span;
-      }
+    Spanner (tracer &t)
+            : id_ (trace_environment::get_next_spanner_id ()), tracer_ (t)
+    {
     }
 
-    return nullptr;
-  }
-};
+    inline uint64_t get_id () const
+    {
+      return id_;
+    }
 
-struct host_spanner : public spanner {
-  sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task)
-      override;
+    bool ends_with_offset (uint64_t addr, uint64_t off)
+    {
+      size_t lz = std::__countl_zero (off);
+      uint64_t mask = lz == 64 ? 0xffffffffffffffff : (1 << (64 - lz)) - 1;
+      uint64_t check = addr & mask;
+      return check == off;
+    }
 
-  host_spanner(tracer &t, context_queue &queue, bool is_client)
-      : spanner(t), queue_(queue), is_client_(is_client) {
-  }
+    // template <class st, class... Args>
+    // std::shared_ptr<st> register_span(std::shared_ptr<event_span> parent,
+    //                                   Args &&...args) {
+    //   if (not parent) {
+    //     std::cout << "try to create a new span without parent" << std::endl;
+    //     return {};
+    //   }
+    //
+    //  auto result =
+    //      tracer_.rergister_new_span<st>(parent->get_trace_id(), args...);
+    //  if (not result) {
+    //    std::cerr << "could not allocate new span" << std::endl;
+    //    return {};
+    //  }
+    //
+    //  result->set_parent(parent);
+    //  return result;
+    //}
 
- protected:
-  bool create_trace_starting_span(uint64_t parser_id);
+    template<class St>
+    std::shared_ptr<St>
+    iterate_add_erase (std::list<std::shared_ptr<St>> &pending,
+                       std::shared_ptr<Event> event_ptr)
+    {
+      std::shared_ptr<St> pending_span = nullptr;
 
-  bool handel_call(std::shared_ptr<Event> event_ptr);
+      for (auto it = pending.begin (); it != pending.end (); it++)
+      {
+        pending_span = *it;
+        if (pending_span and pending_span->add_to_span (event_ptr))
+        {
+          if (pending_span->is_complete ())
+          {
+            pending.erase (it);
+          }
+          return pending_span;
+        }
+      }
 
-  bool handel_mmio(std::shared_ptr<Event> event_ptr);
+      return nullptr;
+    }
+  };
 
-  bool handel_dma(std::shared_ptr<Event> event_ptr);
+struct HostSpanner : public Spanner
+  {
+    concurrencpp::result<void> consume (
+            std::shared_ptr<concurrencpp::executor> resume_executor,
+            std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  bool handel_msix(std::shared_ptr<Event> event_ptr);
+    HostSpanner (tracer &t, context_queue &queue, bool is_client)
+            : Spanner (t), queue_ (queue), is_client_ (is_client)
+    {
+    }
 
-  bool handel_int(std::shared_ptr<Event> event_ptr);
+  protected:
+    bool create_trace_starting_span (uint64_t parser_id);
 
- private:
-  context_queue &queue_;
+    bool handel_call (std::shared_ptr<Event> &event_ptr);
 
-  bool is_client_;
+    bool handel_mmio (std::shared_ptr<Event> &event_ptr);
 
-  size_t expected_xmits_ = 0;
-  bool found_transmit_ = false;
-  bool found_receive_ = false;
-  bool pci_msix_desc_addr_before_ = false;
-  std::shared_ptr<host_call_span> pending_host_call_span_ = nullptr;
-  std::shared_ptr<host_int_span> pending_host_int_span_ = nullptr;
-  std::list<std::shared_ptr<host_dma_span>> pending_host_dma_spans_;
-  std::shared_ptr<host_mmio_span> pending_host_mmio_span_ = nullptr;
-};
+    bool handel_dma (std::shared_ptr<Event> &event_ptr);
 
-struct nic_spanner : public spanner {
-  sim::corobelt::task<void> consume(
-      sim::corobelt::yield_task<std::shared_ptr<Event>> *producer_task);
+    bool handel_msix (std::shared_ptr<Event> &event_ptr);
 
-  nic_spanner(tracer &t, context_queue &host_queue,
-              context_queue &network_queue)
-      : spanner(t), host_queue_(host_queue), network_queue_(network_queue) {
-  }
+    bool handel_int (std::shared_ptr<Event> &event_ptr);
 
- protected:
+  private:
+    context_queue &queue_;
 
-  bool handel_mmio(std::shared_ptr<Event> event_ptr);
+    bool is_client_;
 
-  bool handel_dma(std::shared_ptr<Event> event_ptr);
+    size_t expected_xmits_ = 0;
+    bool found_transmit_ = false;
+    bool found_receive_ = false;
+    bool pci_msix_desc_addr_before_ = false;
+    std::shared_ptr<host_call_span> pending_host_call_span_ = nullptr;
+    std::shared_ptr<host_int_span> pending_host_int_span_ = nullptr;
+    std::list<std::shared_ptr<host_dma_span>> pending_host_dma_spans_;
+    std::shared_ptr<host_mmio_span> pending_host_mmio_span_ = nullptr;
+  };
 
-  bool handel_txrx(std::shared_ptr<Event> event_ptr);
+struct NicSpanner : public Spanner
+  {
+    concurrencpp::result<void> consume (
+            std::shared_ptr<concurrencpp::executor> resume_executor,
+            std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  bool handel_msix(std::shared_ptr<Event> event_ptr);
+    NicSpanner (tracer &t, context_queue &host_queue,
+                 context_queue &network_queue)
+            : Spanner (t), host_queue_ (host_queue),
+              network_queue_ (network_queue)
+    {
+    }
 
- private:
-  context_queue &host_queue_;
-  context_queue &network_queue_;
+  protected:
 
-  std::shared_ptr<context> last_host_context_ = nullptr;
-  std::shared_ptr<event_span> last_completed_ = nullptr;
+    bool handel_mmio (std::shared_ptr<Event> &event_ptr);
 
-  std::list<std::shared_ptr<nic_dma_span>> pending_nic_dma_spans_;
-};
+    bool handel_dma (std::shared_ptr<Event> &event_ptr);
+
+    bool handel_txrx (std::shared_ptr<Event> &event_ptr);
+
+    bool handel_msix (std::shared_ptr<Event> &event_ptr);
+
+  private:
+    context_queue &host_queue_;
+    context_queue &network_queue_;
+
+    std::shared_ptr<context> last_host_context_ = nullptr;
+    std::shared_ptr<event_span> last_completed_ = nullptr;
+
+    std::list<std::shared_ptr<nic_dma_span>> pending_nic_dma_spans_;
+  };
 
 #endif  // SIMBRICKS_TRACE_spanER_H_

@@ -29,11 +29,13 @@ project(simbricks-trace LANGUAGES CXX DESCRIPTION "simbricks trace utility for a
 # if not specified otherwise build in release mode
 # can be spedcified by -DCMAKE_BUILD_TYPE=Debug or -DCMAKE_BUILD_TYPE=Release
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+    set(CMAKE_BUILD_TYPE Release)
 endif()
 
 # we require c++20 --> coroutines
-set(CMAKE_CXX_STANDARD 20)
+if(NOT CMAKE_CXX_STANDARD)
+    set(CMAKE_CXX_STANDARD 20)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # compiler flags for either debug or release mode
@@ -43,77 +45,83 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 # all src files required to build the trace functionality
 set(TRACE_SRC_FILES
 
-    trace.cc
+        trace.cc
 
-    corobelt/corobelt.h
+        util/exception.h
+        util/componenttable.h
+        util/cxxopts.hpp
+        util/log.h
 
-    util/componenttable.h
-    util/cxxopts.hpp
-    util/log.h
-    
-    reader/reader.h
-    reader/reader.cc
-    
-    parser/parser.h
-    parser/parser.cc
-    parser/nicbm.cc
-    parser/gem5.cc
-    
-    events/events.h
-    events/events.cc
-    events/event-filter.h
-    events/eventStreamParser.h
-    
-    env/stringInternalizer.h
-    env/symtable.h
-    env/symtable.cc
-    env/traceEnvironment.h
-    env/traceEnvironment.cc
-    
-    analytics/span.h
-    analytics/trace.h
-    analytics/tracer.h
-    analytics/queue.h
-    analytics/spanner.h
-    analytics/nicSpanner.cc
-    analytics/hostSpanner.cc
-)
+        corobelt/corobelt.h
+
+        reader/reader.h
+        reader/reader.cc
+
+        parser/parser.h
+        parser/parser.cc
+        parser/nicbm.cc
+        parser/gem5.cc
+
+        events/events.h
+        events/events.cc
+        events/event-filter.h
+        events/eventStreamParser.h
+
+        env/stringInternalizer.h
+        env/symtable.h
+        env/symtable.cc
+        env/traceEnvironment.h
+        env/traceEnvironment.cc
+
+        analytics/span.h
+        analytics/trace.h
+        analytics/tracer.h
+        analytics/queue.h
+        analytics/spanner.h
+        analytics/nicSpanner.cc
+        analytics/hostSpanner.cc
+        )
 
 add_executable(${PROJECT_NAME} ${TRACE_SRC_FILES})
 
-target_include_directories( ${PROJECT_NAME} PUBLIC 
-    util
-    reader
-    env
-    corobelt
-    events
-    parser
-    analytics
-)
+target_include_directories( ${PROJECT_NAME} PUBLIC
+        util
+        reader
+        env
+        corobelt
+        events
+        parser
+        analytics
+        )
 
+# Check whether the correct compiler is used
 message(STATUS "The used compiler id: ${CMAKE_CXX_COMPILER_ID}")
 # only gcc is supported at the moment
 if(${CMAKE_CXX_COMPILER_ID} MATCHES "GNU")
-    # make sure that we build with necessary options for coroutines
-    message(STATUS "The compiler is GNU, hence add -fcoroutines and -pthread")
-    target_compile_options(${PROJECT_NAME} PUBLIC -fcoroutines -pthread)
+    message(FATAL "GNU compiler are currently not supported")
 elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
-    message(FATAL_ERROR "Clang is currently not supported.")
+    target_compile_options(${PROJECT_NAME} PUBLIC -pthread)
 else()
     message(FATAL_ERROR "Your compiler, whatever it is, is currently not supported.")
 endif()
 
-# TODO: replace this by using a proper coroutine library
-#       e.g. https://github.com/jbaldwin/libcoro
-set(CORO_TEST_SRC
-    corobelt/corobelt.h
-    corobelt/corobelt-test.cc
-)
-add_executable(coro-test ${CORO_TEST_SRC})
+# link coroutine library
+add_subdirectory(libs/concurrencpp)
+target_link_libraries(${PROJECT_NAME} PUBLIC concurrencpp::concurrencpp)
 
-target_include_directories(coro-test PUBLIC 
-    corobelt
-)
+set(TEST_SRC
+        util/exception.h
+        corobelt/corobelt.h
+        corobelt/concurrencpp-test.cpp
+        )
 
+set(TEST_TAR concurrencpp-test)
+add_executable(${TEST_TAR} ${TEST_SRC})
 
+target_include_directories(${TEST_TAR} PUBLIC
+        util
+        corobelt
+        )
+
+target_link_libraries(${TEST_TAR} PUBLIC concurrencpp::concurrencpp)
 

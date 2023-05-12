@@ -27,6 +27,7 @@
 #include <memory>
 #include <string>
 
+#include "exception.h"
 #include "corobelt.h"
 #include "reader.h"
 #include "string_util.h"
@@ -35,10 +36,8 @@
 #ifndef SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 #define SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 
-using event_t = std::shared_ptr<Event>;
-using ytask_t = sim::corobelt::yield_task<event_t>;
 
-struct event_stream_parser : public sim::corobelt::producer<event_t> {
+struct event_stream_parser : public producer<std::shared_ptr<Event>> {
   bool parse_ident_name_ts(size_t &parser_ident, std::string &parser_name,
                            uint64_t &ts) {
     if (not line_reader_.consume_and_trim_string(": source_id=") or
@@ -61,7 +60,11 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
     return line_reader_.parse_uint_trim(10, ts);
   }
 
-  ytask_t produce() override {
+  concurrencpp::result<void> produce(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                     std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override {
+    throw_if_empty(resume_executor, resume_executor_null);
+    throw_if_empty(tar_chan, channel_is_null);
+
     if (not line_reader_.open_file(log_file_path_)) {
       std::cout << "could not open log file path" << std::endl;
       co_return;
@@ -89,22 +92,18 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         continue;
       }
 
-      /*
-       * TODO: get rid of double string comparisons
-       */
-
-      event_t event = nullptr;
+      std::shared_ptr<Event> event = nullptr;
       uint64_t pc = 0, id = 0, addr = 0, size = 0, vec = 0, dev = 0, func = 0,
                bytes = 0, data = 0, reg = 0, offset = 0, len = 0, intr = 0,
                val = 0, bar = 0;
       std::string function, component;
-      if (event_name.compare("SimSendSyncSimSendSync") == 0) {
+      if (event_name == "SimSendSyncSimSendSync") {
         event = std::make_shared<SimSendSync>(ts, parser_ident, parser_name);
 
-      } else if (event_name.compare("SimProcInEvent") == 0) {
+      } else if (event_name == "SimProcInEvent") {
         event = std::make_shared<SimProcInEvent>(ts, parser_ident, parser_name);
 
-      } else if (event_name.compare("HostInstr") == 0) {
+      } else if (event_name == "HostInstr") {
         if (not line_reader_.consume_and_trim_string(", pc=") or
             not line_reader_.parse_uint_trim(16, pc)) {
           std::cout << "error parsing HostInstr" << std::endl;
@@ -112,7 +111,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         }
         event = std::make_shared<HostInstr>(ts, parser_ident, parser_name, pc);
 
-      } else if (event_name.compare("HostCall") == 0) {
+      } else if (event_name == "HostCall") {
         if (not line_reader_.consume_and_trim_string(", pc=") or
             not line_reader_.parse_uint_trim(16, pc) or
             not line_reader_.consume_and_trim_string(", func=") or
@@ -132,13 +131,13 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
                                            func, comp);
 
-      } else if (event_name.compare("HostMmioImRespPoW") == 0) {
+      } else if (event_name == "HostMmioImRespPoW") {
         event =
             std::make_shared<HostMmioImRespPoW>(ts, parser_ident, parser_name);
 
-      } else if (event_name.compare("HostMmioCR") == 0 or
-                 event_name.compare("HostMmioCW") == 0 or
-                 event_name.compare("HostDmaC") == 0) {
+      } else if (event_name == "HostMmioCR" or
+                 event_name == "HostMmioCW" or
+                 event_name == "HostDmaC") {
         if (not line_reader_.consume_and_trim_string(", id=") or
             not line_reader_.parse_uint_trim(10, id)) {
           std::cout << "error parsing HostMmioCR, HostMmioCW or HostDmaC"
@@ -146,20 +145,20 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("HostMmioCR") == 0) {
+        if (event_name == "HostMmioCR") {
           event =
               std::make_shared<HostMmioCR>(ts, parser_ident, parser_name, id);
-        } else if (event_name.compare("HostMmioCW") == 0) {
+        } else if (event_name == "HostMmioCW") {
           event =
               std::make_shared<HostMmioCW>(ts, parser_ident, parser_name, id);
         } else {
           event = std::make_shared<HostDmaC>(ts, parser_ident, parser_name, id);
         }
 
-      } else if (event_name.compare("HostMmioR") == 0 or
-                 event_name.compare("HostMmioW") == 0 or
-                 event_name.compare("HostDmaR") == 0 or
-                 event_name.compare("HostDmaW") == 0) {
+      } else if (event_name == "HostMmioR" or
+                 event_name == "HostMmioW" or
+                 event_name == "HostDmaR" or
+                 event_name == "HostDmaW") {
         if (not line_reader_.consume_and_trim_string(", id=") or
             not line_reader_.parse_uint_trim(10, id) or
             not line_reader_.consume_and_trim_string(", addr=") or
@@ -172,8 +171,8 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("HostMmioR") == 0 or
-            event_name.compare("HostMmioW") == 0) {
+        if (event_name == "HostMmioR" or
+            event_name == "HostMmioW") {
           // if (not line_reader_.consume_and_trim_string(", bar=") or
           //     not line_reader_.parse_uint_trim(10, bar) or
           //     not line_reader_.consume_and_trim_string(", offset=") or
@@ -188,14 +187,14 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           bar = 0;
           offset = 0;
 
-          if (event_name.compare("HostMmioW") == 0) {
+          if (event_name == "HostMmioW") {
             event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name,
                                                 id, addr, size, bar, offset);
           } else {
             event = std::make_shared<HostMmioR>(ts, parser_ident, parser_name,
                                                 id, addr, size, bar, offset);
           }
-        } else if (event_name.compare("HostDmaR") == 0) {
+        } else if (event_name == "HostDmaR") {
           event = std::make_shared<HostDmaR>(ts, parser_ident, parser_name, id,
                                              addr, size);
         } else {
@@ -203,7 +202,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                                              addr, size);
         }
 
-      } else if (event_name.compare("HostMsiX") == 0) {
+      } else if (event_name == "HostMsiX") {
         if (not line_reader_.consume_and_trim_string(", vec=") or
             not line_reader_.parse_uint_trim(10, vec)) {
           std::cout << "error parsing HostMsiX" << std::endl;
@@ -211,8 +210,8 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         }
         event = std::make_shared<HostMsiX>(ts, parser_ident, parser_name, vec);
 
-      } else if (event_name.compare("HostConfRead") == 0 or
-                 event_name.compare("HostConfWrite") == 0) {
+      } else if (event_name == "HostConfRead" or
+                 event_name == "HostConfWrite") {
         if (not line_reader_.consume_and_trim_string(", dev=") or
             not line_reader_.parse_uint_trim(10, dev) or
             not line_reader_.consume_and_trim_string(", func=") or
@@ -228,7 +227,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("HostConfRead") == 0) {
+        if (event_name == "HostConfRead") {
           event = std::make_shared<HostConf>(ts, parser_ident, parser_name, dev,
                                              func, reg, bytes, data, true);
         } else {
@@ -236,14 +235,14 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                                              func, reg, bytes, data, false);
         }
 
-      } else if (event_name.compare("HostClearInt") == 0) {
+      } else if (event_name == "HostClearInt") {
         event = std::make_shared<HostClearInt>(ts, parser_ident, parser_name);
 
-      } else if (event_name.compare("HostPostInt") == 0) {
+      } else if (event_name == "HostPostInt") {
         event = std::make_shared<HostPostInt>(ts, parser_ident, parser_name);
 
-      } else if (event_name.compare("HostPciR") == 0 or
-                 event_name.compare("HostPciW") == 0) {
+      } else if (event_name == "HostPciR" or
+                 event_name == "HostPciW") {
         if (not line_reader_.consume_and_trim_string(", offset=") or
             not line_reader_.parse_uint_trim(16, offset) or
             not line_reader_.consume_and_trim_string(", size=") or
@@ -252,7 +251,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("HostPciR") == 0) {
+        if (event_name == "HostPciR") {
           event = std::make_shared<HostPciRW>(ts, parser_ident, parser_name,
                                               offset, size, true);
         } else {
@@ -260,15 +259,15 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                                               offset, size, false);
         }
 
-      } else if (event_name.compare("NicMsix") == 0 or
-                 event_name.compare("NicMsi") == 0) {
+      } else if (event_name == "NicMsix" or
+                 event_name == "NicMsi") {
         if (not line_reader_.consume_and_trim_string(", vec=") or
             not line_reader_.parse_uint_trim(10, vec)) {
           std::cout << "error parsing NicMsix" << std::endl;
           continue;
         }
 
-        if (event_name.compare("NicMsix") == 0) {
+        if (event_name == "NicMsix") {
           event = std::make_shared<NicMsix>(ts, parser_ident, parser_name, vec,
                                             true);
         } else {
@@ -276,7 +275,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                                             false);
         }
 
-      } else if (event_name.compare("SetIX") == 0) {
+      } else if (event_name == "SetIX") {
         if (not line_reader_.consume_and_trim_string(", interrupt=") or
             not line_reader_.parse_uint_trim(16, intr)) {
           std::cout << "error parsing NicMsix" << std::endl;
@@ -284,11 +283,11 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         }
         event = std::make_shared<SetIX>(ts, parser_ident, parser_name, intr);
 
-      } else if (event_name.compare("NicDmaI") == 0 or
-                 event_name.compare("NicDmaEx") == 0 or
-                 event_name.compare("NicDmaEn") == 0 or
-                 event_name.compare("NicDmaCR") == 0 or
-                 event_name.compare("NicDmaCW") == 0) {
+      } else if (event_name == "NicDmaI" or
+                 event_name == "NicDmaEx" or
+                 event_name == "NicDmaEn" or
+                 event_name == "NicDmaCR" or
+                 event_name == "NicDmaCW") {
         if (not line_reader_.consume_and_trim_string(", id=") or
             not line_reader_.parse_uint_trim(16, id) or
             not line_reader_.consume_and_trim_string(", addr=") or
@@ -301,16 +300,16 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
           continue;
         }
 
-        if (event_name.compare("NicDmaI") == 0) {
+        if (event_name == "NicDmaI") {
           event = std::make_shared<NicDmaI>(ts, parser_ident, parser_name, id,
                                             addr, len);
-        } else if (event_name.compare("NicDmaEx") == 0) {
+        } else if (event_name == "NicDmaEx") {
           event = std::make_shared<NicDmaEx>(ts, parser_ident, parser_name, id,
                                              addr, len);
-        } else if (event_name.compare("NicDmaEn") == 0) {
+        } else if (event_name == "NicDmaEn") {
           event = std::make_shared<NicDmaEn>(ts, parser_ident, parser_name, id,
                                              addr, len);
-        } else if (event_name.compare("NicDmaCW") == 0) {
+        } else if (event_name == "NicDmaCW") {
           event = std::make_shared<NicDmaCW>(ts, parser_ident, parser_name, id,
                                              addr, len);
         } else {
@@ -318,21 +317,21 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                                              addr, len);
         }
 
-      } else if (event_name.compare("NicMmioR") == 0 or
-                 event_name.compare("NicMmioW") == 0) {
+      } else if (event_name == "NicMmioR" or
+                 event_name == "NicMmioW") {
         if (not line_reader_.consume_and_trim_string(", off=") or
             not line_reader_.parse_uint_trim(16, offset) or
             not line_reader_.consume_and_trim_string(", len=") or
             not line_reader_.parse_uint_trim(10, len) or
             not line_reader_.consume_and_trim_string(
-                ", val=")  // TODO: fix this to ", val=""
+                ", val=")
             or not line_reader_.parse_uint_trim(16, val)) {
           std::cout << "error parsing NicMmioR or NicMmioW: "
                     << line_reader_.get_raw_line() << std::endl;
           continue;
         }
 
-        if (event_name.compare("NicMmioR") == 0) {
+        if (event_name == "NicMmioR") {
           event = std::make_shared<NicMmioR>(ts, parser_ident, parser_name,
                                              offset, len, val);
         } else {
@@ -340,7 +339,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
                                              offset, len, val);
         }
 
-      } else if (event_name.compare("NicTx") == 0) {
+      } else if (event_name == "NicTx") {
         if (not line_reader_.consume_and_trim_string(", len=") or
             not line_reader_.parse_uint_trim(10, len)) {
           std::cout << "error parsing NicTx" << std::endl;
@@ -348,7 +347,7 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         }
         event = std::make_shared<NicTx>(ts, parser_ident, parser_name, len);
 
-      } else if (event_name.compare("NicRx") == 0) {
+      } else if (event_name == "NicRx") {
         if (not line_reader_.consume_and_trim_string(", len=") or
             not line_reader_.parse_uint_trim(10, len) or
             not line_reader_.consume_and_trim_string(", port=") or
@@ -364,12 +363,8 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
         continue;
       }
 
-      if (not event) {
-        std::cout << "no event to write, there should be one" << std::endl;
-        co_return;
-      }
-
-      co_yield event;
+      throw_if_empty(event, event_is_null);
+      co_await tar_chan->push(resume_executor, event);
     }
 
     co_return;
@@ -377,8 +372,8 @@ struct event_stream_parser : public sim::corobelt::producer<event_t> {
 
   explicit event_stream_parser(const std::string log_file_path,
                                LineReader &line_reader)
-      : sim::corobelt::producer<event_t>(),
-        log_file_path_(std::move(log_file_path)),
+      : producer<std::shared_ptr<Event>>(),
+        log_file_path_(log_file_path),
         line_reader_(line_reader) {
   }
 

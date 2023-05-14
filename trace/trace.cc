@@ -26,6 +26,7 @@
 #include <functional>
 #include <iostream>
 #include <memory>
+#include <ostream>
 #include <set>
 #include <string>
 #include <thread>
@@ -38,6 +39,7 @@
 #include "events/event-filter.h"
 #include "events/eventStreamParser.h"
 #include "events/events.h"
+#include "exception.h"
 #include "parser/parser.h"
 #include "spanner.h"
 #include "util/cxxopts.hpp"
@@ -63,6 +65,22 @@ bool create_open_file(std::ofstream &new_out, std::string filename) {
   }
 
   return true;
+}
+
+std::shared_ptr<EventPrinter> createPrinter(cxxopts::ParseResult &result, const std::string &option) {
+  std::shared_ptr<EventPrinter> printer;
+  if (result.count(option) != 0) {
+    std::ofstream out_file;
+    if (not create_open_file(out_file, result[option].as<std::string>())) {
+      std::cerr << "could not open gem5-client-events file" << std::endl;
+      return nullptr;
+    }
+    printer = EventPrinter::create(out_file);
+  } else {
+    printer = EventPrinter::create(std::cout);
+  }
+
+  return printer;
 }
 
 int main(int argc, char *argv[]) {
@@ -122,7 +140,7 @@ int main(int argc, char *argv[]) {
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
   concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 1;
+  concurren_options.max_cpu_threads = 4;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
@@ -168,12 +186,10 @@ int main(int argc, char *argv[]) {
 #endif
 
   if (!result.count("linux-dump-server-client") ||
-      !result.count("gem5-log-server") || !result.count("gem5-server-events") ||
+      !result.count("gem5-log-server") ||
       !result.count("nicbm-log-server") ||
-      !result.count("nicbm-server-events") ||
-      !result.count("gem5-log-client") || !result.count("gem5-client-events") ||
-      !result.count("nicbm-log-client") ||
-      !result.count("nicbm-client-events")) {
+      !result.count("gem5-log-client") ||
+      !result.count("nicbm-log-client")) {
     std::cerr << "invalid arguments given" << std::endl
               << options.help() << std::endl;
     exit(EXIT_FAILURE);
@@ -227,13 +243,10 @@ int main(int argc, char *argv[]) {
                                                               result["gem5-log-server"].as<std::string>(),
                                                               comp_filter_server, server_lr);{};
 
-    std::ofstream out_file;
-    if (not create_open_file(out_file,
-                             result["gem5-server-events"].as<std::string>())) {
-      std::cerr << "could not open gem5-server-events file" << std::endl;
+    auto printer = createPrinter(result, "gem5-server-events");
+    if (not printer) {
       exit(EXIT_FAILURE);
     }
-    auto printer = EventPrinter::create(out_file);
 
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
     run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5_server_par, pipes, printer);
@@ -254,13 +267,10 @@ int main(int argc, char *argv[]) {
                              result["gem5-log-client"].as<std::string>(),
                              comp_filter_client, client_lr);
 
-    std::ofstream out_file;
-    if (not create_open_file(out_file,
-                             result["gem5-client-events"].as<std::string>())) {
-      std::cerr << "could not open gem5-client-events file" << std::endl;
+    auto printer = createPrinter(result, "gem5-client-events");
+    if (not printer) {
       exit(EXIT_FAILURE);
     }
-    auto printer = EventPrinter::create(out_file);
 
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
     run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5_client_par, pipes, printer);
@@ -278,13 +288,10 @@ int main(int argc, char *argv[]) {
     auto nic_ser_par = NicBmParser::create("NicbmServerParser",
                           result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
 
-    std::ofstream out_file;
-    if (not create_open_file(out_file,
-                             result["nicbm-server-events"].as<std::string>())) {
-      std::cerr << "could not open nicbm-server-events file" << std::endl;
+    auto printer = createPrinter(result, "nicbm-server-events");
+    if (not printer) {
       exit(EXIT_FAILURE);
     }
-    auto printer = EventPrinter::create(out_file);
 
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
     run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, nic_ser_par, pipes, printer);
@@ -302,22 +309,24 @@ int main(int argc, char *argv[]) {
     auto nic_cli_par = NicBmParser::create("NicbmClientParser",
                           result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
 
-    std::ofstream out_file;
-    if (not create_open_file(out_file,
-                             result["nicbm-client-events"].as<std::string>())) {
-      std::cerr << "could not open nicbm-client-events file" << std::endl;
+    auto printer = createPrinter(result, "nicbm-client-events");
+    if (not printer) {
       exit(EXIT_FAILURE);
     }
-    auto printer = EventPrinter::create(out_file);
 
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
     run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, nic_cli_par, pipes, printer);
   };
 
-  server_host_task();
-  client_host_task();
-  server_nic_task();
-  client_nic_task();
+  try {
+    server_host_task();
+    client_host_task();
+    server_nic_task();
+    client_nic_task();
+  } catch (const std::runtime_error& err) {
+    std::cerr << err.what() << std::endl;
+    exit(EXIT_FAILURE);
+  }
 
   exit(EXIT_SUCCESS);
 }

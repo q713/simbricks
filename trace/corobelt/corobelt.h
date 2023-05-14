@@ -25,6 +25,8 @@
 #ifndef SIMBRICKS_TRACE_COROBELT_H_
 #define SIMBRICKS_TRACE_COROBELT_H_
 
+#include <concurrencpp/executors/executor.h>
+#include <memory>
 #include "concurrencpp/concurrencpp.h"
 #include "exception.h"
 
@@ -238,6 +240,14 @@ inline void run_pipeline (std::shared_ptr<concurrencpp::executor> resume_executo
     channels[index]->close_channel (resume_executor).get ();
   }
   tasks[amount_channels].get ();
+}
+
+template<typename ValueType>
+inline void run_pipeline(std::shared_ptr<concurrencpp::executor> resume_executor,
+                         std::shared_ptr<producer<ValueType>> prod,
+                         std::shared_ptr<consumer<ValueType>> cons) {
+  std::vector<std::shared_ptr<cpipe<ValueType>>> dummy;
+  run_pipeline<ValueType>(resume_executor, prod, dummy, cons);
 }
 
 #endif //SIMBRICKS_TRACE_COROBELT_H_

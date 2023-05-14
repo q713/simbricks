@@ -314,9 +314,8 @@ concurrencpp::result<void> HostSpanner::consume (
   bool added = false;
   std::optional<std::shared_ptr<Event>> event_ptr_opt;
 
-  for (event_ptr_opt = co_await src_chan->pop (
-          resume_executor); event_ptr_opt.has_value (); event_ptr_opt = co_await src_chan->pop (
-          resume_executor))
+  for (event_ptr_opt = co_await src_chan->pop (resume_executor); event_ptr_opt.has_value ();
+        event_ptr_opt = co_await src_chan->pop (resume_executor))
   {
     event_ptr = event_ptr_opt.value ();
     throw_if_empty (event_ptr, event_is_null);

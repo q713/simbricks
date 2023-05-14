@@ -25,9 +25,7 @@
 #ifndef SIMBRICKS_TRACE_EVENT_FILTER_H_
 #define SIMBRICKS_TRACE_EVENT_FILTER_H_
 
-#include <bits/ranges_algo.h>
 #include <memory>
-#include <algorithm>
 
 #include "corobelt.h"
 #include "events.h"
@@ -62,7 +60,7 @@ struct event_stream_actor : public cpipe<std::shared_ptr<Event>> {
 
       pass_on = act_on(event);
       if (pass_on) {
-        tar_chan->push(resume_executor, event);
+        co_await tar_chan->push(resume_executor, event);
       }
     }
     co_return;
@@ -145,9 +143,12 @@ class EventTimestampFilter : public event_stream_actor {
   bool act_on(std::shared_ptr<Event> &event) override {
     const uint64_t ts = event->timestamp_;
 
-    return std::ranges::any_of(event_time_boundaries_, [ts](EventTimeBoundary &boundary) {
-      return boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_;
-    });
+    for (auto &boundary : event_time_boundaries_) {
+      if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
+        return true;
+      }
+    }
+    return false;
   }
 
   static auto create(std::vector<EventTimeBoundary> &event_time_boundaries) {

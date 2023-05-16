@@ -26,7 +26,10 @@
 #define SIMBRICKS_TRACE_COROBELT_H_
 
 #include <concurrencpp/executors/executor.h>
+#include <concurrencpp/forward_declarations.h>
+#include <concurrencpp/threads/async_lock.h>
 #include <memory>
+#include <optional>
 #include "concurrencpp/concurrencpp.h"
 #include "exception.h"
 
@@ -141,6 +144,30 @@ class Channel
 
       if (size_ > 0)
       {
+        auto result = std::move (buffer_[read_index_]);
+        read_index_ = (read_index_ + 1) % Capacity;
+        --size_;
+
+        guard.unlock ();
+        channel_cv_.notify_one ();
+
+        co_return result;
+      }
+
+      co_return std::nullopt;
+    }
+
+    concurrencpp::lazy_result<std::optional<ValueType>> try_pop(
+        std::shared_ptr<concurrencpp::executor> resume_executor) {
+      throw_if_empty(resume_executor, resume_executor_null);
+
+      concurrencpp::scoped_async_lock guard = co_await channel_lock_.lock(resume_executor);
+
+      if (poisened_) {
+        co_return std::nullopt;
+      }
+
+      if (size_ > 0) {
         auto result = std::move (buffer_[read_index_]);
         read_index_ = (read_index_ + 1) % Capacity;
         --size_;

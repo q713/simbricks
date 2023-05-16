@@ -123,7 +123,8 @@ bool HostSpanner::handel_call (std::shared_ptr<Event> &event_ptr)
   return false;
 }
 
-bool HostSpanner::handel_mmio (std::shared_ptr<Event> &event_ptr)
+bool HostSpanner::handel_mmio (std::shared_ptr<concurrencpp::executor> resume_executor,
+                               std::shared_ptr<Event> &event_ptr)
 {
   assert(event_ptr and "event_ptr is null");
 
@@ -148,8 +149,8 @@ bool HostSpanner::handel_mmio (std::shared_ptr<Event> &event_ptr)
     if (is_type (event_ptr, EventType::HostMmioW_t) or
         is_type (event_ptr, EventType::HostMmioR_t))
     {
-      if (not queue_.push (this->id_, expectation::mmio,
-                           pending_host_mmio_span_))
+      if (not queue_.push (resume_executor, this->id_, expectation::mmio,
+                           pending_host_mmio_span_).get())
       {
         std::cerr << "could not push to nic that mmio is expected"
                   << std::endl;
@@ -164,8 +165,8 @@ bool HostSpanner::handel_mmio (std::shared_ptr<Event> &event_ptr)
       if (pending_host_mmio_span_->is_write () and expected_xmits_ > 0 and
           not pending_host_mmio_span_->is_after_pci_msix_desc_addr ())
       {
-        if (queue_.push (this->get_id (), expectation::tx,
-                         pending_host_mmio_span_))
+        if (queue_.push (resume_executor, this->get_id (), expectation::tx,
+                         pending_host_mmio_span_).get())
         {
           --expected_xmits_;
         } else
@@ -203,7 +204,8 @@ bool HostSpanner::handel_mmio (std::shared_ptr<Event> &event_ptr)
   return false;
 }
 
-bool HostSpanner::handel_dma (std::shared_ptr<Event> &event_ptr)
+bool HostSpanner::handel_dma (std::shared_ptr<concurrencpp::executor> resume_executor,
+                              std::shared_ptr<Event> &event_ptr)
 {
   assert(event_ptr and "event_ptr is null");
 
@@ -220,7 +222,7 @@ bool HostSpanner::handel_dma (std::shared_ptr<Event> &event_ptr)
 
   // when receiving a dma, we expect to get an context from the nic simulator,
   // hence poll this context blocking!!
-  auto con = queue_.poll (this->id_);
+  auto con = queue_.poll (resume_executor, this->id_).get();
   if (not is_expectation (con, expectation::dma))
   {
     std::cerr << "when polling for dma context, no dma context was fetched"
@@ -245,11 +247,12 @@ bool HostSpanner::handel_dma (std::shared_ptr<Event> &event_ptr)
   return false;
 }
 
-bool HostSpanner::handel_msix (std::shared_ptr<Event> &event_ptr)
+bool HostSpanner::handel_msix (std::shared_ptr<concurrencpp::executor> resume_executor,
+                               std::shared_ptr<Event> &event_ptr)
 {
   assert(event_ptr and "event_ptr is null");
 
-  auto con = queue_.poll (this->id_);
+  auto con = queue_.poll (resume_executor, this->id_).get();
   if (not is_expectation (con, expectation::msix))
   {
     std::cerr << "did not receive msix on context queue" << std::endl;
@@ -302,13 +305,7 @@ concurrencpp::result<void> HostSpanner::consume (
 {
   throw_if_empty (resume_executor, resume_executor_null);
   throw_if_empty (src_chan, channel_is_null);
-
-  if (not queue_.register_spanner (id_))
-  {
-    std::cerr << "host_spanner " << id_;
-    std::cerr << " error registering for host or network queue" << std::endl;
-    co_return;
-  }
+  queue_.register_spanner (id_);
 
   std::shared_ptr<Event> event_ptr = nullptr;
   bool added = false;
@@ -336,7 +333,7 @@ concurrencpp::result<void> HostSpanner::consume (
       case EventType::HostMmioCW_t:
       case EventType::HostMmioCR_t:
       {
-        added = handel_mmio (event_ptr);
+        added = handel_mmio (resume_executor, event_ptr);
         break;
       }
 
@@ -344,13 +341,13 @@ concurrencpp::result<void> HostSpanner::consume (
       case EventType::HostDmaR_t:
       case EventType::HostDmaC_t:
       {
-        added = handel_dma (event_ptr);
+        added = handel_dma (resume_executor, event_ptr);
         break;
       }
 
       case EventType::HostMsiX_t:
       {
-        added = handel_msix (event_ptr);
+        added = handel_msix (resume_executor, event_ptr);
         break;
       }
 

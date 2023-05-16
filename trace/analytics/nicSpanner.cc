@@ -28,10 +28,11 @@
 #include "spanner.h"
 #include "exception.h"
 
-bool NicSpanner::handel_mmio(std::shared_ptr<Event> &event_ptr) {
+bool NicSpanner::handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
+                             std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  auto con = host_queue_.poll(this->id_);
+  auto con = host_queue_.poll(resume_executor, this->id_).get();
   if (not is_expectation(con, expectation::mmio)) {
     std::cerr << "nic_spanner: could not poll mmio context" << std::endl;
     return false;
@@ -55,7 +56,8 @@ bool NicSpanner::handel_mmio(std::shared_ptr<Event> &event_ptr) {
   return false;
 }
 
-bool NicSpanner::handel_dma(std::shared_ptr<Event> &event_ptr) {
+bool NicSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
+                            std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   auto pending_dma =
@@ -65,7 +67,7 @@ bool NicSpanner::handel_dma(std::shared_ptr<Event> &event_ptr) {
       last_completed_ = pending_dma;
     } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
       // indicate to host that we expect a dma action
-      host_queue_.push(this->id_, expectation::dma, pending_dma);
+      host_queue_.push(resume_executor, this->id_, expectation::dma, pending_dma).get();
     }
 
     return true;
@@ -88,7 +90,8 @@ bool NicSpanner::handel_dma(std::shared_ptr<Event> &event_ptr) {
 
   return false;
 }
-bool NicSpanner::handel_txrx(std::shared_ptr<Event> &event_ptr) {
+bool NicSpanner::handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
+                             std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   bool is_tx = false;
@@ -98,7 +101,7 @@ bool NicSpanner::handel_txrx(std::shared_ptr<Event> &event_ptr) {
     is_tx = true;
 
   } else if (is_type(event_ptr, EventType::NicRx_t)) {
-    auto con = network_queue_.poll(this->id_);
+    auto con = network_queue_.poll(resume_executor, this->id_).get();
     if (is_expectation(con, expectation::rx)) {
       std::cerr << "nic_spanner: try to create receive span, but no receive ";
       std::cerr << "expectation from network" << std::endl;
@@ -121,7 +124,7 @@ bool NicSpanner::handel_txrx(std::shared_ptr<Event> &event_ptr) {
     assert(eth_span->is_complete() and "eth span was not complette");
     // indicate that somewhere a receive will be expected
     if (is_tx and
-        not network_queue_.push(this->id_, expectation::rx, eth_span)) {
+        not network_queue_.push(resume_executor, this->id_, expectation::rx, eth_span).get()) {
       std::cerr << "could not indicate to network that a";
       std::cerr << "receive is to be expected" << std::endl;
     }
@@ -132,7 +135,8 @@ bool NicSpanner::handel_txrx(std::shared_ptr<Event> &event_ptr) {
   return false;
 }
 
-bool NicSpanner::handel_msix(std::shared_ptr<Event> &event_ptr) {
+bool NicSpanner::handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
+                             std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   auto msix_span = tracer_.rergister_new_span_by_parent<nic_msix_span>(
@@ -144,7 +148,7 @@ bool NicSpanner::handel_msix(std::shared_ptr<Event> &event_ptr) {
 
   if (msix_span->add_to_span(event_ptr)) {
     assert(msix_span->is_complete() and "msix span is not complete");
-    host_queue_.push(this->id_, expectation::msix, last_completed_);
+    host_queue_.push(resume_executor, this->id_, expectation::msix, last_completed_).get();
     return true;
   }
 
@@ -156,12 +160,8 @@ concurrencpp::result<void> NicSpanner::consume(std::shared_ptr<concurrencpp::exe
   throw_if_empty(resume_executor, resume_executor_null);
   throw_if_empty(src_chan, channel_is_null);
 
-  if (not host_queue_.register_spanner(id_) or
-      not network_queue_.register_spanner(id_)) {
-    std::cerr << "nic_packer " << id_;
-    std::cerr << " error registering for host or network queue" << std::endl;
-    co_return;
-  }
+  host_queue_.register_spanner(id_);
+  network_queue_.register_spanner(id_);
 
   std::shared_ptr<Event> event_ptr = nullptr;
   std::shared_ptr<nic_dma_span> pending_dma = nullptr;
@@ -179,7 +179,7 @@ concurrencpp::result<void> NicSpanner::consume(std::shared_ptr<concurrencpp::exe
     switch (event_ptr->get_type()) {
       case EventType::NicMmioW_t:
       case EventType::NicMmioR_t: {
-        added = handel_mmio(event_ptr);
+        added = handel_mmio(resume_executor, event_ptr);
         break;
       }
 
@@ -187,18 +187,18 @@ concurrencpp::result<void> NicSpanner::consume(std::shared_ptr<concurrencpp::exe
       case EventType::NicDmaEx_t:
       case EventType::NicDmaCW_t:
       case EventType::NicDmaCR_t: {
-        added = handel_dma(event_ptr);
+        added = handel_dma(resume_executor, event_ptr);
         break;
       }
 
       case EventType::NicTx_t:
       case EventType::NicRx_t: {
-        added = handel_txrx(event_ptr);
+        added = handel_txrx(resume_executor, event_ptr);
         break;
       }
 
       case EventType::NicMsix_t: {
-        added = handel_msix(event_ptr);
+        added = handel_msix(resume_executor, event_ptr);
         break;
       }
 

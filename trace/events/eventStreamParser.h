@@ -37,7 +37,7 @@
 #define SIMBRICKS_TRACE_EVENT_STREAM_PARSER_H_
 
 
-struct event_stream_parser : public producer<std::shared_ptr<Event>> {
+struct EventStreamParser : public producer<std::shared_ptr<Event>> {
   bool parse_ident_name_ts(size_t &parser_ident, std::string &parser_name,
                            uint64_t &ts) {
     if (not line_reader_.consume_and_trim_string(": source_id=") or
@@ -370,7 +370,14 @@ struct event_stream_parser : public producer<std::shared_ptr<Event>> {
     co_return;
   };
 
-  explicit event_stream_parser(const std::string log_file_path,
+  static auto create(const std::string log_file_path,
+                                                   LineReader &line_reader) {
+    auto parser = std::make_shared<EventStreamParser>(log_file_path, line_reader);
+    throw_if_empty(parser, event_stream_parser_null);
+    return parser;
+  }
+
+  explicit EventStreamParser(const std::string log_file_path,
                                LineReader &line_reader)
       : producer<std::shared_ptr<Event>>(),
         log_file_path_(log_file_path),

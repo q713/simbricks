@@ -25,6 +25,7 @@
 #ifndef SIMBRICKS_TRACE_EXCEPTION_H_
 #define SIMBRICKS_TRACE_EXCEPTION_H_
 
+#include <exception>
 #include <stdexcept>
 #include <memory>
 
@@ -40,6 +41,11 @@ inline const char *span_is_null = "std::shared_ptr<Span> is null";
 inline const char *parser_is_null = "std::shared_ptr<LogParser> is null";
 inline const char *actor_is_null = "std::shared_ptr<event_stream_actor> is null";
 inline const char *printer_is_null = "a printer is null";
+inline const char *context_is_null = "std::shared_ptr<context> is null";
+inline const char* already_two_spanner_registered = "already two spanners are registered within context queue";
+inline const char* unknown_spanner_id = "an unknown spanner id was given to a context queue";
+inline const char* event_stream_parser_null = "std::shared_ptr<EventStreamParser> is null";
+inline const char* spanner_is_null = "sstd::shared_ptr<Spanner> is null";
 
 template<typename Value>
 void throw_if_empty (std::shared_ptr<Value> to_check, const char *message)
@@ -56,6 +62,12 @@ void throw_if_empty (Value *to_check, const char *message)
   if (not to_check)
   {
     throw std::runtime_error (message);
+  }
+}
+
+inline void throw_on(bool should_throw, const char* message) {
+  if (should_throw) {
+    throw std::runtime_error(message);
   }
 }
 

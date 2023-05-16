@@ -25,14 +25,19 @@
 #ifndef SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
 #define SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
 
+#include <concurrencpp/executors/executor.h>
+#include <concurrencpp/results/result.h>
 #include <condition_variable>
 #include <iostream>
 #include <list>
 #include <memory>
 #include <optional>
 #include <unordered_map>
+#include <utility>
 
 #include "span.h"
+#include "exception.h"
+#include "corobelt.h"
 
 enum expectation { tx, rx, dma, msix, mmio };
 
@@ -60,93 +65,37 @@ inline std::ostream &operator<<(std::ostream &os, expectation e) {
   return os;
 }
 
-struct context {
+struct Context {
   expectation expectation_;
+  // NOTE: maybe include trace id, technically currently the parent span contains this information
+  //       this must however be changed in case we consider distributed simulations etc.
   std::shared_ptr<event_span> parent_span_;
 
-  std::shared_ptr<event_span> get_parent() {
+  inline std::shared_ptr<event_span>& get_parent() {
     return parent_span_;
   }
 
  private:
-  context(expectation expectation, std::shared_ptr<event_span> parent_span)
-      : expectation_(expectation), parent_span_(parent_span) {
+  Context(expectation expectation, std::shared_ptr<event_span> parent_span)
+      : expectation_(expectation), parent_span_(std::move(parent_span)) {
   }
 
  public:
-  static std::shared_ptr<context> create(
-      expectation expectation, std::shared_ptr<event_span> parent_span) {
-    if (not parent_span) {
-      std::cerr << "try to create context without parent span" << std::endl;
-      return {};
-    }
-
-    auto con = std::shared_ptr<context>{new context(expectation, parent_span)};
+  static std::shared_ptr<Context> create(
+      expectation expectation, std::shared_ptr<event_span>& parent_span) {
+    throw_if_empty(parent_span, span_is_null);
+    auto con = std::shared_ptr<Context>{new Context(expectation, parent_span)};
+    throw_if_empty(con, context_is_null);
     return con;
   }
 };
 
-inline bool is_expectation(std::shared_ptr<context> con, expectation exp) {
+inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
   if (not con or con->expectation_ != exp) {
     return false;
   }
   return true;
 }
-
-struct queue {
-  std::mutex queue_mutex_;
-  std::list<std::shared_ptr<context>> container_;
-  std::condition_variable condition_v_;
-
-  std::shared_ptr<context> poll() {
-    std::unique_lock lock(queue_mutex_);
-    lock.lock();
-
-    while (container_.empty()) {
-      condition_v_.wait(lock);
-    }
-
-    auto con = container_.front();
-    container_.pop_front();
-
-    lock.unlock();
-
-    return con;
-  }
-
-  std::shared_ptr<context> try_poll() {
-    std::unique_lock lock(queue_mutex_);
-    lock.lock();
-
-    std::shared_ptr<context> con;
-    if (container_.empty()) {
-      con = nullptr;
-    } else {
-      auto con = container_.front();
-      container_.pop_front();
-    }
-
-    lock.unlock();
-
-    return con;
-  }
-
-  bool push(std::shared_ptr<context> con) {
-    if (not con) {
-      return false;
-    }
-
-    std::unique_lock lock(queue_mutex_);
-    lock.lock();
-
-    container_.push_back(con);
-    condition_v_.notify_all();
-
-    lock.unlock();
-
-    return true;
-  }
-};
 
 // The reason why we put two lists into one queue is that always two components
 // (i.e. packers that create the spans for components) interact,
@@ -157,12 +106,15 @@ struct queue {
 //    and then the host will poll from queue_b
 //
 // NOTE: Obviously we could give two simple list to each component, the reason
-// we dont do this is that e.g. a nic has potentially two boundaries:
+// we don't do this is that e.g. a nic has potentially two boundaries:
 //   1) host simulator
 //   2) network simulator / nic simulator
 // When we would do it in a different way we might end up passing 4 queues to a
 // nic packer, this should be prevented by this.
-struct context_queue {
+//
+// Another reason is, that the context queue abstracts away which kind of queues
+// are used internally, this might come in handy when considering distributed simulations etc.
+struct ContextQueue {
  private:
   std::mutex context_queue_mutex_;
 
@@ -171,37 +123,41 @@ struct context_queue {
   uint64_t spanner_b_key_ = 0;
 
   // spanner with key a will write to this queue
-  queue queue_a_;
+  Channel<std::shared_ptr<Context>> queue_a_;
   // spanner with key b will write to this queue
-  queue queue_b_;
+  Channel<std::shared_ptr<Context>> queue_b_;
 
-  queue *assign_write_queue(uint64_t spanner_id) {
+  auto &assign_write_queue(uint64_t spanner_id) {
+    std::lock_guard<std::mutex> const lock(context_queue_mutex_);
+
     if (spanner_id == spanner_a_key_) {
-      return &queue_a_;
-    } else if (spanner_id == spanner_b_key_) {
-      return &queue_b_;
-    } else {
-      return {};
+      return queue_a_;
     }
+
+    if (spanner_id == spanner_b_key_) {
+      return queue_b_;
+    }
+
+    throw_on(true, unknown_spanner_id);
+    return queue_a_;
   }
 
-  queue *assign_read_queue(uint64_t spanner_id) {
+  auto &assign_read_queue(uint64_t spanner_id) {
+    std::lock_guard<std::mutex> const lock(context_queue_mutex_);
+
     if (spanner_id == spanner_a_key_) {
-      return &queue_b_;
-
-    } else if (spanner_id == spanner_b_key_) {
-      return &queue_a_;
-
-    } else {
-      return {};
+      return queue_b_;
     }
+
+    if (spanner_id == spanner_b_key_) {
+      return queue_a_;
+    }
+
+    throw_on(true, unknown_spanner_id);
+    return queue_b_;
   }
 
  public:
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  // TODO: make smaller critical sections!!
-  // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   // TODO: remove the expectation enum, everything
   //       is expected to happen in order, hence
@@ -209,12 +165,10 @@ struct context_queue {
   //       context without the expectation enum
   // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-  bool register_spanner(uint64_t spanner_id) {
-    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+  void register_spanner(uint64_t spanner_id) {
+    std::lock_guard<std::mutex> const lock(context_queue_mutex_);
 
-    if (registered_spanners_ == 2) {
-      return false;
-    }
+    throw_on(registered_spanners_ == 2, already_two_spanner_registered);
 
     if (registered_spanners_ == 0) {
       spanner_a_key_ = spanner_id;
@@ -222,48 +176,51 @@ struct context_queue {
       spanner_b_key_ = spanner_id;
     }
     ++registered_spanners_;
-    return true;
   }
 
-  std::shared_ptr<context> poll(uint64_t spanner_id) {
-    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+  concurrencpp::result<std::shared_ptr<Context>>
+  poll(std::shared_ptr<concurrencpp::executor> resume_executor, uint64_t spanner_id) {
 
-    auto target = assign_read_queue(spanner_id);
-    if (not target) {
-      return {};
-    }
+    throw_if_empty(resume_executor, resume_executor_null);
+    std::optional<std::shared_ptr<Context>> con_opt;
 
-    auto con = target->poll();
-    return con;
+    // note: this function will acquire a lock
+    auto &target = assign_read_queue(spanner_id);
+
+    // the channel is safe for concurrent access itself
+    con_opt = co_await target.pop(resume_executor);
+    co_return con_opt.value_or(nullptr);
   }
 
-  std::shared_ptr<context> try_poll(uint64_t spanner_id) {
-    std::lock_guard<std::mutex> lock(context_queue_mutex_);
+  concurrencpp::result<std::shared_ptr<Context>>
+  try_poll(std::shared_ptr<concurrencpp::executor> resume_executor, uint64_t spanner_id) {
 
-    auto target = assign_read_queue(spanner_id);
-    if (not target) {
-      return {};
-    }
+    throw_if_empty(resume_executor, resume_executor_null);
+    std::optional<std::shared_ptr<Context>> con_opt;
 
-    auto con = target->try_poll();
-    return con;
+    // note: this function will acquire a lock
+    auto &target = assign_read_queue(spanner_id);
+
+    // the channel is safe for concurrent access itself
+    con_opt = co_await target.try_pop(resume_executor);
+    co_return con_opt.value_or(nullptr);
   }
 
-  bool push(uint64_t spanner_id, expectation expectation,
+  concurrencpp::result<bool>
+  push(std::shared_ptr<concurrencpp::executor> resume_executor,
+            uint64_t spanner_id, expectation expectation,
             std::shared_ptr<event_span> parent_span) {
-    std::lock_guard<std::mutex> lock(context_queue_mutex_);
 
-    auto con = context::create(expectation, parent_span);
-    if (not con) {
-      return false;
-    }
+    throw_if_empty(resume_executor, resume_executor_null);
+    auto con = Context::create(expectation, parent_span);
+    bool could_push = false;
 
-    auto target = assign_write_queue(spanner_id);
-    if (not target) {
-      return false;
-    }
+    // note: this function will acquire a lock
+    auto &target = assign_write_queue(spanner_id);
 
-    return target->push(con);
+    // the channel is safe for concurrent access itself
+    could_push = co_await target.push(resume_executor, con);
+    co_return could_push;
   }
 };
 

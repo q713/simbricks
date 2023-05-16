@@ -63,6 +63,13 @@ TEST_CASE("Test coroutine channel", "[Channel]") {
     channel_to_test.close_channel(thread_pool_executor).get();
 
     REQUIRE(channel_to_test.pop_non_lazy(thread_pool_executor).get().value_or(-1) == 1);
-    REQUIRE_FALSE(channel_to_test.try_push_non_lazy(thread_pool_executor, 2));
+    REQUIRE_FALSE(channel_to_test.try_push_non_lazy(thread_pool_executor, 2).get());
+  }
+
+  SECTION("cannot read from or write to poisened channel") {
+    channel_to_test.poisen_channel(thread_pool_executor).get();
+
+    REQUIRE_FALSE(channel_to_test.try_pop_non_lazy(thread_pool_executor).get().has_value());
+    REQUIRE_FALSE(channel_to_test.try_push_non_lazy(thread_pool_executor, 2).get());
   }
 }

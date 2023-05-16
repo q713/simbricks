@@ -26,74 +26,98 @@ cmake_minimum_required(VERSION 3.18)
 
 project(simbricks-trace LANGUAGES CXX DESCRIPTION "simbricks trace utility for analyzing system performance in depth")
 
-# if not specified otherwise build in release mode
+#######################################
+# Build Type, by default build Release
 # can be spedcified by -DCMAKE_BUILD_TYPE=Debug or -DCMAKE_BUILD_TYPE=Release
-if(NOT CMAKE_BUILD_TYPE)
+#######################################
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    set(CMAKE_BUILD_TYPE Debug)
+    add_compile_options(-fno-omit-frame-pointer)
+else()
     set(CMAKE_BUILD_TYPE Release)
+    add_compile_options(-O2)
 endif()
 
-# we require c++20 --> coroutines
+
+#######################################
+# Required C standard
+#######################################
 if(NOT CMAKE_CXX_STANDARD)
     set(CMAKE_CXX_STANDARD 20)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# compiler flags for either debug or release mode
-set(CMAKE_CXX_FLAGS_DEBUG "-g")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
+#######################################
+# Catch 2
+#######################################
+Include(FetchContent)
+FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.3.2 # or a later release
+    )
+FetchContent_MakeAvailable(Catch2)
+
+
+#######################################
+# Concurrencpp
+#######################################
+add_subdirectory(libs/concurrencpp)
+
+
+#######################################
+# The Trace lib
+#######################################
 # all src files required to build the trace functionality
-set(TRACE_SRC_FILES
-
-        trace.cc
-
-        util/exception.h
-        util/componenttable.h
-        util/cxxopts.hpp
-        util/log.h
-
-        corobelt/corobelt.h
-
-        reader/reader.h
-        reader/reader.cc
-
-        parser/parser.h
-        parser/parser.cc
-        parser/nicbm.cc
-        parser/gem5.cc
-
-        events/events.h
-        events/events.cc
-        events/event-filter.h
-        events/eventStreamParser.h
-
-        env/stringInternalizer.h
-        env/symtable.h
-        env/symtable.cc
-        env/traceEnvironment.h
-        env/traceEnvironment.cc
-
-        analytics/span.h
-        analytics/trace.h
-        analytics/tracer.h
-        analytics/queue.h
-        analytics/spanner.h
-        analytics/nicSpanner.cc
-        analytics/hostSpanner.cc
+set(TRACE_LIB_HEADER_FILES
+        #utils
+        include/util/exception.h
+        include/util/componenttable.h
+        include/util/cxxopts.hpp
+        include/util/log.h
+        # coroutine wrappers
+        include/corobelt/corobelt.h
+        # reader
+        include/reader/reader.h
+        # parser
+        include/parser/parser.h
+        # events
+        include/events/events.h
+        include/events/event-filter.h
+        include/events/eventStreamParser.h
+        # tracing environment
+        include/env/stringInternalizer.h
+        include/env/symtable.h
+        include/env/traceEnvironment.h
+        # analytics
+        include/analytics/span.h
+        include/analytics/trace.h
+        include/analytics/tracer.h
+        include/analytics/queue.h
+        include/analytics/spanner.h
         )
-
-add_executable(${PROJECT_NAME} ${TRACE_SRC_FILES})
-
-target_include_directories( ${PROJECT_NAME} PUBLIC
-        util
-        reader
-        env
-        corobelt
-        events
-        parser
-        analytics
+set(TRACE_LIB_SOURCE_FILES
+        # reader
+        source/reader/reader.cc
+        # parser
+        source/parser/parser.cc
+        source/parser/nicbm.cc
+        source/parser/gem5.cc
+        # events
+        source/events/events.cc
+        # tracing environment
+        source/env/symtable.cc
+        source/env/traceEnvironment.cc
+        # analytics
+        source/analytics/nicSpanner.cc
+        source/analytics/hostSpanner.cc
         )
-
+add_library(${PROJECT_NAME} ${TRACE_LIB_HEADER_FILES} ${TRACE_LIB_SOURCE_FILES})
+target_include_directories(${PROJECT_NAME} PUBLIC
+        include
+        source
+        )
 # Check whether the correct compiler is used
 message(STATUS "The used compiler id: ${CMAKE_CXX_COMPILER_ID}")
 # only gcc is supported at the moment
@@ -104,24 +128,51 @@ elseif(${CMAKE_CXX_COMPILER_ID} MATCHES "Clang")
 else()
     message(FATAL_ERROR "Your compiler, whatever it is, is currently not supported.")
 endif()
-
 # link coroutine library
-add_subdirectory(libs/concurrencpp)
 target_link_libraries(${PROJECT_NAME} PUBLIC concurrencpp::concurrencpp)
+target_link_libraries(${PROJECT_NAME} PUBLIC Catch2::Catch2WithMain)
 
-set(TEST_SRC
-        util/exception.h
-        corobelt/corobelt.h
-        corobelt/concurrencpp-test.cpp
+
+#######################################
+# Trace - Tests
+#######################################
+set(UNIT_TESTS_TARGET unittests)
+set (TRACE_UNIT_TESTS_SRC_FILES
+        tests/channel-test.cpp
         )
+add_executable(${UNIT_TESTS_TARGET} ${TRACE_UNIT_TESTS_SRC_FILES})
+target_include_directories(${UNIT_TESTS_TARGET} PUBLIC
+        tests
+        )
+target_link_libraries(${UNIT_TESTS_TARGET} PUBLIC Catch2::Catch2WithMain)
+target_link_libraries(${UNIT_TESTS_TARGET} PUBLIC ${PROJECT_NAME})
 
+
+#######################################
+# Concurrencpp test file to play around with coroutines
+#######################################
+set(TEST_SRC
+        include/util/exception.h
+        include/corobelt/corobelt.h
+        source/corobelt/concurrencpp-test.cpp
+        )
 set(TEST_TAR concurrencpp-test)
 add_executable(${TEST_TAR} ${TEST_SRC})
-
 target_include_directories(${TEST_TAR} PUBLIC
-        util
-        corobelt
+        include
+        source
         )
-
 target_link_libraries(${TEST_TAR} PUBLIC concurrencpp::concurrencpp)
+
+
+#######################################
+# Trace executable
+#######################################
+set(TRACE_SRC_FILES
+    trace.cc
+)
+add_executable(trace ${TRACE_SRC_FILES})
+target_link_libraries(trace ${PROJECT_NAME})
+
+
 

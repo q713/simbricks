@@ -25,23 +25,20 @@
 #include <filesystem>
 #include <functional>
 #include <iostream>
-#include <memory>
 #include <ostream>
 #include <set>
 #include <string>
-#include <thread>
-#include <set>
 #include <vector>
 
-#include "corobelt.h"
+#include "corobelt/corobelt.h"
 #include "env/symtable.h"
 #include "env/traceEnvironment.h"
 #include "events/event-filter.h"
 #include "events/eventStreamParser.h"
 #include "events/events.h"
-#include "exception.h"
 #include "parser/parser.h"
-#include "spanner.h"
+#include "reader/reader.h"
+#include "analytics/spanner.h"
 #include "util/cxxopts.hpp"
 #include "util/log.h"
 
@@ -84,42 +81,27 @@ std::shared_ptr<EventPrinter> createPrinter(cxxopts::ParseResult &result, const 
 }
 
 int main(int argc, char *argv[]) {
-  using event_t = std::shared_ptr<Event>;
 
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
-  options.add_options()("h,help", "Print usage")(
-      "linux-dump-server-client",
-      "file path to a output file obtained by 'objdump -S linux_image'",
-      cxxopts::value<std::string>())(
-      "nic-i40e-dump",
-      "file path to a output file obtained by 'objdump -d i40e.ko' (driver)",
-      cxxopts::value<std::string>())(
-      "gem5-log-server", "file path to a server log file written by gem5",
-      cxxopts::value<std::string>())(
-      "gem5-server-events",
-      "file to which the server event stream is written to",
-      cxxopts::value<std::string>())(
-      "nicbm-log-server", "file path to a server log file written by the nicbm",
-      cxxopts::value<std::string>())(
-      "nicbm-server-events",
-      "file to which the server nic event stream is written to",
-      cxxopts::value<std::string>())(
-      "gem5-log-client", "file path to a client log file written by gem5",
-      cxxopts::value<std::string>())(
-      "gem5-client-events",
-      "file to which the client event stream is written to",
-      cxxopts::value<std::string>())(
-      "nicbm-log-client", "file path to a client log file written by the nicbm",
-      cxxopts::value<std::string>())(
-      "nicbm-client-events",
-      "file to which the client nic event stream is written to",
-      cxxopts::value<std::string>())("ts-lower-bound",
-                                     "lower timestamp bound for events",
-                                     cxxopts::value<std::string>())(
-      "ts-upper-bound", "upper timestamp bound for events",
-      cxxopts::value<std::string>())(
-      "event-stream-log", "file path to file that stores an event stream",
-      cxxopts::value<std::string>());
+  options.add_options()("h,help", "Print usage")
+      ("linux-dump-server-client", "file path to a output file obtained by 'objdump -S linux_image'", cxxopts::value<std::string>())
+      ("nic-i40e-dump","file path to a output file obtained by 'objdump -d i40e.ko' (driver)",cxxopts::value<std::string>())
+      ("gem5-log-server", "file path to a server log file written by gem5",cxxopts::value<std::string>())
+      ("gem5-server-events","file to which the server event stream is written to", cxxopts::value<std::string>())
+      ("nicbm-log-server", "file path to a server log file written by the nicbm",cxxopts::value<std::string>())
+      ("nicbm-server-events", "file to which the server nic event stream is written to", cxxopts::value<std::string>())
+      ("gem5-log-client", "file path to a client log file written by gem5", cxxopts::value<std::string>())
+      ("gem5-client-events", "file to which the client event stream is written to", cxxopts::value<std::string>())
+      ("nicbm-log-client", "file path to a client log file written by the nicbm", cxxopts::value<std::string>())
+      ("nicbm-client-events", "file to which the client nic event stream is written to", cxxopts::value<std::string>())
+      ("ts-lower-bound", "lower timestamp bound for events", cxxopts::value<std::string>())
+      ("ts-upper-bound", "upper timestamp bound for events", cxxopts::value<std::string>())
+      ("event-stream-log", "file path to file that stores an event stream", cxxopts::value<std::string>())
+      ("gem5-server-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
+      ("gem5-client-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
+      ("nicbm-server-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
+      ("nicbm-client-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
+      ;
 
   cxxopts::ParseResult result;
   try {
@@ -144,46 +126,37 @@ int main(int argc, char *argv[]) {
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
-#if 0
-  if (result.count("event-stream-log")) {
-    LineReader streamLr;
-    event_stream_parser streamParser(
-        result["event-stream-log"].as<std::string>(), streamLr);
+  if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
+      and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    pack_printer p_printer;
-    EventTypeFilter filter{{
-        // EventType::HostCall_t,
-        // EventType::HostMmioW_t,
-        // EventType::HostMmioR_t,
-        // EventType::HostMmioImRespPoW_t,
-        // EventType::HostMmioCW_t,
-        // EventType::HostMmioCR_t,
-        EventType::HostDmaW_t, EventType::HostDmaR_t, EventType::HostDmaC_t,
-        // EventType::NicMmioW_t,
-        // EventType::NicMmioR_t,
-        // EventType::NicDmaI_t,
-        // EventType::NicDmaEx_t,
-        // EventType::NicDmaCW_t,
-        // EventType::NicDmaCR_t,
-        // EventType::NicTx_t,
-        // EventType::NicRx_t,
-        // EventType::NicMsix_t,
-        // EventType::HostMsiX_t,
-        // EventType::HostPostInt_t,
-        // EventType::HostClearInt_t
-    }};
-    sim::corobelt::pipeline<event_t> pipel{streamParser, {filter}};
-    host_packer packer{pipel};
-    // nic_packer packer{pipel, env};
+    auto server_host_task = [&]() {
+      LineReader lr;
+      auto parser = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr);
+    };
 
-    if (!sim::corobelt::awaiter<pack_t>::await_termination(packer, p_printer)) {
-      std::cerr << "could not await termination of the pipeline" << std::endl;
-      exit(EXIT_FAILURE);
-    }
+    auto client_host_task = [&]() {
+      LineReader lr;
+      auto parser = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr);
+
+    };
+
+    auto server_nic_task = [&]() {
+      LineReader lr;
+      auto parser = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr);
+    };
+
+    auto client_nic_task = [&]() {
+      LineReader lr;
+      auto parser = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr);
+    };
+
+    client_host_task();
+    client_nic_task();
+    server_nic_task();
+    server_host_task();
 
     exit(EXIT_SUCCESS);
   }
-#endif
 
   if (!result.count("linux-dump-server-client") ||
       !result.count("gem5-log-server") ||

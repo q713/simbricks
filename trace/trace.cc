@@ -129,25 +129,46 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
+    Tracer tracer;
+
+    ContextQueue client_hn;
+    ContextQueue server_client_nn;
+    ContextQueue server_hn;
+
     auto server_host_task = [&]() {
       LineReader lr;
       auto parser = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr);
+
+      auto spanner = HostSpanner::create(tracer, server_hn, false);
+
+      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
     };
 
     auto client_host_task = [&]() {
       LineReader lr;
       auto parser = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr);
 
+      auto spanner = HostSpanner::create(tracer, client_hn, true);
+
+      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
     };
 
     auto server_nic_task = [&]() {
       LineReader lr;
       auto parser = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr);
+
+      auto spanner = NicSpanner::create(tracer, server_hn, server_client_nn);
+
+      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
     };
 
     auto client_nic_task = [&]() {
       LineReader lr;
       auto parser = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr);
+
+      auto spanner = NicSpanner::create(tracer, client_hn, server_client_nn);
+
+      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
     };
 
     client_host_task();

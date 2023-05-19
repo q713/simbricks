@@ -114,7 +114,10 @@ inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
 //
 // Another reason is, that the context queue abstracts away which kind of queues
 // are used internally, this might come in handy when considering distributed simulations etc.
+template<size_t ChannelCapacity = 30>
 struct ContextQueue {
+  static_assert (ChannelCapacity > 0,
+                 "the ContextQueues ChannelCapacity must be at least 1");
  private:
   std::mutex context_queue_mutex_;
 
@@ -123,13 +126,14 @@ struct ContextQueue {
   uint64_t spanner_b_key_ = 0;
 
   // spanner with key a will write to this queue
-  Channel<std::shared_ptr<Context>> queue_a_;
+  Channel<std::shared_ptr<Context>, ChannelCapacity> queue_a_;
   // spanner with key b will write to this queue
-  Channel<std::shared_ptr<Context>> queue_b_;
+  Channel<std::shared_ptr<Context>, ChannelCapacity> queue_b_;
 
   auto &assign_write_queue(uint64_t spanner_id) {
     std::lock_guard<std::mutex> const lock(context_queue_mutex_);
 
+    throw_on(registered_spanners_ < 1, no_spanner_registered);
     if (spanner_id == spanner_a_key_) {
       return queue_a_;
     }
@@ -145,6 +149,7 @@ struct ContextQueue {
   auto &assign_read_queue(uint64_t spanner_id) {
     std::lock_guard<std::mutex> const lock(context_queue_mutex_);
 
+    throw_on(registered_spanners_ < 1, no_spanner_registered);
     if (spanner_id == spanner_a_key_) {
       return queue_b_;
     }
@@ -173,6 +178,7 @@ struct ContextQueue {
     if (registered_spanners_ == 0) {
       spanner_a_key_ = spanner_id;
     } else {
+      throw_on(spanner_id == spanner_a_key_, cant_register_spanner_twice);
       spanner_b_key_ = spanner_id;
     }
     ++registered_spanners_;
@@ -220,6 +226,20 @@ struct ContextQueue {
 
     // the channel is safe for concurrent access itself
     could_push = co_await target.push(resume_executor, con);
+    co_return could_push;
+  }
+
+  concurrencpp::result<bool>
+  try_push(std::shared_ptr<concurrencpp::executor> resume_executor,
+           uint64_t spanner_id, expectation expectation,
+           std::shared_ptr<event_span> parent_span) {
+    throw_if_empty(resume_executor, resume_executor_null);
+    auto con = Context::create(expectation, parent_span);
+
+    // note: this function will acquire a lock
+    auto &target = assign_write_queue(spanner_id);
+
+    bool could_push = co_await target.try_push(resume_executor, con);
     co_return could_push;
   }
 };

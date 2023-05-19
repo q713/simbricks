@@ -106,11 +106,11 @@ struct HostSpanner : public Spanner {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  HostSpanner(Tracer &t, ContextQueue &queue, bool is_client)
+  HostSpanner(Tracer &t, ContextQueue<> &queue, bool is_client)
       : Spanner(t), queue_(queue), is_client_(is_client) {
   }
 
-  static auto create(Tracer &t, ContextQueue &queue, bool is_client) {
+  static auto create(Tracer &t, ContextQueue<> &queue, bool is_client) {
     auto spanner = std::make_shared<HostSpanner>(t, queue, is_client);
     throw_if_empty(spanner, spanner_is_null);
     return spanner;
@@ -133,7 +133,7 @@ struct HostSpanner : public Spanner {
     bool handel_int (std::shared_ptr<Event> &event_ptr);
 
   private:
-    ContextQueue &queue_;
+    ContextQueue<> &queue_;
 
     bool is_client_;
 
@@ -153,14 +153,14 @@ struct NicSpanner : public Spanner
             std::shared_ptr<concurrencpp::executor> resume_executor,
             std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-    NicSpanner (Tracer &t, ContextQueue &host_queue,
-                ContextQueue &network_queue)
+    NicSpanner (Tracer &t, ContextQueue<> &host_queue,
+                ContextQueue<> &network_queue)
             : Spanner (t), host_queue_ (host_queue),
               network_queue_ (network_queue)
     {
     }
 
-    static auto create(Tracer &t, ContextQueue &host_queue, ContextQueue &network_queue) {
+    static auto create(Tracer &t, ContextQueue<> &host_queue, ContextQueue<> &network_queue) {
       auto spanner = std::make_shared<NicSpanner>(t, host_queue, network_queue);
       throw_if_empty(spanner, spanner_is_null);
       return spanner;
@@ -181,8 +181,8 @@ struct NicSpanner : public Spanner
                       std::shared_ptr<Event> &event_ptr);
 
   private:
-    ContextQueue &host_queue_;
-    ContextQueue &network_queue_;
+    ContextQueue<> &host_queue_;
+    ContextQueue<> &network_queue_;
 
     std::shared_ptr<Context> last_host_context_ = nullptr;
     std::shared_ptr<event_span> last_completed_ = nullptr;

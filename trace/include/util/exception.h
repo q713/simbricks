@@ -46,6 +46,8 @@ inline const char* already_two_spanner_registered = "already two spanners are re
 inline const char* unknown_spanner_id = "an unknown spanner id was given to a context queue";
 inline const char* event_stream_parser_null = "std::shared_ptr<EventStreamParser> is null";
 inline const char* spanner_is_null = "sstd::shared_ptr<Spanner> is null";
+inline const char* cant_register_spanner_twice = "cannot register spanner twice";
+inline const char* no_spanner_registered = "no spanner is registered within context queue";
 
 template<typename Value>
 void throw_if_empty (std::shared_ptr<Value> to_check, const char *message)

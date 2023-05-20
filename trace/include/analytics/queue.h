@@ -183,7 +183,14 @@ struct ContextQueue {
     }
     ++registered_spanners_;
   }
-
+  // !!!!!!!!!!!!!!!!!
+  // !!!!!!!!!!!!!!!!!
+  // !!!!!!!!!!!!!!!!!
+  // !!!!!!!!!!!!!!!!!
+  // !!!!!!!!!!!!!!!!!
+  // !!!!!!!!!!!!!!!!!
+  // TODO: return lazy result, these are used inside coroutines, according to concurrencpp it is better to use
+  //        lazy_result with co_await in coroutines, hence return lazy_result and await result
   concurrencpp::result<std::shared_ptr<Context>>
   poll(std::shared_ptr<concurrencpp::executor> resume_executor, uint64_t spanner_id) {
 

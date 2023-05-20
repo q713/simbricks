@@ -84,11 +84,15 @@ int main(int argc, char *argv[]) {
 
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")
-      ("linux-dump-server-client", "file path to a output file obtained by 'objdump -S linux_image'", cxxopts::value<std::string>())
-      ("nic-i40e-dump","file path to a output file obtained by 'objdump -d i40e.ko' (driver)",cxxopts::value<std::string>())
-      ("gem5-log-server", "file path to a server log file written by gem5",cxxopts::value<std::string>())
-      ("gem5-server-events","file to which the server event stream is written to", cxxopts::value<std::string>())
-      ("nicbm-log-server", "file path to a server log file written by the nicbm",cxxopts::value<std::string>())
+      ("linux-dump-server-client",
+       "file path to a output file obtained by 'objdump -S linux_image'",
+       cxxopts::value<std::string>())
+      ("nic-i40e-dump",
+       "file path to a output file obtained by 'objdump -d i40e.ko' (driver)",
+       cxxopts::value<std::string>())
+      ("gem5-log-server", "file path to a server log file written by gem5", cxxopts::value<std::string>())
+      ("gem5-server-events", "file to which the server event stream is written to", cxxopts::value<std::string>())
+      ("nicbm-log-server", "file path to a server log file written by the nicbm", cxxopts::value<std::string>())
       ("nicbm-server-events", "file to which the server nic event stream is written to", cxxopts::value<std::string>())
       ("gem5-log-client", "file path to a client log file written by gem5", cxxopts::value<std::string>())
       ("gem5-client-events", "file to which the client event stream is written to", cxxopts::value<std::string>())
@@ -100,8 +104,7 @@ int main(int argc, char *argv[]) {
       ("gem5-server-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
       ("gem5-client-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
       ("nicbm-server-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
-      ("nicbm-client-event-stream", "create trace by using the event stream", cxxopts::value<std::string>())
-      ;
+      ("nicbm-client-event-stream", "create trace by using the event stream", cxxopts::value<std::string>());
 
   cxxopts::ParseResult result;
   try {
@@ -121,8 +124,8 @@ int main(int argc, char *argv[]) {
   trace_environment::initialize();
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 4;
+  concurren_options.max_background_threads = 8;
+  concurren_options.max_cpu_threads = 8;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
@@ -135,46 +138,34 @@ int main(int argc, char *argv[]) {
     ContextQueue server_client_nn;
     ContextQueue server_hn;
 
-    auto server_host_task = [&]() {
-      LineReader lr;
-      auto parser = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr);
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pi_dummy;
 
-      auto spanner = HostSpanner::create(tracer, server_hn, false);
+    LineReader lr_h_s;
+    auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
+    auto spanner_h_s = HostSpanner::create(tracer, server_hn, false);
+    auto printer_h_s = EventPrinter::create(std::cout);
+    pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pi_dummy, printer_h_s};
 
-      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
-    };
+    LineReader lr_h_c;
+    auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
+    auto spanner_h_c = HostSpanner::create(tracer, client_hn, true);
+    auto printer_h_c = EventPrinter::create(std::cout);
+    const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pi_dummy, printer_h_c};
 
-    auto client_host_task = [&]() {
-      LineReader lr;
-      auto parser = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr);
+    LineReader lr_n_s;
+    auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
+    auto spanner_n_s = NicSpanner::create(tracer, server_hn, server_client_nn);
+    auto printer_n_s = EventPrinter::create(std::cout);
+    const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pi_dummy, printer_n_s};
 
-      auto spanner = HostSpanner::create(tracer, client_hn, true);
+    LineReader lr_n_c;
+    auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
+    auto spanner_n_c = NicSpanner::create(tracer, client_hn, server_client_nn);
+    auto printer_n_c = EventPrinter::create(std::cout);
+    const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pi_dummy, printer_n_c};
 
-      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
-    };
-
-    auto server_nic_task = [&]() {
-      LineReader lr;
-      auto parser = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr);
-
-      auto spanner = NicSpanner::create(tracer, server_hn, server_client_nn);
-
-      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
-    };
-
-    auto client_nic_task = [&]() {
-      LineReader lr;
-      auto parser = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr);
-
-      auto spanner = NicSpanner::create(tracer, client_hn, server_client_nn);
-
-      //run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, parser, spanner);
-    };
-
-    client_host_task();
-    client_nic_task();
-    server_nic_task();
-    server_host_task();
+    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_s, pl_h_c, pl_n_s, pl_n_c};
+    run_pipelines_parallel(thread_pool_executor, pipelines);
 
     exit(EXIT_SUCCESS);
   }
@@ -228,14 +219,15 @@ int main(int argc, char *argv[]) {
     auto event_filter = std::make_shared<EventTypeFilter>(to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
-      EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
     auto timestamp_filter = EventTimestampFilter::create(bounds);
 
     ComponentFilter comp_filter_server("ComponentFilter-Server");
     LineReader server_lr;
     auto gem5_server_par = Gem5Parser::create("Gem5ServerParser",
-                                                              result["gem5-log-server"].as<std::string>(),
-                                                              comp_filter_server, server_lr);{};
+                                              result["gem5-log-server"].as<std::string>(),
+                                              comp_filter_server, server_lr);
+    {};
 
     auto printer = createPrinter(result, "gem5-server-events");
     if (not printer) {
@@ -248,7 +240,7 @@ int main(int argc, char *argv[]) {
 
   auto client_host_task = [&]() {  // CLIENT HOST PIPELINE
     std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t,
-                                     EventType::SimSendSync_t};
+                                  EventType::SimSendSync_t};
     auto event_filter = EventTypeFilter::create(to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
@@ -258,8 +250,8 @@ int main(int argc, char *argv[]) {
     ComponentFilter comp_filter_client("ComponentFilter-Server");
     LineReader client_lr;
     auto gem5_client_par = Gem5Parser::create("Gem5ClientParser",
-                             result["gem5-log-client"].as<std::string>(),
-                             comp_filter_client, client_lr);
+                                              result["gem5-log-client"].as<std::string>(),
+                                              comp_filter_client, client_lr);
 
     auto printer = createPrinter(result, "gem5-client-events");
     if (not printer) {
@@ -280,7 +272,7 @@ int main(int argc, char *argv[]) {
 
     LineReader nic_ser_lr;
     auto nic_ser_par = NicBmParser::create("NicbmServerParser",
-                          result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
+                                           result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
 
     auto printer = createPrinter(result, "nicbm-server-events");
     if (not printer) {
@@ -301,7 +293,7 @@ int main(int argc, char *argv[]) {
 
     LineReader nic_cli_lr;
     auto nic_cli_par = NicBmParser::create("NicbmClientParser",
-                          result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
+                                           result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
 
     auto printer = createPrinter(result, "nicbm-client-events");
     if (not printer) {
@@ -317,7 +309,7 @@ int main(int argc, char *argv[]) {
     client_host_task();
     server_nic_task();
     client_nic_task();
-  } catch (const std::runtime_error& err) {
+  } catch (const std::runtime_error &err) {
     std::cerr << err.what() << std::endl;
     exit(EXIT_FAILURE);
   }

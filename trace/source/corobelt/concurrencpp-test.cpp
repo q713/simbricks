@@ -171,6 +171,10 @@ int main() {
   chan_tar.close_channel (thread_pool_executor).get ();
   await_results(consumers);
 
+  std::cout << "###############################" << std::endl;
+  std::cout << "############ BREAK ############" << std::endl;
+  std::cout << "###############################" << std::endl;
+
   auto p = std::make_shared<int_prod>(0);
   const size_t amount_adder = 30;
   std::vector<std::shared_ptr<cpipe<int>>> pipes{30};
@@ -179,7 +183,35 @@ int main() {
   }
   auto c = std::make_shared<int_cons>();
 
+  run_pipeline<int>(thread_pool_executor, p, c);
+
+  std::cout << "###############################" << std::endl;
+  std::cout << "############ BREAK ############" << std::endl;
+  std::cout << "###############################" << std::endl;
+
   run_pipeline<int> (thread_pool_executor, p, pipes, c);
+
+  std::cout << "###############################" << std::endl;
+  std::cout << "############ BREAK ############" << std::endl;
+  std::cout << "###############################" << std::endl;
+
+  pipeline<int> pl_a{p, pipes, c};
+  pipeline<int> pl_b{p, pipes, c};
+  std::vector<pipeline<int>> pipelines{pl_a, pl_b};
+
+  run_pipeline(thread_pool_executor, pl_a);
+
+  std::cout << "###############################" << std::endl;
+  std::cout << "############ BREAK ############" << std::endl;
+  std::cout << "###############################" << std::endl;
+
+  run_pipelines<int>(thread_pool_executor, pipelines);
+
+  std::cout << "###############################" << std::endl;
+  std::cout << "############ BREAK ############" << std::endl;
+  std::cout << "###############################" << std::endl;
+
+  run_pipelines_parallel(thread_pool_executor, pipelines);
 
   return 0;
 }

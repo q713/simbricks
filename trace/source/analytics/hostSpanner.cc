@@ -56,17 +56,24 @@ bool HostSpanner::create_trace_starting_span (uint64_t parser_id)
   return true;
 }
 
-bool HostSpanner::handel_call (std::shared_ptr<Event> &event_ptr)
+bool HostSpanner::handel_call (std::shared_ptr<concurrencpp::executor> resume_executor,
+                               std::shared_ptr<Event> &event_ptr)
 {
   assert(event_ptr and "event_ptr is null");
 
-  if (not pending_host_call_span_ and
-      not create_trace_starting_span (event_ptr->get_parser_ident ()))
-  {
-    // create a new pack that starts a trace
-    return false;
+  auto con = queue_.try_poll(resume_executor, this->id_).get();
+
+  if (not pending_host_call_span_) {
+    if (con) {
+      pending_host_call_span_ = tracer_.rergister_new_span_by_parent<host_call_span>(
+          con->get_parent(), event_ptr->get_parser_ident());
+    } else if (not create_trace_starting_span (event_ptr->get_parser_ident ())) {
+      // create a new pack that starts a trace
+      return false;
+    }
   }
 
+  throw_if_empty(pending_host_call_span_, span_is_null);
   if (pending_host_call_span_->add_to_span (event_ptr))
   {
     pci_msix_desc_addr_before_ =
@@ -114,10 +121,11 @@ bool HostSpanner::handel_call (std::shared_ptr<Event> &event_ptr)
       return false;
     }
 
-    if (pending_host_call_span_->add_to_span (event_ptr))
-    {
-      return true;
-    }
+    return true;
+    //if (pending_host_call_span_->add_to_span (event_ptr))
+    //{
+    //  return true;
+    //}
   }
 
   return false;
@@ -128,29 +136,15 @@ bool HostSpanner::handel_mmio (std::shared_ptr<concurrencpp::executor> resume_ex
 {
   assert(event_ptr and "event_ptr is null");
 
-  if (not pending_host_mmio_span_)
-  {
-    // create a pack that belongs to the trace of the current host call span
-    pending_host_mmio_span_ =
-            tracer_.rergister_new_span_by_parent<host_mmio_span> (
-                    pending_host_call_span_, event_ptr->get_parser_ident (),
-                    pci_msix_desc_addr_before_);
-
-    if (not pending_host_mmio_span_)
-    {
-      return false;
-    }
-  }
-
-  if (pending_host_mmio_span_->add_to_span (event_ptr))
-  {
+  auto pending_mmio_span = iterate_add_erase<host_mmio_span>(pending_host_mmio_spans_, event_ptr);
+  if (pending_mmio_span) {
     // as the nic receives his events before this span will
     // be completed, we indicate to the nic that a mmiow a.k.a send is expected
     if (is_type (event_ptr, EventType::HostMmioW_t) or
         is_type (event_ptr, EventType::HostMmioR_t))
     {
       if (not queue_.push (resume_executor, this->id_, expectation::mmio,
-                           pending_host_mmio_span_).get())
+                           pending_mmio_span).get())
       {
         std::cerr << "could not push to nic that mmio is expected"
                   << std::endl;
@@ -158,47 +152,73 @@ bool HostSpanner::handel_mmio (std::shared_ptr<concurrencpp::executor> resume_ex
       }
     }
 
-    if (pending_host_mmio_span_->is_complete ())
+    if (pending_mmio_span->is_complete ())
     {
       // if it is a write after xmit, we inform the nic packer that we expect a
       // transmit
-      if (pending_host_mmio_span_->is_write () and expected_xmits_ > 0 and
-          not pending_host_mmio_span_->is_after_pci_msix_desc_addr ())
+      if (pending_mmio_span->is_write () and expected_xmits_ > 0 and
+          not pending_mmio_span->is_after_pci_msix_desc_addr ())
       {
         if (queue_.push (resume_executor, this->get_id (), expectation::tx,
-                         pending_host_mmio_span_).get())
+                         pending_mmio_span).get())
         {
           --expected_xmits_;
         } else
         {
           std::cerr
-                  << "unable to inform nic spanner of mmio write that shall ";
+              << "unable to inform nic spanner of mmio write that shall ";
           std::cerr << "cause a send" << std::endl;
         }
       }
-      pending_host_mmio_span_ = nullptr;
     }
-    return true;
 
-  } else if (is_type (event_ptr, EventType::HostMmioW_t) and
-             pending_host_mmio_span_->is_after_pci_msix_desc_addr ())
+    return true;
+  }
+
+  if (is_type (event_ptr, EventType::HostMmioW_t) )
   {
-    pending_host_mmio_span_->mark_as_done ();
+    pending_mmio_span = nullptr;
+    for (auto it = pending_host_mmio_spans_.begin(); it != pending_host_mmio_spans_.end(); it++) {
+      if ((*it)->is_after_pci_msix_desc_addr()) {
+        pending_mmio_span = *it;
+        pending_host_mmio_spans_.erase(it);
+        break;
+      }
+    }
+
+    if (pending_mmio_span) {
+      pending_mmio_span->mark_as_done();
+    }
 
     // the old one is done, we create a new one
-    pending_host_mmio_span_ =
-            tracer_.rergister_new_span_by_parent<host_mmio_span> (
-                    pending_host_call_span_, event_ptr->get_parser_ident (),
-                    pci_msix_desc_addr_before_);
-    if (not pending_host_mmio_span_)
+    pending_mmio_span =
+        tracer_.rergister_new_span_by_parent<host_mmio_span> (
+            pending_host_call_span_, event_ptr->get_parser_ident (),
+            pci_msix_desc_addr_before_);
+    if (not pending_mmio_span or not pending_mmio_span->add_to_span (event_ptr))
     {
       return false;
     }
 
-    if (pending_host_mmio_span_->add_to_span (event_ptr))
+    pending_host_mmio_spans_.push_back(pending_mmio_span);
+    return true;
+  }
+
+  if (not pending_mmio_span)
+  {
+    // create a pack that belongs to the trace of the current host call span
+    pending_mmio_span =
+            tracer_.rergister_new_span_by_parent<host_mmio_span> (
+                    pending_host_call_span_, event_ptr->get_parser_ident (),
+                    pci_msix_desc_addr_before_);
+
+    if (not pending_mmio_span or not pending_mmio_span->add_to_span(event_ptr))
     {
-      return true;
+      return false;
     }
+
+    pending_host_mmio_spans_.push_back(pending_mmio_span);
+    return true;
   }
 
   return false;
@@ -214,9 +234,6 @@ bool HostSpanner::handel_dma (std::shared_ptr<concurrencpp::executor> resume_exe
                                             event_ptr);
   if (pending_dma)
   {
-    // if (pending_dma->is_complete()) {
-    //   staged_host_dma_spans_.push_back(pending_dma);
-    // }
     return true;
   }
 
@@ -323,7 +340,7 @@ concurrencpp::result<void> HostSpanner::consume (
     {
       case EventType::HostCall_t:
       {
-        added = handel_call (event_ptr);
+        added = handel_call (resume_executor, event_ptr);
         break;
       }
 

@@ -119,7 +119,8 @@ struct HostSpanner : public Spanner {
   protected:
     bool create_trace_starting_span (uint64_t parser_id);
 
-    bool handel_call (std::shared_ptr<Event> &event_ptr);
+    bool handel_call (std::shared_ptr<concurrencpp::executor> resume_executor,
+                      std::shared_ptr<Event> &event_ptr);
 
     bool handel_mmio (std::shared_ptr<concurrencpp::executor> resume_executor,
                       std::shared_ptr<Event> &event_ptr);
@@ -144,7 +145,7 @@ struct HostSpanner : public Spanner {
     std::shared_ptr<host_call_span> pending_host_call_span_ = nullptr;
     std::shared_ptr<host_int_span> pending_host_int_span_ = nullptr;
     std::list<std::shared_ptr<host_dma_span>> pending_host_dma_spans_;
-    std::shared_ptr<host_mmio_span> pending_host_mmio_span_ = nullptr;
+    std::list<std::shared_ptr<host_mmio_span>> pending_host_mmio_spans_;
   };
 
 struct NicSpanner : public Spanner

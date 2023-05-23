@@ -291,23 +291,16 @@ struct host_call_span : public event_span {
       return true;
     }
 
+    // TODO: clean up this code!!!
+
+    // create a default fallback for these events
     if (not call_span_entry_) {
-      return false;
+      //return false;
+      is_pending_ = true;
+      call_span_entry_ = event_ptr;
+      events_.push_back(event_ptr);
+      return true;
     }
-
-    // if (env_.is_driver_tx(event_ptr)) {
-    //   transmits_ = true;
-    //   send_trigger_.push_back(event_ptr);
-    //
-    //   TODO: where does the kernel actually "receive" the packet
-    // } else if (env_.is_driver_rx(event_ptr)) {
-    //   receives_ = true;
-    //   receiver_.push_back(event_ptr);
-    // }
-
-    // is_relevant_ = is_relevant_ || transmits_ || receives_;
-    // sim::analytics::conf::LINUX_NET_STACK_FUNC_INDICATOR.contains(
-    //      host_call->func_);
 
     events_.push_back(event_ptr);
     return true;

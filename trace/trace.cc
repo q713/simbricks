@@ -124,8 +124,8 @@ int main(int argc, char *argv[]) {
   trace_environment::initialize();
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 8;
-  concurren_options.max_cpu_threads = 8;
+  concurren_options.max_background_threads = 0;
+  concurren_options.max_cpu_threads = 1;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
@@ -143,28 +143,24 @@ int main(int argc, char *argv[]) {
     LineReader lr_h_s;
     auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
     auto spanner_h_s = HostSpanner::create(tracer, server_hn, false);
-    auto printer_h_s = EventPrinter::create(std::cout);
-    pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pi_dummy, printer_h_s};
+    pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pi_dummy, spanner_h_s};
 
     LineReader lr_h_c;
     auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
     auto spanner_h_c = HostSpanner::create(tracer, client_hn, true);
-    auto printer_h_c = EventPrinter::create(std::cout);
-    const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pi_dummy, printer_h_c};
+    const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pi_dummy, spanner_h_c};
 
     LineReader lr_n_s;
     auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
     auto spanner_n_s = NicSpanner::create(tracer, server_hn, server_client_nn);
-    auto printer_n_s = EventPrinter::create(std::cout);
-    const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pi_dummy, printer_n_s};
+    const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pi_dummy, spanner_n_s};
 
     LineReader lr_n_c;
     auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
     auto spanner_n_c = NicSpanner::create(tracer, client_hn, server_client_nn);
-    auto printer_n_c = EventPrinter::create(std::cout);
-    const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pi_dummy, printer_n_c};
+    const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pi_dummy, spanner_n_c};
 
-    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_s, pl_h_c, pl_n_s, pl_n_c};
+    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_n_s, pl_h_s};
     run_pipelines_parallel(thread_pool_executor, pipelines);
 
     exit(EXIT_SUCCESS);

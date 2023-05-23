@@ -109,7 +109,7 @@ struct int_adder : public cpipe<int> {
 TEST_CASE("Test pipeline wrapper construct", "[run_pipeline]") {
   auto concurren_options = concurrencpp::runtime_options();
   concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 1;
+  concurren_options.max_cpu_threads = 3;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 

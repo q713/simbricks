@@ -59,6 +59,8 @@ struct Tracer {
       t->mark_as_done();
     }
 
+    t->display(std::cout);
+
     return false;
   }
 

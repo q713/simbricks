@@ -34,7 +34,7 @@ concurrencpp::result<void> producer_loop(
         std::shared_ptr<concurrencpp::thread_pool_executor> tpe, Channel<int>& chan,
         int range_start, int range_end) {
   for (; range_start < range_end; ++range_start) {
-    bool could_write = co_await chan.push(tpe, range_start);
+    bool could_write = co_await chan.push(tpe, std::move(range_start));
     if (not could_write) {
       co_return;
     }
@@ -52,7 +52,7 @@ concurrencpp::result<void> adder_loop(
 
     auto val = res_opt.value();
     val += 1;
-    if (not co_await chan_tar.push(tpe, val)) {
+    if (not co_await chan_tar.push(tpe, std::move(val))) {
       co_return;
     }
   }
@@ -84,7 +84,7 @@ struct int_prod : public producer<int> {
     throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
 
     for (int i = start; i < 10 + start; i++) {
-      bool could_write = co_await tar_chan->push(resume_executor, i);
+      bool could_write = co_await tar_chan->push(resume_executor, std::move(i));
       if (not could_write) {
         break;
       }
@@ -129,7 +129,7 @@ struct int_adder : public cpipe<int> {
     while (int_opt.has_value()) {
       auto val = int_opt.value();
       val += 10;
-      bool could_write = co_await tar_chan->push(resume_executor, val);
+      bool could_write = co_await tar_chan->push(resume_executor, std::move(val));
       if (not could_write) {
         break;
       }
@@ -145,25 +145,25 @@ struct int_adder : public cpipe<int> {
 int main() {
   auto options = concurrencpp::runtime_options();
   options.max_background_threads = 0;
-  options.max_cpu_threads = 4;
+  options.max_cpu_threads = 1;
   concurrencpp::runtime runtime{options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
   Channel<int> chan_src;
   Channel<int> chan_tar;
-  std::vector<concurrencpp::result<void>> producers{4};
+  std::vector<concurrencpp::result<void>> producers{1};
   std::vector<concurrencpp::result<void>> adders{4};
   std::vector<concurrencpp::result<void>> consumers{4};
   for (int i = 0; i < 4; i++) {
+    consumers[i] = consumer_loop(thread_pool_executor, chan_tar);
+  }
+  for (int i = 0; i < 1; i++) {
     producers[i] =
         producer_loop(thread_pool_executor, chan_src, i * 5, (i + 1) * 5);
   }
   for (int i = 0; i < 4; i++) {
     adders[i] =
             adder_loop (thread_pool_executor, chan_src, chan_tar);
-  }
-  for (int i = 0; i < 4; i++) {
-    consumers[i] = consumer_loop(thread_pool_executor, chan_tar);
   }
   await_results(producers);
   chan_src.close_channel(thread_pool_executor).get();

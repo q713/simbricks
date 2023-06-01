@@ -44,7 +44,7 @@ struct int_prod : public producer<int> {
     throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
 
     for (int i = start; i < 3 + start; i++) {
-      bool could_write = co_await tar_chan->push(resume_executor, i);
+      bool could_write = co_await tar_chan->push(resume_executor, std::move(i));
       if (not could_write) {
         break;
       }
@@ -95,7 +95,7 @@ struct int_adder : public cpipe<int> {
     while (int_opt.has_value()) {
       auto val = int_opt.value();
       val += 10;
-      bool could_write = co_await tar_chan->push(resume_executor, val);
+      bool could_write = co_await tar_chan->push(resume_executor, std::move(val));
       if (not could_write) {
         break;
       }

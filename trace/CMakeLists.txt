@@ -76,6 +76,7 @@ set(TRACE_LIB_HEADER_FILES
         include/util/componenttable.h
         include/util/cxxopts.hpp
         include/util/log.h
+        include/util/factory.h
         # coroutine wrappers
         include/corobelt/corobelt.h
         # reader
@@ -94,7 +95,7 @@ set(TRACE_LIB_HEADER_FILES
         include/analytics/span.h
         include/analytics/trace.h
         include/analytics/tracer.h
-        include/analytics/queue.h
+        include/analytics/context.h
         include/analytics/spanner.h
         )
 set(TRACE_LIB_SOURCE_FILES
@@ -139,8 +140,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC Catch2::Catch2WithMain)
 set(UNIT_TESTS_TARGET unittests)
 set (TRACE_UNIT_TESTS_SRC_FILES
         tests/channel-test.cpp
-        tests/context-queue-test.cpp
         tests/pipeline-test.cpp
+        tests/span-test.cpp
         )
 add_executable(${UNIT_TESTS_TARGET} ${TRACE_UNIT_TESTS_SRC_FILES})
 target_include_directories(${UNIT_TESTS_TARGET} PUBLIC

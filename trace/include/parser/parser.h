@@ -98,14 +98,6 @@ class Gem5Parser : public LogParser
     std::shared_ptr<Event> parse_simbricks_event (uint64_t timestamp);
 
   public:
-    static auto create(const std::string name,
-                       const std::string log_file_path,
-                       ComponentFilter &component_table,
-                       LineReader &line_reader) {
-      auto parser = std::make_shared<Gem5Parser>(name, log_file_path, component_table, line_reader);
-      throw_if_empty(parser, parser_is_null);
-      return parser;
-    }
 
     explicit Gem5Parser (const std::string name,
                          const std::string log_file_path,
@@ -135,11 +127,6 @@ class NicBmParser : public LogParser
     bool parse_sync_info (bool &sync_pcie, bool &sync_eth);
 
   public:
-    static auto create(const std::string name, const std::string log_file_path, LineReader &line_reader) {
-      auto parser = std::make_shared<NicBmParser>(name, log_file_path, line_reader);
-      throw_if_empty(parser, parser_is_null);
-      return parser;
-    }
 
     explicit NicBmParser (const std::string name,
                           const std::string log_file_path,

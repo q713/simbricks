@@ -36,6 +36,8 @@ std::set<const std::string *> trace_environment::nw_interface_send_;
 
 std::set<const std::string *> trace_environment::nw_interface_receive_;
 
+std::set<const std::string *> trace_environment::pci_write_indicators_;
+
 std::set<EventType> trace_environment::mmio_related_event_t_;
 
 std::set<EventType> trace_environment::dma_related_event_t_;
@@ -57,7 +59,7 @@ const std::string *trace_environment::get_call_func(
 }
 
 void trace_environment::initialize() {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  //std::lock_guard<std::mutex> lock(trace_env_mutex_);
   mmio_related_event_t_.insert(EventType::HostMmioW_t);
   mmio_related_event_t_.insert(EventType::HostMmioR_t);
   mmio_related_event_t_.insert(EventType::HostMmioImRespPoW_t);
@@ -145,6 +147,9 @@ void trace_environment::initialize() {
 
   // TODO: make full list: read, readv, recvfrom, recvmsg
   nw_interface_receive_.insert(internalizer_.internalize("__sys_recvmsg"));
+
+  pci_write_indicators_.insert(internalizer_.internalize("pci_msix_write_vector_ctrl"));
+  pci_write_indicators_.insert(internalizer_.internalize("__pci_write_msi_msg"));
 }
 
 bool trace_environment::add_symbol_table(const std::string component,
@@ -152,9 +157,9 @@ bool trace_environment::add_symbol_table(const std::string component,
                                          uint64_t address_offset,
                                          FilterType type,
                                          std::set<std::string> symbol_filter) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   static uint64_t next_id = 0;
-  auto filter_ptr = SymsFilter::create(++next_id, std::move(component),
+  auto filter_ptr = SymsFilter::create(++next_id, component,
                                        file_path, address_offset, type,
                                        std::move(symbol_filter), internalizer_);
 
@@ -169,13 +174,13 @@ bool trace_environment::add_symbol_table(const std::string identifier,
                                          const std::string &file_path,
                                          uint64_t address_offset,
                                          FilterType type) {
-  return add_symbol_table(std::move(identifier), file_path, address_offset,
+  return add_symbol_table(identifier, file_path, address_offset,
                           type, {});
 }
 
 std::pair<const std::string *, const std::string *>
 trace_environment::symtable_filter(uint64_t address) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   if (symbol_tables_.empty()) {
     return std::make_pair(nullptr, nullptr);
   }
@@ -191,7 +196,7 @@ trace_environment::symtable_filter(uint64_t address) {
 }
 
 bool trace_environment::is_call_pack_related(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   if (not event_ptr) {
     return false;
   }
@@ -199,7 +204,7 @@ bool trace_environment::is_call_pack_related(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_driver_tx(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
@@ -208,7 +213,7 @@ bool trace_environment::is_driver_tx(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_driver_rx(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
@@ -218,7 +223,7 @@ bool trace_environment::is_driver_rx(std::shared_ptr<Event> event_ptr) {
 
 bool trace_environment::is_pci_msix_desc_addr(
     std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
@@ -226,8 +231,17 @@ bool trace_environment::is_pci_msix_desc_addr(
   return func == internalizer_.internalize("pci_msix_desc_addr");
 }
 
+bool trace_environment::is_pci_write(std::shared_ptr<Event> event_ptr) {
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::string *func = get_call_func(event_ptr);
+  if (not func) {
+    return false;
+  }
+  return pci_write_indicators_.contains(func);
+}
+
 bool trace_environment::is_mmio_pack_related(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   if (not event_ptr) {
     return false;
   }
@@ -235,7 +249,7 @@ bool trace_environment::is_mmio_pack_related(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_dma_pack_related(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   if (not event_ptr) {
     return false;
   }
@@ -243,7 +257,7 @@ bool trace_environment::is_dma_pack_related(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_eth_pack_related(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   if (not event_ptr) {
     return false;
   }
@@ -253,7 +267,7 @@ bool trace_environment::is_eth_pack_related(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_msix_related(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   if (not event_ptr) {
     return false;
   }
@@ -263,7 +277,7 @@ bool trace_environment::is_msix_related(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_nw_interface_send(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
@@ -273,7 +287,7 @@ bool trace_environment::is_nw_interface_send(std::shared_ptr<Event> event_ptr) {
 
 bool trace_environment::is_nw_interface_receive(
     std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
@@ -282,7 +296,7 @@ bool trace_environment::is_nw_interface_receive(
 }
 
 bool trace_environment::is_socket_connect(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
@@ -291,7 +305,7 @@ bool trace_environment::is_socket_connect(std::shared_ptr<Event> event_ptr) {
 }
 
 bool trace_environment::is_sys_entry(std::shared_ptr<Event> event_ptr) {
-  std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;

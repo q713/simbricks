@@ -38,33 +38,32 @@
 struct Tracer {
   std::recursive_mutex tracer_mutex_;
 
-  std::unordered_map<uint64_t, std::shared_ptr<trace>> traces_;
+  std::unordered_map<uint64_t, std::shared_ptr<Trace>> traces_;
 
-  std::shared_ptr<trace> get_trace(uint64_t trace_id) {
+  std::shared_ptr<Trace> get_trace(uint64_t trace_id) {
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
     auto it = traces_.find(trace_id);
     if (it == traces_.end()) {
       return {};
     }
-    std::shared_ptr<trace> target_trace = it->second;
+    std::shared_ptr<Trace> target_trace = it->second;
     return target_trace;
   }
 
   bool mark_trace_as_done(uint64_t trace_id) {
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    std::shared_ptr<trace> t = get_trace(trace_id);
-    if (t) {
-      t->mark_as_done();
-    }
+    auto trace = get_trace(trace_id);
+    throw_if_empty(trace, trace_is_null);
 
-    t->display(std::cout);
+    trace->mark_as_done();
+    //t->display(std::cout);
 
-    return false;
+    return true;
   }
 
-  bool register_span(uint64_t trace_id, std::shared_ptr<event_span> span_ptr) {
+  bool register_span(uint64_t trace_id, std::shared_ptr<EventSpan> span_ptr) {
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
     if (not span_ptr) {
@@ -72,7 +71,8 @@ struct Tracer {
     }
 
     auto target_trace = get_trace(trace_id);
-    if (not target_trace or target_trace->is_done()) {
+    throw_if_empty(target_trace, trace_is_null);
+    if (target_trace->is_done()) {
       return false;
     }
 
@@ -80,13 +80,13 @@ struct Tracer {
   }
 
   // add a new span to an already existing trace
-  template <class span_type, class... Args>
-  std::shared_ptr<span_type> rergister_new_span(uint64_t trace_id,
+  template <class SpanType, class... Args>
+  std::shared_ptr<SpanType> rergister_new_span(uint64_t trace_id,
                                                 Args&&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    std::shared_ptr<span_type> new_span = std::make_shared<span_type>(args...);
+    std::shared_ptr<SpanType> new_span = std::make_shared<SpanType>(args...);
     if (not new_span) {
       return {};
     }
@@ -99,9 +99,9 @@ struct Tracer {
   }
 
   // add a new span to an already existing trace and set the parent immediately
-  template <class span_type, class... Args>
-  std::shared_ptr<span_type> rergister_new_span_by_parent(
-      std::shared_ptr<event_span> parent, Args&&... args) {
+  template <class SpanType, class... Args>
+  std::shared_ptr<SpanType> rergister_new_span_by_parent(
+      std::shared_ptr<EventSpan> parent, Args&&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
@@ -109,7 +109,7 @@ struct Tracer {
       return {};
     }
     auto new_span =
-        rergister_new_span<span_type>(parent->get_trace_id(), args...);
+        rergister_new_span<SpanType>(parent->get_trace_id(), args...);
     if (not new_span) {
       return {};
     }
@@ -121,19 +121,19 @@ struct Tracer {
   }
 
   // add a pack creating a completely new trace
-  template <class span_type, class... Args>
-  std::shared_ptr<span_type> rergister_new_trace(Args&&... args) {
+  template <class SpanType, class... Args>
+  std::shared_ptr<SpanType> rergister_new_trace(Args&&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    std::shared_ptr<span_type> new_span = std::make_shared<span_type>(args...);
+    std::shared_ptr<SpanType> new_span = std::make_shared<SpanType>(args...);
     if (not new_span) {
       return {};
     }
 
     // NOTE: this will already add the pack to the trace
-    std::shared_ptr<trace> new_trace =
-        trace::create_trace(trace_environment::get_next_trace_id(), new_span);
+    std::shared_ptr<Trace> new_trace =
+        Trace::create_trace(trace_environment::get_next_trace_id(), new_span);
     if (not new_trace) {
       return {};
     }

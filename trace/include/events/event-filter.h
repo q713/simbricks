@@ -80,7 +80,7 @@ class GenericEventFilter : public event_stream_actor {
     return to_filter_(event);
   }
 
-  GenericEventFilter(std::function<bool(std::shared_ptr<Event> event)> &to_filter)
+  explicit GenericEventFilter(std::function<bool(std::shared_ptr<Event> event)> &to_filter)
       : event_stream_actor(), to_filter_(to_filter) {
   }
 };
@@ -97,25 +97,13 @@ class EventTypeFilter : public event_stream_actor {
     return is_to_sink;
   }
 
-  static auto create(std::set<EventType> &types_to_filter, bool invert_filter) {
-    auto filter = std::make_shared<EventTypeFilter>(types_to_filter, invert_filter);
-    throw_if_empty(filter, actor_is_null);
-    return filter;
-  }
-
-  static auto create(std::set<EventType> &types_to_filter) {
-    auto filter = std::make_shared<EventTypeFilter>(types_to_filter);
-    throw_if_empty(filter, actor_is_null);
-    return filter;
-  }
-
-  EventTypeFilter(std::set<EventType> &types_to_filter, bool invert_filter)
+  explicit EventTypeFilter(std::set<EventType> &types_to_filter, bool invert_filter)
       : event_stream_actor(),
         types_to_filter_(types_to_filter),
         inverted_(invert_filter) {
   }
 
-  EventTypeFilter(std::set<EventType> &types_to_filter)
+  explicit EventTypeFilter(std::set<EventType> &types_to_filter)
       : event_stream_actor(),
         types_to_filter_(types_to_filter),
         inverted_(false) {
@@ -151,13 +139,7 @@ class EventTimestampFilter : public event_stream_actor {
     return false;
   }
 
-  static auto create(std::vector<EventTimeBoundary> &event_time_boundaries) {
-    auto filter = std::make_shared<EventTimestampFilter>(event_time_boundaries);
-    throw_if_empty(filter, actor_is_null);
-    return filter;
-  }
-
-  EventTimestampFilter(std::vector<EventTimeBoundary> &event_time_boundaries)
+  explicit EventTimestampFilter(std::vector<EventTimeBoundary> &event_time_boundaries)
       : event_stream_actor(),
         event_time_boundaries_(event_time_boundaries) {
   }

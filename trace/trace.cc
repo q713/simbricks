@@ -41,6 +41,7 @@
 #include "analytics/spanner.h"
 #include "util/cxxopts.hpp"
 #include "util/log.h"
+#include "util/factory.h"
 
 bool create_open_file(std::ofstream &new_out, std::string filename) {
   try {
@@ -60,8 +61,6 @@ bool create_open_file(std::ofstream &new_out, std::string filename) {
     std::cerr << "exception opening file " << ex.what() << std::endl;
     return false;
   }
-
-  return true;
 }
 
 std::shared_ptr<EventPrinter> createPrinter(cxxopts::ParseResult &result, const std::string &option) {
@@ -72,9 +71,9 @@ std::shared_ptr<EventPrinter> createPrinter(cxxopts::ParseResult &result, const 
       std::cerr << "could not open gem5-client-events file" << std::endl;
       return nullptr;
     }
-    printer = EventPrinter::create(out_file);
+    printer = create_shared<EventPrinter>(printer_is_null, out_file);
   } else {
-    printer = EventPrinter::create(std::cout);
+    printer = create_shared<EventPrinter>(printer_is_null, std::cout);
   }
 
   return printer;
@@ -134,33 +133,34 @@ int main(int argc, char *argv[]) {
 
     Tracer tracer;
 
-    ContextQueue client_hn;
-    ContextQueue server_client_nn;
-    ContextQueue server_hn;
+    auto client_hn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
+    auto client_nh = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
+    auto nic_cn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
+    auto nic_sn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
 
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pi_dummy;
 
-    LineReader lr_h_s;
-    auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
-    auto spanner_h_s = HostSpanner::create(tracer, server_hn, false);
-    pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pi_dummy, spanner_h_s};
+    //LineReader lr_h_s;
+    //auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
+    //auto spanner_h_s = HostSpanner::create(tracer, server_hn, false);
+    //pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pi_dummy, spanner_h_s};
 
     LineReader lr_h_c;
     auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
-    auto spanner_h_c = HostSpanner::create(tracer, client_hn, true);
+    auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null, tracer, client_hn, client_nh, true);
     const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pi_dummy, spanner_h_c};
 
-    LineReader lr_n_s;
-    auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
-    auto spanner_n_s = NicSpanner::create(tracer, server_hn, server_client_nn);
-    const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pi_dummy, spanner_n_s};
+    //LineReader lr_n_s;
+    //auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
+    //auto spanner_n_s = NicSpanner::create(tracer, server_hn, server_client_nn);
+    //const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pi_dummy, spanner_n_s};
 
     LineReader lr_n_c;
     auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
-    auto spanner_n_c = NicSpanner::create(tracer, client_hn, server_client_nn);
+    auto spanner_n_c = create_shared<NicSpanner>(spanner_is_null, tracer, nic_cn, nic_sn, client_nh, client_hn);
     const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pi_dummy, spanner_n_c};
 
-    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_n_s, pl_h_s};
+    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_n_s, pl_h_s*/};
     run_pipelines_parallel(thread_pool_executor, pipelines);
 
     exit(EXIT_SUCCESS);
@@ -212,18 +212,17 @@ int main(int argc, char *argv[]) {
 
   auto server_host_task = [&]() {  // SERVER HOST PIPELINE
     std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t, EventType::SimSendSync_t};
-    auto event_filter = std::make_shared<EventTypeFilter>(to_filter, true);
+    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = EventTimestampFilter::create(bounds);
+    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
 
     ComponentFilter comp_filter_server("ComponentFilter-Server");
     LineReader server_lr;
-    auto gem5_server_par = Gem5Parser::create("Gem5ServerParser",
-                                              result["gem5-log-server"].as<std::string>(),
-                                              comp_filter_server, server_lr);
-    {};
+    auto gem5_server_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ServerParser",
+                                                     result["gem5-log-server"].as<std::string>(),
+                                                     comp_filter_server, server_lr);
 
     auto printer = createPrinter(result, "gem5-server-events");
     if (not printer) {
@@ -237,17 +236,17 @@ int main(int argc, char *argv[]) {
   auto client_host_task = [&]() {  // CLIENT HOST PIPELINE
     std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t,
                                   EventType::SimSendSync_t};
-    auto event_filter = EventTypeFilter::create(to_filter, true);
+    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = EventTimestampFilter::create(bounds);
+    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
 
     ComponentFilter comp_filter_client("ComponentFilter-Server");
     LineReader client_lr;
-    auto gem5_client_par = Gem5Parser::create("Gem5ClientParser",
-                                              result["gem5-log-client"].as<std::string>(),
-                                              comp_filter_client, client_lr);
+    auto gem5_client_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ClientParser",
+                                                     result["gem5-log-client"].as<std::string>(),
+                                                     comp_filter_client, client_lr);
 
     auto printer = createPrinter(result, "gem5-client-events");
     if (not printer) {
@@ -260,15 +259,15 @@ int main(int argc, char *argv[]) {
 
   auto server_nic_task = [&]() {  // SERVER NIC PIPELINE
     std::set<EventType> to_filter{EventType::SimProcInEvent_t, EventType::SimSendSync_t};
-    auto event_filter = EventTypeFilter::create(to_filter, true);
+    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = EventTimestampFilter::create(bounds);
+    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
 
     LineReader nic_ser_lr;
-    auto nic_ser_par = NicBmParser::create("NicbmServerParser",
-                                           result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
+    auto nic_ser_par = create_shared<NicBmParser>(parser_is_null, "NicbmServerParser",
+                                                  result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
 
     auto printer = createPrinter(result, "nicbm-server-events");
     if (not printer) {
@@ -281,15 +280,15 @@ int main(int argc, char *argv[]) {
 
   auto client_nic_task = [&]() {  // CLIENT NIC PIPELINE
     std::set<EventType> to_filter{EventType::SimProcInEvent_t, EventType::SimSendSync_t};
-    auto event_filter = EventTypeFilter::create(to_filter, true);
+    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = EventTimestampFilter::create(bounds);
+    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
 
     LineReader nic_cli_lr;
-    auto nic_cli_par = NicBmParser::create("NicbmClientParser",
-                                           result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
+    auto nic_cli_par = create_shared<NicBmParser>(parser_is_null, "NicbmClientParser",
+                                                  result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
 
     auto printer = createPrinter(result, "nicbm-client-events");
     if (not printer) {

@@ -24,11 +24,12 @@
 
 #include <list>
 #include <memory>
+#include <utility>
 
 #include "corobelt/corobelt.h"
 #include "events/events.h"
 #include "util/exception.h"
-#include "analytics/queue.h"
+#include "analytics/context.h"
 #include "analytics/span.h"
 #include "env/traceEnvironment.h"
 #include "analytics/tracer.h"
@@ -47,8 +48,8 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan)
   override = 0;
 
-  Spanner(Tracer &t)
-      : id_(trace_environment::get_next_spanner_id()), tracer_(t) {
+  explicit Spanner(Tracer &tra)
+      : id_(trace_environment::get_next_spanner_id()), tracer_(tra) {
   }
 
   inline uint64_t get_id() const {
@@ -106,89 +107,91 @@ struct HostSpanner : public Spanner {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  HostSpanner(Tracer &t, ContextQueue<> &queue, bool is_client)
-      : Spanner(t), queue_(queue), is_client_(is_client) {
+  explicit HostSpanner(Tracer &tra,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic, bool is_client)
+      : Spanner(tra), to_nic_queue_(to_nic), from_nic_queue_(from_nic), is_client_(is_client) {
+    throw_if_empty(to_nic, queue_is_null);
+    throw_if_empty(from_nic, queue_is_null);
   }
 
-  static auto create(Tracer &t, ContextQueue<> &queue, bool is_client) {
-    auto spanner = std::make_shared<HostSpanner>(t, queue, is_client);
-    throw_if_empty(spanner, spanner_is_null);
-    return spanner;
+ private:
+  bool create_trace_starting_span(uint64_t parser_id);
+
+  concurrencpp::lazy_result<bool> handel_call(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                              std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                              std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                             std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                              std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> handel_int(std::shared_ptr<Event> &event_ptr);
+
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_queue_;
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic_queue_;
+
+  bool is_client_;
+
+  size_t expected_xmits_ = 0;
+  bool found_transmit_ = false;
+  bool found_receive_ = false;
+  bool pci_write_before_ = false;
+  std::shared_ptr<HostCallSpan> pending_host_call_span_ = nullptr;
+  std::shared_ptr<HostIntSpan> pending_host_int_span_ = nullptr;
+  std::shared_ptr<HostMsixSpan> pending_host_msix_span_ = nullptr;
+  std::list<std::shared_ptr<HostDmaSpan>> pending_host_dma_spans_;
+  std::list<std::shared_ptr<HostMmioSpan>> pending_host_mmio_spans_;
+};
+
+struct NicSpanner : public Spanner {
+  concurrencpp::result<void> consume(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
+
+  explicit NicSpanner(Tracer &tra, std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host)
+      : Spanner(tra),
+        to_network_queue_(to_network),
+        from_network_queue_(from_network),
+        to_host_queue_(to_host),
+        from_host_queue_(from_host) {
+
+    throw_if_empty(to_network, queue_is_null);
+    throw_if_empty(from_network, queue_is_null);
+    throw_if_empty(to_host, queue_is_null);
+    throw_if_empty(from_host, queue_is_null);
   }
 
-  protected:
-    bool create_trace_starting_span (uint64_t parser_id);
+ private:
 
-    bool handel_call (std::shared_ptr<concurrencpp::executor> resume_executor,
-                      std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                              std::shared_ptr<Event> &event_ptr);
 
-    bool handel_mmio (std::shared_ptr<concurrencpp::executor> resume_executor,
-                      std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                             std::shared_ptr<Event> &event_ptr);
 
-    bool handel_dma (std::shared_ptr<concurrencpp::executor> resume_executor,
-                     std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                              std::shared_ptr<Event> &event_ptr);
 
-    bool handel_msix (std::shared_ptr<concurrencpp::executor> resume_executor,
-                      std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                              std::shared_ptr<Event> &event_ptr);
 
-    bool handel_int (std::shared_ptr<Event> &event_ptr);
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network_queue_;
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network_queue_;
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_queue_;
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host_queue_;
 
-  private:
-    ContextQueue<> &queue_;
+  std::shared_ptr<Context> last_host_context_ = nullptr;
+  std::shared_ptr<EventSpan> last_completed_ = nullptr;
 
-    bool is_client_;
-
-    size_t expected_xmits_ = 0;
-    bool found_transmit_ = false;
-    bool found_receive_ = false;
-    bool pci_msix_desc_addr_before_ = false;
-    std::shared_ptr<host_call_span> pending_host_call_span_ = nullptr;
-    std::shared_ptr<host_int_span> pending_host_int_span_ = nullptr;
-    std::list<std::shared_ptr<host_dma_span>> pending_host_dma_spans_;
-    std::list<std::shared_ptr<host_mmio_span>> pending_host_mmio_spans_;
-  };
-
-struct NicSpanner : public Spanner
-  {
-    concurrencpp::result<void> consume (
-            std::shared_ptr<concurrencpp::executor> resume_executor,
-            std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
-
-    NicSpanner (Tracer &t, ContextQueue<> &host_queue,
-                ContextQueue<> &network_queue)
-            : Spanner (t), host_queue_ (host_queue),
-              network_queue_ (network_queue)
-    {
-    }
-
-    static auto create(Tracer &t, ContextQueue<> &host_queue, ContextQueue<> &network_queue) {
-      auto spanner = std::make_shared<NicSpanner>(t, host_queue, network_queue);
-      throw_if_empty(spanner, spanner_is_null);
-      return spanner;
-    }
-
-  protected:
-
-    bool handel_mmio (std::shared_ptr<concurrencpp::executor> resume_executor,
-                      std::shared_ptr<Event> &event_ptr);
-
-    bool handel_dma (std::shared_ptr<concurrencpp::executor> resume_executor,
-                     std::shared_ptr<Event> &event_ptr);
-
-    bool handel_txrx (std::shared_ptr<concurrencpp::executor> resume_executor,
-                      std::shared_ptr<Event> &event_ptr);
-
-    bool handel_msix (std::shared_ptr<concurrencpp::executor> resume_executor,
-                      std::shared_ptr<Event> &event_ptr);
-
-  private:
-    ContextQueue<> &host_queue_;
-    ContextQueue<> &network_queue_;
-
-    std::shared_ptr<Context> last_host_context_ = nullptr;
-    std::shared_ptr<event_span> last_completed_ = nullptr;
-
-    std::list<std::shared_ptr<nic_dma_span>> pending_nic_dma_spans_;
-  };
+  std::list<std::shared_ptr<NicDmaSpan>> pending_nic_dma_spans_;
+};
 
 #endif  // SIMBRICKS_TRACE_spanER_H_

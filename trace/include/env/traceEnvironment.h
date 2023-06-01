@@ -46,6 +46,8 @@ class trace_environment {
 
   static std::set<const std::string *> nw_interface_receive_;
 
+  static std::set<const std::string *> pci_write_indicators_;
+
   static std::set<EventType> mmio_related_event_t_;
 
   static std::set<EventType> dma_related_event_t_;
@@ -67,32 +69,32 @@ class trace_environment {
   }
 
   inline static uint64_t get_next_parser_id() {
-    std::lock_guard<std::mutex> lock(trace_env_mutex_);
+    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static uint64_t get_next_span_id() {
-    std::lock_guard<std::mutex> lock(trace_env_mutex_);
+    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static uint64_t get_next_spanner_id() {
-    std::lock_guard<std::mutex> lock(trace_env_mutex_);
+    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static uint64_t get_next_trace_id() {
-    std::lock_guard<std::mutex> lock(trace_env_mutex_);
+    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
   inline static const std::string *internalize_additional(
       const std::string &symbol) {
-    std::lock_guard<std::mutex> lock(trace_env_mutex_);
+    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
     return internalizer_.internalize(symbol);
   }
 
@@ -115,6 +117,8 @@ class trace_environment {
   static bool is_driver_rx(std::shared_ptr<Event> event_ptr);
 
   static bool is_pci_msix_desc_addr(std::shared_ptr<Event> event_ptr);
+
+  static bool is_pci_write(std::shared_ptr<Event> event_ptr);
 
   static bool is_mmio_pack_related(std::shared_ptr<Event> event_ptr);
 

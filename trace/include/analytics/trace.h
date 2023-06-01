@@ -35,14 +35,14 @@
 #include "corobelt/corobelt.h"
 #include "env/traceEnvironment.h"
 
-struct trace {
+struct Trace {
   std::mutex mutex_;
 
   uint64_t id_;
-  std::shared_ptr<event_span> parent_span_;
+  std::shared_ptr<EventSpan> parent_span_;
 
   // TODO: maybe store spans by source id...
-  std::vector<std::shared_ptr<event_span>> spans_;
+  std::vector<std::shared_ptr<EventSpan>> spans_;
 
   bool is_done_ = false;
 
@@ -54,39 +54,43 @@ struct trace {
     is_done_ = true;
   }
 
-  bool add_span(std::shared_ptr<event_span> span) {
+  bool add_span(std::shared_ptr<EventSpan> span) {
     throw_if_empty(span, span_is_null);
 
-    std::lock_guard<std::mutex> lock(mutex_);
+    const std::lock_guard<std::mutex> lock(mutex_);
     span->set_trace_id(id_);
     spans_.push_back(span);
     return true;
   }
 
   void display(std::ostream &out) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    const std::lock_guard<std::mutex> lock(mutex_);
     out << std::endl;
     out << "trace: id=" << id_ << std::endl;
-    for (auto span : spans_) {
+    out << "\t parent_span:" << std::endl;
+    if (parent_span_) {
+      parent_span_->display(out, 1);
+    }
+    for (auto &span : spans_) {
       throw_if_empty(span, span_is_null);
       if (span.get() == parent_span_.get()) {
-        out << "\t parent_span:" << std::endl;
-        span->display(out, 1);
+        continue;
       }
+      span->display(out, 1);
     }
     out << std::endl;
   }
 
-  static std::shared_ptr<trace> create_trace(
-      uint64_t id, std::shared_ptr<event_span> parent_span) {
+  static std::shared_ptr<Trace> create_trace(
+      uint64_t id, std::shared_ptr<EventSpan> parent_span) {
     throw_if_empty(parent_span, span_is_null);
 
-    auto t = std::shared_ptr<trace>{new trace{id, parent_span}};
+    auto t = std::shared_ptr<Trace>{new Trace{id, parent_span}};
     return t;
   }
 
  private:
-  trace(uint64_t id, std::shared_ptr<event_span> parent_span)
+  Trace(uint64_t id, std::shared_ptr<EventSpan> parent_span)
       : id_(id), parent_span_(parent_span) {
     this->add_span(parent_span);
   }

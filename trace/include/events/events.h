@@ -682,13 +682,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>> {
   std::ostream &out_;
 
  public:
-  static auto create(std::ostream &out) {
-    auto printer = std::make_shared<EventPrinter>(out);
-    throw_if_empty(printer, printer_is_null);
-    return printer;
-  }
 
-  EventPrinter(std::ostream &out) : out_(out) {
+  explicit EventPrinter(std::ostream &out) : out_(out) {
   }
 
   concurrencpp::result<void> consume(
@@ -711,9 +706,9 @@ class EventPrinter : public consumer<std::shared_ptr<Event>> {
 };
 
 struct EventComperator {
-  bool operator()(const std::shared_ptr<Event> &e1,
-                  const std::shared_ptr<Event> &e2) const {
-    return e1->timestamp_ > e2->timestamp_;
+  bool operator()(const std::shared_ptr<Event> &ev1,
+                  const std::shared_ptr<Event> &ev2) const {
+    return ev1->timestamp_ > ev2->timestamp_;
   }
 };
 

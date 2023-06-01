@@ -48,9 +48,20 @@ inline const char* event_stream_parser_null = "std::shared_ptr<EventStreamParser
 inline const char* spanner_is_null = "sstd::shared_ptr<Spanner> is null";
 inline const char* cant_register_spanner_twice = "cannot register spanner twice";
 inline const char* no_spanner_registered = "no spanner is registered within context queue";
+inline const char* could_not_push_to_context_queue = "could not push value into context queue";
+inline const char* queue_is_null = "std::shared_ptr<ContextQueue<...>> is null";
 
 template<typename Value>
 void throw_if_empty (std::shared_ptr<Value> to_check, const char *message)
+{
+  if (not to_check)
+  {
+    throw std::runtime_error (message);
+  }
+}
+
+template<typename Value>
+void throw_if_empty (std::unique_ptr<Value> &to_check, const char *message)
 {
   if (not to_check)
   {

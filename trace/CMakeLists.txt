@@ -142,6 +142,7 @@ set (TRACE_UNIT_TESTS_SRC_FILES
         tests/channel-test.cpp
         tests/pipeline-test.cpp
         tests/span-test.cpp
+        tests/gem5-parser-test.cpp
         )
 add_executable(${UNIT_TESTS_TARGET} ${TRACE_UNIT_TESTS_SRC_FILES})
 target_include_directories(${UNIT_TESTS_TARGET} PUBLIC

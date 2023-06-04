@@ -31,10 +31,10 @@ bool HostSpanner::create_trace_starting_span(uint64_t parser_id) {
   if (pending_host_call_span_ and is_client_) {
     // Note: this is to inform potential server hosts, that the trace is now
     // done, hence no new spans are added to it!
-    if (not tracer_.mark_trace_as_done(
-        pending_host_call_span_->get_trace_id())) {
-      std::cerr << "client could not mark trace as done" << std::endl;
-    }
+    //if (not tracer_.mark_trace_as_done(
+    //    pending_host_call_span_->get_trace_id())) {
+    //  std::cerr << "client could not mark trace as done" << std::endl;
+    //}
   }
 
   pending_host_call_span_ =
@@ -211,11 +211,11 @@ HostSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
 
   // when receiving a dma, we expect to get a context from the nic simulator,
   // hence poll this context blocking!!
-  //std::cout << "host try poll dma" << std::endl;
+  std::cout << "host try poll dma" << std::endl;
   auto con_opt = co_await from_nic_queue_->pop(resume_executor);
   throw_on(not con_opt.has_value(), context_is_null);
   auto con = con_opt.value();
-  //std::cout << "host polled dma" << std::endl;
+  std::cout << "host polled dma" << std::endl;
   if (not is_expectation(con_opt.value(), expectation::dma)) {
     std::cerr << "when polling for dma context, no dma context was fetched"
               << std::endl;
@@ -242,11 +242,11 @@ HostSpanner::handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor
                          std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  //std::cout << "host try poll msix" << std::endl;
+  std::cout << "host try poll msix" << std::endl;
   auto con_opt = co_await from_nic_queue_->pop(resume_executor);
   throw_on(not con_opt.has_value(), context_is_null);
   auto con = con_opt.value();
-  //std::cout << "host polled msix" << std::endl;
+  std::cout << "host polled msix" << std::endl;
   if (not is_expectation(con, expectation::msix)) {
     std::cerr << "did not receive msix on context queue" << std::endl;
     co_return false;
@@ -304,7 +304,7 @@ concurrencpp::result<void> HostSpanner::consume(
 
     added = false;
 
-    //std::cout << "host spanner try handel: " << *event_ptr << std::endl;
+    std::cout << "host spanner try handel: " << *event_ptr << std::endl;
 
     switch (event_ptr->get_type()) {
       case EventType::HostCall_t: {

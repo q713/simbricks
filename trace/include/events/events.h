@@ -90,7 +90,7 @@ class Event {
   // TODO: optimize string name out in later versions
   const std::string parser_name_;
 
-  inline size_t get_parser_ident() {
+  inline size_t get_parser_ident() const {
     return parser_identifier_;
   }
 
@@ -98,15 +98,19 @@ class Event {
     return name_;
   }
 
-  EventType get_type() {
+  EventType get_type() const {
     return type_;
   }
 
-  inline uint64_t get_ts() {
+  inline uint64_t get_ts() const {
     return timestamp_;
   }
 
-  virtual void display(std::ostream &os);
+  virtual void display(std::ostream &out);
+
+  virtual bool equal(const Event &other);
+
+  virtual ~Event() = default;
 
  protected:
   explicit Event(uint64_t ts, const size_t parser_identifier,
@@ -118,8 +122,6 @@ class Event {
         parser_identifier_(parser_identifier),
         parser_name_(parser_name) {
   }
-
-  virtual ~Event() = default;
 };
 
 /* Simbricks Events */
@@ -133,7 +135,9 @@ class SimSendSync : public Event {
 
   ~SimSendSync() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class SimProcInEvent : public Event {
@@ -146,7 +150,9 @@ class SimProcInEvent : public Event {
 
   ~SimProcInEvent() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 /* Host related events */
@@ -170,27 +176,31 @@ class HostInstr : public Event {
 
   virtual ~HostInstr() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class HostCall : public HostInstr {
  public:
-  const std::string * func_;
+  const std::string *func_;
   const std::string *comp_;
 
   explicit HostCall(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t pc,
-                    const std::string * func,
+                    const std::string *func,
                     const std::string *comp)
       : HostInstr(ts, parser_identifier, parser_name, pc,
                   EventType::HostCall_t, "HostCall"),
         func_(func),
-        comp_(std::move(comp)) {
+        comp_(comp) {
   }
 
   ~HostCall() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostMmioImRespPoW : public Event {
@@ -203,14 +213,16 @@ class HostMmioImRespPoW : public Event {
 
   ~HostMmioImRespPoW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostIdOp : public Event {
  public:
   uint64_t id_;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
 
  protected:
   explicit HostIdOp(uint64_t ts, const size_t parser_identifier,
@@ -222,6 +234,8 @@ class HostIdOp : public Event {
   }
 
   virtual ~HostIdOp() = default;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class HostMmioCR : public HostIdOp {
@@ -234,7 +248,9 @@ class HostMmioCR : public HostIdOp {
 
   ~HostMmioCR() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 class HostMmioCW : public HostIdOp {
  public:
@@ -246,7 +262,9 @@ class HostMmioCW : public HostIdOp {
 
   ~HostMmioCW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostAddrSizeOp : public HostIdOp {
@@ -254,7 +272,7 @@ class HostAddrSizeOp : public HostIdOp {
   uint64_t addr_;
   uint64_t size_;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
 
  protected:
   explicit HostAddrSizeOp(uint64_t ts, const size_t parser_identifier,
@@ -268,6 +286,8 @@ class HostAddrSizeOp : public HostIdOp {
   }
 
   virtual ~HostAddrSizeOp() = default;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class HostMmioOp : public HostAddrSizeOp {
@@ -275,7 +295,7 @@ class HostMmioOp : public HostAddrSizeOp {
   uint64_t bar_;
   uint64_t offset_;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
 
  protected:
   explicit HostMmioOp(uint64_t ts, const size_t parser_identifier,
@@ -283,8 +303,10 @@ class HostMmioOp : public HostAddrSizeOp {
                       std::string name, uint64_t id, uint64_t addr,
                       uint64_t size, uint64_t bar, uint64_t offset)
       : HostAddrSizeOp(ts, parser_identifier, parser_name, type,
-                       std::move(name), id, addr, size) {
+                       std::move(name), id, addr, size), bar_(bar), offset_(offset) {
   }
+
+  virtual bool equal(const Event &other) override;
 };
 
 class HostMmioR : public HostMmioOp {
@@ -299,7 +321,9 @@ class HostMmioR : public HostMmioOp {
 
   ~HostMmioR() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostMmioW : public HostMmioOp {
@@ -314,7 +338,9 @@ class HostMmioW : public HostMmioOp {
 
   ~HostMmioW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostDmaC : public HostIdOp {
@@ -327,7 +353,9 @@ class HostDmaC : public HostIdOp {
 
   ~HostDmaC() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostDmaR : public HostAddrSizeOp {
@@ -341,7 +369,9 @@ class HostDmaR : public HostAddrSizeOp {
 
   ~HostDmaR() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostDmaW : public HostAddrSizeOp {
@@ -355,7 +385,9 @@ class HostDmaW : public HostAddrSizeOp {
 
   ~HostDmaW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostMsiX : public Event {
@@ -371,7 +403,9 @@ class HostMsiX : public Event {
 
   ~HostMsiX() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostConf : public Event {
@@ -399,7 +433,9 @@ class HostConf : public Event {
 
   ~HostConf() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostClearInt : public Event {
@@ -412,7 +448,9 @@ class HostClearInt : public Event {
 
   ~HostClearInt() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostPostInt : public Event {
@@ -425,7 +463,9 @@ class HostPostInt : public Event {
 
   ~HostPostInt() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class HostPciRW : public Event {
@@ -446,7 +486,9 @@ class HostPciRW : public Event {
 
   ~HostPciRW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 /* NIC related events */
@@ -465,7 +507,9 @@ class NicMsix : public Event {
 
   ~NicMsix() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicDma : public Event {
@@ -474,7 +518,7 @@ class NicDma : public Event {
   uint64_t addr_;
   uint64_t len_;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
 
  protected:
   NicDma(uint64_t ts, const size_t parser_identifier,
@@ -488,6 +532,8 @@ class NicDma : public Event {
   }
 
   virtual ~NicDma() = default;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class SetIX : public Event {
@@ -503,7 +549,9 @@ class SetIX : public Event {
 
   ~SetIX() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicDmaI : public NicDma {
@@ -517,7 +565,9 @@ class NicDmaI : public NicDma {
 
   ~NicDmaI() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicDmaEx : public NicDma {
@@ -531,7 +581,9 @@ class NicDmaEx : public NicDma {
 
   ~NicDmaEx() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicDmaEn : public NicDma {
@@ -545,7 +597,9 @@ class NicDmaEn : public NicDma {
 
   ~NicDmaEn() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicDmaCR : public NicDma {
@@ -559,7 +613,9 @@ class NicDmaCR : public NicDma {
 
   ~NicDmaCR() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicDmaCW : public NicDma {
@@ -573,7 +629,9 @@ class NicDmaCW : public NicDma {
 
   ~NicDmaCW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicMmio : public Event {
@@ -582,7 +640,7 @@ class NicMmio : public Event {
   uint64_t len_;
   uint64_t val_;
 
-  virtual void display(std::ostream &os) override;
+  virtual void display(std::ostream &out) override;
 
  protected:
   NicMmio(uint64_t ts, const size_t parser_identifier,
@@ -596,6 +654,8 @@ class NicMmio : public Event {
   }
 
   virtual ~NicMmio() = default;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class NicMmioR : public NicMmio {
@@ -609,7 +669,9 @@ class NicMmioR : public NicMmio {
 
   ~NicMmioR() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicMmioW : public NicMmio {
@@ -623,14 +685,16 @@ class NicMmioW : public NicMmio {
 
   ~NicMmioW() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicTrx : public Event {
  public:
   uint16_t len_;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
 
  protected:
   NicTrx(uint64_t ts, const size_t parser_identifier,
@@ -642,6 +706,8 @@ class NicTrx : public Event {
   }
 
   virtual ~NicTrx() = default;
+
+  virtual bool equal(const Event &other) override;
 };
 
 class NicTx : public NicTrx {
@@ -654,7 +720,9 @@ class NicTx : public NicTrx {
 
   ~NicTx() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
 class NicRx : public NicTrx {
@@ -670,12 +738,14 @@ class NicRx : public NicTrx {
 
   ~NicRx() = default;
 
-  void display(std::ostream &os) override;
+  void display(std::ostream &out) override;
+
+  bool equal(const Event &other) override;
 };
 
-inline std::ostream &operator<<(std::ostream &os, Event &e) {
-  e.display(os);
-  return os;
+inline std::ostream &operator<<(std::ostream &out, Event &e) {
+  e.display(out);
+  return out;
 }
 
 class EventPrinter : public consumer<std::shared_ptr<Event>> {
@@ -689,14 +759,14 @@ class EventPrinter : public consumer<std::shared_ptr<Event>> {
   concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan
-      ) override {
+  ) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);
 
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->pop(resume_executor); msg.has_value();
-         msg = co_await  src_chan->pop(resume_executor)) {
+         msg = co_await src_chan->pop(resume_executor)) {
       event = msg.value();
       throw_if_empty(event, event_is_null);
       out_ << *event << std::endl;
@@ -712,6 +782,8 @@ struct EventComperator {
   }
 };
 
-bool is_type(std::shared_ptr<Event> event_ptr, EventType type);
+bool is_type(std::shared_ptr<Event> &event_ptr, EventType type);
+
+bool is_type(const Event& event, EventType type);
 
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

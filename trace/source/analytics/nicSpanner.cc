@@ -74,10 +74,10 @@ NicSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
       last_completed_ = pending_dma;
     } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
       // indicate to host that we expect a dma action
-      //std::cout << "nic try push dma" << std::endl;
+      std::cout << "nic try push dma" << std::endl;
       throw_on(not co_await to_host_queue_->push(resume_executor, Context::create(expectation::dma, pending_dma)),
                could_not_push_to_context_queue);
-      //std::cout << "nic pushed dma" << std::endl;
+      std::cout << "nic pushed dma" << std::endl;
     }
 
     co_return true;
@@ -163,10 +163,10 @@ NicSpanner::handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
   if (msix_span->add_to_span(event_ptr)) {
     assert(msix_span->is_complete() and "msix span is not complete");
 
-    //std::cout << "nic try push msix" << std::endl;
+    std::cout << "nic try push msix" << std::endl;
     throw_on(not co_await to_host_queue_->push(resume_executor, Context::create(expectation::msix, last_completed_)),
              could_not_push_to_context_queue);
-    //std::cout << "nic pushed msix" << std::endl;
+    std::cout << "nic pushed msix" << std::endl;
 
     co_return true;
   }
@@ -193,7 +193,7 @@ NicSpanner::consume(std::shared_ptr<concurrencpp::executor> resume_executor,
 
     added = false;
 
-    //std::cout << "nic spanner try handel: " << *event_ptr << std::endl;
+    std::cout << "nic spanner try handel: " << *event_ptr << std::endl;
 
     switch (event_ptr->get_type()) {
       case EventType::NicMmioW_t:

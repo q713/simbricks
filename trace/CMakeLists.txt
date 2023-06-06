@@ -38,6 +38,13 @@ else()
     add_compile_options(-O2)
 endif()
 
+#####################################
+# Fixme: Workaround for the server build
+#####################################
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -pthread")
+#set(CMAKE_EXE_LINKER_FLAGS "-stdlib=libc++")
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -pthread")
+#set(CMAKE_EXE_LINKER_FLAGS "-L/usr/lib/llvm-17/lib/ -stdlib=libc++")
 
 #######################################
 # Required C standard

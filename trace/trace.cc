@@ -43,35 +43,32 @@
 #include "util/log.h"
 #include "util/factory.h"
 
-bool create_open_file(std::ofstream &new_out, std::string filename) {
-  try {
-    // TODO: later let user specify output directory
-    // auto path = std::filesystem::path(directory);
-    // auto targetPath = std::filesystem::canonical(path);
+void create_open_file(std::ofstream& out, std::string filename) {
     if (std::filesystem::exists(filename)) {
-      std::cerr << "the file " << filename
-                << " already exists, we will not overwrite it" << std::endl;
-      return false;
+      std::stringstream error;
+      error << "the file " << filename << " already exists, we will not overwrite it";
+      throw std::runtime_error(error.str());
     }
 
-    new_out.open(filename, std::ios::out);
-    return new_out.is_open();
-
-  } catch (const std::exception &ex) {
-    std::cerr << "exception opening file " << ex.what() << std::endl;
-    return false;
-  }
+    out.open(filename, std::ios::out);
+    if (not out.is_open()) {
+      std::stringstream error;
+      error << "could not open file " << filename;
+      throw std::runtime_error(error.str());
+    }
+    return;
 }
 
-std::shared_ptr<EventPrinter> createPrinter(cxxopts::ParseResult &result, const std::string &option) {
+std::shared_ptr<EventPrinter> createPrinter(std::ofstream& out, cxxopts::ParseResult &result, const std::string &option) {
   std::shared_ptr<EventPrinter> printer;
   if (result.count(option) != 0) {
-    std::ofstream out_file;
-    if (not create_open_file(out_file, result[option].as<std::string>())) {
-      std::cerr << "could not open gem5-client-events file" << std::endl;
+    try {
+      create_open_file(out, result[option].as<std::string>());
+      printer = create_shared<EventPrinter>(printer_is_null, out);
+    } catch (std::exception &exe)  {
+      std::cerr << "could not create printer: " << exe.what() << std::endl;
       return nullptr;
     }
-    printer = create_shared<EventPrinter>(printer_is_null, out_file);
   } else {
     printer = create_shared<EventPrinter>(printer_is_null, std::cout);
   }
@@ -124,7 +121,7 @@ int main(int argc, char *argv[]) {
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
   concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 1;
+  concurren_options.max_cpu_threads = 3;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
@@ -224,7 +221,8 @@ int main(int argc, char *argv[]) {
                                                      result["gem5-log-server"].as<std::string>(),
                                                      comp_filter_server, server_lr);
 
-    auto printer = createPrinter(result, "gem5-server-events");
+    std::ofstream out;
+    auto printer = createPrinter(out, result, "gem5-server-events");
     if (not printer) {
       exit(EXIT_FAILURE);
     }
@@ -248,7 +246,8 @@ int main(int argc, char *argv[]) {
                                                      result["gem5-log-client"].as<std::string>(),
                                                      comp_filter_client, client_lr);
 
-    auto printer = createPrinter(result, "gem5-client-events");
+    std::ofstream out;
+    auto printer = createPrinter(out, result, "gem5-client-events");
     if (not printer) {
       exit(EXIT_FAILURE);
     }
@@ -269,7 +268,8 @@ int main(int argc, char *argv[]) {
     auto nic_ser_par = create_shared<NicBmParser>(parser_is_null, "NicbmServerParser",
                                                   result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
 
-    auto printer = createPrinter(result, "nicbm-server-events");
+    std::ofstream out;
+    auto printer = createPrinter(out, result, "nicbm-server-events");
     if (not printer) {
       exit(EXIT_FAILURE);
     }
@@ -290,7 +290,8 @@ int main(int argc, char *argv[]) {
     auto nic_cli_par = create_shared<NicBmParser>(parser_is_null, "NicbmClientParser",
                                                   result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
 
-    auto printer = createPrinter(result, "nicbm-client-events");
+    std::ofstream out;
+    auto printer = createPrinter(out, result, "nicbm-client-events");
     if (not printer) {
       exit(EXIT_FAILURE);
     }

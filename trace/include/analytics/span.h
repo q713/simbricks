@@ -195,6 +195,14 @@ struct EventSpan {
     return false;
   }
 
+  bool has_parent() const {
+    return parent_ != nullptr;
+  }
+
+  std::shared_ptr<EventSpan> get_parent() const {
+    return parent_;
+  }
+
   bool add_children(std::shared_ptr<EventSpan> child_span) {
     if (child_span and child_span.get() != this and
         get_starting_ts() < child_span->get_starting_ts()) {

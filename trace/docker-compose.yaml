@@ -1,0 +1,19 @@
+version: '3'
+services:
+  #service-a: # start here the tracing utility once dockerfile is running
+  #  build:
+  #    context: .
+  #    dockerfile: service-a/Dockerfile
+  #  ports:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"     # Jaeger UI
+      - "4317:4317"       # gRPC
+      - "4318:4318"       # HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    command: []
+
+

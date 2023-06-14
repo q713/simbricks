@@ -13,3 +13,6 @@
 [submodule "trace/libs/concurrencpp"]
 	path = trace/libs/concurrencpp
 	url = git@github.com:q713/concurrencpp.git
+[submodule "trace/libs/opentelemetry-cpp"]
+	path = trace/libs/opentelemetry-cpp
+	url = git@github.com:open-telemetry/opentelemetry-cpp.git

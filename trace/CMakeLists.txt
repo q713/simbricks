@@ -22,7 +22,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-cmake_minimum_required(VERSION 3.18)
+cmake_minimum_required(VERSION 3.16.3)
 
 project(simbricks-trace LANGUAGES CXX DESCRIPTION "simbricks trace utility for analyzing system performance in depth")
 
@@ -74,6 +74,16 @@ add_subdirectory(libs/concurrencpp)
 
 
 #######################################
+# Opentelemetry cpp client
+#######################################
+add_subdirectory(libs/opentelemetry-cpp)
+include_directories(
+        libs/opentelemetry-cpp/exporters/otlp/include
+        libs/opentelemetry-cpp/exporters/ostream/include
+)
+
+
+#######################################
 # The Trace lib
 #######################################
 # all src files required to build the trace functionality
@@ -104,6 +114,8 @@ set(TRACE_LIB_HEADER_FILES
         include/analytics/tracer.h
         include/analytics/context.h
         include/analytics/spanner.h
+        # exporter
+        include/exporter/exporter.h
         )
 set(TRACE_LIB_SOURCE_FILES
         # reader
@@ -137,8 +149,14 @@ else()
     message(FATAL_ERROR "Your compiler, whatever it is, is currently not supported.")
 endif()
 # link coroutine library
-target_link_libraries(${PROJECT_NAME} PUBLIC concurrencpp::concurrencpp)
-target_link_libraries(${PROJECT_NAME} PUBLIC Catch2::Catch2WithMain)
+target_link_libraries(${PROJECT_NAME} PUBLIC
+        concurrencpp::concurrencpp
+        Catch2::Catch2WithMain
+        opentelemetry_trace
+        opentelemetry_api
+        opentelemetry_exporter_otlp_http
+        opentelemetry_exporter_ostream_span
+        )
 
 
 #######################################
@@ -181,9 +199,22 @@ target_link_libraries(${TEST_TAR} PUBLIC concurrencpp::concurrencpp)
 #######################################
 set(TRACE_SRC_FILES
     trace.cc
-)
+   )
 add_executable(trace ${TRACE_SRC_FILES})
 target_link_libraries(trace ${PROJECT_NAME})
 
 
+#######################################
+# dummy executable
+#######################################
+set(DUMMY_FILES
+        dummy.cpp)
+add_executable(dummy ${DUMMY_FILES})
+target_link_libraries(dummy PUBLIC
+        opentelemetry_trace
+        opentelemetry_api
+        opentelemetry_exporter_otlp_http
+        opentelemetry_exporter_ostream_span
+        ${PROJECT_NAME}
+)
 

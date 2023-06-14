@@ -23,7 +23,6 @@
  */
 
 #include <filesystem>
-#include <functional>
 #include <iostream>
 #include <ostream>
 #include <set>

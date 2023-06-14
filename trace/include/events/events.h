@@ -98,6 +98,10 @@ class Event {
     return name_;
   }
 
+  inline const std::string &get_parser_name() {
+    return parser_name_;
+  }
+
   EventType get_type() const {
     return type_;
   }
@@ -174,6 +178,8 @@ class HostInstr : public Event {
         pc_(pc) {
   }
 
+  uint64_t GetPc() const;
+
   virtual ~HostInstr() = default;
 
   void display(std::ostream &out) override;
@@ -201,6 +207,10 @@ class HostCall : public HostInstr {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  const std::string *GetFunc() const;
+
+  const std::string *GetComp() const;
 };
 
 class HostMmioImRespPoW : public Event {
@@ -223,6 +233,8 @@ class HostIdOp : public Event {
   uint64_t id_;
 
   void display(std::ostream &out) override;
+
+  uint64_t GetId() const;
 
  protected:
   explicit HostIdOp(uint64_t ts, const size_t parser_identifier,
@@ -274,6 +286,10 @@ class HostAddrSizeOp : public HostIdOp {
 
   void display(std::ostream &out) override;
 
+  uint64_t GetAddr() const;
+
+  uint64_t GetSize() const;
+
  protected:
   explicit HostAddrSizeOp(uint64_t ts, const size_t parser_identifier,
                           const std::string parser_name, EventType type,
@@ -296,6 +312,10 @@ class HostMmioOp : public HostAddrSizeOp {
   uint64_t offset_;
 
   void display(std::ostream &out) override;
+
+  uint64_t GetBar() const;
+
+  uint64_t GetOffset() const;
 
  protected:
   explicit HostMmioOp(uint64_t ts, const size_t parser_identifier,
@@ -406,6 +426,8 @@ class HostMsiX : public Event {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  uint64_t GetVec() const;
 };
 
 class HostConf : public Event {
@@ -436,6 +458,18 @@ class HostConf : public Event {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  uint64_t GetDev() const;
+
+  uint64_t GetFunc() const;
+
+  uint64_t GetReg() const;
+
+  uint64_t GetBytes() const;
+
+  uint64_t GetData() const;
+
+  bool IsRead() const;
 };
 
 class HostClearInt : public Event {
@@ -489,6 +523,12 @@ class HostPciRW : public Event {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  uint64_t GetOffset() const;
+
+  uint64_t GetSize() const;
+
+  bool IsRead() const;
 };
 
 /* NIC related events */
@@ -510,6 +550,10 @@ class NicMsix : public Event {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  uint16_t GetVec() const;
+
+  bool IsX() const;
 };
 
 class NicDma : public Event {
@@ -519,6 +563,12 @@ class NicDma : public Event {
   uint64_t len_;
 
   void display(std::ostream &out) override;
+
+  uint64_t GetId() const;
+
+  uint64_t GetAddr() const;
+
+  uint64_t GetLen() const;
 
  protected:
   NicDma(uint64_t ts, const size_t parser_identifier,
@@ -552,6 +602,8 @@ class SetIX : public Event {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  uint64_t GetIntr() const;
 };
 
 class NicDmaI : public NicDma {
@@ -642,6 +694,12 @@ class NicMmio : public Event {
 
   virtual void display(std::ostream &out) override;
 
+  uint64_t GetOff() const;
+
+  uint64_t GetLen() const;
+
+  uint64_t GetVal() const;
+
  protected:
   NicMmio(uint64_t ts, const size_t parser_identifier,
           const std::string parser_name, EventType type, std::string name,
@@ -696,6 +754,8 @@ class NicTrx : public Event {
 
   void display(std::ostream &out) override;
 
+  uint16_t GetLen() const;
+
  protected:
   NicTrx(uint64_t ts, const size_t parser_identifier,
          const std::string parser_name, EventType type, std::string name,
@@ -741,6 +801,8 @@ class NicRx : public NicTrx {
   void display(std::ostream &out) override;
 
   bool equal(const Event &other) override;
+
+  uint64_t GetPort() const;
 };
 
 inline std::ostream &operator<<(std::ostream &out, Event &e) {

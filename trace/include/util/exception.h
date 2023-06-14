@@ -50,9 +50,12 @@ inline const char* cant_register_spanner_twice = "cannot register spanner twice"
 inline const char* no_spanner_registered = "no spanner is registered within context queue";
 inline const char* could_not_push_to_context_queue = "could not push value into context queue";
 inline const char* queue_is_null = "std::shared_ptr<ContextQueue<...>> is null";
+inline const char* span_exporter_null = "SpanExporter is null";
+inline const char* span_processor_null = "SpanProcessor is null";
+inline const char* trace_provider_null = "TracerProvider is null";
 
 template<typename Value>
-void throw_if_empty (std::shared_ptr<Value> to_check, const char *message)
+void throw_if_empty (std::shared_ptr<Value> &to_check, const char *message)
 {
   if (not to_check)
   {
@@ -83,5 +86,19 @@ inline void throw_on(bool should_throw, const char* message) {
     throw std::runtime_error(message);
   }
 }
+
+inline void throw_on(bool should_throw, std::string&& message) {
+  throw_on(should_throw, message.c_str());
+}
+
+template<typename ...Args>
+inline void throw_just(Args&&... args) {
+  std::stringstream message_builder;
+  ([&] {
+    message_builder << args;
+  } (), ...);
+  throw std::runtime_error(message_builder.str());
+}
+
 
 #endif //SIMBRICKS_TRACE_EXCEPTION_H_

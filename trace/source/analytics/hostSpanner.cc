@@ -77,6 +77,7 @@ HostSpanner::handel_call(std::shared_ptr<concurrencpp::executor> resume_executor
     // create a completely new trace
     if (found_receive_ and found_transmit_ and
         not create_trace_starting_span(event_ptr->get_parser_ident())) {
+      // TODO: we received, hence poll from nic queue the respective Rx event
       std::cerr << "found new syscall entry, could not allocate ";
       std::cerr << "pending_host_call_span_" << std::endl;
       co_return false;

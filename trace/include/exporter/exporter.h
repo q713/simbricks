@@ -52,7 +52,12 @@
 
 namespace simbricks::trace {
 
-class OtlpSpanExporter {
+class Exporter {
+ public:
+  virtual void finish_span(std::shared_ptr<EventSpan> &span_to_export) = 0;
+};
+
+class OtlpSpanExporter : public Exporter {
 
   int64_t time_offset_ = 0;
   opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer> tracer_;
@@ -369,26 +374,99 @@ class OtlpSpanExporter {
     span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
   }
 
+  void add_HostCall(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>& span, std::shared_ptr<HostCall> event) {
+    auto type = get_type_str(event);
+    std::map<std::string, std::string> attributes;
+    add_HostCall(attributes, event);
+    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+  }
+
+  void add_HostMsiX(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>& span, std::shared_ptr<HostMsiX> event) {
+    auto type = get_type_str(event);
+    std::map<std::string, std::string> attributes;
+    add_HostMsiX(attributes, event);
+    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+  }
+
+  void add_HostDmaC(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>& span, std::shared_ptr<HostDmaC> event) {
+    auto type = get_type_str(event);
+    std::map<std::string, std::string> attributes;
+    add_HostDmaC(attributes, event);
+    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+  }
+
+  void add_HostDmaR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>& span, std::shared_ptr<HostDmaR> event) {
+    auto type = get_type_str(event);
+    std::map<std::string, std::string> attributes;
+    add_HostDmaR(attributes, event);
+    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+  }
+
+  void add_HostDmaW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>& span, std::shared_ptr<HostDmaW> event) {
+    auto type = get_type_str(event);
+    std::map<std::string, std::string> attributes;
+    add_HostDmaW(attributes, event);
+    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+  }
+
+  void add_EventSpanAttr(std::map<std::string, std::string> attributes, std::shared_ptr<EventSpan> span) {
+    auto span_name = get_type_str(span);
+    attributes.insert({"id", std::to_string(span->get_id())});
+    attributes.insert({"source id", std::to_string(span->get_source_id())});
+    attributes.insert({"type", span_name});
+    attributes.insert({"pending", span->is_pending() ? "true" : "false"});
+    attributes.insert({"trace id", std::to_string(span->get_trace_id())});
+  }
+
   void transform_HostCallSpan(std::shared_ptr<HostCallSpan> &to_transform) {
-    // TODO
+    auto span_opts = get_span_start_opts(to_transform);
+    auto span_name = get_type_str(to_transform);
+    std::map<std::string, std::string> attributes;
+    add_EventSpanAttr(attributes, to_transform);
+    auto call_span = tracer_->StartSpan(span_name, attributes, span_opts);
+
+    for (auto &event : to_transform->events_) {
+      switch (event->get_type()) {
+        case EventType::HostCall_t:
+          add_HostCall(call_span, std::static_pointer_cast<HostCall>(event));
+          break;
+        default:
+          throw_just("transform_HostCallSpan unexpected event: ", *event);
+      }
+    }
+
+    end_span(to_transform, call_span);
   }
 
   void transform_HostMsixSpan(std::shared_ptr<HostMsixSpan> &to_transform) {
-    // TODO
+    auto span_opts = get_span_start_opts(to_transform);
+    auto span_name = get_type_str(to_transform);
+    std::map<std::string, std::string> attributes;
+    add_EventSpanAttr(attributes, to_transform);
+    auto msix_span = tracer_->StartSpan(span_name, attributes, span_opts);
+
+    for (auto &event : to_transform->events_) {
+      switch (event->get_type()) {
+        case EventType::HostMsiX_t:
+          add_HostMsiX(msix_span, std::static_pointer_cast<HostMsiX>(event));
+          break;
+        case EventType::HostDmaC_t:
+          add_HostDmaC(msix_span, std::static_pointer_cast<HostDmaC>(event));
+          break;
+        default:
+          throw_just("transform_HostMsixSpan unexpected event: ", *event);
+      }
+    }
+
+    end_span(to_transform, msix_span);
   }
 
   void transform_HostMmioSpan(std::shared_ptr<HostMmioSpan> &to_transform) {
     auto span_options = get_span_start_opts(to_transform);
-    std::stringstream span_name;
-    span_name << to_transform->get_type();
-    const std::map<std::string, std::string> span_attributes {
-        {"id", std::to_string(to_transform->get_id())},
-        {"source id", std::to_string(to_transform->get_source_id())},
-        {"type", span_name.str()},
-        {"pending", to_transform->is_pending() ? "true" : "false"},
-        {"trace id", std::to_string(to_transform->get_trace_id())}
-    };
-    auto mmio_span = tracer_->StartSpan(span_name.str(), span_attributes, span_options);
+    auto span_name = get_type_str(to_transform);
+    std::map<std::string, std::string> attributes;
+    add_EventSpanAttr(attributes, to_transform);
+    auto mmio_span = tracer_->StartSpan(span_name, attributes, span_options);
 
     for (auto &event : to_transform->events_) {
       switch (event->get_type()) {
@@ -420,7 +498,32 @@ class OtlpSpanExporter {
 
 
   void transform_HostDmaSpan(std::shared_ptr<HostDmaSpan> &to_transform) {
-    // TODO
+    auto span_opts = get_span_start_opts(to_transform);
+    auto span_name = get_type_str(to_transform);
+    std::map<std::string, std::string> attributes;
+    add_EventSpanAttr(attributes, to_transform);
+    auto dma_span = tracer_->StartSpan(span_name, attributes, span_opts);
+
+    for (auto &event : to_transform->events_) {
+      switch (event->get_type()) {
+        case EventType::HostDmaW_t:
+          add_HostDmaW(dma_span, std::static_pointer_cast<HostDmaW>(event));
+          break;
+
+        case EventType::HostDmaR_t:
+          add_HostDmaR(dma_span, std::static_pointer_cast<HostDmaR>(event));
+          break;
+
+        case EventType::HostDmaC_t:
+          add_HostDmaC(dma_span, std::static_pointer_cast<HostDmaC>(event));
+          break;
+
+        default:
+          throw_just("transform_HostMsixSpan unexpected event: ", *event);
+      }
+    }
+
+    end_span(to_transform, dma_span);
   }
 
   void transform_HostIntSpan(std::shared_ptr<HostIntSpan> &to_transform) {
@@ -496,7 +599,7 @@ class OtlpSpanExporter {
     opentelemetry::trace::Provider::SetTracerProvider(none);
   }
 
-  void export_span(std::shared_ptr<EventSpan> &span_to_export) {
+  void finish_span(std::shared_ptr<EventSpan> &span_to_export) {
     return;
   }
 };

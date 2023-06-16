@@ -28,6 +28,8 @@
 #include <exception>
 #include <stdexcept>
 #include <memory>
+#include <string>
+#include <sstream>
 
 inline const char *resume_executor_null =
         "std::shared_ptr<concurrencpp::executor> is null";

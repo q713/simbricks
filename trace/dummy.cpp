@@ -21,7 +21,7 @@
 
 
 int main() {
-
+/*
   const simbricks::trace::OtlpSpanExporter exporter("http://localhost:4318/v1/traces",
                                      "dummy-simbricks-tracer", true, "dummy application");
 
@@ -77,5 +77,5 @@ int main() {
   end_call.end_steady_time = simbricks::trace::SpanExporter::to_steady_microseconds(1967469891374, offset);
   call_span->AddEvent("return via sysret", simbricks::trace::SpanExporter::to_system_microseconds(1967469891374, offset));
   call_span->End(end_call);
-
+*/
 }

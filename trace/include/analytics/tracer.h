@@ -34,11 +34,15 @@
 #include "analytics/span.h"
 #include "analytics/trace.h"
 #include "env/traceEnvironment.h"
+#include "exporter/exporter.h"
+#include "util/factory.h"
 
 struct Tracer {
   std::recursive_mutex tracer_mutex_;
 
   std::unordered_map<uint64_t, std::shared_ptr<Trace>> traces_;
+
+  simbricks::trace::Exporter &exporter_;
 
   std::shared_ptr<Trace> get_trace(uint64_t trace_id) {
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
@@ -59,6 +63,8 @@ struct Tracer {
 
     trace->mark_as_done();
     //t->display(std::cout);
+
+    // TODO: export trace using exporter
 
     return true;
   }
@@ -132,20 +138,17 @@ struct Tracer {
     }
 
     // NOTE: this will already add the pack to the trace
-    std::shared_ptr<Trace> new_trace =
-        Trace::create_trace(trace_environment::get_next_trace_id(), new_span);
-    if (not new_trace) {
-      return {};
-    }
+    std::shared_ptr<Trace> new_trace = create_shared<Trace>(trace_is_null,
+                                                            trace_environment::get_next_trace_id(), new_span);
+    throw_if_empty(new_trace, trace_is_null);
 
-    auto it = traces_.insert({new_trace->id_, new_trace});
-    if (not it.second) {
-      return {};
-    }
+    auto iter = traces_.insert({new_trace->id_, new_trace});
+    throw_on(not iter.second, "could not insert trace into traces map");
+
     return new_span;
   }
 
-  Tracer() = default;
+  explicit Tracer(simbricks::trace::Exporter &exporter) : exporter_(exporter) {};
 
   ~Tracer() = default;
 };

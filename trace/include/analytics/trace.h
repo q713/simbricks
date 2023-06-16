@@ -81,18 +81,9 @@ struct Trace {
     out << std::endl;
   }
 
-  // TODO: remove this method, use factory instead
-  static std::shared_ptr<Trace> create_trace(
-      uint64_t id, std::shared_ptr<EventSpan> parent_span) {
-    throw_if_empty(parent_span, span_is_null);
-
-    auto t = std::shared_ptr<Trace>{new Trace{id, parent_span}};
-    return t;
-  }
-
- private:
   Trace(uint64_t id, std::shared_ptr<EventSpan> parent_span)
       : id_(id), parent_span_(parent_span) {
+    throw_if_empty(parent_span, span_is_null);
     this->add_span(parent_span);
   }
 };

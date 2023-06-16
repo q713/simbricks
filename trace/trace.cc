@@ -41,30 +41,33 @@
 #include "util/cxxopts.hpp"
 #include "util/log.h"
 #include "util/factory.h"
+#include "exporter/exporter.h"
 
-void create_open_file(std::ofstream& out, std::string filename) {
-    if (std::filesystem::exists(filename)) {
-      std::stringstream error;
-      error << "the file " << filename << " already exists, we will not overwrite it";
-      throw std::runtime_error(error.str());
-    }
+void create_open_file(std::ofstream &out, std::string filename) {
+  if (std::filesystem::exists(filename)) {
+    std::stringstream error;
+    error << "the file " << filename << " already exists, we will not overwrite it";
+    throw std::runtime_error(error.str());
+  }
 
-    out.open(filename, std::ios::out);
-    if (not out.is_open()) {
-      std::stringstream error;
-      error << "could not open file " << filename;
-      throw std::runtime_error(error.str());
-    }
-    return;
+  out.open(filename, std::ios::out);
+  if (not out.is_open()) {
+    std::stringstream error;
+    error << "could not open file " << filename;
+    throw std::runtime_error(error.str());
+  }
+  return;
 }
 
-std::shared_ptr<EventPrinter> createPrinter(std::ofstream& out, cxxopts::ParseResult &result, const std::string &option) {
+std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
+                                            cxxopts::ParseResult &result,
+                                            const std::string &option) {
   std::shared_ptr<EventPrinter> printer;
   if (result.count(option) != 0) {
     try {
       create_open_file(out, result[option].as<std::string>());
       printer = create_shared<EventPrinter>(printer_is_null, out);
-    } catch (std::exception &exe)  {
+    } catch (std::exception &exe) {
       std::cerr << "could not create printer: " << exe.what() << std::endl;
       return nullptr;
     }
@@ -127,7 +130,10 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    Tracer tracer;
+    simbricks::trace::OtlpSpanExporter
+        exporter{"http://localhost:4318/v1/traces", "simbricks-tracer", false, "trace"};
+
+    Tracer tracer{exporter};
 
     auto client_hn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
     auto client_nh = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);

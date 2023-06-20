@@ -73,7 +73,7 @@ class EventChecker : public consumer<std::shared_ptr<Event>> {
 
 TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
 
-  const std::string test_file_path{"./tests/test-files/gem5-events-test.txt"};
+  const std::string test_file_path{"./tests/raw-logs/gem5-events-test.txt"};
   const std::string parser_name{"Gem5ClientParser"};
 
   ComponentFilter comp_filter_client("ComponentFilter-Server");

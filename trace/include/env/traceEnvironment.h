@@ -68,26 +68,32 @@ class trace_environment {
     return symbol_tables_;
   }
 
-  inline static uint64_t get_next_parser_id() {
-    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline static uint64_t GetNextParserId() {
+    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t get_next_span_id() {
-    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline static uint64_t GetNextSpanId() {
+    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t get_next_spanner_id() {
-    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline static uint64_t GetNextSpannerId() {
+    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t get_next_trace_id() {
-    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline static uint64_t GetNextTraceId() {
+    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+    static uint64_t next_id = 0;
+    return next_id++;
+  }
+
+  inline static uint64_t GetNextTraceContextId() {
+    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }

@@ -39,22 +39,25 @@ NicSpanner::handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   auto con = con_opt.value();
   throw_if_empty(con, context_is_null);
   std::cout << "nic polled mmio" << std::endl;
-  if (not is_expectation(con, expectation::mmio)) {
+  if (not is_expectation(con, expectation::kMmio)) {
     std::cerr << "nic_spanner: could not poll mmio context" << std::endl;
     co_return false;
   }
   last_host_context_ = con;
 
-  auto mmio_span = tracer_.rergister_new_span_by_parent<NicMmioSpan>(
-      last_host_context_->get_parent(), event_ptr->get_parser_ident());
+  //auto mmio_span = tracer_.rergister_new_span_by_parent<NicMmioSpan>(
+  //    last_host_context_->GetParent(), event_ptr->get_parser_ident());
+  auto context = last_host_context_->GetNonEmptyTraceContext();
+  auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
+      context->GetParent(), event_ptr->get_parser_ident());
 
   if (not mmio_span) {
     std::cerr << "could not register mmio_span" << std::endl;
     co_return false;
   }
 
-  if (mmio_span->add_to_span(event_ptr)) {
-    assert(mmio_span->is_complete() and "mmio span is not complete");
+  if (mmio_span->AddToSpan(event_ptr)) {
+    assert(mmio_span->IsComplete() and "mmio span is not complete");
     last_completed_ = mmio_span;
     co_return true;
   }
@@ -70,12 +73,14 @@ NicSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
   auto pending_dma =
       iterate_add_erase<NicDmaSpan>(pending_nic_dma_spans_, event_ptr);
   if (pending_dma) {
-    if (pending_dma->is_complete()) {
+    if (pending_dma->IsComplete()) {
       last_completed_ = pending_dma;
     } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
       // indicate to host that we expect a dma action
       std::cout << "nic try push dma" << std::endl;
-      throw_on(not co_await to_host_queue_->push(resume_executor, Context::create(expectation::dma, pending_dma)),
+      auto context = create_shared<Context>(
+          "handel_dma could not create context", expectation::kDma, pending_dma->GetContext());
+      throw_on(not co_await to_host_queue_->push(resume_executor, context),
                could_not_push_to_context_queue);
       std::cout << "nic pushed dma" << std::endl;
     }
@@ -86,14 +91,15 @@ NicSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
   assert(is_type(event_ptr, EventType::NicDmaI_t) and
       "try starting a new dma span with NON issue");
 
-  pending_dma = tracer_.rergister_new_span_by_parent<NicDmaSpan>(
-      last_completed_, event_ptr->get_parser_ident());
+  //pending_dma = tracer_.rergister_new_span_by_parent<NicDmaSpan>(
+  //    last_completed_, event_ptr->get_parser_ident());
+  pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(last_completed_, event_ptr->get_parser_ident());
   if (not pending_dma) {
     std::cerr << "could not register new pending dma action" << std::endl;
     co_return false;
   }
 
-  if (pending_dma->add_to_span(event_ptr)) {
+  if (pending_dma->AddToSpan(event_ptr)) {
     pending_nic_dma_spans_.push_back(pending_dma);
     co_return true;
   }
@@ -110,6 +116,7 @@ NicSpanner::handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
   if (is_type(event_ptr, EventType::NicTx_t)) {
     parent = last_completed_;
     is_tx = true;
+    last_action_was_send_ = true;
 
   } else if (is_type(event_ptr, EventType::NicRx_t)) {
     //auto con = co_await network_queue_.poll(resume_executor, this->id_);
@@ -118,23 +125,26 @@ NicSpanner::handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     //  std::cerr << "expectation from network" << std::endl;
     //  co_return false;
     //}
-    //parent = con->get_parent();
+    //parent = con->GetParent();
     parent = last_completed_;
     is_tx = false;
+    last_action_was_send_ = false;
 
   } else {
     co_return false;
   }
 
-  auto eth_span = tracer_.rergister_new_span_by_parent<NicEthSpan>(
+  //auto eth_span = tracer_.rergister_new_span_by_parent<NicEthSpan>(
+  //    parent, event_ptr->get_parser_ident());
+  auto eth_span = tracer_.StartSpanByParent<NicEthSpan>(
       parent, event_ptr->get_parser_ident());
   if (not eth_span) {
     std::cerr << "could not register eth_span" << std::endl;
     co_return false;
   }
 
-  if (eth_span->add_to_span(event_ptr)) {
-    assert(eth_span->is_complete() and "eth span was not complette");
+  if (eth_span->AddToSpan(event_ptr)) {
+    assert(eth_span->IsComplete() and "eth span was not complette");
     // indicate that somewhere a receive will be expected
     //if (is_tx and
     //    not co_await network_queue_.push(resume_executor, this->id_, expectation::rx, eth_span)) {
@@ -153,18 +163,22 @@ NicSpanner::handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
                         std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  auto msix_span = tracer_.rergister_new_span_by_parent<NicMsixSpan>(
+  //auto msix_span = tracer_.rergister_new_span_by_parent<NicMsixSpan>(
+  //    last_completed_, event_ptr->get_parser_ident());
+  auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
       last_completed_, event_ptr->get_parser_ident());
   if (not msix_span) {
     std::cerr << "could not register msix span" << std::endl;
     co_return false;
   }
 
-  if (msix_span->add_to_span(event_ptr)) {
-    assert(msix_span->is_complete() and "msix span is not complete");
+  if (msix_span->AddToSpan(event_ptr)) {
+    assert(msix_span->IsComplete() and "msix span is not complete");
 
     std::cout << "nic try push msix" << std::endl;
-    throw_on(not co_await to_host_queue_->push(resume_executor, Context::create(expectation::msix, last_completed_)),
+    auto context = create_shared<Context>(
+        "handel_msix could not create context", expectation::kMsix, last_completed_->GetContext());
+    throw_on(not co_await to_host_queue_->push(resume_executor, context),
              could_not_push_to_context_queue);
     std::cout << "nic pushed msix" << std::endl;
 

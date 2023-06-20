@@ -27,7 +27,7 @@
 
 #include <iostream>
 #include <memory>
-#include <vector>
+#include <unordered_map>
 #include <optional>
 
 #include "util/exception.h"
@@ -35,31 +35,44 @@
 #include "corobelt/corobelt.h"
 #include "env/traceEnvironment.h"
 
-struct Trace {
+class Trace {
   std::mutex mutex_;
 
   uint64_t id_;
   std::shared_ptr<EventSpan> parent_span_;
 
-  // TODO: maybe store spans by source id...
-  std::vector<std::shared_ptr<EventSpan>> spans_;
+  // span_id -> span
+  std::unordered_map<uint64_t, std::shared_ptr<EventSpan>> spans_;
 
   bool is_done_ = false;
 
-  inline bool is_done() const {
+ public:
+  inline bool IsDone() const {
     return is_done_;
   }
 
-  inline void mark_as_done() {
+  inline void MarkAsDone() {
     is_done_ = true;
   }
 
-  bool add_span(std::shared_ptr<EventSpan> span) {
+  inline uint64_t GetId() const {
+    return id_;
+  }
+
+  std::shared_ptr<EventSpan> GetSpan(uint64_t span_id) {
+    auto iter = spans_.find(span_id);
+    if (iter == spans_.end()) {
+      return {};
+    }
+    return iter->second;
+  }
+
+  bool AddSpan(std::shared_ptr<EventSpan> span) {
     throw_if_empty(span, span_is_null);
 
     const std::lock_guard<std::mutex> lock(mutex_);
-    span->set_trace_id(id_);
-    spans_.push_back(span);
+    auto iter = spans_.insert({span->GetId(), span});
+    throw_on(not iter.second, "could not insert span into spans map");
     return true;
   }
 
@@ -69,14 +82,14 @@ struct Trace {
     out << "trace: id=" << id_ << std::endl;
     out << "\t parent_span:" << std::endl;
     if (parent_span_) {
-      parent_span_->display(out, 1);
+      parent_span_->display(out);
     }
     for (auto &span : spans_) {
-      throw_if_empty(span, span_is_null);
-      if (span.get() == parent_span_.get()) {
+      throw_if_empty(span.second, span_is_null);
+      if (span.second.get() == parent_span_.get()) {
         continue;
       }
-      span->display(out, 1);
+      span.second->display(out);
     }
     out << std::endl;
   }
@@ -84,9 +97,8 @@ struct Trace {
   Trace(uint64_t id, std::shared_ptr<EventSpan> parent_span)
       : id_(id), parent_span_(parent_span) {
     throw_if_empty(parent_span, span_is_null);
-    this->add_span(parent_span);
+    this->AddSpan(parent_span);
   }
 };
-
 
 #endif  // SIMBRICKS_TRACE_EVENT_TRACE_H_

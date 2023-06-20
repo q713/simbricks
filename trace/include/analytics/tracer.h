@@ -36,16 +36,27 @@
 #include "env/traceEnvironment.h"
 #include "exporter/exporter.h"
 #include "util/factory.h"
+#include "analytics/context.h"
 
-struct Tracer {
+class Tracer {
   std::recursive_mutex tracer_mutex_;
 
+  // trace_id -> trace
   std::unordered_map<uint64_t, std::shared_ptr<Trace>> traces_;
+  // context_id -> context
+  std::unordered_map<uint64_t, std::shared_ptr<TraceContext>> contexts_;
 
   simbricks::trace::Exporter &exporter_;
 
-  std::shared_ptr<Trace> get_trace(uint64_t trace_id) {
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+  void InsertTrace(std::shared_ptr<Trace> &new_trace) {
+    // NOTE: the lock must be held when calling this method
+    auto iter = traces_.insert({new_trace->GetId(), new_trace});
+    throw_on(not iter.second, "could not insert trace into traces map");
+  }
+
+  std::shared_ptr<Trace> GetTrace(uint64_t trace_id) {
+    // NOTE: the lock must be held when calling this method
+    //const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
     auto it = traces_.find(trace_id);
     if (it == traces_.end()) {
@@ -55,95 +66,103 @@ struct Tracer {
     return target_trace;
   }
 
-  bool mark_trace_as_done(uint64_t trace_id) {
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
-
-    auto trace = get_trace(trace_id);
-    throw_if_empty(trace, trace_is_null);
-
-    trace->mark_as_done();
-    //t->display(std::cout);
-
-    // TODO: export trace using exporter
-
-    return true;
+  void InsertContext(std::shared_ptr<TraceContext> &trace_context) {
+    // NOTE: the lock must be held when calling this method
+    auto iter = contexts_.insert({trace_context->GetId(), trace_context});
+    throw_on(not iter.second, "could not insert context into contexts map");
   }
 
-  bool register_span(uint64_t trace_id, std::shared_ptr<EventSpan> span_ptr) {
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
-
-    if (not span_ptr) {
-      return false;
+  std::shared_ptr<TraceContext> GetContext(uint64_t trace_context_id) {
+    // NOTE: lock must be held when calling this method
+    auto it = contexts_.find(trace_context_id);
+    if (it == contexts_.end()) {
+      return {};
     }
 
-    auto target_trace = get_trace(trace_id);
+    return it->second;
+  }
+
+  void AddSpanToTrace(uint64_t trace_id, std::shared_ptr<EventSpan> span_ptr) {
+    // NOTE: lock must be held when calling this method
+
+    auto target_trace = GetTrace(trace_id);
     throw_if_empty(target_trace, trace_is_null);
-    if (target_trace->is_done()) {
-      return false;
-    }
 
-    return target_trace->add_span(span_ptr);
+    target_trace->AddSpan(span_ptr);
   }
 
-  // add a new span to an already existing trace
-  template <class SpanType, class... Args>
-  std::shared_ptr<SpanType> rergister_new_span(uint64_t trace_id,
-                                                Args&&... args) {
+  std::shared_ptr<TraceContext>
+  RegisterCreateContext(uint64_t trace_id, std::shared_ptr<EventSpan> parent) {
+    // NOTE: lock must be held when calling this method
+    auto trace_context = create_shared<TraceContext>(
+        "RegisterCreateContext couldnt create context", parent, trace_id);
+    InsertContext(trace_context);
+    return trace_context;
+  }
+
+ public:
+  void MarkSpanAsDone(std::shared_ptr<EventSpan> span) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    std::shared_ptr<SpanType> new_span = std::make_shared<SpanType>(args...);
-    if (not new_span) {
-      return {};
-    }
+    throw_if_empty(span, "MarkSpanAsDone, span is null");
+    auto context = span->GetContext();
+    throw_if_empty(context, "MarkSpanAsDone context is null");
+    const uint64_t trace_id = context->GetTraceId();
 
-    if (register_span(trace_id, new_span)) {
-      return new_span;
-    }
+    auto trace = GetTrace(trace_id);
+    throw_if_empty(trace, "MarkSpanAsDone trace is null");
 
-    return {};
+    auto found_span = trace->GetSpan(span->GetId());
+    throw_if_empty(found_span, "MarkSpanAsDone found span is null");
+    found_span->MarkAsDone();
+
+    exporter_.EndSpan(found_span);
   }
 
-  // add a new span to an already existing trace and set the parent immediately
-  template <class SpanType, class... Args>
-  std::shared_ptr<SpanType> rergister_new_span_by_parent(
-      std::shared_ptr<EventSpan> parent, Args&&... args) {
+  // will create and add a new span to a trace using the context
+  template<class SpanType, class... Args>
+  std::shared_ptr<SpanType> StartSpanByParent(std::shared_ptr<EventSpan> parent_span, Args &&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    if (not parent) {
-      return {};
-    }
-    auto new_span =
-        rergister_new_span<SpanType>(parent->get_trace_id(), args...);
-    if (not new_span) {
-      return {};
-    }
+    throw_if_empty(parent_span,"StartSpan(...) parent span is null");
+    auto parent_context = parent_span->GetContext();
+    throw_if_empty(parent_context, "StartSpan(...) parent context is null");
+    const uint64_t trace_id = parent_context->GetTraceId();
 
-    if (not new_span->set_parent(parent)) {
-      return {};
-    }
+    auto trace_context = RegisterCreateContext(trace_id, parent_span);
+
+    auto new_span = create_shared<SpanType>(
+        "StartSpan(Args &&... args) could not create a new span", trace_context, args...);
+    // must add span to trace manually
+    AddSpanToTrace(trace_id, new_span);
+
+    exporter_.StartSpan(new_span);
+
     return new_span;
   }
 
-  // add a pack creating a completely new trace
-  template <class SpanType, class... Args>
-  std::shared_ptr<SpanType> rergister_new_trace(Args&&... args) {
+  // will start and create a new trace creating a new context
+  template<class SpanType, class... Args>
+  std::shared_ptr<SpanType> StartSpan(Args &&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    std::shared_ptr<SpanType> new_span = std::make_shared<SpanType>(args...);
-    if (not new_span) {
-      return {};
-    }
+    uint64_t trace_id = trace_environment::GetNextTraceId();
 
-    // NOTE: this will already add the pack to the trace
-    std::shared_ptr<Trace> new_trace = create_shared<Trace>(trace_is_null,
-                                                            trace_environment::get_next_trace_id(), new_span);
-    throw_if_empty(new_trace, trace_is_null);
+    auto trace_context = RegisterCreateContext(trace_id, nullptr);
 
-    auto iter = traces_.insert({new_trace->id_, new_trace});
-    throw_on(not iter.second, "could not insert trace into traces map");
+    auto new_span = create_shared<SpanType>(
+        "StartSpan(Args &&... args) could not create a new span", trace_context, args...);
+
+    // span is here added to the trace
+    auto new_trace = create_shared<Trace>(
+        "StartSpan(Args &&... args) could not create a new trace", trace_id, new_span);
+
+    InsertTrace(new_trace);
+
+    exporter_.StartSpan(new_span);
 
     return new_span;
   }

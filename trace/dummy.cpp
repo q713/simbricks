@@ -44,7 +44,7 @@ int main() {
   HostMmioSpan span{1, false};
   span.add_to_span(mmio_w);
   span.add_to_span(mmio_imr);
-  span.add_to_span(mmio_cw);
+  span.AddToSpan(mmio_cw);
 
 
   opentelemetry::trace::StartSpanOptions mmio_opts;
@@ -74,8 +74,8 @@ int main() {
 
   // end call span
   opentelemetry::trace::EndSpanOptions end_call;
-  end_call.end_steady_time = simbricks::trace::SpanExporter::to_steady_microseconds(1967469891374, offset);
-  call_span->AddEvent("return via sysret", simbricks::trace::SpanExporter::to_system_microseconds(1967469891374, offset));
+  end_call.end_steady_time = simbricks::trace::SpanExporter::ToSteadyMicroseconds(1967469891374, offset);
+  call_span->AddEvent("return via sysret", simbricks::trace::SpanExporter::ToSystemMicroseconds(1967469891374, offset));
   call_span->End(end_call);
 */
 }

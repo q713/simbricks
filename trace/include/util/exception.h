@@ -44,12 +44,8 @@ inline const char *parser_is_null = "std::shared_ptr<LogParser> is null";
 inline const char *actor_is_null = "std::shared_ptr<event_stream_actor> is null";
 inline const char *printer_is_null = "a printer is null";
 inline const char *context_is_null = "std::shared_ptr<context> is null";
-inline const char* already_two_spanner_registered = "already two spanners are registered within context queue";
-inline const char* unknown_spanner_id = "an unknown spanner id was given to a context queue";
 inline const char* event_stream_parser_null = "std::shared_ptr<EventStreamParser> is null";
 inline const char* spanner_is_null = "sstd::shared_ptr<Spanner> is null";
-inline const char* cant_register_spanner_twice = "cannot register spanner twice";
-inline const char* no_spanner_registered = "no spanner is registered within context queue";
 inline const char* could_not_push_to_context_queue = "could not push value into context queue";
 inline const char* queue_is_null = "std::shared_ptr<ContextQueue<...>> is null";
 inline const char* span_exporter_null = "SpanExporter is null";
@@ -57,7 +53,7 @@ inline const char* span_processor_null = "SpanProcessor is null";
 inline const char* trace_provider_null = "TracerProvider is null";
 
 template<typename Value>
-void throw_if_empty (std::shared_ptr<Value> &to_check, const char *message)
+inline void throw_if_empty (std::shared_ptr<Value> &to_check, const char *message)
 {
   if (not to_check)
   {
@@ -66,7 +62,12 @@ void throw_if_empty (std::shared_ptr<Value> &to_check, const char *message)
 }
 
 template<typename Value>
-void throw_if_empty (std::unique_ptr<Value> &to_check, const char *message)
+inline void throw_if_empty(std::shared_ptr<Value> &to_check, std::string&& message) {
+  throw_if_empty(to_check, message.c_str());
+}
+
+template<typename Value>
+inline void throw_if_empty (std::unique_ptr<Value> &to_check, const char *message)
 {
   if (not to_check)
   {
@@ -75,7 +76,7 @@ void throw_if_empty (std::unique_ptr<Value> &to_check, const char *message)
 }
 
 template<typename Value>
-void throw_if_empty (Value *to_check, const char *message)
+inline void throw_if_empty (Value *to_check, const char *message)
 {
   if (not to_check)
   {

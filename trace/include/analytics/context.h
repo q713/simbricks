@@ -34,69 +34,103 @@
 #include <optional>
 #include <unordered_map>
 #include <utility>
+#include <mutex>
 
-#include "analytics/span.h"
 #include "util/exception.h"
 #include "corobelt/corobelt.h"
+#include "env/traceEnvironment.h"
 
-enum expectation { tx, rx, dma, msix, mmio };
+enum expectation { kTx, kRx, kDma, kMsix, kMmio };
 
-inline std::ostream &operator<<(std::ostream &os, expectation e) {
-  switch (e) {
-    case expectation::tx:os << "expectation::tx";
+inline std::ostream &operator<<(std::ostream &out, expectation exp) {
+  switch (exp) {
+    case expectation::kTx:out << "expectation::tx";
       break;
-    case expectation::rx:os << "expectation::rx";
+    case expectation::kRx:out << "expectation::rx";
       break;
-    case expectation::dma:os << "expectation::dma";
+    case expectation::kDma:out << "expectation::dma";
       break;
-    case expectation::msix:os << "expectation::msix";
+    case expectation::kMsix:out << "expectation::msix";
       break;
-    case expectation::mmio:os << "expectation::mmio";
+    case expectation::kMmio:out << "expectation::mmio";
       break;
-    default:os << "could not convert given 'expectation'";
+    default:out << "could not convert given 'expectation'";
       break;
   }
-  return os;
-}
-
-struct Context {
-  expectation expectation_;
-  // NOTE: maybe include trace id, technically currently the parent span contains this information
-  //       this must however be changed in case we consider distributed simulations etc.
-  std::shared_ptr<EventSpan> parent_span_;
-
-  inline std::shared_ptr<EventSpan> &get_parent() {
-    return parent_span_;
-  }
-
- private:
-  Context(expectation expectation, std::shared_ptr<EventSpan> parent_span)
-      : expectation_(expectation), parent_span_(std::move(parent_span)) {
-  }
-
- public:
-  static std::shared_ptr<Context> create(
-      expectation expectation, std::shared_ptr<EventSpan> parent_span) {
-    throw_if_empty(parent_span, span_is_null);
-    auto con = std::shared_ptr<Context>{new Context(expectation, parent_span)};
-    throw_if_empty(con, context_is_null);
-    return con;
-  }
-
-  void display(std::ostream &out) {
-    out << "Context: " << std::endl;
-    out << "expectation=" << expectation_ << std::endl;
-    out << "parent span=" << *parent_span_ << std::endl;
-  }
-};
-
-inline std::ostream &operator<<(std::ostream &out, Context &con) {
-  con.display(out);
   return out;
 }
 
+class EventSpan;
+
+class TraceContext {
+  // if parent is null it is a trace starting span
+  std::shared_ptr<EventSpan> parent_ = nullptr;
+  uint64_t trace_id_;
+  uint64_t id_;
+
+  std::mutex trace_context_mutex_;
+
+ public:
+  explicit TraceContext(uint64_t trace_id)
+      : parent_(nullptr), trace_id_(trace_id), id_(trace_environment::GetNextTraceContextId()) {
+  }
+
+  explicit TraceContext(std::shared_ptr<EventSpan> &parent, uint64_t trace_id)
+      : parent_(parent), trace_id_(trace_id), id_(trace_environment::GetNextTraceContextId()) {
+  }
+
+  bool HasParent() {
+    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
+    return parent_ != nullptr;
+  }
+
+  const std::shared_ptr<EventSpan> &GetParent() {
+    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
+    return parent_;
+  }
+
+  uint64_t GetTraceId() {
+    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
+    return trace_id_;
+  }
+
+  uint64_t GetId() {
+    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
+    return id_;
+  }
+
+};
+
+class Context {
+
+  expectation expectation_;
+  // NOTE: maybe include trace id, technically currently the parent span contains this information
+  //       this must however be changed in case we consider distributed simulations etc.
+  std::shared_ptr<TraceContext> trace_context_;
+
+ public:
+  Context(expectation expectation, std::shared_ptr<TraceContext> trace_context)
+      : expectation_(expectation), trace_context_(trace_context) {
+    throw_if_empty(trace_context, "trying to create Context, trace context is null");
+  }
+
+  inline const std::shared_ptr<TraceContext> &GetTraceContext() const {
+    return trace_context_;
+  }
+
+  inline const std::shared_ptr<TraceContext> &GetNonEmptyTraceContext() {
+    throw_if_empty(trace_context_, "GetNonEmptyTraceContext trace context is null");
+    return trace_context_;
+  }
+
+  inline expectation GetExpectation() const {
+    return expectation_;
+  }
+
+};
+
 inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
-  if (not con or con->expectation_ != exp) {
+  if (not con or con->GetExpectation() != exp) {
     return false;
   }
   return true;

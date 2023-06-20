@@ -44,11 +44,11 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
 
     HostMmioSpan span{source_id, false};
 
-    REQUIRE(span.is_pending());
-    REQUIRE(span.add_to_span(mmio_r));
-    REQUIRE(span.add_to_span(mmio_cr));
-    REQUIRE(span.is_complete());
-    REQUIRE_FALSE(span.is_pending());
+    REQUIRE(span.IsPending());
+    REQUIRE(span.AddToSpan(mmio_r));
+    REQUIRE(span.AddToSpan(mmio_cr));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
   }
 
   /*
@@ -64,14 +64,14 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
 
     HostMmioSpan span{source_id, false};
 
-    REQUIRE(span.is_pending());
-    REQUIRE(span.add_to_span(mmio_w));
-    REQUIRE(span.add_to_span(mmio_imr));
-    REQUIRE(span.is_pending());
-    REQUIRE_FALSE(span.is_complete());
-    REQUIRE(span.add_to_span(mmio_cw));
-    REQUIRE(span.is_complete());
-    REQUIRE_FALSE(span.is_pending());
+    REQUIRE(span.IsPending());
+    REQUIRE(span.AddToSpan(mmio_w));
+    REQUIRE(span.AddToSpan(mmio_imr));
+    REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.AddToSpan(mmio_cw));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
   }
 
   /*
@@ -89,12 +89,12 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
 
     HostMmioSpan span{source_id, true};
 
-    REQUIRE(span.is_pending());
-    REQUIRE(span.add_to_span(mmio_w));
-    REQUIRE(span.add_to_span(mmio_imr));
-    REQUIRE(span.add_to_span(mmio_r));
-    REQUIRE(span.is_complete());
-    REQUIRE_FALSE(span.is_pending());
+    REQUIRE(span.IsPending());
+    REQUIRE(span.AddToSpan(mmio_w));
+    REQUIRE(span.AddToSpan(mmio_imr));
+    REQUIRE(span.AddToSpan(mmio_r));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
   }
 }
 
@@ -110,12 +110,12 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
 
     HostMsixSpan span{source_id};
 
-    REQUIRE(span.is_pending());
-    REQUIRE_FALSE(span.is_complete());
-    REQUIRE(span.add_to_span(msix));
-    REQUIRE(span.add_to_span(dma_c));
-    REQUIRE(span.is_complete());
-    REQUIRE_FALSE(span.is_pending());
+    REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.AddToSpan(msix));
+    REQUIRE(span.AddToSpan(dma_c));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
   }
 
   SECTION("no msix but dma with id 0") {
@@ -123,9 +123,9 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
 
     HostMsixSpan span{source_id};
 
-    REQUIRE(span.is_pending());
-    REQUIRE_FALSE(span.is_complete());
-    REQUIRE_FALSE(span.add_to_span(dma_c));
+    REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE_FALSE(span.AddToSpan(dma_c));
   }
 
   SECTION("msix followed by dma completion with non 0 id") {
@@ -134,10 +134,10 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
 
     HostMsixSpan span{source_id};
 
-    REQUIRE(span.add_to_span(msix));
-    REQUIRE_FALSE(span.add_to_span(dma_c));
-    REQUIRE_FALSE(span.is_complete());
-    REQUIRE(span.is_pending());
+    REQUIRE(span.AddToSpan(msix));
+    REQUIRE_FALSE(span.AddToSpan(dma_c));
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.IsPending());
   }
 
   SECTION("msix followed by arbitrary dma") {
@@ -146,10 +146,10 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
 
     HostMsixSpan span{source_id};
 
-    REQUIRE(span.add_to_span(msix));
-    REQUIRE_FALSE(span.add_to_span(dma_r));
-    REQUIRE_FALSE(span.is_complete());
-    REQUIRE(span.is_pending());
+    REQUIRE(span.AddToSpan(msix));
+    REQUIRE_FALSE(span.AddToSpan(dma_r));
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.IsPending());
   }
 }
 

@@ -29,11 +29,13 @@
 #include <memory>
 #include <vector>
 #include <optional>
+#include <mutex>
 
 #include "util/exception.h"
 #include "corobelt/corobelt.h"
 #include "events/events.h"
 #include "env/traceEnvironment.h"
+#include "analytics/context.h"
 
 inline void write_ident(std::ostream &out, unsigned ident) {
   if (ident == 0)
@@ -45,72 +47,71 @@ inline void write_ident(std::ostream &out, unsigned ident) {
 }
 
 enum span_type {
-  host_call,
-  host_msix,
-  host_mmio,
-  host_dma,
-  host_int,
-  nic_dma,
-  nic_mmio,
-  nic_eth,
-  nic_msix,
-  generic_single
+  kHostCall,
+  kHostMsix,
+  kHostMmio,
+  kHostDma,
+  kHostInt,
+  kNicDma,
+  kNicMmio,
+  kNicEth,
+  kNicMsix,
+  kGenericSingle
 };
 
-inline std::ostream &operator<<(std::ostream &os, span_type t) {
-  switch (t) {
-    case span_type::host_call:os << "host_call";
+inline std::ostream &operator<<(std::ostream &out, span_type type) {
+  switch (type) {
+    case span_type::kHostCall:out << "kHostCall";
       break;
-    case span_type::host_msix:os << "host_msix";
+    case span_type::kHostMsix:out << "kHostMsix";
       break;
-    case span_type::host_mmio:os << "host_mmio";
+    case span_type::kHostMmio:out << "kHostMmio";
       break;
-    case span_type::host_dma:os << "host_dma";
+    case span_type::kHostDma:out << "kHostDma";
       break;
-    case span_type::host_int:os << "host_int";
+    case span_type::kHostInt:out << "kHostInt";
       break;
-    case span_type::nic_dma:os << "nic_dma";
+    case span_type::kNicDma:out << "kNicDma";
       break;
-    case span_type::nic_mmio:os << "nic_mmio";
+    case span_type::kNicMmio:out << "kNicMmio";
       break;
-    case span_type::nic_eth:os << "nic_eth";
+    case span_type::kNicEth:out << "kNicEth";
       break;
-    case span_type::nic_msix:os << "nic_msix";
+    case span_type::kNicMsix:out << "kNicMsix";
       break;
-    case span_type::generic_single:os << "generic_single";
+    case span_type::kGenericSingle:out << "kGenericSingle";
       break;
-    default:os << "could not represent given span type";
+    default:out << "could not represent given span type";
       break;
   }
-  return os;
+  return out;
 }
 
-struct EventSpan {
+class EventSpan {
+ protected:
   uint64_t id_;
   uint64_t source_id_;
   span_type type_;
   std::vector<std::shared_ptr<Event>> events_;
-
-  std::shared_ptr<EventSpan> parent_ = nullptr;
-  std::vector<std::shared_ptr<EventSpan>> children_;
-
   bool is_pending_ = true;
   bool is_relevant_ = false;
 
-  uint64_t trace_id_;
+  std::shared_ptr<TraceContext> trace_context_ = nullptr;
 
+  std::mutex span_mutex_;
+
+  inline static const char *tc_null = "try setting std::shared_ptr<TraceContext> which is null";
+
+ private:
   virtual void display(std::ostream &out, unsigned ident) {
     write_ident(out, ident);
     out << "id: " << (unsigned long long) id_;
     out << ", source_id: " << (unsigned long long) source_id_;
     out << ", kind: " << type_ << std::endl;
     write_ident(out, ident);
-    out << "has parent? " << (parent_ != nullptr) << std::endl;
+    // TODO: fix
+    //out << "has parent? " << (parent_ != nullptr) << std::endl;
     write_ident(out, ident);
-    out << "children? ";
-    for (auto &p : children_) {
-      out << (unsigned long long) p->id_ << ", ";
-    }
     out << std::endl;
     for (std::shared_ptr<Event> event : events_) {
       write_ident(out, ident);
@@ -118,51 +119,71 @@ struct EventSpan {
     }
   }
 
+ public:
+  size_t GetAmountEvents() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+    return events_.size();
+  }
+
+  std::shared_ptr<Event> GetAt(size_t index) {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+    if (index >= events_.size()) {
+      return nullptr;
+    }
+    return events_[index];
+  }
+
   inline virtual void display(std::ostream &out) {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     display(out, 0);
   }
 
-  inline uint64_t get_id() {
+  inline uint64_t GetId() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     return id_;
   }
 
-  inline span_type get_type() const {
+  inline span_type GetType() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     return type_;
   }
 
-  inline uint64_t get_source_id() const {
+  inline uint64_t GetSourceId() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     return source_id_;
   }
 
-  inline uint64_t get_trace_id() const {
-    return trace_id_;
+  inline const std::shared_ptr<TraceContext> &GetContext() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+    return trace_context_;
   }
 
-  inline void set_trace_id(uint64_t trace_id) {
-    trace_id_ = trace_id;
-  }
-
-  void mark_as_done() {
+  void MarkAsDone() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     is_pending_ = false;
   }
 
-  bool is_pending() const {
+  bool IsPending() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     return is_pending_;
   }
 
-  bool is_complete() const {
-    return not is_pending();
+  bool IsComplete() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+    return not IsPending();
   }
 
-  inline void mark_as_relevant() {
+  inline void MarkAsRelevant() {
     is_relevant_ = true;
   }
 
-  inline void mark_as_non_relevant() {
+  inline void MarkAsNonRelevant() {
     is_relevant_ = false;
   }
 
-  uint64_t get_starting_ts() {
+  uint64_t GetStartingTs() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
     if (events_.empty()) {
       return 0xFFFFFFFFFFFFFFFF;
     }
@@ -174,8 +195,10 @@ struct EventSpan {
     return 0xFFFFFFFFFFFFFFFF;
   }
 
-  uint64_t get_completion_ts() {
-    if (events_.empty() or is_pending()) {
+  uint64_t GetCompletionTs() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (events_.empty() or IsPending()) {
       return 0xFFFFFFFFFFFFFFFF;
     }
 
@@ -186,47 +209,59 @@ struct EventSpan {
     return 0xFFFFFFFFFFFFFFFF;
   }
 
-  bool set_parent(std::shared_ptr<EventSpan> parent_span) {
-    if (not parent_ and parent_span and
-        parent_span->get_starting_ts() < get_starting_ts()) {
-      parent_ = parent_span;
-      return true;
+  bool SetContext(std::shared_ptr<TraceContext> traceContext) {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (trace_context_) {
+      return false;
     }
-    return false;
-  }
+    throw_if_empty(traceContext, tc_null);
 
-  bool has_parent() const {
-    return parent_ != nullptr;
-  }
-
-  std::shared_ptr<EventSpan> get_parent() const {
-    return parent_;
-  }
-
-  bool add_children(std::shared_ptr<EventSpan> child_span) {
-    if (child_span and child_span.get() != this and
-        get_starting_ts() < child_span->get_starting_ts()) {
-      children_.push_back(child_span);
-      return true;
+    auto parent = traceContext->GetParent();
+    if (not parent or parent->GetStartingTs() >= GetStartingTs()) {
+      return false;
     }
 
-    return false;
+    trace_context_ = traceContext;
+    return true;
+  }
+
+  bool HasParent() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    return trace_context_ != nullptr and trace_context_->GetParent() != nullptr;
+  }
+
+  std::shared_ptr<EventSpan> GetParent() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not trace_context_) {
+      return nullptr;
+    }
+
+    return trace_context_->GetParent();
   }
 
   virtual ~EventSpan() = default;
 
-  explicit EventSpan(uint64_t source_id, span_type t)
-      : id_(trace_environment::get_next_span_id()),
+  explicit EventSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id, span_type t)
+      : id_(trace_environment::GetNextSpanId()),
         source_id_(source_id),
-        type_(t) {
+        type_(t),
+        trace_context_(trace_context) {
+    throw_if_empty(trace_context, tc_null);
   }
 
-  bool is_potential_add(std::shared_ptr<Event> event_ptr) {
+  virtual bool AddToSpan(std::shared_ptr<Event> event_ptr) = 0;
+
+ protected:
+  // When calling this method the lock must be held
+  bool IsPotentialAdd(std::shared_ptr<Event> event_ptr) {
     if (not event_ptr) {
       return false;
     }
 
-    if (is_complete()) {
+    if (IsComplete()) {
       return false;
     }
 
@@ -235,12 +270,13 @@ struct EventSpan {
       if (first->get_parser_ident() != event_ptr->get_parser_ident()) {
         return false;
       }
+      if (first->get_ts() > event_ptr->get_ts()) {
+        return false;
+      }
     }
 
     return true;
   }
-
-  virtual bool add_to_span(std::shared_ptr<Event> event_ptr) = 0;
 };
 
 inline std::ostream &operator<<(std::ostream &os, EventSpan &span) {
@@ -248,28 +284,23 @@ inline std::ostream &operator<<(std::ostream &os, EventSpan &span) {
   return os;
 }
 
-struct HostCallSpan : public EventSpan {
+class HostCallSpan : public EventSpan {
   std::shared_ptr<Event> call_span_entry_ = nullptr;
   std::shared_ptr<Event> syscall_return_ = nullptr;
   bool transmits_ = false;
   bool receives_ = false;
 
-  void set_call_pack_entry(std::shared_ptr<Event> event_ptr) {
-    call_span_entry_ = event_ptr;
-  }
-
-  void set_syscall_return(std::shared_ptr<Event> event_ptr) {
-    syscall_return_ = event_ptr;
-  }
-
-  explicit HostCallSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::host_call) {
+ public:
+  explicit HostCallSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kHostCall) {
   }
 
   ~HostCallSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
       std::cout << "is not a potential add" << std::endl;
       return false;
     }
@@ -309,18 +340,21 @@ struct HostCallSpan : public EventSpan {
   }
 };
 
-struct HostIntSpan : public EventSpan {
+class HostIntSpan : public EventSpan {
   std::shared_ptr<Event> host_post_int_ = nullptr;
   std::shared_ptr<Event> host_clear_int_ = nullptr;
 
-  explicit HostIntSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::host_int) {
+ public:
+  explicit HostIntSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kHostInt) {
   }
 
   ~HostIntSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
       return false;
     }
 
@@ -346,21 +380,24 @@ struct HostIntSpan : public EventSpan {
   }
 };
 
-struct HostDmaSpan : public EventSpan {
+class HostDmaSpan : public EventSpan {
   // HostDmaW_t or HostDmaR_t
   std::shared_ptr<Event> host_dma_execution_ = nullptr;
   bool is_read_ = true;
   // HostDmaC_t
   std::shared_ptr<Event> host_dma_completion_ = nullptr;
 
-  explicit HostDmaSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::host_dma) {
+ public:
+  explicit HostDmaSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kHostDma) {
   }
 
   ~HostDmaSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
       return false;
     }
 
@@ -401,7 +438,7 @@ struct HostDmaSpan : public EventSpan {
   }
 };
 
-struct HostMmioSpan : public EventSpan {
+class HostMmioSpan : public EventSpan {
   // issue, either host_mmio_w_ or host_mmio_r_
   std::shared_ptr<Event> host_mmio_issue_ = nullptr;
   bool is_read_ = false;
@@ -411,27 +448,23 @@ struct HostMmioSpan : public EventSpan {
   // completion, either host_mmio_cw_ or host_mmio_cr_
   std::shared_ptr<Event> completion_ = nullptr;
 
-  explicit HostMmioSpan(uint64_t source_id, bool pci_before)
-      : EventSpan(source_id, span_type::host_mmio),
+ public:
+  explicit HostMmioSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id, bool pci_before)
+      : EventSpan(trace_context, source_id, span_type::kHostMmio),
         pci_before_(pci_before) {
   }
 
   ~HostMmioSpan() = default;
 
-  inline bool is_after_pci() const {
+  inline bool IsAfterPci() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     return pci_before_;
   }
 
-  inline bool is_read() const {
-    return is_read_;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
 
-  inline bool is_write() const {
-    return not is_read_;
-  }
-
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+    if (not IsPotentialAdd(event_ptr)) {
       return false;
     }
 
@@ -515,18 +548,21 @@ struct HostMmioSpan : public EventSpan {
   }
 };
 
-struct HostMsixSpan : public EventSpan {
+class HostMsixSpan : public EventSpan {
   std::shared_ptr<Event> host_msix_ = nullptr;
   std::shared_ptr<Event> host_dma_c_ = nullptr;
 
-  explicit HostMsixSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::host_msix) {
+ public:
+  explicit HostMsixSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kHostMsix) {
   }
 
   ~HostMsixSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
       return false;
     }
 
@@ -558,17 +594,20 @@ struct HostMsixSpan : public EventSpan {
   }
 };
 
-struct NicMsixSpan : public EventSpan {
+class NicMsixSpan : public EventSpan {
   std::shared_ptr<Event> nic_msix_ = nullptr;
 
-  NicMsixSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::nic_msix) {
+ public:
+  NicMsixSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kNicMsix) {
   }
 
   ~NicMsixSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
       return false;
     }
 
@@ -588,19 +627,22 @@ struct NicMsixSpan : public EventSpan {
   }
 };
 
-struct NicMmioSpan : public EventSpan {
+class NicMmioSpan : public EventSpan {
   // nic action nic_mmio_w_ or nic_mmio_r_
   std::shared_ptr<Event> action_ = nullptr;
   bool is_read_ = false;
 
-  explicit NicMmioSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::nic_mmio) {
+ public:
+  explicit NicMmioSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kNicMmio) {
   }
 
   ~NicMmioSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr) or action_) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr) or action_) {
       return false;
     }
 
@@ -619,7 +661,7 @@ struct NicMmioSpan : public EventSpan {
   }
 };
 
-struct NicDmaSpan : public EventSpan {
+class NicDmaSpan : public EventSpan {
   // NicDmaI_t
   std::shared_ptr<Event> dma_issue_ = nullptr;
   // NicDmaEx_t
@@ -628,13 +670,17 @@ struct NicDmaSpan : public EventSpan {
   std::shared_ptr<Event> nic_dma_completion_ = nullptr;
   bool is_read_ = true;
 
-  explicit NicDmaSpan(uint64_t source_id) : EventSpan(source_id, span_type::nic_dma) {
+ public:
+  explicit NicDmaSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kNicDma) {
   }
 
   ~NicDmaSpan() = default;
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr)) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
       return false;
     }
 
@@ -687,26 +733,32 @@ struct NicDmaSpan : public EventSpan {
   }
 };
 
-struct NicEthSpan : public EventSpan {
+class NicEthSpan : public EventSpan {
   // NicTx or NicRx
   std::shared_ptr<Event> tx_rx_ = nullptr;
   bool is_send_ = false;
 
-  explicit NicEthSpan(uint64_t source_id) : EventSpan(source_id, span_type::nic_eth) {
+ public:
+  explicit NicEthSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kNicEth) {
   }
 
   ~NicEthSpan() = default;
 
-  inline bool is_transmit() const {
+  inline bool IsTransmit() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
     return is_send_;
   }
 
-  inline bool is_receive() const {
-    return not is_transmit();
+  inline bool IsReceive() {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+    return not IsTransmit();
   }
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr) or tx_rx_) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr) or tx_rx_) {
       return false;
     }
 
@@ -725,15 +777,18 @@ struct NicEthSpan : public EventSpan {
   }
 };
 
-struct GenericSingleSpan : public EventSpan {
+class GenericSingleSpan : public EventSpan {
   std::shared_ptr<Event> event_p_ = nullptr;
 
-  explicit GenericSingleSpan(uint64_t source_id)
-      : EventSpan(source_id, span_type::generic_single) {
+ public:
+  explicit GenericSingleSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kGenericSingle) {
   }
 
-  bool add_to_span(std::shared_ptr<Event> event_ptr) override {
-    if (not is_potential_add(event_ptr) or event_p_) {
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr) or event_p_) {
       return false;
     }
 
@@ -752,7 +807,7 @@ inline bool is_type(std::shared_ptr<EventSpan> span, span_type type) {
   if (not span) {
     return false;
   }
-  return span->get_type() == type;
+  return span->GetType() == type;
 }
 
 struct SpanPrinter

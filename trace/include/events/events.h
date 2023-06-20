@@ -79,6 +79,81 @@ enum EventType {
   NicRx_t
 };
 
+inline std::ostream &operator<<(std::stringstream &into, EventType &type) {
+  switch (type) {
+    case EventType::Event_t:into << "Event_t";
+      break;
+    case EventType::SimSendSync_t:into << "SimSendSync_t";
+      break;
+    case EventType::SimProcInEvent_t:into << "SimProcInEvent_t";
+      break;
+    case EventType::HostInstr_t:into << "HostInstr_t";
+      break;
+    case EventType::HostCall_t:into << "HostCall_t";
+      break;
+    case EventType::HostMmioImRespPoW_t:into << "HostMmioImRespPoW_t";
+      break;
+    case EventType::HostIdOp_t:into << "HostIdOp_t";
+      break;
+    case EventType::HostMmioCR_t:into << "HostMmioCR_t";
+      break;
+    case EventType::HostMmioCW_t:into << "HostMmioCW_t";
+      break;
+    case EventType::HostAddrSizeOp_t:into << "HostAddrSizeOp_t";
+      break;
+    case EventType::HostMmioR_t:into << "HostMmioR_t";
+      break;
+    case EventType::HostMmioW_t:into << "HostMmioW_t";
+      break;
+    case EventType::HostDmaC_t:into << "HostDmaC_t";
+      break;
+    case EventType::HostDmaR_t:into << "HostDmaR_t";
+      break;
+    case EventType::HostDmaW_t:into << "HostDmaW_t";
+      break;
+    case EventType::HostMsiX_t:into << "HostMsiX_t";
+      break;
+    case EventType::HostConf_t:into << "HostConf_t";
+      break;
+    case EventType::HostClearInt_t:into << "HostClearInt_t";
+      break;
+    case EventType::HostPostInt_t:into << "HostPostInt_t";
+      break;
+    case EventType::HostPciRW_t:into << "HostPciRW_t";
+      break;
+    case EventType::NicMsix_t:into << "NicMsix_t";
+      break;
+    case EventType::NicDma_t:into << "NicDma_t";
+      break;
+    case EventType::SetIX_t:into << "SetIX_t";
+      break;
+    case EventType::NicDmaI_t:into << "NicDmaI_t";
+      break;
+    case EventType::NicDmaEx_t:into << "NicDmaEx_t";
+      break;
+    case EventType::NicDmaEn_t:into << "NicDmaEn_t";
+      break;
+    case EventType::NicDmaCR_t:into << "NicDmaCR_t";
+      break;
+    case EventType::NicDmaCW_t:into << "NicDmaCW_t";
+      break;
+    case EventType::NicMmio_t:into << "NicMmio_t";
+      break;
+    case EventType::NicMmioR_t:into << "NicMmioR_t";
+      break;
+    case EventType::NicMmioW_t:into << "NicMmioW_t";
+      break;
+    case EventType::NicTrx_t:into << "NicTrx_t";
+      break;
+    case EventType::NicTx_t:into << "NicTx_t";
+      break;
+    case EventType::NicRx_t:into << "NicRx_t";
+      break;
+    default:throw_just("encountered unknown event type");
+  }
+  return into;
+}
+
 /* Parent class for all events of interest */
 class Event {
   EventType type_;
@@ -846,6 +921,6 @@ struct EventComperator {
 
 bool is_type(std::shared_ptr<Event> &event_ptr, EventType type);
 
-bool is_type(const Event& event, EventType type);
+bool is_type(const Event &event, EventType type);
 
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

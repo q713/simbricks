@@ -49,7 +49,7 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
   override = 0;
 
   explicit Spanner(Tracer &tra)
-      : id_(trace_environment::get_next_spanner_id()), tracer_(tra) {
+      : id_(trace_environment::GetNextSpannerId()), tracer_(tra) {
   }
 
   inline uint64_t get_id() const {
@@ -90,8 +90,8 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
     for (auto it = pending.begin(); it != pending.end(); it++) {
       pending_span = *it;
-      if (pending_span and pending_span->add_to_span(event_ptr)) {
-        if (pending_span->is_complete()) {
+      if (pending_span and pending_span->AddToSpan(event_ptr)) {
+        if (pending_span->IsComplete()) {
           pending.erase(it);
         }
         return pending_span;
@@ -190,6 +190,7 @@ struct NicSpanner : public Spanner {
 
   std::shared_ptr<Context> last_host_context_ = nullptr;
   std::shared_ptr<EventSpan> last_completed_ = nullptr;
+  bool last_action_was_send_ = false;
 
   std::list<std::shared_ptr<NicDmaSpan>> pending_nic_dma_spans_;
 };

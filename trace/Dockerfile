@@ -24,13 +24,10 @@ RUN apt-get update && \
       libbenchmark-dev \
       ninja-build \
       protobuf-compiler \
-      libcurl4-openssl-dev
-
-RUN apt-get update &&                           \
-    apt-get install -yq    \
-        clang-$llvmver                                   \
-        lldb-$llvmver &&                                 \
-    apt-get clean &&                               \
+      libcurl4-openssl-dev \
+      clang-$llvmver \
+      lldb-$llvmver && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*;
 
 WORKDIR /usr/src
@@ -43,5 +40,5 @@ RUN cmake -B build-docker -DWITH_OTLP_HTTP=ON -DBUILD_TESTING=OFF -G Ninja . && 
     cd build-docker && \
     ninja
 
+# TODO: execute the actual tracing utility
 CMD [ "/bin/bash" ]
-#CMD ["./build-docker/dummy"]

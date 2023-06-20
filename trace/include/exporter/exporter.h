@@ -62,17 +62,76 @@ class Exporter {
  public:
   Exporter() = default;
 
-  virtual void export_trace(std::shared_ptr<Trace> &trace_to_export) = 0;
+  virtual void StartSpan(std::shared_ptr<EventSpan> to_start) = 0;
+
+  virtual void EndSpan(std::shared_ptr<EventSpan> to_end) = 0;
 };
 
 class OtlpSpanExporter : public Exporter {
 
   int64_t time_offset_ = 0;
   opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer> tracer_;
-  std::unordered_map<uint64_t, opentelemetry::trace::SpanContext> contex_map_;
+
+  // mapping: own_context_id -> opentelemetry_span_context
+  std::unordered_map<uint64_t, opentelemetry::trace::SpanContext> context_map_;
+
+  // mapping: own_span_id -> opentelemetry_span
+  std::unordered_map<uint64_t, opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>> span_map_;
 
   using ts_steady = std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds>;
   using ts_system = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
+
+  void InsertNewContext(std::shared_ptr<TraceContext> &custom,
+                        opentelemetry::trace::SpanContext &context) {
+    throw_if_empty(custom, "InsertNewContext custom is null");
+    auto context_id = custom->GetId();
+    auto iter = context_map_.insert({context_id, context});
+    throw_on(not iter.second, "InsertNewContext could not insert context into map");
+  }
+
+  opentelemetry::trace::SpanContext
+  GetContext(std::shared_ptr<TraceContext> &context_to_get) {
+    throw_if_empty(context_to_get, "GetContext context_to_get is null");
+    auto iter = context_map_.find(context_to_get->GetId());
+    throw_on(iter == context_map_.end(), "GetContext context was not found");
+    return iter->second;
+  }
+
+  void InsertNewSpan(std::shared_ptr<EventSpan> &old_span,
+                     opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &new_span) {
+    throw_if_empty(old_span, "InsertNewSpan old span is null");
+    throw_on(not new_span, "InsertNewSpan new_span is null");
+
+    const uint64_t span_id = old_span->GetId();
+    auto iter = span_map_.insert({span_id, new_span});
+    throw_on(not iter.second, "InsertNewSpan could not insert into span map");
+  }
+
+  opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>
+  GetSpan(std::shared_ptr<EventSpan> &span_to_get) {
+    throw_if_empty(span_to_get, "GetSpan span_to_get is null");
+    const uint64_t span_id = span_to_get->GetId();
+    auto span = span_map_.find(span_id)->second;
+    throw_on(not span, "InsertNewSpan span is null");
+    return span;
+  }
+
+  static int64_t GetNowOffsetMicroseconds() {
+    auto now = std::chrono::system_clock::now();
+    auto now_ms = std::chrono::time_point_cast<std::chrono::microseconds>(now);
+    auto value = now_ms.time_since_epoch();
+    return value.count();
+  }
+
+  opentelemetry::common::SteadyTimestamp ToSteadyMicroseconds(uint64_t timestamp) const {
+    const ts_steady time_point{std::chrono::microseconds{time_offset_ + (timestamp / 1000 / 1000)}};
+    return opentelemetry::common::SteadyTimestamp(time_point);
+  }
+
+  opentelemetry::common::SystemTimestamp ToSystemMicroseconds(uint64_t timestamp) const {
+    const ts_system time_point{std::chrono::microseconds{time_offset_ + (timestamp / 1000 / 1000)}};
+    return opentelemetry::common::SystemTimestamp(time_point);
+  }
 
   std::string get_type_str(std::shared_ptr<Event> event) {
     assert(event and "event is not null");
@@ -84,7 +143,7 @@ class OtlpSpanExporter : public Exporter {
   std::string get_type_str(std::shared_ptr<EventSpan> span) {
     assert(span and "event is not null");
     std::stringstream sss;
-    sss << span->get_type();
+    sss << span->GetType();
     return std::move(sss.str());
   }
 
@@ -295,46 +354,17 @@ class OtlpSpanExporter : public Exporter {
     attributes.insert({"port", std::to_string(event->GetPort())});
   }
 
-  int64_t get_now_offset_microseconds() {
-    auto now = std::chrono::system_clock::now();
-    auto now_ms = std::chrono::time_point_cast<std::chrono::microseconds>(now);
-    auto value = now_ms.time_since_epoch();
-    return value.count();
-  }
-
-  opentelemetry::common::SteadyTimestamp to_steady_microseconds(uint64_t timestamp) {
-    const ts_steady time_point{std::chrono::microseconds{time_offset_ + (timestamp / 1000 / 1000)}};
-    return opentelemetry::common::SteadyTimestamp(time_point);
-  }
-
-  opentelemetry::common::SystemTimestamp to_system_microseconds(uint64_t timestamp) {
-    const ts_system time_point{std::chrono::microseconds{time_offset_ + (timestamp / 1000 / 1000)}};
-    return opentelemetry::common::SystemTimestamp(time_point);
-  }
-
   opentelemetry::trace::StartSpanOptions get_span_start_opts(std::shared_ptr<EventSpan> span) {
     opentelemetry::trace::StartSpanOptions span_options;
-    if (span->has_parent()) {
-      auto parent = span->get_parent();
-      throw_if_empty(parent, event_is_null);
-      const uint64_t parent_id = parent->get_id();
-
-      auto search = contex_map_.find(parent_id);
-      throw_on(search == contex_map_.end(), "the parent has not yet an entry within the context map");
-
-      span_options.parent = search->second;
+    if (span->HasParent()) {
+      auto custom_context = span->GetContext();
+      auto open_context = GetContext(custom_context);
+      span_options.parent = open_context;
     }
-    span_options.start_system_time = to_system_microseconds(span->get_starting_ts());
-    span_options.start_steady_time = to_steady_microseconds(span->get_starting_ts());
+    span_options.start_system_time = ToSystemMicroseconds(span->GetStartingTs());
+    span_options.start_steady_time = ToSteadyMicroseconds(span->GetStartingTs());
 
     return std::move(span_options);
-  }
-
-  void update_context_map(std::shared_ptr<EventSpan> old_span,
-                          opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &new_span) {
-    auto context = new_span->GetContext();
-    const bool updated = contex_map_.insert({old_span->get_id(), context}).second;
-    throw_on(not updated, "could not update context map");
   }
 
   void end_span(std::shared_ptr<EventSpan> old_span,
@@ -342,9 +372,8 @@ class OtlpSpanExporter : public Exporter {
     assert(old_span and "old span is null");
     assert(new_span and "new span is null");
     opentelemetry::trace::EndSpanOptions end_opts;
-    end_opts.end_steady_time = to_steady_microseconds(old_span->get_completion_ts());
+    end_opts.end_steady_time = ToSteadyMicroseconds(old_span->GetCompletionTs());
     new_span->End(end_opts);
-    update_context_map(old_span, new_span);
   }
 
   void add_HostMmioW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -352,7 +381,7 @@ class OtlpSpanExporter : public Exporter {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioW(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostMmioR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -360,7 +389,7 @@ class OtlpSpanExporter : public Exporter {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioR(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostMmioImRespPoW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -368,7 +397,7 @@ class OtlpSpanExporter : public Exporter {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioImRespPoW(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostMmioCW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -376,7 +405,7 @@ class OtlpSpanExporter : public Exporter {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioCW(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostMmioCR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -384,7 +413,7 @@ class OtlpSpanExporter : public Exporter {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioCR(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostCall(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -392,7 +421,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostCall(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostMsiX(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -400,7 +429,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMsiX(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostDmaC(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -408,7 +437,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostDmaC(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostDmaR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -416,7 +445,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostDmaR(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostDmaW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -424,7 +453,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostDmaW(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostPostInt(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -432,7 +461,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostPostInt(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_HostClearInt(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -440,14 +469,14 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostClearInt(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicDmaI(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicDmaI> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaI(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicDmaEx(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -455,7 +484,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaEx(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicDmaCW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -463,7 +492,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaCW(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicDmaCR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -471,7 +500,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaCR(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicMmioR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -479,7 +508,7 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicMmioR(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicMmioW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
@@ -487,37 +516,39 @@ class OtlpSpanExporter : public Exporter {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicMmioW(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicTx(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicTx> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicTx(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicRx(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicRx> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicRx(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_NicMsix(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicMsix> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicMsix(attributes, event);
-    span->AddEvent(type, to_system_microseconds(event->get_ts()), attributes);
+    span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
   void add_EventSpanAttr(std::map<std::string, std::string> attributes, std::shared_ptr<EventSpan> span) {
     auto span_name = get_type_str(span);
-    attributes.insert({"id", std::to_string(span->get_id())});
-    attributes.insert({"source id", std::to_string(span->get_source_id())});
+    attributes.insert({"id", std::to_string(span->GetId())});
+    attributes.insert({"source id", std::to_string(span->GetSourceId())});
     attributes.insert({"type", span_name});
-    attributes.insert({"pending", span->is_pending() ? "true" : "false"});
-    attributes.insert({"trace id", std::to_string(span->get_trace_id())});
+    attributes.insert({"pending", span->IsPending() ? "true" : "false"});
+    auto context = span->GetContext();
+    throw_if_empty(context, "add_EventSpanAttr context is null");
+    attributes.insert({"trace id", std::to_string(context->GetTraceId())});
   }
 
   void transform_HostCallSpan(std::shared_ptr<HostCallSpan> &to_transform) {
@@ -527,17 +558,166 @@ class OtlpSpanExporter : public Exporter {
     add_EventSpanAttr(attributes, to_transform);
     auto call_span = tracer_->StartSpan(span_name, attributes, span_opts);
 
-    for (auto &event : to_transform->events_) {
-      switch (event->get_type()) {
-        case EventType::HostCall_t:add_HostCall(call_span, std::static_pointer_cast<HostCall>(event));
+  }
+
+ public:
+  OtlpSpanExporter(std::string &&url, std::string service_name, bool batch_mode, std::string &&lib_name) : Exporter() {
+    // create exporter
+    opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
+    opts.url = url;
+    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
+        opts);
+    //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
+    throw_if_empty(exporter, span_exporter_null);
+
+    // create span processor
+    std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> processor = nullptr;
+    if (batch_mode) {
+      const opentelemetry::sdk::trace::BatchSpanProcessorOptions batch_opts;
+      processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
+          std::move(exporter), batch_opts);
+    } else {
+      processor = opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
+    }
+    throw_if_empty(processor, span_processor_null);
+
+    // TODO: create multiple provider, accessed by string mapping to see different sources within jaeger ui
+    // create trace provider
+    auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
+        {"service.name", service_name}
+    };
+    auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
+    std::shared_ptr<opentelemetry::trace::TracerProvider> provider =
+        opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
+    throw_if_empty(provider, trace_provider_null);
+
+    // Set the global trace provider
+    opentelemetry::trace::Provider::SetTracerProvider(provider);
+
+    // set tracer and offset
+    tracer_ = provider->GetTracer(lib_name, OPENTELEMETRY_SDK_VERSION);
+    time_offset_ = GetNowOffsetMicroseconds();
+  }
+
+  void StartSpan(std::shared_ptr<EventSpan> to_start) override {
+    auto span_opts = get_span_start_opts(to_start);
+    auto span_name = get_type_str(to_start);
+    std::map<std::string, std::string> attributes;
+    add_EventSpanAttr(attributes, to_start);
+
+    auto call_span = tracer_->StartSpan(span_name, attributes, span_opts);
+    InsertNewSpan(to_start, call_span);
+
+    auto old_context = to_start->GetContext();
+    auto new_context = call_span->GetContext();
+    InsertNewContext(old_context, new_context);
+  }
+
+  void EndSpan(std::shared_ptr<EventSpan> to_end) override {
+    auto span = GetSpan(to_end);
+
+    const size_t amount_events = to_end->GetAmountEvents();
+    for (size_t index = 0; index < amount_events; index++) {
+
+      auto action = to_end->GetAt(index);
+      throw_if_empty(action, "EndSpan action is null");
+
+      switch (action->get_type()) {
+        case EventType::HostCall_t: {
+          add_HostCall(span, std::static_pointer_cast<HostCall>(action));
           break;
-        default:throw_just("transform_HostCallSpan unexpected event: ", *event);
+        }
+        case EventType::HostMsiX_t: {
+          add_HostMsiX(span, std::static_pointer_cast<HostMsiX>(action));
+          break;
+        }
+        case EventType::HostMmioW_t: {
+          add_HostMmioW(span, std::static_pointer_cast<HostMmioW>(action));
+          break;
+        }
+        case EventType::HostMmioR_t: {
+          add_HostMmioR(span, std::static_pointer_cast<HostMmioR>(action));
+          break;
+        }
+        case EventType::HostMmioImRespPoW_t: {
+          add_HostMmioImRespPoW(span,
+                                std::static_pointer_cast<HostMmioImRespPoW>(action));
+          break;
+        }
+        case EventType::HostMmioCW_t: {
+          add_HostMmioCW(span, std::static_pointer_cast<HostMmioCW>(action));
+          break;
+        }
+        case EventType::HostMmioCR_t: {
+          add_HostMmioCR(span, std::static_pointer_cast<HostMmioCR>(action));
+          break;
+        }
+        case EventType::HostDmaW_t: {
+          add_HostDmaW(span, std::static_pointer_cast<HostDmaW>(action));
+          break;
+        }
+        case EventType::HostDmaR_t: {
+          add_HostDmaR(span, std::static_pointer_cast<HostDmaR>(action));
+          break;
+        }
+        case EventType::HostDmaC_t: {
+          add_HostDmaC(span, std::static_pointer_cast<HostDmaC>(action));
+          break;
+        }
+        case EventType::HostPostInt_t: {
+          add_HostPostInt(span, std::static_pointer_cast<HostPostInt>(action));
+          break;
+        }
+        case EventType::HostClearInt_t: {
+          add_HostClearInt(span, std::static_pointer_cast<HostClearInt>(action));
+          break;
+        }
+        case EventType::NicDmaI_t: {
+          add_NicDmaI(span, std::static_pointer_cast<NicDmaI>(action));
+          break;
+        }
+        case EventType::NicDmaEx_t: {
+          add_NicDmaEx(span, std::static_pointer_cast<NicDmaEx>(action));
+          break;
+        }
+        case EventType::NicDmaCW_t: {
+          add_NicDmaCW(span, std::static_pointer_cast<NicDmaCW>(action));
+          break;
+        }
+        case EventType::NicDmaCR_t: {
+          add_NicDmaCR(span, std::static_pointer_cast<NicDmaCR>(action));
+          break;
+        }
+        case EventType::NicMmioR_t: {
+          add_NicMmioR(span, std::static_pointer_cast<NicMmioR>(action));
+          break;
+        }
+        case EventType::NicMmioW_t: {
+          add_NicMmioW(span, std::static_pointer_cast<NicMmioW>(action));
+          break;
+        }
+        case EventType::NicRx_t: {
+          add_NicRx(span, std::static_pointer_cast<NicRx>(action));
+          break;
+        }
+        case EventType::NicTx_t: {
+          add_NicTx(span, std::static_pointer_cast<NicTx>(action));
+          break;
+        }
+        case EventType::NicMsix_t: {
+          add_NicMsix(span, std::static_pointer_cast<NicMsix>(action));
+          break;
+        }
+        default: {
+          throw_just("transform_HostCallSpan unexpected event: ", *action);
+        }
       }
     }
 
-    end_span(to_transform, call_span);
+    end_span(to_end, span);
   }
 
+  /*
   void transform_HostMsixSpan(std::shared_ptr<HostMsixSpan> &to_transform) {
     auto span_opts = get_span_start_opts(to_transform);
     auto span_name = get_type_str(to_transform);
@@ -773,43 +953,7 @@ class OtlpSpanExporter : public Exporter {
   }
 
  public:
-  OtlpSpanExporter(std::string &&url, std::string service_name, bool batch_mode, std::string &&lib_name) : Exporter() {
-    // create exporter
-    opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
-    opts.url = url;
-    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
-        opts);
-    //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
-    throw_if_empty(exporter, span_exporter_null);
 
-    // create span processor
-    std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> processor = nullptr;
-    if (batch_mode) {
-      const opentelemetry::sdk::trace::BatchSpanProcessorOptions batch_opts;
-      processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
-          std::move(exporter), batch_opts);
-    } else {
-      processor = opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
-    }
-    throw_if_empty(processor, span_processor_null);
-
-    // TODO: create multiple provider, accessed by string mapping to see different sources within jaeger ui
-    // create trace provider
-    auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", service_name}
-    };
-    auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
-    std::shared_ptr<opentelemetry::trace::TracerProvider> provider =
-        opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
-    throw_if_empty(provider, trace_provider_null);
-
-    // Set the global trace provider
-    opentelemetry::trace::Provider::SetTracerProvider(provider);
-
-    // set tracer and offset
-    tracer_ = provider->GetTracer(lib_name, OPENTELEMETRY_SDK_VERSION);
-    time_offset_ = get_now_offset_microseconds();
-  }
 
   ~OtlpSpanExporter() {
     auto provider = opentelemetry::trace::Provider::GetTracerProvider();
@@ -820,69 +964,129 @@ class OtlpSpanExporter : public Exporter {
     opentelemetry::trace::Provider::SetTracerProvider(none);
   }
 
-  void export_trace(std::shared_ptr<Trace> &trace_to_export) override {
+  void StartSpan(std::shared_ptr<EventSpan> span) override {
     const std::lock_guard<std::mutex> lock_guard(exporter_mutex_);
 
-    throw_on(not trace_to_export->is_done(), "trace to export is not yet done");
+    throw_on(span->IsPending(), "span to export is not yet done");
 
-    for (auto &span : trace_to_export->spans_) {
-      switch (span->get_type()) {
-        case span_type::host_call: {
-          auto host_call = std::static_pointer_cast<HostCallSpan>(span);
-          transform_HostCallSpan(host_call);
-          break;
-        }
-        case span_type::host_msix: {
-          auto host_msix = std::static_pointer_cast<HostMsixSpan>(span);
-          transform_HostMsixSpan(host_msix);
-          break;
-        }
-        case span_type::host_mmio: {
-          auto host_mmio = std::static_pointer_cast<HostMmioSpan>(span);
-          transform_HostMmioSpan(host_mmio);
-          break;
-        }
-        case span_type::host_dma: {
-          auto host_dma = std::static_pointer_cast<HostDmaSpan>(span);
-          transform_HostDmaSpan(host_dma);
-          break;
-        }
-        case span_type::host_int: {
-          auto host_int = std::static_pointer_cast<HostIntSpan>(span);
-          transform_HostIntSpan(host_int);
-          break;
-        }
-        case span_type::nic_dma: {
-          auto nic_dma = std::static_pointer_cast<NicDmaSpan>(span);
-          transform_NicDmaSpan(nic_dma);
-          break;
-        }
-        case span_type::nic_mmio: {
-          auto nic_mmio = std::static_pointer_cast<NicMmioSpan>(span);
-          transform_NicMmioSpan(nic_mmio);
-          break;
-        }
-        case span_type::nic_eth: {
-          auto nic_eth = std::static_pointer_cast<NicEthSpan>(span);
-          transform_NicEthSpan(nic_eth);
-          break;
-        }
-        case span_type::nic_msix: {
-          auto nic_msix = std::static_pointer_cast<NicMsixSpan>(span);
-          transform_NicMsixSpan(nic_msix);
-          break;
-        }
-        case span_type::generic_single: {
-          auto generic_single = std::static_pointer_cast<GenericSingleSpan>(span);
-          transform_GenericSingleSpan(generic_single);
-          break;
-        }
-        default:std::stringstream tss;
-          tss << span->get_type();
-          throw_just("export_trace unknown span type: ", tss.str());
+    switch (span->GetType()) {
+      case span_type::kHostCall: {
+        auto host_call = std::static_pointer_cast<HostCallSpan>(span);
+        start_HostCallSpan(host_call);
+        break;
       }
+      case span_type::kHostMsix: {
+        auto host_msix = std::static_pointer_cast<HostMsixSpan>(span);
+        start_HostMsixSpan(host_msix);
+        break;
+      }
+      case span_type::kHostMmio: {
+        auto host_mmio = std::static_pointer_cast<HostMmioSpan>(span);
+        start_HostMmioSpan(host_mmio);
+        break;
+      }
+      case span_type::kHostDma: {
+        auto host_dma = std::static_pointer_cast<HostDmaSpan>(span);
+        start_HostDmaSpan(host_dma);
+        break;
+      }
+      case span_type::kHostInt: {
+        auto host_int = std::static_pointer_cast<HostIntSpan>(span);
+        start_HostIntSpan(host_int);
+        break;
+      }
+      case span_type::kHostDma: {
+        auto nic_dma = std::static_pointer_cast<NicDmaSpan>(span);
+        start_NicDmaSpan(nic_dma);
+        break;
+      }
+      case span_type::kNicMmio: {
+        auto nic_mmio = std::static_pointer_cast<NicMmioSpan>(span);
+        start_NicMmioSpan(nic_mmio);
+        break;
+      }
+      case span_type::kNicEth: {
+        auto nic_eth = std::static_pointer_cast<NicEthSpan>(span);
+        start_NicEthSpan(nic_eth);
+        break;
+      }
+      case span_type::kNicMsix: {
+        auto nic_msix = std::static_pointer_cast<NicMsixSpan>(span);
+        start_NicMsixSpan(nic_msix);
+        break;
+      }
+      case span_type::kGenericSingle: {
+        auto generic_single = std::static_pointer_cast<GenericSingleSpan>(span);
+        start_GenericSingleSpan(generic_single);
+        break;
+      }
+      default:std::stringstream tss;
+        tss << span->GetType();
+        throw_just("span to export has unknown span type: ", tss.str());
     }
   }
+
+  void EndSpan(std::shared_ptr<EventSpan> span) override {
+    const std::lock_guard<std::mutex> lock_guard(exporter_mutex_);
+
+    throw_on(span->IsPending(), "span to export is not yet done");
+
+    switch (span->GetType()) {
+      case span_type::kHostCall: {
+        auto host_call = std::static_pointer_cast<HostCallSpan>(span);
+        end_HostCallSpan(host_call);
+        break;
+      }
+      case span_type::kHostMsix: {
+        auto host_msix = std::static_pointer_cast<HostMsixSpan>(span);
+        end_HostMsixSpan(host_msix);
+        break;
+      }
+      case span_type::kHostMmio: {
+        auto host_mmio = std::static_pointer_cast<HostMmioSpan>(span);
+        end_HostMmioSpan(host_mmio);
+        break;
+      }
+      case span_type::kHostDma: {
+        auto host_dma = std::static_pointer_cast<HostDmaSpan>(span);
+        end_HostDmaSpan(host_dma);
+        break;
+      }
+      case span_type::kHostInt: {
+        auto host_int = std::static_pointer_cast<HostIntSpan>(span);
+        end_HostIntSpan(host_int);
+        break;
+      }
+      case span_type::kHostDma: {
+        auto nic_dma = std::static_pointer_cast<NicDmaSpan>(span);
+        end_NicDmaSpan(nic_dma);
+        break;
+      }
+      case span_type::kNicMmio: {
+        auto nic_mmio = std::static_pointer_cast<NicMmioSpan>(span);
+        end_NicMmioSpan(nic_mmio);
+        break;
+      }
+      case span_type::kNicEth: {
+        auto nic_eth = std::static_pointer_cast<NicEthSpan>(span);
+        end_NicEthSpan(nic_eth);
+        break;
+      }
+      case span_type::kNicMsix: {
+        auto nic_msix = std::static_pointer_cast<NicMsixSpan>(span);
+        end_NicMsixSpan(nic_msix);
+        break;
+      }
+      case span_type::kGenericSingle: {
+        auto generic_single = std::static_pointer_cast<GenericSingleSpan>(span);
+        end_GenericSingleSpan(generic_single);
+        break;
+      }
+      default:std::stringstream tss;
+        tss << span->GetType();
+        throw_just("span to export has unknown span type: ", tss.str());
+    }
+  }*/
 };
 
 }  // namespace simbricks::trace

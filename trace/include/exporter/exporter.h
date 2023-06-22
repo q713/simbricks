@@ -54,35 +54,45 @@
 
 namespace simbricks::trace {
 
-class Exporter {
+class SpanExporter {
 
  protected:
   std::mutex exporter_mutex_;
 
  public:
-  Exporter() = default;
+  SpanExporter() = default;
 
-  virtual void StartSpan(std::shared_ptr<EventSpan> to_start) = 0;
+  virtual void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) = 0;
 
   virtual void EndSpan(std::shared_ptr<EventSpan> to_end) = 0;
 };
 
-class OtlpSpanExporter : public Exporter {
+class OtlpSpanExporter : public SpanExporter {
 
   int64_t time_offset_ = 0;
-  opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer> tracer_;
+  std::string url_;
+  bool batch_mode_ = false;
+  std::string lib_name_;
 
   // mapping: own_context_id -> opentelemetry_span_context
-  std::unordered_map<uint64_t, opentelemetry::trace::SpanContext> context_map_;
+  using context_t = opentelemetry::trace::SpanContext;
+  std::unordered_map<uint64_t, context_t> context_map_;
 
   // mapping: own_span_id -> opentelemetry_span
-  std::unordered_map<uint64_t, opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>> span_map_;
+  using span_t = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
+  std::unordered_map<uint64_t, span_t> span_map_;
+
+  // service/simulator/spanner name -> otlp_exporter
+  using tracer_t = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Tracer>;
+  using provider_t = std::shared_ptr<opentelemetry::trace::TracerProvider>;
+  std::unordered_map<std::string, tracer_t> tracer_map_;
+  std::vector<provider_t> provider_;
 
   using ts_steady = std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds>;
   using ts_system = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
 
   void InsertNewContext(std::shared_ptr<TraceContext> &custom,
-                        opentelemetry::trace::SpanContext &context) {
+                        context_t &context) {
     throw_if_empty(custom, "InsertNewContext custom is null");
     auto context_id = custom->GetId();
     auto iter = context_map_.insert({context_id, context});
@@ -98,7 +108,7 @@ class OtlpSpanExporter : public Exporter {
   }
 
   void InsertNewSpan(std::shared_ptr<EventSpan> &old_span,
-                     opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &new_span) {
+                     span_t &new_span) {
     throw_if_empty(old_span, "InsertNewSpan old span is null");
     throw_on(not new_span, "InsertNewSpan new_span is null");
 
@@ -107,8 +117,61 @@ class OtlpSpanExporter : public Exporter {
     throw_on(not iter.second, "InsertNewSpan could not insert into span map");
   }
 
-  opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>
-  GetSpan(std::shared_ptr<EventSpan> &span_to_get) {
+  void RemoveSpan(std::shared_ptr<EventSpan> &old_span) {
+    const size_t erased = span_map_.erase(old_span->GetId());
+    throw_on(erased != 1, "RemoveSpan did not remove a single span");
+  }
+
+  tracer_t CreateTracer(std::string &service_name) {
+    // create exporter
+    opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
+    opts.url = url_;
+    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
+        opts);
+    //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
+    throw_if_empty(exporter, span_exporter_null);
+
+    // create span processor
+    std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> processor = nullptr;
+    if (batch_mode_) {
+      const opentelemetry::sdk::trace::BatchSpanProcessorOptions batch_opts;
+      processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
+          std::move(exporter), batch_opts);
+    } else {
+      processor = opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
+    }
+    throw_if_empty(processor, span_processor_null);
+
+    // TODO: create multiple provider, accessed by string mapping to see different sources within jaeger ui
+    // create trace provider
+    auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
+        {"service.name", service_name}
+    };
+    auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
+    provider_t provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
+    throw_if_empty(provider, trace_provider_null);
+
+    // Set the global trace provider
+    provider_.push_back(provider);
+    //opentelemetry::trace::Provider::SetTracerProvider(provider);
+
+    // set tracer
+    auto tracer = provider->GetTracer(lib_name_, OPENTELEMETRY_SDK_VERSION);
+    return tracer;
+  }
+
+  tracer_t GetTracerLazy(std::string &service_name) {
+    auto iter = tracer_map_.find(service_name);
+    if (iter != tracer_map_.end()) {
+      return iter->second;
+    }
+
+    auto tracer = CreateTracer(service_name);
+    tracer_map_.insert({service_name, tracer});
+    return tracer;
+  }
+
+  span_t GetSpan(std::shared_ptr<EventSpan> &span_to_get) {
     throw_if_empty(span_to_get, "GetSpan span_to_get is null");
     const uint64_t span_id = span_to_get->GetId();
     auto span = span_map_.find(span_id)->second;
@@ -354,11 +417,14 @@ class OtlpSpanExporter : public Exporter {
     attributes.insert({"port", std::to_string(event->GetPort())});
   }
 
-  opentelemetry::trace::StartSpanOptions get_span_start_opts(std::shared_ptr<EventSpan> span) {
+  opentelemetry::trace::StartSpanOptions GetSpanStartOpts(std::shared_ptr<EventSpan> span) {
     opentelemetry::trace::StartSpanOptions span_options;
     if (span->HasParent()) {
       auto custom_context = span->GetContext();
-      auto open_context = GetContext(custom_context);
+      auto parent = custom_context->GetParent();
+      auto parent_context = parent->GetContext();
+      throw_if_empty(parent_context, "GetSpanStartOpts, parent context is null");
+      auto open_context = GetContext(parent_context);
       span_options.parent = open_context;
     }
     span_options.start_system_time = ToSystemMicroseconds(span->GetStartingTs());
@@ -367,173 +433,156 @@ class OtlpSpanExporter : public Exporter {
     return std::move(span_options);
   }
 
-  void end_span(std::shared_ptr<EventSpan> old_span,
-                opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &new_span) {
+  void end_span(std::shared_ptr<EventSpan> old_span, span_t &new_span) {
     assert(old_span and "old span is null");
     assert(new_span and "new span is null");
     opentelemetry::trace::EndSpanOptions end_opts;
     end_opts.end_steady_time = ToSteadyMicroseconds(old_span->GetCompletionTs());
     new_span->End(end_opts);
+    RemoveSpan(old_span);
   }
 
-  void add_HostMmioW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                     std::shared_ptr<HostMmioW> event) {
+  void add_HostMmioW(span_t &span, std::shared_ptr<HostMmioW> event) {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioW(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostMmioR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                     std::shared_ptr<HostMmioR> event) {
+  void add_HostMmioR(span_t &span, std::shared_ptr<HostMmioR> event) {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioR(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostMmioImRespPoW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                             std::shared_ptr<HostMmioImRespPoW> event) {
+  void add_HostMmioImRespPoW(span_t &span, std::shared_ptr<HostMmioImRespPoW> event) {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioImRespPoW(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostMmioCW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                      std::shared_ptr<HostMmioCW> event) {
+  void add_HostMmioCW(span_t &span, std::shared_ptr<HostMmioCW> event) {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioCW(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostMmioCR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                      std::shared_ptr<HostMmioCR> event) {
+  void add_HostMmioCR(span_t &span, std::shared_ptr<HostMmioCR> event) {
     const std::string type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMmioCR(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostCall(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<HostCall> event) {
+  void add_HostCall(span_t &span, std::shared_ptr<HostCall> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostCall(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostMsiX(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<HostMsiX> event) {
+  void add_HostMsiX(span_t &span, std::shared_ptr<HostMsiX> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostMsiX(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostDmaC(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<HostDmaC> event) {
+  void add_HostDmaC(span_t &span, std::shared_ptr<HostDmaC> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostDmaC(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostDmaR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<HostDmaR> event) {
+  void add_HostDmaR(span_t &span, std::shared_ptr<HostDmaR> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostDmaR(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostDmaW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<HostDmaW> event) {
+  void add_HostDmaW(span_t &span, std::shared_ptr<HostDmaW> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostDmaW(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostPostInt(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                       std::shared_ptr<HostPostInt> event) {
+  void add_HostPostInt(span_t &span, std::shared_ptr<HostPostInt> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostPostInt(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_HostClearInt(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                        std::shared_ptr<HostClearInt> event) {
+  void add_HostClearInt(span_t &span, std::shared_ptr<HostClearInt> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_HostClearInt(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicDmaI(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicDmaI> event) {
+  void add_NicDmaI(span_t &span, std::shared_ptr<NicDmaI> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaI(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicDmaEx(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<NicDmaEx> event) {
+  void add_NicDmaEx(span_t &span, std::shared_ptr<NicDmaEx> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaEx(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicDmaCW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<NicDmaCW> event) {
+  void add_NicDmaCW(span_t &span, std::shared_ptr<NicDmaCW> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaCW(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicDmaCR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<NicDmaCR> event) {
+  void add_NicDmaCR(span_t &span, std::shared_ptr<NicDmaCR> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicDmaCR(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicMmioR(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<NicMmioR> event) {
+  void add_NicMmioR(span_t &span, std::shared_ptr<NicMmioR> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicMmioR(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicMmioW(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span,
-                    std::shared_ptr<NicMmioW> event) {
+  void add_NicMmioW(span_t &span, std::shared_ptr<NicMmioW> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicMmioW(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicTx(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicTx> event) {
+  void add_NicTx(span_t &span, std::shared_ptr<NicTx> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicTx(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicRx(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicRx> event) {
+  void add_NicRx(span_t &span, std::shared_ptr<NicRx> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicRx(attributes, event);
     span->AddEvent(type, ToSystemMicroseconds(event->get_ts()), attributes);
   }
 
-  void add_NicMsix(opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> &span, std::shared_ptr<NicMsix> event) {
+  void add_NicMsix(span_t &span, std::shared_ptr<NicMsix> event) {
     auto type = get_type_str(event);
     std::map<std::string, std::string> attributes;
     add_NicMsix(attributes, event);
@@ -551,61 +600,32 @@ class OtlpSpanExporter : public Exporter {
     attributes.insert({"trace id", std::to_string(context->GetTraceId())});
   }
 
-  void transform_HostCallSpan(std::shared_ptr<HostCallSpan> &to_transform) {
-    auto span_opts = get_span_start_opts(to_transform);
-    auto span_name = get_type_str(to_transform);
-    std::map<std::string, std::string> attributes;
-    add_EventSpanAttr(attributes, to_transform);
-    auto call_span = tracer_->StartSpan(span_name, attributes, span_opts);
-
-  }
-
  public:
-  OtlpSpanExporter(std::string &&url, std::string service_name, bool batch_mode, std::string &&lib_name) : Exporter() {
-    // create exporter
-    opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
-    opts.url = url;
-    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
-        opts);
-    //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
-    throw_if_empty(exporter, span_exporter_null);
-
-    // create span processor
-    std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> processor = nullptr;
-    if (batch_mode) {
-      const opentelemetry::sdk::trace::BatchSpanProcessorOptions batch_opts;
-      processor = opentelemetry::sdk::trace::BatchSpanProcessorFactory::Create(
-          std::move(exporter), batch_opts);
-    } else {
-      processor = opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
-    }
-    throw_if_empty(processor, span_processor_null);
-
-    // TODO: create multiple provider, accessed by string mapping to see different sources within jaeger ui
-    // create trace provider
-    auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", service_name}
-    };
-    auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
-    std::shared_ptr<opentelemetry::trace::TracerProvider> provider =
-        opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
-    throw_if_empty(provider, trace_provider_null);
-
-    // Set the global trace provider
-    opentelemetry::trace::Provider::SetTracerProvider(provider);
-
-    // set tracer and offset
-    tracer_ = provider->GetTracer(lib_name, OPENTELEMETRY_SDK_VERSION);
+  explicit OtlpSpanExporter(std::string &&url, bool batch_mode, std::string &&lib_name)
+      : SpanExporter() {
     time_offset_ = GetNowOffsetMicroseconds();
+    url_ = url;
+    batch_mode_ = batch_mode;
+    lib_name_ = lib_name;
   }
 
-  void StartSpan(std::shared_ptr<EventSpan> to_start) override {
-    auto span_opts = get_span_start_opts(to_start);
+  ~OtlpSpanExporter() {
+    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+    if (provider) {
+      static_cast<opentelemetry::sdk::trace::TracerProvider *>(provider.get())->ForceFlush();
+    }
+    const std::shared_ptr<opentelemetry::trace::TracerProvider> none;
+    opentelemetry::trace::Provider::SetTracerProvider(none);
+  }
+
+  void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) override {
+    auto span_opts = GetSpanStartOpts(to_start);
     auto span_name = get_type_str(to_start);
     std::map<std::string, std::string> attributes;
     add_EventSpanAttr(attributes, to_start);
 
-    auto call_span = tracer_->StartSpan(span_name, attributes, span_opts);
+    auto tracer = GetTracerLazy(service_name);
+    auto call_span = tracer->StartSpan(span_name, attributes, span_opts);
     InsertNewSpan(to_start, call_span);
 
     auto old_context = to_start->GetContext();
@@ -718,6 +738,14 @@ class OtlpSpanExporter : public Exporter {
   }
 
   /*
+   * void transform_HostCallSpan(std::shared_ptr<HostCallSpan> &to_transform) {
+    auto span_opts = GetSpanStartOpts(to_transform);
+    auto span_name = get_type_str(to_transform);
+    std::map<std::string, std::string> attributes;
+    add_EventSpanAttr(attributes, to_transform);
+    auto call_span = tracer_->StartSpan(span_name, attributes, span_opts);
+  }
+
   void transform_HostMsixSpan(std::shared_ptr<HostMsixSpan> &to_transform) {
     auto span_opts = get_span_start_opts(to_transform);
     auto span_name = get_type_str(to_transform);
@@ -894,7 +922,7 @@ class OtlpSpanExporter : public Exporter {
   }
 
   void transform_GenericSingleSpan(std::shared_ptr<GenericSingleSpan> &to_transform) {
-    auto span_opts = get_span_start_opts(to_transform);
+    auto span_opts = GetSpanStartOpts(to_transform);
     auto span_name = get_type_str(to_transform);
     std::map<std::string, std::string> attributes;
     add_EventSpanAttr(attributes, to_transform);
@@ -953,16 +981,6 @@ class OtlpSpanExporter : public Exporter {
   }
 
  public:
-
-
-  ~OtlpSpanExporter() {
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    if (provider) {
-      static_cast<opentelemetry::sdk::trace::TracerProvider *>(provider.get())->ForceFlush();
-    }
-    const std::shared_ptr<opentelemetry::trace::TracerProvider> none;
-    opentelemetry::trace::Provider::SetTracerProvider(none);
-  }
 
   void StartSpan(std::shared_ptr<EventSpan> span) override {
     const std::lock_guard<std::mutex> lock_guard(exporter_mutex_);

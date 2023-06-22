@@ -29,8 +29,8 @@
 #include "util/exception.h"
 
 concurrencpp::lazy_result<bool>
-NicSpanner::handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
-                        std::shared_ptr<Event> &event_ptr) {
+NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
+                       std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   std::cout << "nic try poll mmio" << std::endl;
@@ -49,37 +49,34 @@ NicSpanner::handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   //    last_host_context_->GetParent(), event_ptr->get_parser_ident());
   auto context = last_host_context_->GetNonEmptyTraceContext();
   auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
-      context->GetParent(), event_ptr->get_parser_ident());
-
+      name_, context->GetParent(), event_ptr, event_ptr->get_parser_ident());
   if (not mmio_span) {
     std::cerr << "could not register mmio_span" << std::endl;
     co_return false;
   }
 
-  if (mmio_span->AddToSpan(event_ptr)) {
-    assert(mmio_span->IsComplete() and "mmio span is not complete");
-    last_completed_ = mmio_span;
-    co_return true;
-  }
-
-  co_return false;
+  assert(mmio_span->IsComplete() and "mmio span is not complete");
+  tracer_.MarkSpanAsDone(mmio_span);
+  last_completed_ = mmio_span;
+  co_return true;
 }
 
 concurrencpp::lazy_result<bool>
-NicSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
-                       std::shared_ptr<Event> &event_ptr) {
+NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
+                      std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   auto pending_dma =
       iterate_add_erase<NicDmaSpan>(pending_nic_dma_spans_, event_ptr);
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
+      tracer_.MarkSpanAsDone(pending_dma);
       last_completed_ = pending_dma;
     } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
       // indicate to host that we expect a dma action
       std::cout << "nic try push dma" << std::endl;
       auto context = create_shared<Context>(
-          "handel_dma could not create context", expectation::kDma, pending_dma->GetContext());
+          "HandelDma could not create context", expectation::kDma, pending_dma->GetContext());
       throw_on(not co_await to_host_queue_->push(resume_executor, context),
                could_not_push_to_context_queue);
       std::cout << "nic pushed dma" << std::endl;
@@ -93,22 +90,19 @@ NicSpanner::handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
 
   //pending_dma = tracer_.rergister_new_span_by_parent<NicDmaSpan>(
   //    last_completed_, event_ptr->get_parser_ident());
-  pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(last_completed_, event_ptr->get_parser_ident());
+  pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(name_, last_completed_,
+                                                      event_ptr, event_ptr->get_parser_ident());
   if (not pending_dma) {
     std::cerr << "could not register new pending dma action" << std::endl;
     co_return false;
   }
 
-  if (pending_dma->AddToSpan(event_ptr)) {
-    pending_nic_dma_spans_.push_back(pending_dma);
-    co_return true;
-  }
-
-  co_return false;
+  pending_nic_dma_spans_.push_back(pending_dma);
+  co_return true;
 }
 concurrencpp::lazy_result<bool>
-NicSpanner::handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
-                        std::shared_ptr<Event> &event_ptr) {
+NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
+                       std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   bool is_tx = false;
@@ -137,55 +131,49 @@ NicSpanner::handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
   //auto eth_span = tracer_.rergister_new_span_by_parent<NicEthSpan>(
   //    parent, event_ptr->get_parser_ident());
   auto eth_span = tracer_.StartSpanByParent<NicEthSpan>(
-      parent, event_ptr->get_parser_ident());
+      name_, parent, event_ptr, event_ptr->get_parser_ident());
   if (not eth_span) {
     std::cerr << "could not register eth_span" << std::endl;
     co_return false;
   }
 
-  if (eth_span->AddToSpan(event_ptr)) {
-    assert(eth_span->IsComplete() and "eth span was not complette");
-    // indicate that somewhere a receive will be expected
-    //if (is_tx and
-    //    not co_await network_queue_.push(resume_executor, this->id_, expectation::rx, eth_span)) {
-    //  std::cerr << "could not indicate to network that a";
-    //  std::cerr << "receive is to be expected" << std::endl;
-    //}
-    last_completed_ = eth_span;
-    co_return true;
-  }
-
-  co_return false;
+  assert(eth_span->IsComplete() and "eth span was not complette");
+  // indicate that somewhere a receive will be expected
+  //if (is_tx and
+  //    not co_await network_queue_.push(resume_executor, this->id_, expectation::rx, eth_span)) {
+  //  std::cerr << "could not indicate to network that a";
+  //  std::cerr << "receive is to be expected" << std::endl;
+  //}
+  tracer_.MarkSpanAsDone(eth_span);
+  last_completed_ = eth_span;
+  co_return true;
 }
 
 concurrencpp::lazy_result<bool>
-NicSpanner::handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
-                        std::shared_ptr<Event> &event_ptr) {
+NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
+                       std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   //auto msix_span = tracer_.rergister_new_span_by_parent<NicMsixSpan>(
   //    last_completed_, event_ptr->get_parser_ident());
   auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
-      last_completed_, event_ptr->get_parser_ident());
+      name_, last_completed_, event_ptr, event_ptr->get_parser_ident());
   if (not msix_span) {
     std::cerr << "could not register msix span" << std::endl;
     co_return false;
   }
 
-  if (msix_span->AddToSpan(event_ptr)) {
-    assert(msix_span->IsComplete() and "msix span is not complete");
+  assert(msix_span->IsComplete() and "msix span is not complete");
+  tracer_.MarkSpanAsDone(msix_span);
 
-    std::cout << "nic try push msix" << std::endl;
-    auto context = create_shared<Context>(
-        "handel_msix could not create context", expectation::kMsix, last_completed_->GetContext());
-    throw_on(not co_await to_host_queue_->push(resume_executor, context),
-             could_not_push_to_context_queue);
-    std::cout << "nic pushed msix" << std::endl;
+  std::cout << "nic try push msix" << std::endl;
+  auto context = create_shared<Context>(
+      "HandelMsix could not create context", expectation::kMsix, last_completed_->GetContext());
+  throw_on(not co_await to_host_queue_->push(resume_executor, context),
+           could_not_push_to_context_queue);
+  std::cout << "nic pushed msix" << std::endl;
 
-    co_return true;
-  }
-
-  co_return false;
+  co_return true;
 }
 
 concurrencpp::result<void>
@@ -212,7 +200,7 @@ NicSpanner::consume(std::shared_ptr<concurrencpp::executor> resume_executor,
     switch (event_ptr->get_type()) {
       case EventType::NicMmioW_t:
       case EventType::NicMmioR_t: {
-        added = co_await handel_mmio(resume_executor, event_ptr);
+        added = co_await HandelMmio(resume_executor, event_ptr);
         break;
       }
 
@@ -220,18 +208,18 @@ NicSpanner::consume(std::shared_ptr<concurrencpp::executor> resume_executor,
       case EventType::NicDmaEx_t:
       case EventType::NicDmaCW_t:
       case EventType::NicDmaCR_t: {
-        added = co_await handel_dma(resume_executor, event_ptr);
+        added = co_await HandelDma(resume_executor, event_ptr);
         break;
       }
 
       case EventType::NicTx_t:
       case EventType::NicRx_t: {
-        added = co_await handel_txrx(resume_executor, event_ptr);
+        added = co_await HandelTxrx(resume_executor, event_ptr);
         break;
       }
 
       case EventType::NicMsix_t: {
-        added = co_await handel_msix(resume_executor, event_ptr);
+        added = co_await HandelMsix(resume_executor, event_ptr);
         break;
       }
 

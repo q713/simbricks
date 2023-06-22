@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
     simbricks::trace::OtlpSpanExporter
-        exporter{"http://localhost:4318/v1/traces", "simbricks-tracer", false, "trace"};
+        exporter{"http://localhost:4318/v1/traces", false, "trace"};
 
     Tracer tracer{exporter};
 
@@ -149,7 +149,7 @@ int main(int argc, char *argv[]) {
 
     LineReader lr_h_c;
     auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
-    auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null, tracer, client_hn, client_nh, true);
+    auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null, "Client-Host", tracer, client_hn, client_nh, true);
     const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pi_dummy, spanner_h_c};
 
     //LineReader lr_n_s;
@@ -159,7 +159,8 @@ int main(int argc, char *argv[]) {
 
     LineReader lr_n_c;
     auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
-    auto spanner_n_c = create_shared<NicSpanner>(spanner_is_null, tracer, nic_cn, nic_sn, client_nh, client_hn);
+    auto spanner_n_c =
+        create_shared<NicSpanner>(spanner_is_null, "Client-NIC", tracer, nic_cn, nic_sn, client_nh, client_hn);
     const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pi_dummy, spanner_n_c};
 
     std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_n_s, pl_h_s*/};

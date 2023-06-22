@@ -46,7 +46,7 @@ class Tracer {
   // context_id -> context
   std::unordered_map<uint64_t, std::shared_ptr<TraceContext>> contexts_;
 
-  simbricks::trace::Exporter &exporter_;
+  simbricks::trace::SpanExporter &exporter_;
 
   void InsertTrace(std::shared_ptr<Trace> &new_trace) {
     // NOTE: the lock must be held when calling this method
@@ -122,11 +122,15 @@ class Tracer {
 
   // will create and add a new span to a trace using the context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParent(std::shared_ptr<EventSpan> parent_span, Args &&... args) {
+  std::shared_ptr<SpanType> StartSpanByParent(std::string &service_name,
+                                              std::shared_ptr<EventSpan> parent_span,
+                                              std::shared_ptr<Event> starting_event,
+                                              Args &&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    throw_if_empty(parent_span,"StartSpan(...) parent span is null");
+    // TODO: fix host dma relateed bug
+    throw_if_empty(parent_span, "StartSpan(...) parent span is null");
     auto parent_context = parent_span->GetContext();
     throw_if_empty(parent_context, "StartSpan(...) parent context is null");
     const uint64_t trace_id = parent_context->GetTraceId();
@@ -135,17 +139,22 @@ class Tracer {
 
     auto new_span = create_shared<SpanType>(
         "StartSpan(Args &&... args) could not create a new span", trace_context, args...);
+    const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
+    throw_on(not was_added, "StartSpanByParent(...) could not add first event");
+
     // must add span to trace manually
     AddSpanToTrace(trace_id, new_span);
 
-    exporter_.StartSpan(new_span);
+    exporter_.StartSpan(service_name, new_span);
 
     return new_span;
   }
 
   // will start and create a new trace creating a new context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpan(Args &&... args) {
+  std::shared_ptr<SpanType> StartSpan(std::string &service_name,
+                                      std::shared_ptr<Event> starting_event,
+                                      Args &&... args) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
@@ -154,20 +163,22 @@ class Tracer {
     auto trace_context = RegisterCreateContext(trace_id, nullptr);
 
     auto new_span = create_shared<SpanType>(
-        "StartSpan(Args &&... args) could not create a new span", trace_context, args...);
+        "StartSpan(...) could not create a new span", trace_context, args...);
+    const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
+    throw_on(not was_added, "StartSpan(...) could not add first event");
 
     // span is here added to the trace
     auto new_trace = create_shared<Trace>(
-        "StartSpan(Args &&... args) could not create a new trace", trace_id, new_span);
+        "StartSpan(...) could not create a new trace", trace_id, new_span);
 
     InsertTrace(new_trace);
 
-    exporter_.StartSpan(new_span);
+    exporter_.StartSpan(service_name, new_span);
 
     return new_span;
   }
 
-  explicit Tracer(simbricks::trace::Exporter &exporter) : exporter_(exporter) {};
+  explicit Tracer(simbricks::trace::SpanExporter &exporter) : exporter_(exporter) {};
 
   ~Tracer() = default;
 };

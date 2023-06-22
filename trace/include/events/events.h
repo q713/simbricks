@@ -79,7 +79,7 @@ enum EventType {
   NicRx_t
 };
 
-inline std::ostream &operator<<(std::stringstream &into, EventType &type) {
+inline std::ostream &operator<<(std::stringstream &into, EventType type) {
   switch (type) {
     case EventType::Event_t:into << "Event_t";
       break;

@@ -39,7 +39,7 @@
 
 struct Spanner : public consumer<std::shared_ptr<Event>> {
   uint64_t id_;
-
+  std::string name_;
   Tracer &tracer_;
 
   // Override this method!
@@ -48,8 +48,8 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan)
   override = 0;
 
-  explicit Spanner(Tracer &tra)
-      : id_(trace_environment::GetNextSpannerId()), tracer_(tra) {
+  explicit Spanner(std::string &&name, Tracer &tra)
+      : id_(trace_environment::GetNextSpannerId()), name_(name), tracer_(tra) {
   }
 
   inline uint64_t get_id() const {
@@ -107,30 +107,30 @@ struct HostSpanner : public Spanner {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  explicit HostSpanner(Tracer &tra,
+  explicit HostSpanner(std::string &&name, Tracer &tra,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic, bool is_client)
-      : Spanner(tra), to_nic_queue_(to_nic), from_nic_queue_(from_nic), is_client_(is_client) {
+      : Spanner(std::move(name), tra), to_nic_queue_(to_nic), from_nic_queue_(from_nic), is_client_(is_client) {
     throw_if_empty(to_nic, queue_is_null);
     throw_if_empty(from_nic, queue_is_null);
   }
 
  private:
-  bool create_trace_starting_span(uint64_t parser_id);
+  bool CreateTraceStartingSpan(std::shared_ptr<Event> &starting_event);
 
-  concurrencpp::lazy_result<bool> handel_call(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                              std::shared_ptr<Event> &event_ptr);
-
-  concurrencpp::lazy_result<bool> handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                              std::shared_ptr<Event> &event_ptr);
-
-  concurrencpp::lazy_result<bool> handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
+  concurrencpp::lazy_result<bool> HandelCall(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
 
-  concurrencpp::lazy_result<bool> handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                              std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                             std::shared_ptr<Event> &event_ptr);
 
-  concurrencpp::lazy_result<bool> handel_int(std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                            std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                             std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> HandelInt(std::shared_ptr<Event> &event_ptr);
 
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_queue_;
   std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic_queue_;
@@ -153,11 +153,11 @@ struct NicSpanner : public Spanner {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  explicit NicSpanner(Tracer &tra, std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
+  explicit NicSpanner(std::string &&name, Tracer &tra, std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host)
-      : Spanner(tra),
+      : Spanner(std::move(name), tra),
         to_network_queue_(to_network),
         from_network_queue_(from_network),
         to_host_queue_(to_host),
@@ -171,17 +171,17 @@ struct NicSpanner : public Spanner {
 
  private:
 
-  concurrencpp::lazy_result<bool> handel_mmio(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                              std::shared_ptr<Event> &event_ptr);
-
-  concurrencpp::lazy_result<bool> handel_dma(std::shared_ptr<concurrencpp::executor> resume_executor,
+  concurrencpp::lazy_result<bool> HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
 
-  concurrencpp::lazy_result<bool> handel_txrx(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                              std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                            std::shared_ptr<Event> &event_ptr);
 
-  concurrencpp::lazy_result<bool> handel_msix(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                              std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                             std::shared_ptr<Event> &event_ptr);
+
+  concurrencpp::lazy_result<bool> HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                             std::shared_ptr<Event> &event_ptr);
 
   std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network_queue_;
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network_queue_;

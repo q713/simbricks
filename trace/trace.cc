@@ -118,6 +118,21 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+  uint64_t lower_bound =
+      EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND;
+  uint64_t upper_bound =
+      EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND;
+
+  if (result.count("ts-upper-bound")) {
+    sim_string_utils::parse_uint_trim_copy(
+        result["ts-upper-bound"].as<std::string>(), 10, &upper_bound);
+  }
+
+  if (result.count("ts-lower-bound")) {
+    sim_string_utils::parse_uint_trim_copy(
+        result["ts-lower-bound"].as<std::string>(), 10, &lower_bound);
+  }
+
   // Init the trace environment --> IMPORTANT
   trace_environment::initialize();
   // Init runtime and set threads to use --> IMPORTANT
@@ -142,6 +157,9 @@ int main(int argc, char *argv[]) {
 
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pi_dummy;
 
+    std::vector<EventTimestampFilter::EventTimeBoundary> timestamp_bounds{
+        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+
     //LineReader lr_h_s;
     //auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
     //auto spanner_h_s = HostSpanner::create(tracer, server_hn, false);
@@ -149,8 +167,10 @@ int main(int argc, char *argv[]) {
 
     LineReader lr_h_c;
     auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
+    auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
     auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null, "Client-Host", tracer, client_hn, client_nh, true);
-    const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pi_dummy, spanner_h_c};
+    const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
 
     //LineReader lr_n_s;
     //auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
@@ -159,9 +179,11 @@ int main(int argc, char *argv[]) {
 
     LineReader lr_n_c;
     auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
+    auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
     auto spanner_n_c =
         create_shared<NicSpanner>(spanner_is_null, "Client-NIC", tracer, nic_cn, nic_sn, client_nh, client_hn);
-    const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pi_dummy, spanner_n_c};
+    const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
 
     std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_n_s, pl_h_s*/};
     run_pipelines_parallel(thread_pool_executor, pipelines);
@@ -196,21 +218,6 @@ int main(int argc, char *argv[]) {
           0xffffffffa0000000ULL, FilterType::S)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
-  }
-
-  uint64_t lower_bound =
-      EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND;
-  uint64_t upper_bound =
-      EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND;
-
-  if (result.count("ts-upper-bound")) {
-    sim_string_utils::parse_uint_trim_copy(
-        result["ts-upper-bound"].as<std::string>(), 10, &upper_bound);
-  }
-
-  if (result.count("ts-lower-bound")) {
-    sim_string_utils::parse_uint_trim_copy(
-        result["ts-lower-bound"].as<std::string>(), 10, &lower_bound);
   }
 
   auto server_host_task = [&]() {  // SERVER HOST PIPELINE

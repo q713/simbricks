@@ -113,6 +113,7 @@ class Tracer {
     auto trace = GetTrace(trace_id);
     throw_if_empty(trace, "MarkSpanAsDone trace is null");
 
+    // 283866
     auto found_span = trace->GetSpan(span->GetId());
     throw_if_empty(found_span, "MarkSpanAsDone found span is null");
     found_span->MarkAsDone();
@@ -129,7 +130,6 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    // TODO: fix host dma relateed bug
     throw_if_empty(parent_span, "StartSpan(...) parent span is null");
     auto parent_context = parent_span->GetContext();
     throw_if_empty(parent_context, "StartSpan(...) parent context is null");

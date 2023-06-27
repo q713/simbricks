@@ -94,6 +94,7 @@ set(TRACE_LIB_HEADER_FILES
         include/util/cxxopts.hpp
         include/util/log.h
         include/util/factory.h
+        include/util/utils.h
         # coroutine wrappers
         include/corobelt/corobelt.h
         # reader

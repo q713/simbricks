@@ -923,4 +923,13 @@ bool is_type(std::shared_ptr<Event> &event_ptr, EventType type);
 
 bool is_type(const Event &event, EventType type);
 
+inline std::string GetTypeStr(std::shared_ptr<Event> event) {
+  if (not event) {
+    return "";
+  }
+  std::stringstream sss;
+  sss << event->get_type();
+  return std::move(sss.str());
+}
+
 #endif  // SIMBRICKS_TRACE_EVENTS_H_

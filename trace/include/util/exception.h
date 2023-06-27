@@ -31,6 +31,7 @@
 #include <string>
 #include <sstream>
 
+// TODO: create proper exceptions!!!
 inline const char *resume_executor_null =
         "std::shared_ptr<concurrencpp::executor> is null";
 inline const char *channel_is_null = "std::shared_ptr<channel<ValueType>> is null";
@@ -41,7 +42,7 @@ inline const char *event_is_null = "std::shared_ptr<Event> is null";
 inline const char *trace_is_null = "std::shared_ptr<Trace> is null";
 inline const char *span_is_null = "std::shared_ptr<Span> is null";
 inline const char *parser_is_null = "std::shared_ptr<LogParser> is null";
-inline const char *actor_is_null = "std::shared_ptr<event_stream_actor> is null";
+inline const char *actor_is_null = "std::shared_ptr<EventStreamActor> is null";
 inline const char *printer_is_null = "a printer is null";
 inline const char *context_is_null = "std::shared_ptr<context> is null";
 inline const char* event_stream_parser_null = "std::shared_ptr<EventStreamParser> is null";

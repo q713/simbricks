@@ -300,6 +300,16 @@ class HostCallSpan : public EventSpan {
 
   ~HostCallSpan() = default;
 
+  bool DoesTransmit() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return transmits_;
+  }
+
+  bool DoesReceive() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return receives_;
+  }
+
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
@@ -316,26 +326,19 @@ class HostCallSpan : public EventSpan {
       if (call_span_entry_) {
         is_pending_ = false;
         syscall_return_ = events_.back();
-        // std::cout << "found call stack end" << std::endl;
-        // this->display(std::cout);
-        // std::cout << std::endl;
         return false;
       }
+
       is_pending_ = true;
       call_span_entry_ = event_ptr;
       events_.push_back(event_ptr);
       return true;
     }
 
-    // TODO: clean up this code!!!
-
-    // create a default fallback for these events
-    if (not call_span_entry_) {
-      //return false;
-      is_pending_ = true;
-      call_span_entry_ = event_ptr;
-      events_.push_back(event_ptr);
-      return true;
+    if (trace_environment::is_driver_tx(event_ptr)) {
+      transmits_ = true;
+    } else if (trace_environment::is_driver_rx(event_ptr)) {
+      receives_ = true;
     }
 
     events_.push_back(event_ptr);
@@ -396,6 +399,11 @@ class HostDmaSpan : public EventSpan {
   }
 
   ~HostDmaSpan() = default;
+
+  bool IsRead() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_read_;
+  }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
@@ -462,6 +470,11 @@ class HostMmioSpan : public EventSpan {
   inline bool IsAfterPci() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return pci_before_;
+  }
+
+  inline bool IsRead() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_read_;
   }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
@@ -642,6 +655,16 @@ class NicMmioSpan : public EventSpan {
 
   ~NicMmioSpan() = default;
 
+  bool IsRead() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_read_;
+  }
+
+  bool IsWrite() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return not IsRead();
+  }
+
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
@@ -679,6 +702,11 @@ class NicDmaSpan : public EventSpan {
   }
 
   ~NicDmaSpan() = default;
+
+  bool IsRead() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_read_;
+  }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
@@ -811,6 +839,15 @@ inline bool is_type(std::shared_ptr<EventSpan> span, span_type type) {
     return false;
   }
   return span->GetType() == type;
+}
+
+inline std::string GetTypeStr(std::shared_ptr<EventSpan> span) {
+  if (not span) {
+    return "";
+  }
+  std::stringstream sss;
+  sss << span->GetType();
+  return std::move(sss.str());
 }
 
 struct SpanPrinter

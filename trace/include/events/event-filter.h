@@ -32,7 +32,7 @@
 #include "util/exception.h"
 
 /* general operator to act on an event stream */
-struct event_stream_actor : public cpipe<std::shared_ptr<Event>> {
+struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
   /* this method acts on an event within the stream,
    * if true is returned, the event is after acting on
    * it pased on, in case false is returned, the event
@@ -66,13 +66,13 @@ struct event_stream_actor : public cpipe<std::shared_ptr<Event>> {
     co_return;
   }
 
-  explicit event_stream_actor() : cpipe<std::shared_ptr<Event>>() {
+  explicit EventStreamActor() : cpipe<std::shared_ptr<Event>>() {
   }
 
-  ~event_stream_actor() = default;
+  ~EventStreamActor() = default;
 };
 
-class GenericEventFilter : public event_stream_actor {
+class GenericEventFilter : public EventStreamActor {
   std::function<bool(std::shared_ptr<Event> event)> &to_filter_;
 
  public:
@@ -81,11 +81,11 @@ class GenericEventFilter : public event_stream_actor {
   }
 
   explicit GenericEventFilter(std::function<bool(std::shared_ptr<Event> event)> &to_filter)
-      : event_stream_actor(), to_filter_(to_filter) {
+      : EventStreamActor(), to_filter_(to_filter) {
   }
 };
 
-class EventTypeFilter : public event_stream_actor {
+class EventTypeFilter : public EventStreamActor {
   std::set<EventType> &types_to_filter_;
   bool inverted_;
 
@@ -98,19 +98,19 @@ class EventTypeFilter : public event_stream_actor {
   }
 
   explicit EventTypeFilter(std::set<EventType> &types_to_filter, bool invert_filter)
-      : event_stream_actor(),
+      : EventStreamActor(),
         types_to_filter_(types_to_filter),
         inverted_(invert_filter) {
   }
 
   explicit EventTypeFilter(std::set<EventType> &types_to_filter)
-      : event_stream_actor(),
+      : EventStreamActor(),
         types_to_filter_(types_to_filter),
         inverted_(false) {
   }
 };
 
-class EventTimestampFilter : public event_stream_actor {
+class EventTimestampFilter : public EventStreamActor {
  public:
   struct EventTimeBoundary {
     uint64_t lower_bound_;
@@ -140,7 +140,7 @@ class EventTimestampFilter : public event_stream_actor {
   }
 
   explicit EventTimestampFilter(std::vector<EventTimeBoundary> &event_time_boundaries)
-      : event_stream_actor(),
+      : EventStreamActor(),
         event_time_boundaries_(event_time_boundaries) {
   }
 };

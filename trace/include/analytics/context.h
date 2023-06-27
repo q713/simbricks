@@ -104,24 +104,22 @@ class TraceContext {
 class Context {
 
   expectation expectation_;
-  // NOTE: maybe include trace id, technically currently the parent span contains this information
-  //       this must however be changed in case we consider distributed simulations etc.
-  std::shared_ptr<TraceContext> trace_context_;
+  std::shared_ptr<EventSpan> parent_span_;
 
  public:
-  Context(expectation expectation, std::shared_ptr<TraceContext> trace_context)
-      : expectation_(expectation), trace_context_(trace_context) {
-    throw_if_empty(trace_context, "trying to create Context, trace context is null");
+  Context(expectation expectation, std::shared_ptr<EventSpan> parent_span)
+      : expectation_(expectation), parent_span_(parent_span) {
+    throw_if_empty(parent_span, "trying to create Context, parent span is null");
   }
 
-  inline const std::shared_ptr<TraceContext> &GetTraceContext() const {
-    return trace_context_;
-  }
+  inline std::shared_ptr<EventSpan> &GetParent() {
+    return parent_span_;
+  };
 
-  inline const std::shared_ptr<TraceContext> &GetNonEmptyTraceContext() {
-    throw_if_empty(trace_context_, "GetNonEmptyTraceContext trace context is null");
-    return trace_context_;
-  }
+  inline std::shared_ptr<EventSpan> &GetNonEmptyParent() {
+    throw_if_empty(parent_span_, "GetNonEmptyParent parent is null");
+    return parent_span_;
+  };
 
   inline expectation GetExpectation() const {
     return expectation_;

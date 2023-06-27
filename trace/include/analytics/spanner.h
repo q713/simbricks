@@ -141,6 +141,7 @@ struct HostSpanner : public Spanner {
   bool found_transmit_ = false;
   bool found_receive_ = false;
   bool pci_write_before_ = false;
+  std::shared_ptr<HostCallSpan> last_trace_starting_span_ = nullptr;
   std::shared_ptr<HostCallSpan> pending_host_call_span_ = nullptr;
   std::shared_ptr<HostIntSpan> pending_host_int_span_ = nullptr;
   std::shared_ptr<HostMsixSpan> pending_host_msix_span_ = nullptr;
@@ -189,7 +190,9 @@ struct NicSpanner : public Spanner {
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host_queue_;
 
   std::shared_ptr<Context> last_host_context_ = nullptr;
-  std::shared_ptr<EventSpan> last_completed_ = nullptr;
+  // TODO: change last completed
+  // std::shared_ptr<EventSpan> last_completed_ = nullptr;
+  std::shared_ptr<EventSpan> last_causing_ = nullptr;
   bool last_action_was_send_ = false;
 
   std::list<std::shared_ptr<NicDmaSpan>> pending_nic_dma_spans_;

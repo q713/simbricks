@@ -56,7 +56,7 @@ class LogParser : public producer<std::shared_ptr<Event>>
                         LineReader &line_reader)
             : producer<std::shared_ptr<Event>> (),
               name_ (name),
-              identifier_ (trace_environment::GetNextParserId()),
+              identifier_ (TraceEnvironment::GetNextParserId()),
               log_file_path_ (log_file_path),
               line_reader_ (line_reader)
     {};

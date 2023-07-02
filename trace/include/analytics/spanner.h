@@ -33,54 +33,45 @@
 #include "analytics/span.h"
 #include "env/traceEnvironment.h"
 #include "analytics/tracer.h"
+#include "analytics/timer.h"
 
-#ifndef SIMBRICKS_TRACE_spanER_H_
-#define SIMBRICKS_TRACE_spanER_H_
+#ifndef SIMBRICKS_TRACE_SPANNER_H_
+#define SIMBRICKS_TRACE_SPANNER_H_
 
 struct Spanner : public consumer<std::shared_ptr<Event>> {
   uint64_t id_;
   std::string name_;
   Tracer &tracer_;
+  Timer &timer_;
 
-  // Override this method!
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan)
-  override = 0;
+  using ExecutorT = std::shared_ptr<concurrencpp::executor>;
+  using EventT = std::shared_ptr<Event>;
+  using LazyResultT = concurrencpp::lazy_result<bool>;
+  using HandlerT = std::function<LazyResultT(ExecutorT, EventT &)>;
+  std::unordered_map<EventType, HandlerT> handler_;
 
-  explicit Spanner(std::string &&name, Tracer &tra)
-      : id_(trace_environment::GetNextSpannerId()), name_(name), tracer_(tra) {
+  concurrencpp::result<void> consume(ExecutorT resume_executor, std::shared_ptr<Channel<EventT>> &src_chan) override;
+
+  explicit Spanner(std::string &&name, Tracer &tra, Timer &timer)
+      : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer) {
   }
 
-  inline uint64_t get_id() const {
+  explicit Spanner(std::string &&name,
+                   Tracer &tra,
+                   Timer &timer,
+                   std::unordered_map<EventType, HandlerT> &&handler)
+      : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer), handler_(handler) {
+  }
+
+  void RegisterHandler(EventType type, HandlerT &&handler) {
+    auto it_suc = handler_.insert({type, handler});
+    throw_on(not it_suc.second,
+             "Spanner::RegisterHandler Could not insert new handler");
+  }
+
+  inline uint64_t GetId() const {
     return id_;
   }
-
-  bool ends_with_offset(uint64_t addr, uint64_t off) {
-    size_t lz = std::__countl_zero(off);
-    uint64_t mask = lz == 64 ? 0xffffffffffffffff : (1 << (64 - lz)) - 1;
-    uint64_t check = addr & mask;
-    return check == off;
-  }
-
-  // template <class st, class... Args>
-  // std::shared_ptr<st> register_span(std::shared_ptr<event_span> parent,
-  //                                   Args &&...args) {
-  //   if (not parent) {
-  //     std::cout << "try to create a new span without parent" << std::endl;
-  //     return {};
-  //   }
-  //
-  //  auto result =
-  //      tracer_.rergister_new_span<st>(parent->get_trace_id(), args...);
-  //  if (not result) {
-  //    std::cerr << "could not allocate new span" << std::endl;
-  //    return {};
-  //  }
-  //
-  //  result->set_parent(parent);
-  //  return result;
-  //}
 
   template<class St>
   std::shared_ptr<St>
@@ -103,17 +94,10 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 };
 
 struct HostSpanner : public Spanner {
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  explicit HostSpanner(std::string &&name, Tracer &tra,
+  explicit HostSpanner(std::string &&name, Tracer &tra, Timer &timer,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
-                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic, bool is_client)
-      : Spanner(std::move(name), tra), to_nic_queue_(to_nic), from_nic_queue_(from_nic), is_client_(is_client) {
-    throw_if_empty(to_nic, queue_is_null);
-    throw_if_empty(from_nic, queue_is_null);
-  }
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic, bool is_client);
 
  private:
   bool CreateTraceStartingSpan(std::shared_ptr<Event> &starting_event);
@@ -130,7 +114,8 @@ struct HostSpanner : public Spanner {
   concurrencpp::lazy_result<bool> HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
 
-  concurrencpp::lazy_result<bool> HandelInt(std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> HandelInt(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                            std::shared_ptr<Event> &event_ptr);
 
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_queue_;
   std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic_queue_;
@@ -150,25 +135,12 @@ struct HostSpanner : public Spanner {
 };
 
 struct NicSpanner : public Spanner {
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) override;
 
-  explicit NicSpanner(std::string &&name, Tracer &tra, std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
+  explicit NicSpanner(std::string &&name, Tracer &tra, Timer &timer,
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host)
-      : Spanner(std::move(name), tra),
-        to_network_queue_(to_network),
-        from_network_queue_(from_network),
-        to_host_queue_(to_host),
-        from_host_queue_(from_host) {
-
-    throw_if_empty(to_network, queue_is_null);
-    throw_if_empty(from_network, queue_is_null);
-    throw_if_empty(to_host, queue_is_null);
-    throw_if_empty(from_host, queue_is_null);
-  }
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host);
 
  private:
 
@@ -190,12 +162,10 @@ struct NicSpanner : public Spanner {
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host_queue_;
 
   std::shared_ptr<Context> last_host_context_ = nullptr;
-  // TODO: change last completed
-  // std::shared_ptr<EventSpan> last_completed_ = nullptr;
   std::shared_ptr<EventSpan> last_causing_ = nullptr;
   bool last_action_was_send_ = false;
 
   std::list<std::shared_ptr<NicDmaSpan>> pending_nic_dma_spans_;
 };
 
-#endif  // SIMBRICKS_TRACE_spanER_H_
+#endif  // SIMBRICKS_TRACE_SPANNER_H_

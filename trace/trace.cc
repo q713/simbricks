@@ -134,7 +134,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Init the trace environment --> IMPORTANT
-  trace_environment::initialize();
+  TraceEnvironment::initialize();
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
   concurren_options.max_background_threads = 0;
@@ -145,10 +145,14 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    simbricks::trace::OtlpSpanExporter
-        exporter{"http://localhost:4318/v1/traces", false, "trace"};
+    //simbricks::trace::OtlpSpanExporter
+    //    exporter{"http://localhost:4318/v1/traces", false, "trace"};
+    simbricks::trace::NoOpExporter exporter;
 
     Tracer tracer{exporter};
+
+    const size_t amount_sources = 2;
+    Timer timer{amount_sources};
 
     auto client_hn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
     auto client_nh = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
@@ -169,7 +173,8 @@ int main(int argc, char *argv[]) {
     auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
     auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
-    auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null, "Client-Host", tracer, client_hn, client_nh, true);
+    auto spanner_h_c =
+        create_shared<HostSpanner>(spanner_is_null, "Client-Host", tracer, timer, client_hn, client_nh, true);
     const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
 
     //LineReader lr_n_s;
@@ -182,7 +187,7 @@ int main(int argc, char *argv[]) {
     auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
     auto spanner_n_c =
-        create_shared<NicSpanner>(spanner_is_null, "Client-NIC", tracer, nic_cn, nic_sn, client_nh, client_hn);
+        create_shared<NicSpanner>(spanner_is_null, "Client-NIC", tracer, timer, nic_cn, nic_sn, client_nh, client_hn);
     const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
 
     std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_n_s, pl_h_s*/};
@@ -204,7 +209,7 @@ int main(int argc, char *argv[]) {
   // add both symbol tables / symbol filterr to translate hex addresses to
   // function-name/label
   if (result.count("linux-dump-server-client") &&
-      !trace_environment::add_symbol_table(
+      !TraceEnvironment::add_symbol_table(
           "Linuxvm-Symbols",
           result["linux-dump-server-client"].as<std::string>(), 0,
           FilterType::S)) {
@@ -213,7 +218,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
   if (result.count("nic-i40e-dump") &&
-      !trace_environment::add_symbol_table(
+      !TraceEnvironment::add_symbol_table(
           "Nicdriver-Symbols", result["nic-i40e-dump"].as<std::string>(),
           0xffffffffa0000000ULL, FilterType::S)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;

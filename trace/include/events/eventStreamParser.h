@@ -124,9 +124,9 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
           continue;
         }
         const std::string *func =
-            trace_environment::internalize_additional(function);
+            TraceEnvironment::internalize_additional(function);
         const std::string *comp =
-            trace_environment::internalize_additional(component);
+            TraceEnvironment::internalize_additional(component);
 
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
                                            func, comp);

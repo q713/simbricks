@@ -33,7 +33,9 @@
 #include "env/stringInternalizer.h"
 #include "env/symtable.h"
 
-class trace_environment {
+
+// TODO: add proper configuration support for the tracing environment!!!!
+class TraceEnvironment {
   static std::mutex trace_env_mutex_;
 
   static string_internalizer internalizer_;
@@ -42,11 +44,15 @@ class trace_environment {
 
   static std::set<const std::string *> driver_func_indicator_;
 
-  static std::set<const std::string *> nw_interface_send_;
+  static std::set<const std::string *> kernel_tx_indicator_;
 
-  static std::set<const std::string *> nw_interface_receive_;
+  static std::set<const std::string *> kernel_rx_indicator_;
 
   static std::set<const std::string *> pci_write_indicators_;
+
+  static std::set<const std::string *> driver_tx_indicator_;
+
+  static std::set<const std::string *> driver_rx_indicator_;
 
   static std::set<EventType> mmio_related_event_t_;
 
@@ -118,9 +124,9 @@ class trace_environment {
 
   static bool is_call_pack_related(std::shared_ptr<Event> event_ptr);
 
-  static bool is_driver_tx(std::shared_ptr<Event> event_ptr);
+  static bool IsDriverTx(std::shared_ptr<Event> event_ptr);
 
-  static bool is_driver_rx(std::shared_ptr<Event> event_ptr);
+  static bool IsDriverRx(std::shared_ptr<Event> event_ptr);
 
   static bool is_pci_msix_desc_addr(std::shared_ptr<Event> event_ptr);
 
@@ -134,9 +140,9 @@ class trace_environment {
 
   static bool is_msix_related(std::shared_ptr<Event> event_ptr);
 
-  static bool is_nw_interface_send(std::shared_ptr<Event> event_ptr);
+  static bool IsKernelTx(std::shared_ptr<Event> event_ptr);
 
-  static bool is_nw_interface_receive(std::shared_ptr<Event> event_ptr);
+  static bool IsKernelRx(std::shared_ptr<Event> event_ptr);
 
   static bool is_socket_connect(std::shared_ptr<Event> event_ptr);
 

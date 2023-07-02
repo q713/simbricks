@@ -72,11 +72,11 @@ class TraceContext {
 
  public:
   explicit TraceContext(uint64_t trace_id)
-      : parent_(nullptr), trace_id_(trace_id), id_(trace_environment::GetNextTraceContextId()) {
+      : parent_(nullptr), trace_id_(trace_id), id_(TraceEnvironment::GetNextTraceContextId()) {
   }
 
   explicit TraceContext(std::shared_ptr<EventSpan> &parent, uint64_t trace_id)
-      : parent_(parent), trace_id_(trace_id), id_(trace_environment::GetNextTraceContextId()) {
+      : parent_(parent), trace_id_(trace_id), id_(TraceEnvironment::GetNextTraceContextId()) {
   }
 
   bool HasParent() {

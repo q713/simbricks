@@ -91,7 +91,7 @@ class EventTypeFilter : public EventStreamActor {
 
  public:
   bool act_on(std::shared_ptr<Event> &event) override {
-    auto search = types_to_filter_.find(event->get_type());
+    auto search = types_to_filter_.find(event->GetType());
     const bool is_to_sink = inverted_ ? search == types_to_filter_.end()
                                       : search != types_to_filter_.end();
     return is_to_sink;

@@ -46,7 +46,7 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   last_host_context_ = con;
 
   auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
-      name_, con->GetNonEmptyParent(), event_ptr, event_ptr->get_parser_ident());
+      name_, con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent());
   if (not mmio_span) {
     std::cerr << "could not register mmio_span" << std::endl;
     co_return false;
@@ -54,7 +54,6 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
 
   assert(mmio_span->IsComplete() and "mmio span is not complete");
   tracer_.MarkSpanAsDone(mmio_span);
-  //last_completed_ = mmio_span;
   if (mmio_span->IsWrite()) {
     last_causing_ = mmio_span;
   }
@@ -71,7 +70,6 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
       tracer_.MarkSpanAsDone(pending_dma);
-      //last_completed_ = pending_dma;
     } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
       // indicate to host that we expect a dma action
       std::cout << "nic try push dma" << std::endl;
@@ -89,7 +87,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
       "try starting a new dma span with NON issue");
 
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(name_, last_causing_,
-                                                      event_ptr, event_ptr->get_parser_ident());
+                                                      event_ptr, event_ptr->GetParserIdent());
   if (not pending_dma) {
     std::cerr << "could not register new pending dma action" << std::endl;
     co_return false;
@@ -106,21 +104,18 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
   bool is_tx = false;
   std::shared_ptr<EventSpan> parent = nullptr;
   if (is_type(event_ptr, EventType::NicTx_t)) {
-    // parent = last_completed_;
     parent = last_causing_;
     is_tx = true;
     last_action_was_send_ = true;
 
   } else if (is_type(event_ptr, EventType::NicRx_t)) {
-    //auto con = co_await network_queue_.poll(resume_executor, this->id_);
-    //if (is_expectation(con, expectation::rx)) {
-    //  std::cerr << "nic_spanner: try to create receive span, but no receive ";
-    //  std::cerr << "expectation from network" << std::endl;
-    //  co_return false;
-    //}
+    //auto con_opt = co_await from_network_queue_->pop(resume_executor);
+    //throw_on(not con_opt.has_value(), context_is_null);
+    //auto con = con_opt.value();
+    //throw_on(is_expectation(con, expectation::kRx),
+    //         "nic_spanner: received non kRx context");
     //parent = con->GetParent();
-    //parent = last_completed_;
-    parent = last_causing_; // TODO: change when incoperating server node!!!
+    parent = last_causing_;
     is_tx = false;
     last_action_was_send_ = false;
 
@@ -129,25 +124,24 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   auto eth_span = tracer_.StartSpanByParent<NicEthSpan>(
-      name_, parent, event_ptr, event_ptr->get_parser_ident());
+      name_, parent, event_ptr, event_ptr->GetParserIdent());
   if (not eth_span) {
     std::cerr << "could not register eth_span" << std::endl;
     co_return false;
   }
 
   assert(eth_span->IsComplete() and "eth span was not complette");
-  // indicate that somewhere a receive will be expected
-  //if (is_tx and
-  //    not co_await network_queue_.push(resume_executor, this->id_, expectation::rx, eth_span)) {
-  //  std::cerr << "could not indicate to network that a";
-  //  std::cerr << "receive is to be expected" << std::endl;
-  //}
   tracer_.MarkSpanAsDone(eth_span);
-  //last_completed_ = eth_span;
-  // TODO: if it is a transmit send out to network queue
+
   if (not is_tx) {
     last_causing_ = eth_span;
   }
+  //else {
+  //  auto context = create_shared<Context>(
+  //      "HandelTxrx: could not create context", expectation::kRx, parent);
+  //  throw_on(not co_await to_network_queue_->push(resume_executor, context),
+  //           "HandelTxrx: could not write TO network context ");
+  //}
   co_return true;
 }
 
@@ -157,7 +151,7 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   assert(event_ptr and "event_ptr is null");
 
   auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
-      name_, last_causing_, event_ptr, event_ptr->get_parser_ident());
+      name_, last_causing_, event_ptr, event_ptr->GetParserIdent());
   if (not msix_span) {
     std::cerr << "could not register msix span" << std::endl;
     co_return false;
@@ -176,66 +170,44 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   co_return true;
 }
 
-concurrencpp::result<void>
-NicSpanner::consume(std::shared_ptr<concurrencpp::executor> resume_executor,
-                    std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan) {
-  throw_if_empty(resume_executor, resume_executor_null);
-  throw_if_empty(src_chan, channel_is_null);
+NicSpanner::NicSpanner(std::string &&name, Tracer &tra, Timer &timer,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host)
+    : Spanner(std::move(name), tra, timer),
+      to_network_queue_(to_network),
+      from_network_queue_(from_network),
+      to_host_queue_(to_host),
+      from_host_queue_(from_host) {
 
-  std::shared_ptr<Event> event_ptr = nullptr;
-  std::shared_ptr<NicDmaSpan> pending_dma = nullptr;
-  bool added = false;
-  std::optional<std::shared_ptr<Event>> event_ptr_opt;
+  throw_if_empty(to_network, queue_is_null);
+  throw_if_empty(from_network, queue_is_null);
+  throw_if_empty(to_host, queue_is_null);
+  throw_if_empty(from_host, queue_is_null);
 
-  for (event_ptr_opt = co_await src_chan->pop(resume_executor); event_ptr_opt.has_value();
-       event_ptr_opt = co_await src_chan->pop(resume_executor)) {
+  auto handel_mmio = [this](ExecutorT resume_executor, EventT &event_ptr) {
+    return HandelMmio(std::move(resume_executor), event_ptr);
+  };
+  RegisterHandler(EventType::NicMmioW_t, handel_mmio);
+  RegisterHandler(EventType::NicMmioR_t, handel_mmio);
 
-    event_ptr = event_ptr_opt.value();
-    throw_if_empty(event_ptr, event_is_null);
+  auto handel_dma = [this](ExecutorT resume_executor, EventT &event_ptr) {
+    return HandelDma(std::move(resume_executor), event_ptr);
+  };
+  RegisterHandler(EventType::NicDmaI_t, handel_dma);
+  RegisterHandler(EventType::NicDmaEx_t, handel_dma);
+  RegisterHandler(EventType::NicDmaCW_t, handel_dma);
+  RegisterHandler(EventType::NicDmaCR_t, handel_dma);
 
-    added = false;
+  auto handel_tx_rx = [this](ExecutorT resume_executor, EventT &event_ptr) {
+    return HandelTxrx(std::move(resume_executor), event_ptr);
+  };
+  RegisterHandler(EventType::NicTx_t, handel_tx_rx);
+  RegisterHandler(EventType::NicRx_t, handel_tx_rx);
 
-    std::cout << "nic spanner try handel: " << *event_ptr << std::endl;
-
-    switch (event_ptr->get_type()) {
-      case EventType::NicMmioW_t:
-      case EventType::NicMmioR_t: {
-        added = co_await HandelMmio(resume_executor, event_ptr);
-        break;
-      }
-
-      case EventType::NicDmaI_t:
-      case EventType::NicDmaEx_t:
-      case EventType::NicDmaCW_t:
-      case EventType::NicDmaCR_t: {
-        added = co_await HandelDma(resume_executor, event_ptr);
-        break;
-      }
-
-      case EventType::NicTx_t:
-      case EventType::NicRx_t: {
-        added = co_await HandelTxrx(resume_executor, event_ptr);
-        break;
-      }
-
-      case EventType::NicMsix_t: {
-        added = co_await HandelMsix(resume_executor, event_ptr);
-        break;
-      }
-
-      default: {
-        std::cout << "encountered non expected event ";
-        std::cout << *event_ptr << std::endl;
-        added = false;
-        break;
-      }
-    }
-
-    if (not added) {
-      std::cout << "found event that could not be added to a pack: "
-                << *event_ptr << std::endl;
-    }
-  }
-
-  co_return;
+  auto handel_msix = [this](ExecutorT resume_executor, EventT &event_ptr) {
+    return HandelMsix(std::move(resume_executor), event_ptr);
+  };
+  RegisterHandler(EventType::NicMsix_t, handel_msix);
 }

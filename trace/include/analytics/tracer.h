@@ -158,7 +158,7 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    uint64_t trace_id = trace_environment::GetNextTraceId();
+    uint64_t trace_id = TraceEnvironment::GetNextTraceId();
 
     auto trace_context = RegisterCreateContext(trace_id, nullptr);
 

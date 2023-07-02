@@ -38,7 +38,6 @@
 #include "util/exception.h"
 #include "util/factory.h"
 
-
 template<typename ValueType>
 class Channel {
 

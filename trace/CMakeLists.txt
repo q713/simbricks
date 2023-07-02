@@ -115,6 +115,7 @@ set(TRACE_LIB_HEADER_FILES
         include/analytics/tracer.h
         include/analytics/context.h
         include/analytics/spanner.h
+        include/analytics/timer.h
         # exporter
         include/exporter/exporter.h
         )
@@ -131,6 +132,7 @@ set(TRACE_LIB_SOURCE_FILES
         source/env/symtable.cc
         source/env/traceEnvironment.cc
         # analytics
+        source/analytics/spanner.cpp
         source/analytics/nicSpanner.cc
         source/analytics/hostSpanner.cc
         )
@@ -157,8 +159,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         opentelemetry_api
         opentelemetry_exporter_otlp_http
         opentelemetry_exporter_ostream_span
-        )
-
+)
 
 #######################################
 # Trace - Tests

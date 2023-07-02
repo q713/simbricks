@@ -22,8 +22,8 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SIMBRICKS_TRACE_EVENT_PACK_H_
-#define SIMBRICKS_TRACE_EVENT_PACK_H_
+#ifndef SIMBRICKS_TRACE_EVENT_SPAN_H_
+#define SIMBRICKS_TRACE_EVENT_SPAN_H_
 
 #include <iostream>
 #include <memory>
@@ -37,7 +37,7 @@
 #include "env/traceEnvironment.h"
 #include "analytics/context.h"
 
-inline void write_ident(std::ostream &out, unsigned ident) {
+inline void WriteIdent(std::ostream &out, unsigned ident) {
   if (ident == 0)
     return;
 
@@ -104,17 +104,17 @@ class EventSpan {
 
  private:
   virtual void display(std::ostream &out, unsigned ident) {
-    write_ident(out, ident);
+    WriteIdent(out, ident);
     out << "id: " << (unsigned long long) id_;
     out << ", source_id: " << (unsigned long long) source_id_;
     out << ", kind: " << type_ << std::endl;
-    write_ident(out, ident);
+    WriteIdent(out, ident);
     // TODO: fix
     //out << "has parent? " << (parent_ != nullptr) << std::endl;
-    write_ident(out, ident);
+    WriteIdent(out, ident);
     out << std::endl;
     for (std::shared_ptr<Event> event : events_) {
-      write_ident(out, ident);
+      WriteIdent(out, ident);
       out << *event << std::endl;
     }
   }
@@ -247,7 +247,7 @@ class EventSpan {
   virtual ~EventSpan() = default;
 
   explicit EventSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id, span_type t)
-      : id_(trace_environment::GetNextSpanId()),
+      : id_(TraceEnvironment::GetNextSpanId()),
         source_id_(source_id),
         type_(t),
         trace_context_(trace_context) {
@@ -269,11 +269,11 @@ class EventSpan {
 
     if (not events_.empty()) {
       auto first = events_.front();
-      if (first->get_parser_ident() != event_ptr->get_parser_ident()) {
+      if (first->GetParserIdent() != event_ptr->GetParserIdent()) {
         return false;
       }
       // TODO: investigate this further in original log files
-      // if (first->get_ts() > event_ptr->get_ts()) {
+      // if (first->get_ts() > event_ptr->GetTs()) {
       //   return false;
       // }
     }
@@ -322,7 +322,7 @@ class HostCallSpan : public EventSpan {
       return false;
     }
 
-    if (trace_environment::is_sys_entry(event_ptr)) {
+    if (TraceEnvironment::is_sys_entry(event_ptr)) {
       if (call_span_entry_) {
         is_pending_ = false;
         syscall_return_ = events_.back();
@@ -335,9 +335,9 @@ class HostCallSpan : public EventSpan {
       return true;
     }
 
-    if (trace_environment::is_driver_tx(event_ptr)) {
+    if (TraceEnvironment::IsDriverTx(event_ptr)) {
       transmits_ = true;
-    } else if (trace_environment::is_driver_rx(event_ptr)) {
+    } else if (TraceEnvironment::IsDriverRx(event_ptr)) {
       receives_ = true;
     }
 
@@ -412,7 +412,7 @@ class HostDmaSpan : public EventSpan {
       return false;
     }
 
-    switch (event_ptr->get_type()) {
+    switch (event_ptr->GetType()) {
       case EventType::HostDmaW_t:
       case EventType::HostDmaR_t: {
         if (host_dma_execution_) {
@@ -484,7 +484,7 @@ class HostMmioSpan : public EventSpan {
       return false;
     }
 
-    switch (event_ptr->get_type()) {
+    switch (event_ptr->GetType()) {
       case EventType::HostMmioW_t: {
         if (host_mmio_issue_) {
           return false;
@@ -715,7 +715,7 @@ class NicDmaSpan : public EventSpan {
       return false;
     }
 
-    switch (event_ptr->get_type()) {
+    switch (event_ptr->GetType()) {
       case EventType::NicDmaI_t: {
         if (dma_issue_) {
           return false;
@@ -834,7 +834,7 @@ class GenericSingleSpan : public EventSpan {
   }
 };
 
-inline bool is_type(std::shared_ptr<EventSpan> span, span_type type) {
+inline bool IsType(std::shared_ptr<EventSpan> span, span_type type) {
   if (not span) {
     return false;
   }
@@ -873,4 +873,4 @@ struct SpanPrinter
   }
 };
 
-#endif  // SIMBRICKS_TRACE_EVENT_PACK_H_
+#endif  // SIMBRICKS_TRACE_EVENT_SPAN_H_

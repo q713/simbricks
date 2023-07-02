@@ -59,7 +59,7 @@ class EventChecker : public consumer<std::shared_ptr<Event>> {
       event = msg.value();
       REQUIRE(event != nullptr);
       if (cur_match < to_macth_) {
-        REQUIRE(event->equal(*expected_events_[cur_match]));
+        REQUIRE(event->Equal(*expected_events_[cur_match]));
       } else {
         // we got more events as expected
         REQUIRE(false);

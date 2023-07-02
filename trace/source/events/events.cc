@@ -24,60 +24,60 @@
 
 #include "events/events.h"
 
-void Event::display(std::ostream &out) {
-  out << get_name() << ": source_id=" << parser_identifier_
+void Event::Display(std::ostream &out) {
+  out << GetName() << ": source_id=" << parser_identifier_
      << ", source_name=" << parser_name_ << ", timestamp=" << timestamp_;
 }
 
-bool Event::equal(const Event &other) {
+bool Event::Equal(const Event &other) {
   return timestamp_ == other.timestamp_ and parser_identifier_ == other.parser_identifier_
       and parser_name_ == other.parser_name_ and type_ == other.type_ and name_ == other.name_;
 }
 
-void SimSendSync::display(std::ostream &out) {
-  Event::display(out);
+void SimSendSync::Display(std::ostream &out) {
+  Event::Display(out);
 }
 
-bool SimSendSync::equal(const Event &other) {
-  return Event::equal(other);
+bool SimSendSync::Equal(const Event &other) {
+  return Event::Equal(other);
 }
 
-void SimProcInEvent::display(std::ostream &out) {
-  Event::display(out);
+void SimProcInEvent::Display(std::ostream &out) {
+  Event::Display(out);
 }
 
-bool SimProcInEvent::equal(const Event &other) {
-  return Event::equal(other);
+bool SimProcInEvent::Equal(const Event &other) {
+  return Event::Equal(other);
 }
 
-void HostInstr::display(std::ostream &out) {
-  Event::display(out);
+void HostInstr::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", pc=" << std::hex << pc_;
 }
 
-bool HostInstr::equal(const Event &other) {
+bool HostInstr::Equal(const Event &other) {
   if (not is_type(other, EventType::HostInstr_t)) {
     return false;
   }
   const HostInstr hinstr = static_cast<const HostInstr &>(other);
-  return pc_ == hinstr.pc_ and Event::equal(hinstr);
+  return pc_ == hinstr.pc_ and Event::Equal(hinstr);
 }
 uint64_t HostInstr::GetPc() const {
   return pc_;
 }
 
-void HostCall::display(std::ostream &out) {
-  HostInstr::display(out);
+void HostCall::Display(std::ostream &out) {
+  HostInstr::Display(out);
   out << ", func=" << (func_ ? *func_ : "null");
   out << ", comp=" << (comp_ ? *comp_ : "null");
 }
 
-bool HostCall::equal(const Event &other) {
+bool HostCall::Equal(const Event &other) {
   if (not is_type(other, EventType::HostCall_t)) {
     return false;
   }
   const HostCall call = static_cast<const HostCall &>(other);
-  return func_ == call.func_ and comp_ == call.comp_ and HostInstr::equal(call);
+  return func_ == call.func_ and comp_ == call.comp_ and HostInstr::Equal(call);
 }
 const std::string *HostCall::GetFunc() const {
   return func_;
@@ -86,57 +86,57 @@ const std::string *HostCall::GetComp() const {
   return comp_;
 }
 
-void HostMmioImRespPoW::display(std::ostream &out) {
-  Event::display(out);
+void HostMmioImRespPoW::Display(std::ostream &out) {
+  Event::Display(out);
 }
 
-bool HostMmioImRespPoW::equal(const Event &other) {
-  return Event::equal(other);
+bool HostMmioImRespPoW::Equal(const Event &other) {
+  return Event::Equal(other);
 }
 
-void HostIdOp::display(std::ostream &out) {
-  Event::display(out);
+void HostIdOp::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", id=" << id_;
 }
 
-bool HostIdOp::equal(const Event &other) {
+bool HostIdOp::Equal(const Event &other) {
   const HostIdOp *iop = dynamic_cast<const HostIdOp *>(&other);
   if (not iop) {
     return false;
   }
-  return id_ == iop->id_ and Event::equal(*iop);
+  return id_ == iop->id_ and Event::Equal(*iop);
 }
 uint64_t HostIdOp::GetId() const {
   return id_;
 }
 
-void HostMmioCR::display(std::ostream &out) {
-  HostIdOp::display(out);
+void HostMmioCR::Display(std::ostream &out) {
+  HostIdOp::Display(out);
 }
 
-bool HostMmioCR::equal(const Event &other) {
-  return HostIdOp::equal(other);
+bool HostMmioCR::Equal(const Event &other) {
+  return HostIdOp::Equal(other);
 }
 
-void HostMmioCW::display(std::ostream &out) {
-  HostIdOp::display(out);
+void HostMmioCW::Display(std::ostream &out) {
+  HostIdOp::Display(out);
 }
 
-bool HostMmioCW::equal(const Event &other) {
-  return HostIdOp::equal(other);
+bool HostMmioCW::Equal(const Event &other) {
+  return HostIdOp::Equal(other);
 }
 
-void HostAddrSizeOp::display(std::ostream &out) {
-  HostIdOp::display(out);
+void HostAddrSizeOp::Display(std::ostream &out) {
+  HostIdOp::Display(out);
   out << ", addr=" << std::hex << addr_ << ", size=" << size_;
 }
 
-bool HostAddrSizeOp::equal(const Event &other) {
+bool HostAddrSizeOp::Equal(const Event &other) {
   const HostAddrSizeOp *addop = dynamic_cast<const HostAddrSizeOp *>(&other);
   if (not addop) {
     return false;
   }
-  return addr_ == addop->addr_ and size_ == addop->size_ and HostIdOp::equal(*addop);
+  return addr_ == addop->addr_ and size_ == addop->size_ and HostIdOp::Equal(*addop);
 }
 
 uint64_t HostAddrSizeOp::GetAddr() const {
@@ -147,17 +147,17 @@ uint64_t HostAddrSizeOp::GetSize() const {
   return size_;
 }
 
-void HostMmioOp::display(std::ostream &out) {
-  HostAddrSizeOp::display(out);
+void HostMmioOp::Display(std::ostream &out) {
+  HostAddrSizeOp::Display(out);
   out << ", bar=" << bar_ << std::hex << ", offset=" << offset_;
 }
 
-bool HostMmioOp::equal(const Event &other) {
+bool HostMmioOp::Equal(const Event &other) {
   const HostMmioOp *mmioop = dynamic_cast<const HostMmioOp *>(&other);
   if (not mmioop) {
     return false;
   }
-  return bar_ == mmioop->bar_ and offset_ == mmioop->offset_ and HostAddrSizeOp::equal(*mmioop);
+  return bar_ == mmioop->bar_ and offset_ == mmioop->offset_ and HostAddrSizeOp::Equal(*mmioop);
 }
 
 uint64_t HostMmioOp::GetBar() const {
@@ -168,70 +168,70 @@ uint64_t HostMmioOp::GetOffset() const {
   return offset_;
 }
 
-void HostMmioR::display(std::ostream &out) {
-  HostMmioOp::display(out);
+void HostMmioR::Display(std::ostream &out) {
+  HostMmioOp::Display(out);
 }
 
-bool HostMmioR::equal(const Event &other) {
-  return HostMmioOp::equal(other);
+bool HostMmioR::Equal(const Event &other) {
+  return HostMmioOp::Equal(other);
 }
 
-void HostMmioW::display(std::ostream &out) {
-  HostMmioOp::display(out);
+void HostMmioW::Display(std::ostream &out) {
+  HostMmioOp::Display(out);
 }
 
-bool HostMmioW::equal(const Event &other) {
-  return HostMmioOp::equal(other);
+bool HostMmioW::Equal(const Event &other) {
+  return HostMmioOp::Equal(other);
 }
 
-void HostDmaC::display(std::ostream &out) {
-  HostIdOp::display(out);
+void HostDmaC::Display(std::ostream &out) {
+  HostIdOp::Display(out);
 }
 
-bool HostDmaC::equal(const Event &other) {
-  return HostIdOp::equal(other);
+bool HostDmaC::Equal(const Event &other) {
+  return HostIdOp::Equal(other);
 }
 
-void HostDmaR::display(std::ostream &out) {
-  HostAddrSizeOp::display(out);
+void HostDmaR::Display(std::ostream &out) {
+  HostAddrSizeOp::Display(out);
 }
 
-bool HostDmaR::equal(const Event &other) {
-  return HostAddrSizeOp::equal(other);
+bool HostDmaR::Equal(const Event &other) {
+  return HostAddrSizeOp::Equal(other);
 }
 
-void HostDmaW::display(std::ostream &out) {
-  HostAddrSizeOp::display(out);
+void HostDmaW::Display(std::ostream &out) {
+  HostAddrSizeOp::Display(out);
 }
 
-bool HostDmaW::equal(const Event &other) {
-  return HostAddrSizeOp::equal(other);
+bool HostDmaW::Equal(const Event &other) {
+  return HostAddrSizeOp::Equal(other);
 }
 
-void HostMsiX::display(std::ostream &out) {
-  Event::display(out);
+void HostMsiX::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", vec=" << vec_;
 }
 
-bool HostMsiX::equal(const Event &other) {
+bool HostMsiX::Equal(const Event &other) {
   if (not is_type(other, EventType::HostMsiX_t)) {
     return false;
   }
   const HostMsiX &msi = static_cast<const HostMsiX &>(other);
-  return vec_ == msi.vec_ and Event::equal(msi);
+  return vec_ == msi.vec_ and Event::Equal(msi);
 }
 
 uint64_t HostMsiX::GetVec() const {
   return vec_;
 }
 
-void HostConf::display(std::ostream &out) {
-  Event::display(out);
+void HostConf::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", dev=" << dev_ << ", func=" << func_ << ", reg=" << std::hex << reg_
      << ", bytes=" << bytes_ << ", data=" << std::hex << data_;
 }
 
-bool HostConf::equal(const Event &other) {
+bool HostConf::Equal(const Event &other) {
   if (not is_type(other, EventType::HostConf_t)) {
     return false;
   }
@@ -241,7 +241,7 @@ bool HostConf::equal(const Event &other) {
       reg_ == hconf.reg_ and
       bytes_ == hconf.bytes_ and
       data_ == hconf.data_ and
-      is_read_ == hconf.is_read_ and Event::equal(hconf);
+      is_read_ == hconf.is_read_ and Event::Equal(hconf);
 }
 
 uint64_t HostConf::GetDev() const {
@@ -268,34 +268,34 @@ bool HostConf::IsRead() const {
   return is_read_;
 }
 
-void HostClearInt::display(std::ostream &out) {
-  Event::display(out);
+void HostClearInt::Display(std::ostream &out) {
+  Event::Display(out);
 }
 
-bool HostClearInt::equal(const Event &other) {
-  return Event::equal(other);
+bool HostClearInt::Equal(const Event &other) {
+  return Event::Equal(other);
 }
 
-void HostPostInt::display(std::ostream &out) {
-  Event::display(out);
+void HostPostInt::Display(std::ostream &out) {
+  Event::Display(out);
 }
 
-bool HostPostInt::equal(const Event &other) {
-  return Event::equal(other);
+bool HostPostInt::Equal(const Event &other) {
+  return Event::Equal(other);
 }
 
-void HostPciRW::display(std::ostream &out) {
-  Event::display(out);
+void HostPciRW::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", offset=" << std::hex << offset_ << ", size=" << std::hex << size_;
 }
 
-bool HostPciRW::equal(const Event &other) {
+bool HostPciRW::Equal(const Event &other) {
   if (not is_type(other, EventType::HostPciRW_t)) {
     return false;
   }
   const HostPciRW &pci = static_cast<const HostPciRW &>(other);
   return offset_ == pci.offset_ and size_ == pci.size_ and
-      is_read_ == pci.is_read_ and Event::equal(pci);
+      is_read_ == pci.is_read_ and Event::Equal(pci);
 }
 
 uint64_t HostPciRW::GetOffset() const {
@@ -310,17 +310,17 @@ bool HostPciRW::IsRead() const {
   return is_read_;
 }
 
-void NicMsix::display(std::ostream &out) {
-  Event::display(out);
+void NicMsix::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", vec=" << vec_;
 }
 
-bool NicMsix::equal(const Event &other) {
+bool NicMsix::Equal(const Event &other) {
   if (not is_type(other, EventType::NicMsix_t)) {
     return false;
   }
   const NicMsix &msi = static_cast<const NicMsix &>(other);
-  return vec_ == msi.vec_ and isX_ == msi.isX_ and Event::equal(msi);
+  return vec_ == msi.vec_ and isX_ == msi.isX_ and Event::Equal(msi);
 }
 
 uint16_t NicMsix::GetVec() const {
@@ -331,19 +331,19 @@ bool NicMsix::IsX() const {
   return isX_;
 }
 
-void NicDma::display(std::ostream &out) {
-  Event::display(out);
+void NicDma::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", id=" << std::hex << id_ << ", addr=" << std::hex << addr_
      << ", size=" << len_;
 }
 
-bool NicDma::equal(const Event &other) {
+bool NicDma::Equal(const Event &other) {
   const NicDma *dma = dynamic_cast<const NicDma *>(&other);
   if (not dma) {
     return false;
   }
   return id_ == dma->id_ and addr_ == dma->addr_
-      and len_ == dma->len_ and Event::equal(*dma);
+      and len_ == dma->len_ and Event::Equal(*dma);
 }
 
 uint64_t NicDma::GetId() const {
@@ -358,75 +358,75 @@ uint64_t NicDma::GetLen() const {
   return len_;
 }
 
-void SetIX::display(std::ostream &out) {
-  Event::display(out);
+void SetIX::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", interrupt=" << std::hex << intr_;
 }
 
-bool SetIX::equal(const Event &other) {
+bool SetIX::Equal(const Event &other) {
   if (not is_type(other, EventType::SetIX_t)) {
     return false;
   }
   const SetIX &six = static_cast<const SetIX &>(other);
-  return intr_ == six.intr_ and Event::equal(six);
+  return intr_ == six.intr_ and Event::Equal(six);
 }
 
 uint64_t SetIX::GetIntr() const {
   return intr_;
 }
 
-void NicDmaI::display(std::ostream &out) {
-  NicDma::display(out);
+void NicDmaI::Display(std::ostream &out) {
+  NicDma::Display(out);
 }
 
-bool NicDmaI::equal(const Event &other) {
-  return NicDma::equal(other);
+bool NicDmaI::Equal(const Event &other) {
+  return NicDma::Equal(other);
 }
 
-void NicDmaEx::display(std::ostream &out) {
-  NicDma::display(out);
+void NicDmaEx::Display(std::ostream &out) {
+  NicDma::Display(out);
 }
 
-bool NicDmaEx::equal(const Event &other) {
-  return NicDma::equal(other);
+bool NicDmaEx::Equal(const Event &other) {
+  return NicDma::Equal(other);
 }
 
-void NicDmaEn::display(std::ostream &out) {
-  NicDma::display(out);
+void NicDmaEn::Display(std::ostream &out) {
+  NicDma::Display(out);
 }
 
-bool NicDmaEn::equal(const Event &other) {
-  return NicDma::equal(other);
+bool NicDmaEn::Equal(const Event &other) {
+  return NicDma::Equal(other);
 }
 
-void NicDmaCR::display(std::ostream &out) {
-  NicDma::display(out);
+void NicDmaCR::Display(std::ostream &out) {
+  NicDma::Display(out);
 }
 
-bool NicDmaCR::equal(const Event &other) {
-  return NicDma::equal(other);
+bool NicDmaCR::Equal(const Event &other) {
+  return NicDma::Equal(other);
 }
 
-void NicDmaCW::display(std::ostream &out) {
-  NicDma::display(out);
+void NicDmaCW::Display(std::ostream &out) {
+  NicDma::Display(out);
 }
 
-bool NicDmaCW::equal(const Event &other) {
-  return NicDma::equal(other);
+bool NicDmaCW::Equal(const Event &other) {
+  return NicDma::Equal(other);
 }
 
-void NicMmio::display(std::ostream &out) {
-  Event::display(out);
+void NicMmio::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", off=" << std::hex << off_ << ", len=" << len_ << ", val=" << std::hex
      << val_;
 }
 
-bool NicMmio::equal(const Event &other) {
+bool NicMmio::Equal(const Event &other) {
   const NicMmio *mmio = dynamic_cast<const NicMmio *>(&other);
   if (not mmio) {
     return false;
   }
-  return off_ == mmio->off_ and len_ == mmio->len_ and val_ == mmio->val_ and Event::equal(*mmio);
+  return off_ == mmio->off_ and len_ == mmio->len_ and val_ == mmio->val_ and Event::Equal(*mmio);
 }
 
 uint64_t NicMmio::GetOff() const {
@@ -441,58 +441,58 @@ uint64_t NicMmio::GetVal() const {
   return val_;
 }
 
-void NicMmioR::display(std::ostream &out) {
-  NicMmio::display(out);
+void NicMmioR::Display(std::ostream &out) {
+  NicMmio::Display(out);
 }
 
-bool NicMmioR::equal(const Event &other) {
-  return NicMmio::equal(other);
+bool NicMmioR::Equal(const Event &other) {
+  return NicMmio::Equal(other);
 }
 
-void NicMmioW::display(std::ostream &out) {
-  NicMmio::display(out);
+void NicMmioW::Display(std::ostream &out) {
+  NicMmio::Display(out);
 }
 
-bool NicMmioW::equal(const Event &other) {
-  return NicMmio::equal(other);
+bool NicMmioW::Equal(const Event &other) {
+  return NicMmio::Equal(other);
 }
 
-void NicTrx::display(std::ostream &out) {
-  Event::display(out);
+void NicTrx::Display(std::ostream &out) {
+  Event::Display(out);
   out << ", len=" << len_;
 }
 
-bool NicTrx::equal(const Event &other) {
+bool NicTrx::Equal(const Event &other) {
   const NicTrx *trx = dynamic_cast<const NicTrx *>(&other);
   if (not trx) {
     return false;
   }
-  return len_ == trx->len_ and Event::equal(*trx);
+  return len_ == trx->len_ and Event::Equal(*trx);
 }
 
 uint16_t NicTrx::GetLen() const {
   return len_;
 }
 
-void NicTx::display(std::ostream &out) {
-  NicTrx::display(out);
+void NicTx::Display(std::ostream &out) {
+  NicTrx::Display(out);
 }
 
-bool NicTx::equal(const Event &other) {
-  return NicTrx::equal(other);
+bool NicTx::Equal(const Event &other) {
+  return NicTrx::Equal(other);
 }
 
-void NicRx::display(std::ostream &out) {
-  NicTrx::display(out);
+void NicRx::Display(std::ostream &out) {
+  NicTrx::Display(out);
   out << ", port=" << port_;
 }
 
-bool NicRx::equal(const Event &other) {
+bool NicRx::Equal(const Event &other) {
   if (not is_type(other, EventType::NicRx_t)) {
     return false;
   }
   const NicRx &rec = static_cast<const NicRx &>(other);
-  return port_ == rec.port_ and NicTrx::equal(rec);
+  return port_ == rec.port_ and NicTrx::Equal(rec);
 }
 
 uint64_t NicRx::GetPort() const {
@@ -500,9 +500,9 @@ uint64_t NicRx::GetPort() const {
 }
 
 bool is_type(const Event &event, EventType type) {
-  return event.get_type() == type;
+  return event.GetType() == type;
 }
 
 bool is_type(std::shared_ptr<Event> &event_ptr, EventType type) {
-  return event_ptr && event_ptr->get_type() == type;
+  return event_ptr && event_ptr->GetType() == type;
 }

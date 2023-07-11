@@ -30,6 +30,7 @@
 #include <memory>
 #include <string>
 #include <sstream>
+#include <optional>
 
 // TODO: create proper exceptions!!!
 inline const char *resume_executor_null =
@@ -93,6 +94,22 @@ inline void throw_on(bool should_throw, const char* message) {
 
 inline void throw_on(bool should_throw, std::string&& message) {
   throw_on(should_throw, message.c_str());
+}
+
+template<typename ValueType>
+ValueType OrElseThrow(std::optional<ValueType> &val_opt, const char* message) {
+  throw_on(not val_opt.has_value(), message);
+  return val_opt.value();
+}
+
+template<typename ValueType>
+ValueType OrElseThrow(std::optional<ValueType>& val_opt, std::string&& message) {
+  return OrElseThrow(val_opt, message.c_str());
+}
+
+template<typename ValueType>
+ValueType OrElseThrow(std::optional<ValueType>&& val_opt, std::string&& message) {
+  return OrElseThrow(val_opt, message.c_str());
 }
 
 template<typename ...Args>

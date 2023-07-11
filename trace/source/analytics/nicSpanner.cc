@@ -53,7 +53,7 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   assert(mmio_span->IsComplete() and "mmio span is not complete");
-  tracer_.MarkSpanAsDone(mmio_span);
+  tracer_.MarkSpanAsDone(name_, mmio_span);
   if (mmio_span->IsWrite()) {
     last_causing_ = mmio_span;
   }
@@ -69,7 +69,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
       iterate_add_erase<NicDmaSpan>(pending_nic_dma_spans_, event_ptr);
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
-      tracer_.MarkSpanAsDone(pending_dma);
+      tracer_.MarkSpanAsDone(name_, pending_dma);
     } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
       // indicate to host that we expect a dma action
       std::cout << "nic try push dma" << std::endl;
@@ -82,6 +82,19 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
 
     co_return true;
   }
+
+  if (not is_type(event_ptr, EventType::NicDmaI_t)) {
+    co_return false;
+  }
+
+  // 1967446102500 -> ts lower bound
+  // 1967446080000 NicDmaI
+  // 1967446080000 NicDmaEx
+  // 1967447090000 NicDmaCW
+  //
+
+  //--ts-lower-bound 1967446102500
+  //1967446080000
 
   assert(is_type(event_ptr, EventType::NicDmaI_t) and
       "try starting a new dma span with NON issue");
@@ -123,24 +136,36 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     co_return false;
   }
 
-  auto eth_span = tracer_.StartSpanByParent<NicEthSpan>(
-      name_, parent, event_ptr, event_ptr->GetParserIdent());
+  // TODO: Fixme!!
+  std::shared_ptr<NicEthSpan> eth_span;
+  if (not is_tx) {
+    eth_span = tracer_.StartSpan<NicEthSpan>(event_ptr, event_ptr->GetParserIdent());
+  } else {
+    eth_span = tracer_.StartSpanByParent<NicEthSpan>(
+        name_, parent, event_ptr, event_ptr->GetParserIdent());
+  }
   if (not eth_span) {
     std::cerr << "could not register eth_span" << std::endl;
     co_return false;
   }
 
   assert(eth_span->IsComplete() and "eth span was not complette");
-  tracer_.MarkSpanAsDone(eth_span);
+  tracer_.MarkSpanAsDone(name_, eth_span);
 
   if (not is_tx) {
     last_causing_ = eth_span;
+    std::cout << "nic tryna push receive update." << std::endl;
+
+    auto receive_context = create_shared<Context>(
+        "could not create receive context to pass on to host", expectation::kRx, eth_span);
+    throw_on(not co_await to_host_receives_->push(resume_executor, receive_context),
+             "HandelTxrx: could not write host receive context ");
   }
   //else {
   //  auto context = create_shared<Context>(
   //      "HandelTxrx: could not create context", expectation::kRx, parent);
   //  throw_on(not co_await to_network_queue_->push(resume_executor, context),
-  //           "HandelTxrx: could not write TO network context ");
+  //           "HandelTxrx: could not write network context ");
   //}
   co_return true;
 }
@@ -158,7 +183,7 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   assert(msix_span->IsComplete() and "msix span is not complete");
-  tracer_.MarkSpanAsDone(msix_span);
+  tracer_.MarkSpanAsDone(name_, msix_span);
 
   std::cout << "nic try push msix" << std::endl;
   auto context = create_shared<Context>(
@@ -174,12 +199,14 @@ NicSpanner::NicSpanner(std::string &&name, Tracer &tra, Timer &timer,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
-                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host)
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_receives)
     : Spanner(std::move(name), tra, timer),
       to_network_queue_(to_network),
       from_network_queue_(from_network),
       to_host_queue_(to_host),
-      from_host_queue_(from_host) {
+      from_host_queue_(from_host),
+      to_host_receives_(to_host_receives) {
 
   throw_if_empty(to_network, queue_is_null);
   throw_if_empty(from_network, queue_is_null);

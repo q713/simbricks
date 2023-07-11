@@ -145,52 +145,94 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    //simbricks::trace::OtlpSpanExporter
-    //    exporter{"http://localhost:4318/v1/traces", false, "trace"};
-    simbricks::trace::NoOpExporter exporter;
+    simbricks::trace::OtlpSpanExporter
+        exporter{"http://localhost:4318/v1/traces", false, "trace"};
+    //simbricks::trace::NoOpExporter exporter;
 
     Tracer tracer{exporter};
 
-    const size_t amount_sources = 2;
-    Timer timer{amount_sources};
+    constexpr size_t kAmountSources = 2;
+    Timer timer{kAmountSources};
 
-    auto client_hn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
-    auto client_nh = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
-    auto nic_cn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
-    auto nic_sn = create_shared<UnBoundedChannel<std::shared_ptr<Context>>>(channel_is_null);
+    // TODO: Fix the error related to the timestamp
+    //       boundary when using the server site arts of everything!
 
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pi_dummy;
+    using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
+    auto server_hn = create_shared<QueueT>(channel_is_null);
+    auto server_nh = create_shared<QueueT>(channel_is_null);
+    auto client_hn = create_shared<QueueT>(channel_is_null);
+    auto client_nh = create_shared<QueueT>(channel_is_null);
+    auto nic_cn = create_shared<QueueT>(channel_is_null);
+    auto nic_sn = create_shared<QueueT>(channel_is_null);
+    auto server_n_h_receive = create_shared<QueueT>(channel_is_null);
+    auto client_n_h_receive = create_shared<QueueT>(channel_is_null);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> timestamp_bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
-    //LineReader lr_h_s;
-    //auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
-    //auto spanner_h_s = HostSpanner::create(tracer, server_hn, false);
-    //pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pi_dummy, spanner_h_s};
+    LineReader lr_h_s;
+    auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
+    auto filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
+    auto spanner_h_s =
+        create_shared<HostSpanner>(spanner_is_null,
+                                   "Server-Host",
+                                   tracer,
+                                   timer,
+                                   server_hn,
+                                   server_nh,
+                                   server_n_h_receive,
+                                   false);
+    const pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pipeline_h_s, spanner_h_s};
 
     LineReader lr_h_c;
     auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
     auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
     auto spanner_h_c =
-        create_shared<HostSpanner>(spanner_is_null, "Client-Host", tracer, timer, client_hn, client_nh, true);
+        create_shared<HostSpanner>(spanner_is_null,
+                                   "Client-Host",
+                                   tracer,
+                                   timer,
+                                   client_hn,
+                                   client_nh,
+                                   client_n_h_receive,
+                                   true);
     const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
 
-    //LineReader lr_n_s;
-    //auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
-    //auto spanner_n_s = NicSpanner::create(tracer, server_hn, server_client_nn);
-    //const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pi_dummy, spanner_n_s};
+    LineReader lr_n_s;
+    auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
+    auto filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
+    auto spanner_n_s =
+        create_shared<NicSpanner>(spanner_is_null,
+                                  "NIC-Server",
+                                  tracer,
+                                  timer,
+                                  nic_sn,
+                                  nic_cn,
+                                  server_nh,
+                                  server_hn,
+                                  server_n_h_receive);
+    const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pipeline_n_s, spanner_n_s};
 
     LineReader lr_n_c;
     auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
     auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
     auto spanner_n_c =
-        create_shared<NicSpanner>(spanner_is_null, "Client-NIC", tracer, timer, nic_cn, nic_sn, client_nh, client_hn);
+        create_shared<NicSpanner>(spanner_is_null,
+                                  "Client-NIC",
+                                  tracer,
+                                  timer,
+                                  nic_cn,
+                                  nic_sn,
+                                  client_nh,
+                                  client_hn,
+                                  client_n_h_receive);
     const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
 
-    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_n_s, pl_h_s*/};
+    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_h_s, pl_n_s*/};
     run_pipelines_parallel(thread_pool_executor, pipelines);
 
     exit(EXIT_SUCCESS);

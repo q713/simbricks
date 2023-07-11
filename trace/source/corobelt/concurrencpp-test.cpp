@@ -277,6 +277,26 @@ prod_b(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<
   co_return;
 }
 
+concurrencpp::result<void>
+prod_a_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<TestTimer> &timer) {
+  for (int i = 100; i < 1000; i += 100) {
+    co_await timer->MoveForward(resume_executor, i);
+    std::cout << "prod_a_test: " << i << std::endl;
+  }
+  co_await timer->Done(resume_executor);
+  co_return;
+}
+
+concurrencpp::result<void>
+prod_b_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<TestTimer> &timer) {
+  for (int i = 150; i < 1050; i += 100) {
+    co_await timer->MoveForward(resume_executor, i);
+    std::cout << "prod_b_test: " << i << std::endl;
+  }
+  co_await timer->Done(resume_executor);
+  co_return;
+}
+
 int main() {
   auto options = concurrencpp::runtime_options();
   options.max_background_threads = 0;
@@ -365,6 +385,22 @@ int main() {
   task_a.get().get();
   task_b.get().get();
   task_c.get().get();
+
+  std::cout << "###############################" << std::endl;
+  std::cout << "############ BREAK ############" << std::endl;
+  std::cout << "###############################" << std::endl;
+
+  auto testTimer = std::make_shared<TestTimer>(5);
+  auto task_a_test = thread_pool_executor->submit(prod_a_test, thread_pool_executor, testTimer);
+  auto task_a2_test = thread_pool_executor->submit(prod_a_test, thread_pool_executor, testTimer);
+  auto task_a3_test = thread_pool_executor->submit(prod_a_test, thread_pool_executor, testTimer);
+  auto task_b_test = thread_pool_executor->submit(prod_b_test, thread_pool_executor, testTimer);
+  auto task_c_test = thread_pool_executor->submit(prod_b_test, thread_pool_executor, testTimer);
+  task_a_test.get().get();
+  task_a2_test.get().get();
+  task_a3_test.get().get();
+  task_b_test.get().get();
+  task_c_test.get().get();
 
   return 0;
 }

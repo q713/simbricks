@@ -42,6 +42,8 @@ std::set<const std::string *> TraceEnvironment::driver_tx_indicator_;
 
 std::set<const std::string *> TraceEnvironment::driver_rx_indicator_;
 
+std::set<const std::string *> TraceEnvironment::sys_entry_;
+
 std::set<EventType> TraceEnvironment::mmio_related_event_t_;
 
 std::set<EventType> TraceEnvironment::dma_related_event_t_;
@@ -152,15 +154,19 @@ void TraceEnvironment::initialize() {
   kernel_tx_indicator_.insert(internalizer_.internalize("__sys_sendto"));
   kernel_tx_indicator_.insert(internalizer_.internalize("__sys_sendto"));
   kernel_tx_indicator_.insert(internalizer_.internalize("dev_hard_start_xmit"));
+  kernel_tx_indicator_.insert(internalizer_.internalize("netdev_start_xmit"));
+  kernel_tx_indicator_.insert(internalizer_.internalize("dev_queue_xmit"));
 
   // TODO: make sure these are correct
-  kernel_rx_indicator_.insert(internalizer_.internalize("__sys_recvmsg"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("recvfrom"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("__sys_recvmsg"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("__sys_recvmsg"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("ip_recv"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("netif_receive_skb"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("netif_rx"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("recvfrom"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("__sys_recvmsg"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("___sys_recvmsg"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("__x64_sys_recvmsg"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("ip_recv"));
+  kernel_rx_indicator_.insert(internalizer_.internalize("ip_list_rcv"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("netif_receive_skb"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("netif_rx"));
+  //kernel_rx_indicator_.insert(internalizer_.internalize("net_rx_action"));
 
   pci_write_indicators_.insert(internalizer_.internalize("pci_msix_write_vector_ctrl"));
   pci_write_indicators_.insert(internalizer_.internalize("__pci_write_msi_msg"));
@@ -168,6 +174,10 @@ void TraceEnvironment::initialize() {
   driver_tx_indicator_.insert(internalizer_.internalize("i40e_lan_xmit_frame"));
 
   driver_rx_indicator_.insert(internalizer_.internalize("i40e_napi_poll"));
+  driver_rx_indicator_.insert(internalizer_.internalize("i40e_finalize_xdp_rx"));
+
+  sys_entry_.insert(internalizer_.internalize("entry_SYSCALL_64"));
+  sys_entry_.insert(internalizer_.internalize("error_entry"));
 }
 
 bool TraceEnvironment::add_symbol_table(const std::string component,
@@ -313,6 +323,24 @@ bool TraceEnvironment::IsKernelRx(
   return kernel_rx_indicator_.contains(func);
 }
 
+bool TraceEnvironment::IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr) {
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::string *func = get_call_func(event_ptr);
+  if (not func) {
+    return false;
+  }
+  return kernel_tx_indicator_.contains(func) or driver_tx_indicator_.contains(func);
+}
+
+bool TraceEnvironment::IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr) {
+  const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  const std::string *func = get_call_func(event_ptr);
+  if (not func) {
+    return false;
+  }
+  return kernel_rx_indicator_.contains(func) or driver_rx_indicator_.contains(func);
+}
+
 bool TraceEnvironment::is_socket_connect(std::shared_ptr<Event> event_ptr) {
   const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
@@ -322,11 +350,11 @@ bool TraceEnvironment::is_socket_connect(std::shared_ptr<Event> event_ptr) {
   return func == internalizer_.internalize("__sys_connect");
 }
 
-bool TraceEnvironment::is_sys_entry(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsSysEntry(std::shared_ptr<Event> event_ptr) {
   const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   const std::string *func = get_call_func(event_ptr);
   if (not func) {
     return false;
   }
-  return func == internalizer_.internalize("entry_SYSCALL_64");
+  return sys_entry_.contains(func);
 }

@@ -40,26 +40,30 @@ class Trace {
 
   uint64_t id_;
   std::shared_ptr<EventSpan> parent_span_;
-
   // span_id -> span
   std::unordered_map<uint64_t, std::shared_ptr<EventSpan>> spans_;
 
-  bool is_done_ = false;
-
  public:
-  inline bool IsDone() const {
-    return is_done_;
-  }
-
-  inline void MarkAsDone() {
-    is_done_ = true;
-  }
 
   inline uint64_t GetId() const {
     return id_;
   }
 
+  auto GetSpansAndRemoveSpans() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<std::shared_ptr<EventSpan>> spans;
+    spans.reserve(spans_.size());
+    for (const auto &iter : spans_) {
+      spans.push_back(iter.second);
+    }
+    for (const auto &iter : spans) {
+      spans_.erase(iter->GetId());
+    }
+    return std::move(spans);
+  }
+
   std::shared_ptr<EventSpan> GetSpan(uint64_t span_id) {
+    const std::lock_guard<std::mutex> lock(mutex_);
     auto iter = spans_.find(span_id);
     if (iter == spans_.end()) {
       return {};

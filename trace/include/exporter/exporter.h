@@ -65,17 +65,22 @@ class SpanExporter {
   virtual void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) = 0;
 
   virtual void EndSpan(std::shared_ptr<EventSpan> to_end) = 0;
+
+  virtual void ExportSpan(std::string &service_name, std::shared_ptr<EventSpan> to_export) = 0;
 };
 
 // special span exporter that doies nothing, may be useful for debugging purposes
 class NoOpExporter : public SpanExporter {
  public:
   NoOpExporter() = default;
-  
+
   void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) override {
   }
 
   void EndSpan(std::shared_ptr<EventSpan> to_end) override {
+  }
+
+  void ExportSpan(std::string &service_name, std::shared_ptr<EventSpan> to_export) override {
   }
 };
 
@@ -595,69 +600,82 @@ class OtlpSpanExporter : public SpanExporter {
     }
   }
 
-  void set_HostCallSpanAttr(span_t &new_span, std::shared_ptr<HostCallSpan> old_span) {
+  void set_HostCallSpanAttr(span_t &new_span, std::shared_ptr<HostCallSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
-    new_span->SetAttribute("transmits", BoolToString(old_span->DoesTransmit()));
-    new_span->SetAttribute("receives", BoolToString(old_span->DoesReceive()));
+    new_span->SetAttribute("kernel-transmit", BoolToString(old_span->DoesKernelTransmit()));
+    new_span->SetAttribute("driver-transmit", BoolToString(old_span->DoesDriverTransmit()));
+    new_span->SetAttribute("kernel-receive", BoolToString(old_span->DoesKernelReceive()));
+    new_span->SetAttribute("driver-receive", BoolToString(old_span->DoesDriverReceive()));
+    new_span->SetAttribute("overall-transmit", BoolToString(old_span->IsOverallTx()));
+    new_span->SetAttribute("overall-receive", BoolToString(old_span->IsOverallRx()));
+    new_span->SetAttribute("fragmented", BoolToString(old_span->IsFragmented()));
   }
 
-  void set_HostDmaSpanAttr(span_t &new_span, std::shared_ptr<HostDmaSpan> old_span) {
+  void set_HostDmaSpanAttr(span_t &new_span, std::shared_ptr<HostDmaSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
   }
 
-  void set_HostMmioSpanAttr(span_t &new_span, std::shared_ptr<HostMmioSpan> old_span) {
+  void set_HostMmioSpanAttr(span_t &new_span, std::shared_ptr<HostMmioSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
     new_span->SetAttribute("after-pci/pci-before", BoolToString(old_span->IsAfterPci()));
   }
 
-  void set_NicMmioSpanAttr(span_t &new_span, std::shared_ptr<NicMmioSpan> old_span) {
+  void set_NicMmioSpanAttr(span_t &new_span, std::shared_ptr<NicMmioSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
   }
 
-  void set_NicDmaSpanAttr(span_t &new_span, std::shared_ptr<NicDmaSpan> old_span) {
+  void set_NicDmaSpanAttr(span_t &new_span, std::shared_ptr<NicDmaSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
   }
 
-  void set_NicEthSpanAttr(span_t &new_span, std::shared_ptr<NicEthSpan> old_span) {
+  void set_NicEthSpanAttr(span_t &new_span, std::shared_ptr<NicEthSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-transmit", BoolToString(old_span->IsTransmit()));
   }
 
-  void set_Attr(span_t &span, std::shared_ptr<EventSpan> to_end) {
+  void set_Attr(span_t &span, std::shared_ptr<EventSpan> &to_end) {
     switch (to_end->GetType()) {
       case kHostCall: {
-        set_HostCallSpanAttr(span, std::static_pointer_cast<HostCallSpan>(to_end));
+        auto call_span = std::static_pointer_cast<HostCallSpan>(to_end);
+        set_HostCallSpanAttr(span, call_span);
         break;
       }
       case kHostMmio: {
-        set_HostMmioSpanAttr(span, std::static_pointer_cast<HostMmioSpan>(to_end));
+        auto mmio_span = std::static_pointer_cast<HostMmioSpan>(to_end);
+        set_HostMmioSpanAttr(span, mmio_span);
         break;
       }
       case kHostDma: {
-        set_HostDmaSpanAttr(span, std::static_pointer_cast<HostDmaSpan>(to_end));
+        auto dma_span = std::static_pointer_cast<HostDmaSpan>(to_end);
+        set_HostDmaSpanAttr(span, dma_span);
         break;
       }
       case kNicDma: {
-        set_NicDmaSpanAttr(span, std::static_pointer_cast<NicDmaSpan>(to_end));
+        auto dma_span = std::static_pointer_cast<NicDmaSpan>(to_end);
+        set_NicDmaSpanAttr(span, dma_span);
         break;
       }
       case kNicMmio: {
-        set_NicMmioSpanAttr(span, std::static_pointer_cast<NicMmioSpan>(to_end));
+        auto mmio_span = std::static_pointer_cast<NicMmioSpan>(to_end);
+        set_NicMmioSpanAttr(span, mmio_span);
         break;
       }
       case kNicEth: {
-        set_NicEthSpanAttr(span, std::static_pointer_cast<NicEthSpan>(to_end));
+        auto eth_span = std::static_pointer_cast<NicEthSpan>(to_end);
+        set_NicEthSpanAttr(span, eth_span);
         break;
       }
       case kNicMsix:
       case kGenericSingle:
       case kHostInt:
       case kHostMsix:
-      default:set_EventSpanAttr(span, to_end);
+      default: {
+        set_EventSpanAttr(span, to_end);
+      }
     }
   }
 
@@ -792,10 +810,15 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void EndSpan(std::shared_ptr<EventSpan> to_end) override {
-    auto span = GetSpan(to_end);
+    span_t span = GetSpan(to_end);
     set_Attr(span, to_end);
     add_Events(span, to_end);
     end_span(to_end, span);
+  }
+
+  void ExportSpan(std::string &service_name, std::shared_ptr<EventSpan> to_export) override {
+    StartSpan(service_name, to_export);
+    EndSpan(to_export);
   }
 
   /*

@@ -27,13 +27,27 @@
 #include "analytics/spanner.h"
 #include "util/exception.h"
 
-bool HostSpanner::CreateTraceStartingSpan(std::shared_ptr<Event> &starting_event) {
+concurrencpp::lazy_result<bool>
+HostSpanner::CreateTraceStartingSpan(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                     std::shared_ptr<Event> &starting_event,
+                                     bool fragmented) {
   if (pending_host_call_span_) {
-    tracer_.MarkSpanAsDone(pending_host_call_span_);
+    if (pending_host_call_span_->DoesKernelReceive()) {
+      //std::cout << "host tryna eceive receive update. Current queue: " << std::endl;
+      //from_nic_receives_queue_->display(resume_executor, std::cout);
+
+      std::cout << "host try poll nic receive" << std::endl;
+      auto context_opt = co_await from_nic_receives_queue_->pop(resume_executor);
+      std::cout << "host polled nic receive" << std::endl;
+      auto context = OrElseThrow(context_opt, "HostSpanner::CreateTraceStartingSpan could not receive rx context");
+      tracer_.AddParentLazily(pending_host_call_span_, context->GetNonEmptyParent());
+    }
+
+    tracer_.MarkSpanAsDone(name_, pending_host_call_span_);
   }
 
-  pending_host_call_span_ = tracer_.StartSpan<HostCallSpan>(
-      name_, starting_event, starting_event->GetParserIdent());
+  pending_host_call_span_ =
+      tracer_.StartSpan<HostCallSpan>(starting_event, starting_event->GetParserIdent(), fragmented);
   throw_if_empty(pending_host_call_span_, "could not register new pending_host_call_span_");
   last_trace_starting_span_ = pending_host_call_span_;
 
@@ -41,7 +55,7 @@ bool HostSpanner::CreateTraceStartingSpan(std::shared_ptr<Event> &starting_event
   found_receive_ = false;
   expected_xmits_ = 0;
   pci_write_before_ = false;
-  return true;
+  co_return true;
 }
 
 concurrencpp::lazy_result<bool>
@@ -49,44 +63,36 @@ HostSpanner::HandelCall(std::shared_ptr<concurrencpp::executor> resume_executor,
                         std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  if (not pending_host_call_span_ and not CreateTraceStartingSpan(event_ptr)) {
+  if (not pending_host_call_span_ and not co_await CreateTraceStartingSpan(resume_executor, event_ptr, false)) {
     co_return false;
   }
+
+  //if (pending_host_call_span_) {
+  //  if (found_transmit_ and TraceEnvironment::IsKernelOrDriverRx(event_ptr)) {
+  //    auto created = CreateTraceStartingSpan(event_ptr, true);
+  //    assert(created and "HostSpanner: CreateTraceStartingSpan could not create new span");
+  //  }
+  //
+  //  if (found_receive_ and TraceEnvironment::IsKernelOrDriverTx(event_ptr)) {
+  //    auto created = CreateTraceStartingSpan(event_ptr, true);
+  //    assert(created and "HostSpanner: CreateTraceStartingSpan could not create new span");
+  //  }
+  //}
 
   throw_if_empty(pending_host_call_span_, span_is_null);
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
     pci_write_before_ = TraceEnvironment::is_pci_write(event_ptr);
 
-    if (not found_transmit_ and pending_host_call_span_->DoesTransmit()) {
-      ++expected_xmits_;
+    if (pending_host_call_span_->DoesDriverTransmit()) {
       found_transmit_ = true;
-    } else if (not found_receive_ and pending_host_call_span_->DoesReceive()) {
+    } else if (pending_host_call_span_->DoesKernelReceive()) {
       found_receive_ = true;
     }
     co_return true;
 
   } else if (pending_host_call_span_->IsComplete()) {
-    // TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    // TODO: !!!!change this logic here!!!!
-    // TODO: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-    // create a completely new trace
-    if (found_receive_ and found_transmit_) {
-      auto created_new = CreateTraceStartingSpan(event_ptr);
-      throw_on(not created_new, "found new syscall entry, could not allocate pending_host_call_span_");
-
-    } else if ((found_receive_ and not found_transmit_)
-        or (not found_receive_ and found_transmit_)) { // get new pack for current trace
-
-      tracer_.MarkSpanAsDone(pending_host_call_span_);
-      pending_host_call_span_ = tracer_.StartSpanByParent<HostCallSpan>(
-          name_, last_trace_starting_span_, event_ptr, event_ptr->GetParserIdent());
-      throw_if_empty(pending_host_call_span_, "could not register new pending_host_call_span_");
-
-    } else { // create new trace on its own
-      auto created = CreateTraceStartingSpan(event_ptr);
-      throw_on(not created, "found new syscall entry, could not allocate pending_host_call_span_");
-    }
+    auto created_new = co_await CreateTraceStartingSpan(resume_executor, event_ptr, false);
+    assert (created_new and "HostSpanner: CreateTraceStartingSpan could not create new span");
 
     if (not pending_host_call_span_) {
       std::cerr << "found new syscall entry, could not add "
@@ -109,7 +115,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   auto pending_mmio_span = iterate_add_erase<HostMmioSpan>(pending_host_mmio_spans_, event_ptr);
   if (pending_mmio_span) {
     if (pending_mmio_span->IsComplete()) {
-      tracer_.MarkSpanAsDone(pending_mmio_span);
+      tracer_.MarkSpanAsDone(name_, pending_mmio_span);
     }
 
     co_return true;
@@ -126,7 +132,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
     }
 
     if (pending_mmio_span) {
-      tracer_.MarkSpanAsDone(pending_mmio_span);
+      tracer_.MarkSpanAsDone(name_, pending_mmio_span);
     }
     pending_mmio_span = nullptr;
   }
@@ -171,7 +177,7 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   // check if we had an interrupt (msix) this belongs to
   if (pending_host_msix_span_ and pending_host_msix_span_->AddToSpan(event_ptr)) {
     assert(pending_host_msix_span_->IsComplete() and "pending_host_msix_span_ is not complete");
-    tracer_.MarkSpanAsDone(pending_host_msix_span_);
+    tracer_.MarkSpanAsDone(name_, pending_host_msix_span_);
     pending_host_msix_span_ = nullptr;
     co_return true;
   }
@@ -181,7 +187,7 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
                                      event_ptr);
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
-      tracer_.MarkSpanAsDone(pending_dma);
+      tracer_.MarkSpanAsDone(name_, pending_dma);
     }
     co_return true;
   }
@@ -264,15 +270,21 @@ HostSpanner::HandelInt([[maybe_unused]] std::shared_ptr<concurrencpp::executor> 
     co_return false;
   }
 
-  tracer_.MarkSpanAsDone(pending_host_int_span_);
+  tracer_.MarkSpanAsDone(name_, pending_host_int_span_);
   pending_host_int_span_ = nullptr;
   co_return true;
 }
 
 HostSpanner::HostSpanner(std::string &&name, Tracer &tra, Timer &timer,
                          std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
-                         std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic, bool is_client)
-    : Spanner(std::move(name), tra, timer), to_nic_queue_(to_nic), from_nic_queue_(from_nic), is_client_(is_client) {
+                         std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic,
+                         std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_receives,
+                         bool is_client)
+    : Spanner(std::move(name), tra, timer),
+      to_nic_queue_(to_nic),
+      from_nic_queue_(from_nic),
+      from_nic_receives_queue_(from_nic_receives),
+      is_client_(is_client) {
   throw_if_empty(to_nic, queue_is_null);
   throw_if_empty(from_nic, queue_is_null);
 

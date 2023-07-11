@@ -158,7 +158,7 @@ class EventSpan {
     return trace_context_;
   }
 
-  void MarkAsDone() {
+  virtual void MarkAsDone() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     is_pending_ = false;
   }
@@ -211,10 +211,10 @@ class EventSpan {
     return 0xFFFFFFFFFFFFFFFF;
   }
 
-  bool SetContext(std::shared_ptr<TraceContext> traceContext) {
+  bool SetContext(std::shared_ptr<TraceContext> traceContext, bool override_existing) {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
-    if (trace_context_) {
+    if (not override_existing and trace_context_) {
       return false;
     }
     throw_if_empty(traceContext, tc_null);
@@ -290,24 +290,58 @@ inline std::ostream &operator<<(std::ostream &os, EventSpan &span) {
 class HostCallSpan : public EventSpan {
   std::shared_ptr<Event> call_span_entry_ = nullptr;
   std::shared_ptr<Event> syscall_return_ = nullptr;
-  bool transmits_ = false;
-  bool receives_ = false;
+  bool kernel_transmit_ = false;
+  bool driver_transmit_ = false;
+  bool kernel_receive_ = false;
+  bool driver_receive_ = false;
+  bool is_fragmented_ = true;
 
  public:
-  explicit HostCallSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kHostCall) {
+  explicit HostCallSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id, bool fragmented)
+      : EventSpan(trace_context, source_id, span_type::kHostCall), is_fragmented_(fragmented) {
   }
 
   ~HostCallSpan() = default;
 
-  bool DoesTransmit() {
+  bool DoesKernelTransmit() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return transmits_;
+    return kernel_transmit_;
   }
 
-  bool DoesReceive() {
+  bool DoesDriverTransmit() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return receives_;
+    return driver_transmit_;
+  }
+
+  bool DoesKernelReceive() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return kernel_receive_;
+  }
+
+  bool DoesDriverReceive() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return driver_receive_;
+  }
+
+  bool IsOverallTx() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return kernel_transmit_ and driver_transmit_;
+  }
+
+  bool IsOverallRx() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return kernel_receive_ and driver_receive_;
+  }
+
+  bool IsFragmented() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_fragmented_;
+  }
+
+  void MarkAsDone() override {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    is_fragmented_ = is_fragmented_ or call_span_entry_ == nullptr or syscall_return_ == nullptr;
+    is_pending_ = false;
   }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
@@ -322,10 +356,11 @@ class HostCallSpan : public EventSpan {
       return false;
     }
 
-    if (TraceEnvironment::is_sys_entry(event_ptr)) {
-      if (call_span_entry_) {
+    if (TraceEnvironment::IsSysEntry(event_ptr)) {
+      if (is_fragmented_ or call_span_entry_) {
         is_pending_ = false;
         syscall_return_ = events_.back();
+        is_fragmented_ = false;
         return false;
       }
 
@@ -335,10 +370,14 @@ class HostCallSpan : public EventSpan {
       return true;
     }
 
-    if (TraceEnvironment::IsDriverTx(event_ptr)) {
-      transmits_ = true;
+    if (TraceEnvironment::IsKernelTx(event_ptr)) {
+      kernel_transmit_ = true;
+    } else if (TraceEnvironment::IsDriverTx(event_ptr)) {
+      driver_transmit_ = true;
+    } else if (TraceEnvironment::IsKernelRx(event_ptr)) {
+      kernel_receive_ = true;
     } else if (TraceEnvironment::IsDriverRx(event_ptr)) {
-      receives_ = true;
+      driver_receive_ = true;
     }
 
     events_.push_back(event_ptr);

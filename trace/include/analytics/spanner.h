@@ -97,10 +97,14 @@ struct HostSpanner : public Spanner {
 
   explicit HostSpanner(std::string &&name, Tracer &tra, Timer &timer,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
-                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic, bool is_client);
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic,
+                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_receives,
+                       bool is_client);
 
  private:
-  bool CreateTraceStartingSpan(std::shared_ptr<Event> &starting_event);
+  concurrencpp::lazy_result<bool> CreateTraceStartingSpan(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                                          std::shared_ptr<Event> &starting_event,
+                                                          bool fragmented);
 
   concurrencpp::lazy_result<bool> HandelCall(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
@@ -118,6 +122,7 @@ struct HostSpanner : public Spanner {
                                             std::shared_ptr<Event> &event_ptr);
 
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_queue_;
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_receives_queue_;
   std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic_queue_;
 
   bool is_client_;
@@ -140,7 +145,8 @@ struct NicSpanner : public Spanner {
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host);
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host,
+                      std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_receives);
 
  private:
 
@@ -160,6 +166,7 @@ struct NicSpanner : public Spanner {
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network_queue_;
   std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_queue_;
   std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host_queue_;
+  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_receives_;
 
   std::shared_ptr<Context> last_host_context_ = nullptr;
   std::shared_ptr<EventSpan> last_causing_ = nullptr;

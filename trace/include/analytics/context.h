@@ -99,10 +99,22 @@ class TraceContext {
     return id_;
   }
 
+  void SetTraceId(uint64_t new_id) {
+    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
+    trace_id_ = new_id;
+  }
+
+  void SetParentSpan(std::shared_ptr<EventSpan> new_parent_span) {
+    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
+    parent_ = std::move(new_parent_span);
+  }
+
 };
 
 class Context {
 
+  // TODO: technically the expectation is not needed, for now, it stays
+  //       as it might come in handy for debugging or there like
   expectation expectation_;
   std::shared_ptr<EventSpan> parent_span_;
 

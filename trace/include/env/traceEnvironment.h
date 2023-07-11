@@ -54,6 +54,8 @@ class TraceEnvironment {
 
   static std::set<const std::string *> driver_rx_indicator_;
 
+  static std::set<const std::string *> sys_entry_;
+
   static std::set<EventType> mmio_related_event_t_;
 
   static std::set<EventType> dma_related_event_t_;
@@ -144,9 +146,13 @@ class TraceEnvironment {
 
   static bool IsKernelRx(std::shared_ptr<Event> event_ptr);
 
+  static bool IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr);
+
+  static bool IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr);
+
   static bool is_socket_connect(std::shared_ptr<Event> event_ptr);
 
-  static bool is_sys_entry(std::shared_ptr<Event> event_ptr);
+  static bool IsSysEntry(std::shared_ptr<Event> event_ptr);
 };
 
 #endif  // SIM_TRACE_CONFIG_VARS_H_

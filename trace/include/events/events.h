@@ -43,111 +43,111 @@
 class LogParser;
 
 enum EventType {
-  Event_t,
-  SimSendSync_t,
-  SimProcInEvent_t,
-  HostInstr_t,
-  HostCall_t,
-  HostMmioImRespPoW_t,
-  HostIdOp_t,
-  HostMmioCR_t,
-  HostMmioCW_t,
-  HostAddrSizeOp_t,
-  HostMmioR_t,
-  HostMmioW_t,
-  HostDmaC_t,
-  HostDmaR_t,
-  HostDmaW_t,
-  HostMsiX_t,
-  HostConf_t,
-  HostClearInt_t,
-  HostPostInt_t,
-  HostPciRW_t,
-  NicMsix_t,
-  NicDma_t,
-  SetIX_t,
-  NicDmaI_t,
-  NicDmaEx_t,
-  NicDmaEn_t,
-  NicDmaCR_t,
-  NicDmaCW_t,
-  NicMmio_t,
-  NicMmioR_t,
-  NicMmioW_t,
-  NicTrx_t,
-  NicTx_t,
-  NicRx_t
+  kEventT,
+  kSimSendSyncT,
+  kSimProcInEventT,
+  kHostInstrT,
+  kHostCallT,
+  kHostMmioImRespPoWT,
+  kHostIdOpT,
+  kHostMmioCRT,
+  kHostMmioCWT,
+  kHostAddrSizeOpT,
+  kHostMmioRT,
+  kHostMmioWT,
+  kHostDmaCT,
+  kHostDmaRT,
+  kHostDmaWT,
+  kHostMsiXT,
+  kHostConfT,
+  kHostClearIntT,
+  kHostPostIntT,
+  kHostPciRWT,
+  kNicMsixT,
+  kNicDmaT,
+  kSetIXT,
+  kNicDmaIT,
+  kNicDmaExT,
+  kNicDmaEnT,
+  kNicDmaCRT,
+  kNicDmaCWT,
+  kNicMmioT,
+  kNicMmioRT,
+  kNicMmioWT,
+  kNicTrxT,
+  kNicTxT,
+  kNicRxT
 };
 
 inline std::ostream &operator<<(std::stringstream &into, EventType type) {
   switch (type) {
-    case EventType::Event_t:into << "Event_t";
+    case EventType::kEventT:into << "kEventT";
       break;
-    case EventType::SimSendSync_t:into << "SimSendSync_t";
+    case EventType::kSimSendSyncT:into << "kSimSendSyncT";
       break;
-    case EventType::SimProcInEvent_t:into << "SimProcInEvent_t";
+    case EventType::kSimProcInEventT:into << "kSimProcInEventT";
       break;
-    case EventType::HostInstr_t:into << "HostInstr_t";
+    case EventType::kHostInstrT:into << "kHostInstrT";
       break;
-    case EventType::HostCall_t:into << "HostCall_t";
+    case EventType::kHostCallT:into << "kHostCallT";
       break;
-    case EventType::HostMmioImRespPoW_t:into << "HostMmioImRespPoW_t";
+    case EventType::kHostMmioImRespPoWT:into << "kHostMmioImRespPoWT";
       break;
-    case EventType::HostIdOp_t:into << "HostIdOp_t";
+    case EventType::kHostIdOpT:into << "kHostIdOpT";
       break;
-    case EventType::HostMmioCR_t:into << "HostMmioCR_t";
+    case EventType::kHostMmioCRT:into << "kHostMmioCRT";
       break;
-    case EventType::HostMmioCW_t:into << "HostMmioCW_t";
+    case EventType::kHostMmioCWT:into << "kHostMmioCWT";
       break;
-    case EventType::HostAddrSizeOp_t:into << "HostAddrSizeOp_t";
+    case EventType::kHostAddrSizeOpT:into << "kHostAddrSizeOpT";
       break;
-    case EventType::HostMmioR_t:into << "HostMmioR_t";
+    case EventType::kHostMmioRT:into << "kHostMmioRT";
       break;
-    case EventType::HostMmioW_t:into << "HostMmioW_t";
+    case EventType::kHostMmioWT:into << "kHostMmioWT";
       break;
-    case EventType::HostDmaC_t:into << "HostDmaC_t";
+    case EventType::kHostDmaCT:into << "kHostDmaCT";
       break;
-    case EventType::HostDmaR_t:into << "HostDmaR_t";
+    case EventType::kHostDmaRT:into << "kHostDmaRT";
       break;
-    case EventType::HostDmaW_t:into << "HostDmaW_t";
+    case EventType::kHostDmaWT:into << "kHostDmaWT";
       break;
-    case EventType::HostMsiX_t:into << "HostMsiX_t";
+    case EventType::kHostMsiXT:into << "kHostMsiXT";
       break;
-    case EventType::HostConf_t:into << "HostConf_t";
+    case EventType::kHostConfT:into << "kHostConfT";
       break;
-    case EventType::HostClearInt_t:into << "HostClearInt_t";
+    case EventType::kHostClearIntT:into << "kHostClearIntT";
       break;
-    case EventType::HostPostInt_t:into << "HostPostInt_t";
+    case EventType::kHostPostIntT:into << "kHostPostIntT";
       break;
-    case EventType::HostPciRW_t:into << "HostPciRW_t";
+    case EventType::kHostPciRWT:into << "kHostPciRWT";
       break;
-    case EventType::NicMsix_t:into << "NicMsix_t";
+    case EventType::kNicMsixT:into << "kNicMsixT";
       break;
-    case EventType::NicDma_t:into << "NicDma_t";
+    case EventType::kNicDmaT:into << "kNicDmaT";
       break;
-    case EventType::SetIX_t:into << "SetIX_t";
+    case EventType::kSetIXT:into << "kSetIXT";
       break;
-    case EventType::NicDmaI_t:into << "NicDmaI_t";
+    case EventType::kNicDmaIT:into << "kNicDmaIT";
       break;
-    case EventType::NicDmaEx_t:into << "NicDmaEx_t";
+    case EventType::kNicDmaExT:into << "kNicDmaExT";
       break;
-    case EventType::NicDmaEn_t:into << "NicDmaEn_t";
+    case EventType::kNicDmaEnT:into << "kNicDmaEnT";
       break;
-    case EventType::NicDmaCR_t:into << "NicDmaCR_t";
+    case EventType::kNicDmaCRT:into << "kNicDmaCRT";
       break;
-    case EventType::NicDmaCW_t:into << "NicDmaCW_t";
+    case EventType::kNicDmaCWT:into << "kNicDmaCWT";
       break;
-    case EventType::NicMmio_t:into << "NicMmio_t";
+    case EventType::kNicMmioT:into << "kNicMmioT";
       break;
-    case EventType::NicMmioR_t:into << "NicMmioR_t";
+    case EventType::kNicMmioRT:into << "kNicMmioRT";
       break;
-    case EventType::NicMmioW_t:into << "NicMmioW_t";
+    case EventType::kNicMmioWT:into << "kNicMmioWT";
       break;
-    case EventType::NicTrx_t:into << "NicTrx_t";
+    case EventType::kNicTrxT:into << "kNicTrxT";
       break;
-    case EventType::NicTx_t:into << "NicTx_t";
+    case EventType::kNicTxT:into << "kNicTxT";
       break;
-    case EventType::NicRx_t:into << "NicRx_t";
+    case EventType::kNicRxT:into << "kNicRxT";
       break;
     default:throw_just("encountered unknown event type");
   }
@@ -158,13 +158,12 @@ inline std::ostream &operator<<(std::stringstream &into, EventType type) {
 class Event {
   EventType type_;
   std::string name_;
-
- public:
   uint64_t timestamp_;
   const size_t parser_identifier_;
   // TODO: optimize string name out in later versions
   const std::string parser_name_;
 
+ public:
   inline size_t GetParserIdent() const {
     return parser_identifier_;
   }
@@ -189,6 +188,10 @@ class Event {
 
   virtual bool Equal(const Event &other);
 
+  virtual Event *clone() {
+    return new Event(*this);
+  }
+
   virtual ~Event() = default;
 
  protected:
@@ -201,6 +204,8 @@ class Event {
         parser_identifier_(parser_identifier),
         parser_name_(parser_name) {
   }
+
+  Event(const Event &other) = default;
 };
 
 /* Simbricks Events */
@@ -208,11 +213,17 @@ class SimSendSync : public Event {
  public:
   explicit SimSendSync(uint64_t ts, const size_t parser_identifier,
                        const std::string parser_name)
-      : Event(ts, parser_identifier, parser_name, EventType::SimSendSync_t,
+      : Event(ts, parser_identifier, parser_name, EventType::kSimSendSyncT,
               "SimSendSyncSimSendSync") {
   }
 
-  ~SimSendSync() = default;
+  SimSendSync(const SimSendSync &other) = default;
+
+  Event *clone() override {
+    return new SimSendSync(*this);
+  }
+
+  ~SimSendSync() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -224,10 +235,16 @@ class SimProcInEvent : public Event {
   explicit SimProcInEvent(uint64_t ts, const size_t parser_identifier,
                           const std::string parser_name)
       : Event(ts, parser_identifier, parser_name,
-              EventType::SimProcInEvent_t, "SimProcInEvent") {
+              EventType::kSimProcInEventT, "SimProcInEvent") {
   }
 
-  ~SimProcInEvent() = default;
+  SimProcInEvent(const SimProcInEvent &other) = default;
+
+  Event *clone() override {
+    return new SimProcInEvent(*this);
+  }
+
+  ~SimProcInEvent() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -237,13 +254,14 @@ class SimProcInEvent : public Event {
 /* Host related events */
 
 class HostInstr : public Event {
- public:
+
   uint64_t pc_;
 
+ public:
   HostInstr(uint64_t ts, const size_t parser_identifier,
             const std::string parser_name, uint64_t pc)
       : Event(ts, parser_identifier, std::move(parser_name),
-              EventType::HostInstr_t, "HostInstr"),
+              EventType::kHostInstrT, "HostInstr"),
         pc_(pc) {
   }
 
@@ -253,9 +271,15 @@ class HostInstr : public Event {
         pc_(pc) {
   }
 
+  HostInstr(const HostInstr &other) = default;
+
+  Event *clone() override {
+    return new HostInstr(*this);
+  }
+
   uint64_t GetPc() const;
 
-  virtual ~HostInstr() = default;
+  ~HostInstr() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -263,21 +287,28 @@ class HostInstr : public Event {
 };
 
 class HostCall : public HostInstr {
- public:
+
   const std::string *func_;
   const std::string *comp_;
 
+ public:
   explicit HostCall(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t pc,
                     const std::string *func,
                     const std::string *comp)
       : HostInstr(ts, parser_identifier, parser_name, pc,
-                  EventType::HostCall_t, "HostCall"),
+                  EventType::kHostCallT, "HostCall"),
         func_(func),
         comp_(comp) {
   }
 
-  ~HostCall() = default;
+  HostCall(const HostCall &other) = default;
+
+  Event *clone() override {
+    return new HostCall(*this);
+  }
+
+  ~HostCall() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -293,10 +324,16 @@ class HostMmioImRespPoW : public Event {
   explicit HostMmioImRespPoW(uint64_t ts, const size_t parser_identifier,
                              const std::string parser_name)
       : Event(ts, parser_identifier, parser_name,
-              EventType::HostMmioImRespPoW_t, "HostMmioImRespPoW") {
+              EventType::kHostMmioImRespPoWT, "HostMmioImRespPoW") {
   }
 
-  ~HostMmioImRespPoW() = default;
+  HostMmioImRespPoW(const HostMmioImRespPoW &other) = default;
+
+  Event *clone() override {
+    return new HostMmioImRespPoW(*this);
+  }
+
+  ~HostMmioImRespPoW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -304,12 +341,16 @@ class HostMmioImRespPoW : public Event {
 };
 
 class HostIdOp : public Event {
- public:
   uint64_t id_;
 
+ public:
   void Display(std::ostream &out) override;
 
   uint64_t GetId() const;
+
+  Event *clone() override {
+    return new HostIdOp(*this);
+  }
 
  protected:
   explicit HostIdOp(uint64_t ts, const size_t parser_identifier,
@@ -320,7 +361,9 @@ class HostIdOp : public Event {
         id_(id) {
   }
 
-  virtual ~HostIdOp() = default;
+  HostIdOp(const HostIdOp &other) = default;
+
+  ~HostIdOp() override = default;
 
   virtual bool Equal(const Event &other) override;
 };
@@ -330,10 +373,16 @@ class HostMmioCR : public HostIdOp {
   explicit HostMmioCR(uint64_t ts, const size_t parser_identifier,
                       const std::string parser_name, uint64_t id)
       : HostIdOp(ts, parser_identifier, parser_name,
-                 EventType::HostMmioCR_t, "HostMmioCR", id) {
+                 EventType::kHostMmioCRT, "HostMmioCR", id) {
   }
 
-  ~HostMmioCR() = default;
+  HostMmioCR(const HostMmioCR &other) = default;
+
+  Event *clone() override {
+    return new HostMmioCR(*this);
+  }
+
+  ~HostMmioCR() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -344,10 +393,16 @@ class HostMmioCW : public HostIdOp {
   explicit HostMmioCW(uint64_t ts, const size_t parser_identifier,
                       const std::string parser_name, uint64_t id)
       : HostIdOp(ts, parser_identifier, parser_name,
-                 EventType::HostMmioCW_t, "HostMmioCW", id) {
+                 EventType::kHostMmioCWT, "HostMmioCW", id) {
   }
 
-  ~HostMmioCW() = default;
+  HostMmioCW(const HostMmioCW &other) = default;
+
+  Event *clone() override {
+    return new HostMmioCW(*this);
+  }
+
+  ~HostMmioCW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -355,15 +410,20 @@ class HostMmioCW : public HostIdOp {
 };
 
 class HostAddrSizeOp : public HostIdOp {
- public:
+
   uint64_t addr_;
   uint64_t size_;
 
+ public:
   void Display(std::ostream &out) override;
 
   uint64_t GetAddr() const;
 
   uint64_t GetSize() const;
+
+  Event *clone() override {
+    return new HostAddrSizeOp(*this);
+  }
 
  protected:
   explicit HostAddrSizeOp(uint64_t ts, const size_t parser_identifier,
@@ -376,21 +436,28 @@ class HostAddrSizeOp : public HostIdOp {
         size_(size) {
   }
 
-  virtual ~HostAddrSizeOp() = default;
+  HostAddrSizeOp(const HostAddrSizeOp &other) = default;
+
+  ~HostAddrSizeOp() override = default;
 
   virtual bool Equal(const Event &other) override;
 };
 
 class HostMmioOp : public HostAddrSizeOp {
- public:
+
   uint64_t bar_;
   uint64_t offset_;
 
+ public:
   void Display(std::ostream &out) override;
 
   uint64_t GetBar() const;
 
   uint64_t GetOffset() const;
+
+  Event *clone() override {
+    return new HostMmioOp(*this);
+  }
 
  protected:
   explicit HostMmioOp(uint64_t ts, const size_t parser_identifier,
@@ -401,6 +468,8 @@ class HostMmioOp : public HostAddrSizeOp {
                        std::move(name), id, addr, size), bar_(bar), offset_(offset) {
   }
 
+  HostMmioOp(const HostMmioOp &other) = default;
+
   virtual bool Equal(const Event &other) override;
 };
 
@@ -410,11 +479,17 @@ class HostMmioR : public HostMmioOp {
                      const std::string parser_name, uint64_t id, uint64_t addr,
                      uint64_t size, uint64_t bar, uint64_t offset)
       : HostMmioOp(ts, parser_identifier, parser_name,
-                   EventType::HostMmioR_t, "HostMmioR", id, addr, size, bar,
+                   EventType::kHostMmioRT, "HostMmioR", id, addr, size, bar,
                    offset) {
   }
 
-  ~HostMmioR() = default;
+  HostMmioR(const HostMmioR &other) = default;
+
+  Event *clone() override {
+    return new HostMmioR(*this);
+  }
+
+  ~HostMmioR() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -427,11 +502,17 @@ class HostMmioW : public HostMmioOp {
                      const std::string parser_name, uint64_t id, uint64_t addr,
                      uint64_t size, uint64_t bar, uint64_t offset)
       : HostMmioOp(ts, parser_identifier, parser_name,
-                   EventType::HostMmioW_t, "HostMmioW", id, addr, size, bar,
+                   EventType::kHostMmioWT, "HostMmioW", id, addr, size, bar,
                    offset) {
   }
 
-  ~HostMmioW() = default;
+  HostMmioW(const HostMmioW &other) = default;
+
+  Event *clone() override {
+    return new HostMmioW(*this);
+  }
+
+  ~HostMmioW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -443,10 +524,16 @@ class HostDmaC : public HostIdOp {
   explicit HostDmaC(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t id)
       : HostIdOp(ts, parser_identifier, parser_name,
-                 EventType::HostDmaC_t, "HostDmaC", id) {
+                 EventType::kHostDmaCT, "HostDmaC", id) {
   }
 
-  ~HostDmaC() = default;
+  HostDmaC(const HostDmaC &other) = default;
+
+  Event *clone() override {
+    return new HostDmaC(*this);
+  }
+
+  ~HostDmaC() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -459,10 +546,16 @@ class HostDmaR : public HostAddrSizeOp {
                     const std::string parser_name, uint64_t id, uint64_t addr,
                     uint64_t size)
       : HostAddrSizeOp(ts, parser_identifier, parser_name,
-                       EventType::HostDmaR_t, "HostDmaR", id, addr, size) {
+                       EventType::kHostDmaRT, "HostDmaR", id, addr, size) {
   }
 
-  ~HostDmaR() = default;
+  HostDmaR(const HostDmaR &other) = default;
+
+  Event *clone() override {
+    return new HostDmaR(*this);
+  }
+
+  ~HostDmaR() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -475,10 +568,16 @@ class HostDmaW : public HostAddrSizeOp {
                     const std::string parser_name, uint64_t id, uint64_t addr,
                     uint64_t size)
       : HostAddrSizeOp(ts, parser_identifier, parser_name,
-                       EventType::HostDmaW_t, "HostDmaW", id, addr, size) {
+                       EventType::kHostDmaWT, "HostDmaW", id, addr, size) {
   }
 
-  ~HostDmaW() = default;
+  HostDmaW(const HostDmaW &other) = default;
+
+  Event *clone() override {
+    return new HostDmaW(*this);
+  }
+
+  ~HostDmaW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -486,17 +585,24 @@ class HostDmaW : public HostAddrSizeOp {
 };
 
 class HostMsiX : public Event {
- public:
+
   uint64_t vec_;
 
+ public:
   explicit HostMsiX(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t vec)
       : Event(ts, parser_identifier, parser_name,
-              EventType::HostMsiX_t, "HostMsiX"),
+              EventType::kHostMsiXT, "HostMsiX"),
         vec_(vec) {
   }
 
-  ~HostMsiX() = default;
+  HostMsiX(const HostMsiX &other) = default;
+
+  Event *clone() override {
+    return new HostMsiX(*this);
+  }
+
+  ~HostMsiX() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -506,7 +612,7 @@ class HostMsiX : public Event {
 };
 
 class HostConf : public Event {
- public:
+
   uint64_t dev_;
   uint64_t func_;
   uint64_t reg_;
@@ -514,11 +620,12 @@ class HostConf : public Event {
   uint64_t data_;
   bool is_read_;
 
+ public:
   explicit HostConf(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t dev, uint64_t func,
                     uint64_t reg, uint64_t bytes, uint64_t data, bool is_read)
       : Event(ts, parser_identifier, parser_name,
-              EventType::HostConf_t,
+              EventType::kHostConfT,
               is_read ? "HostConfRead" : "HostConfWrite"),
         dev_(dev),
         func_(func),
@@ -528,7 +635,13 @@ class HostConf : public Event {
         is_read_(is_read) {
   }
 
-  ~HostConf() = default;
+  HostConf(const HostConf &other) = default;
+
+  Event *clone() override {
+    return new HostConf(*this);
+  }
+
+  ~HostConf() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -552,10 +665,16 @@ class HostClearInt : public Event {
   explicit HostClearInt(uint64_t ts, const size_t parser_identifier,
                         const std::string parser_name)
       : Event(ts, parser_identifier, parser_name,
-              EventType::HostClearInt_t, "HostClearInt") {
+              EventType::kHostClearIntT, "HostClearInt") {
   }
 
-  ~HostClearInt() = default;
+  HostClearInt(const HostClearInt &other) = default;
+
+  Event *clone() override {
+    return new HostClearInt(*this);
+  }
+
+  ~HostClearInt() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -567,10 +686,16 @@ class HostPostInt : public Event {
   explicit HostPostInt(uint64_t ts, const size_t parser_identifier,
                        const std::string parser_name)
       : Event(ts, parser_identifier, parser_name,
-              EventType::HostPostInt_t, "HostPostInt") {
+              EventType::kHostPostIntT, "HostPostInt") {
   }
 
-  ~HostPostInt() = default;
+  HostPostInt(const HostPostInt &other) = default;
+
+  Event *clone() override {
+    return new HostPostInt(*this);
+  }
+
+  ~HostPostInt() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -578,22 +703,30 @@ class HostPostInt : public Event {
 };
 
 class HostPciRW : public Event {
- public:
+
   uint64_t offset_;
   uint64_t size_;
   bool is_read_;
+
+ public:
 
   explicit HostPciRW(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t offset,
                      uint64_t size, bool is_read)
       : Event(ts, parser_identifier, parser_name,
-              EventType::HostPciRW_t, is_read ? "HostPciR" : "HostPciW"),
+              EventType::kHostPciRWT, is_read ? "HostPciR" : "HostPciW"),
         offset_(offset),
         size_(size),
         is_read_(is_read) {
   }
 
-  ~HostPciRW() = default;
+  HostPciRW(const HostPciRW &other) = default;
+
+  Event *clone() override {
+    return new HostPciRW(*this);
+  }
+
+  ~HostPciRW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -608,19 +741,27 @@ class HostPciRW : public Event {
 
 /* NIC related events */
 class NicMsix : public Event {
- public:
+
   uint16_t vec_;
   bool isX_;
+
+ public:
 
   NicMsix(uint64_t ts, const size_t parser_identifier,
           const std::string parser_name, uint16_t vec, bool isX)
       : Event(ts, parser_identifier, parser_name,
-              EventType::NicMsix_t, isX ? "NicMsix" : "NicMsi"),
+              EventType::kNicMsixT, isX ? "NicMsix" : "NicMsi"),
         vec_(vec),
         isX_(isX) {
   }
 
-  ~NicMsix() = default;
+  NicMsix(const NicMsix &other) = default;
+
+  Event *clone() override {
+    return new NicMsix(*this);
+  }
+
+  ~NicMsix() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -632,10 +773,12 @@ class NicMsix : public Event {
 };
 
 class NicDma : public Event {
- public:
+
   uint64_t id_;
   uint64_t addr_;
   uint64_t len_;
+
+ public:
 
   void Display(std::ostream &out) override;
 
@@ -644,6 +787,10 @@ class NicDma : public Event {
   uint64_t GetAddr() const;
 
   uint64_t GetLen() const;
+
+  Event *clone() override {
+    return new NicDma(*this);
+  }
 
  protected:
   NicDma(uint64_t ts, const size_t parser_identifier,
@@ -656,23 +803,33 @@ class NicDma : public Event {
         len_(len) {
   }
 
-  virtual ~NicDma() = default;
+  NicDma(const NicDma &other) = default;
+
+  ~NicDma() override = default;
 
   virtual bool Equal(const Event &other) override;
 };
 
 class SetIX : public Event {
- public:
+
   uint64_t intr_;
+
+ public:
 
   SetIX(uint64_t ts, const size_t parser_identifier,
         const std::string parser_name, uint64_t intr)
-      : Event(ts, parser_identifier, parser_name, EventType::SetIX_t,
+      : Event(ts, parser_identifier, parser_name, EventType::kSetIXT,
               "SetIX"),
         intr_(intr) {
   }
 
-  ~SetIX() = default;
+  SetIX(const SetIX &other) = default;
+
+  Event *clone() override {
+    return new SetIX(*this);
+  }
+
+  ~SetIX() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -687,10 +844,16 @@ class NicDmaI : public NicDma {
           const std::string parser_name, uint64_t id, uint64_t addr,
           uint64_t len)
       : NicDma(ts, parser_identifier, parser_name,
-               EventType::NicDmaI_t, "NicDmaI", id, addr, len) {
+               EventType::kNicDmaIT, "NicDmaI", id, addr, len) {
   }
 
-  ~NicDmaI() = default;
+  NicDmaI(const NicDmaI &other) = default;
+
+  Event *clone() override {
+    return new NicDmaI(*this);
+  }
+
+  ~NicDmaI() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -703,10 +866,16 @@ class NicDmaEx : public NicDma {
            const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, parser_identifier, parser_name,
-               EventType::NicDmaEx_t, "NicDmaEx", id, addr, len) {
+               EventType::kNicDmaExT, "NicDmaEx", id, addr, len) {
   }
 
-  ~NicDmaEx() = default;
+  NicDmaEx(const NicDmaEx &other) = default;
+
+  Event *clone() override {
+    return new NicDmaEx(*this);
+  }
+
+  ~NicDmaEx() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -719,10 +888,16 @@ class NicDmaEn : public NicDma {
            const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, parser_identifier, parser_name,
-               EventType::NicDmaEn_t, "NicDmaEn", id, addr, len) {
+               EventType::kNicDmaEnT, "NicDmaEn", id, addr, len) {
   }
 
-  ~NicDmaEn() = default;
+  NicDmaEn(const NicDmaEn &other) = default;
+
+  Event *clone() override {
+    return new NicDmaEn(*this);
+  }
+
+  ~NicDmaEn() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -735,10 +910,16 @@ class NicDmaCR : public NicDma {
            const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, parser_identifier, parser_name,
-               EventType::NicDmaCR_t, "NicDmaCR", id, addr, len) {
+               EventType::kNicDmaCRT, "NicDmaCR", id, addr, len) {
   }
 
-  ~NicDmaCR() = default;
+  NicDmaCR(const NicDmaCR &other) = default;
+
+  Event *clone() override {
+    return new NicDmaCR(*this);
+  }
+
+  ~NicDmaCR() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -751,10 +932,16 @@ class NicDmaCW : public NicDma {
            const std::string parser_name, uint64_t id, uint64_t addr,
            uint64_t len)
       : NicDma(ts, parser_identifier, parser_name,
-               EventType::NicDmaCW_t, "NicDmaCW", id, addr, len) {
+               EventType::kNicDmaCWT, "NicDmaCW", id, addr, len) {
   }
 
-  ~NicDmaCW() = default;
+  NicDmaCW(const NicDmaCW &other) = default;
+
+  Event *clone() override {
+    return new NicDmaCW(*this);
+  }
+
+  ~NicDmaCW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -762,10 +949,12 @@ class NicDmaCW : public NicDma {
 };
 
 class NicMmio : public Event {
- public:
+
   uint64_t off_;
   uint64_t len_;
   uint64_t val_;
+
+ public:
 
   virtual void Display(std::ostream &out) override;
 
@@ -774,6 +963,10 @@ class NicMmio : public Event {
   uint64_t GetLen() const;
 
   uint64_t GetVal() const;
+
+  Event *clone() override {
+    return new NicMmio(*this);
+  }
 
  protected:
   NicMmio(uint64_t ts, const size_t parser_identifier,
@@ -786,7 +979,9 @@ class NicMmio : public Event {
         val_(val) {
   }
 
-  virtual ~NicMmio() = default;
+  NicMmio(const NicMmio &other) = default;
+
+  ~NicMmio() override = default;
 
   virtual bool Equal(const Event &other) override;
 };
@@ -797,10 +992,16 @@ class NicMmioR : public NicMmio {
            const std::string parser_name, uint64_t off, uint64_t len,
            uint64_t val)
       : NicMmio(ts, parser_identifier, parser_name,
-                EventType::NicMmioR_t, "NicMmioR", off, len, val) {
+                EventType::kNicMmioRT, "NicMmioR", off, len, val) {
   }
 
-  ~NicMmioR() = default;
+  NicMmioR(const NicMmioR &other) = default;
+
+  Event *clone() override {
+    return new NicMmioR(*this);
+  }
+
+  ~NicMmioR() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -813,10 +1014,16 @@ class NicMmioW : public NicMmio {
            const std::string parser_name, uint64_t off, uint64_t len,
            uint64_t val)
       : NicMmio(ts, parser_identifier, parser_name,
-                EventType::NicMmioW_t, "NicMmioW", off, len, val) {
+                EventType::kNicMmioWT, "NicMmioW", off, len, val) {
   }
 
-  ~NicMmioW() = default;
+  NicMmioW(const NicMmioW &other) = default;
+
+  Event *clone() override {
+    return new NicMmioW(*this);
+  }
+
+  ~NicMmioW() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -824,23 +1031,35 @@ class NicMmioW : public NicMmio {
 };
 
 class NicTrx : public Event {
- public:
   uint16_t len_;
+  bool is_read_;
+
+ public:
 
   void Display(std::ostream &out) override;
 
   uint16_t GetLen() const;
 
+  bool IsRead() const {
+    return is_read_;
+  }
+
+  Event *clone() override {
+    return new NicTrx(*this);
+  }
+
  protected:
   NicTrx(uint64_t ts, const size_t parser_identifier,
          const std::string parser_name, EventType type, std::string name,
-         uint16_t len)
+         uint16_t len, bool is_read)
       : Event(ts, parser_identifier, parser_name, type,
               std::move(name)),
-        len_(len) {
+        len_(len), is_read_(is_read) {
   }
 
-  virtual ~NicTrx() = default;
+  NicTrx(const NicTrx &other) = default;
+
+  ~NicTrx() override = default;
 
   virtual bool Equal(const Event &other) override;
 };
@@ -850,10 +1069,16 @@ class NicTx : public NicTrx {
   NicTx(uint64_t ts, const size_t parser_identifier,
         const std::string parser_name, uint16_t len)
       : NicTrx(ts, parser_identifier, parser_name,
-               EventType::NicTx_t, "NicTx", len) {
+               EventType::kNicTxT, "NicTx", len, false) {
   }
 
-  ~NicTx() = default;
+  NicTx(const NicTx &other) = default;
+
+  Event *clone() override {
+    return new NicTx(*this);
+  }
+
+  ~NicTx() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -867,11 +1092,17 @@ class NicRx : public NicTrx {
   NicRx(uint64_t ts, const size_t parser_identifier,
         const std::string parser_name, uint64_t port, uint16_t len)
       : NicTrx(ts, parser_identifier, parser_name,
-               EventType::NicRx_t, "NicRx", len),
+               EventType::kNicRxT, "NicRx", len, true),
         port_(port) {
   }
 
-  ~NicRx() = default;
+  NicRx(const NicRx &other) = default;
+
+  Event *clone() override {
+    return new NicRx(*this);
+  }
+
+  ~NicRx() override = default;
 
   void Display(std::ostream &out) override;
 
@@ -883,6 +1114,15 @@ class NicRx : public NicTrx {
 inline std::ostream &operator<<(std::ostream &out, Event &event) {
   event.Display(out);
   return out;
+}
+
+inline std::shared_ptr<Event> clone_shared(const std::shared_ptr<Event> &other) {
+  if (not other) {
+    return {};
+  }
+  auto raw_ptr = other->clone();
+  throw_if_empty(raw_ptr, "clone_shared: cloned raw pointer is null");
+  return std::shared_ptr<Event>(raw_ptr);
 }
 
 class EventPrinter : public consumer<std::shared_ptr<Event>> {
@@ -915,7 +1155,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>> {
 struct EventComperator {
   bool operator()(const std::shared_ptr<Event> &ev1,
                   const std::shared_ptr<Event> &ev2) const {
-    return ev1->timestamp_ > ev2->timestamp_;
+    return ev1->GetTs() > ev2->GetTs();
   }
 };
 

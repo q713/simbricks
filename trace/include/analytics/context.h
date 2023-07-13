@@ -61,6 +61,7 @@ inline std::ostream &operator<<(std::ostream &out, expectation exp) {
 }
 
 class EventSpan;
+std::shared_ptr<EventSpan> clone_shared(const std::shared_ptr<EventSpan> &other);
 
 class TraceContext {
   // if parent is null it is a trace starting span
@@ -77,6 +78,12 @@ class TraceContext {
 
   explicit TraceContext(std::shared_ptr<EventSpan> &parent, uint64_t trace_id)
       : parent_(parent), trace_id_(trace_id), id_(TraceEnvironment::GetNextTraceContextId()) {
+  }
+
+  TraceContext(const TraceContext &other) {
+    trace_id_ = other.trace_id_;
+    id_ = other.id_;
+    parent_ = clone_shared(other.parent_);
   }
 
   bool HasParent() {
@@ -138,6 +145,12 @@ class Context {
   }
 
 };
+
+inline std::shared_ptr<TraceContext> clone_shared(const std::shared_ptr<TraceContext> &other) {
+  throw_if_empty(other, context_is_null);
+  auto new_con = create_shared<TraceContext>(context_is_null, *other);
+  return new_con;
+}
 
 inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
   if (not con or con->GetExpectation() != exp) {

@@ -53,11 +53,11 @@ std::vector<std::shared_ptr<SymsFilter>> TraceEnvironment::symbol_tables_;
 const std::string *TraceEnvironment::get_call_func(
     // NOTE: when calling this function the lock must be already held
     std::shared_ptr<Event> event_ptr) {
-  if (not event_ptr or not is_type(event_ptr, EventType::HostCall_t)) {
+  if (not event_ptr or not is_type(event_ptr, EventType::kHostCallT)) {
     return nullptr;
   }
   auto call = std::static_pointer_cast<HostCall>(event_ptr);
-  const std::string *func = call->func_;
+  const std::string *func = call->GetFunc();
   if (not func) {
     return nullptr;
   }
@@ -66,21 +66,21 @@ const std::string *TraceEnvironment::get_call_func(
 
 void TraceEnvironment::initialize() {
   //std::lock_guard<std::mutex> lock(trace_env_mutex_);
-  mmio_related_event_t_.insert(EventType::HostMmioW_t);
-  mmio_related_event_t_.insert(EventType::HostMmioR_t);
-  mmio_related_event_t_.insert(EventType::HostMmioImRespPoW_t);
-  mmio_related_event_t_.insert(EventType::NicMmioW_t);
-  mmio_related_event_t_.insert(EventType::NicMmioR_t);
-  mmio_related_event_t_.insert(EventType::HostMmioCW_t);
-  mmio_related_event_t_.insert(EventType::HostMmioCR_t);
+  mmio_related_event_t_.insert(EventType::kHostMmioWT);
+  mmio_related_event_t_.insert(EventType::kHostMmioRT);
+  mmio_related_event_t_.insert(EventType::kHostMmioImRespPoWT);
+  mmio_related_event_t_.insert(EventType::kNicMmioWT);
+  mmio_related_event_t_.insert(EventType::kNicMmioRT);
+  mmio_related_event_t_.insert(EventType::kHostMmioCWT);
+  mmio_related_event_t_.insert(EventType::kHostMmioCRT);
 
-  dma_related_event_t_.insert(EventType::NicDmaI_t);
-  dma_related_event_t_.insert(EventType::NicDmaEx_t);
-  dma_related_event_t_.insert(EventType::HostDmaW_t);
-  dma_related_event_t_.insert(EventType::HostDmaR_t);
-  dma_related_event_t_.insert(EventType::HostDmaC_t);
-  dma_related_event_t_.insert(EventType::NicDmaCW_t);
-  dma_related_event_t_.insert(EventType::NicDmaCR_t);
+  dma_related_event_t_.insert(EventType::kNicDmaIT);
+  dma_related_event_t_.insert(EventType::kNicDmaExT);
+  dma_related_event_t_.insert(EventType::kHostDmaWT);
+  dma_related_event_t_.insert(EventType::kHostDmaRT);
+  dma_related_event_t_.insert(EventType::kHostDmaCT);
+  dma_related_event_t_.insert(EventType::kNicDmaCWT);
+  dma_related_event_t_.insert(EventType::kNicDmaCRT);
 
   linux_net_func_indicator_.insert(internalizer_.internalize("__sys_socket"));
   linux_net_func_indicator_.insert(
@@ -228,7 +228,7 @@ bool TraceEnvironment::is_call_pack_related(std::shared_ptr<Event> event_ptr) {
   if (not event_ptr) {
     return false;
   }
-  return is_type(event_ptr, EventType::HostCall_t);
+  return is_type(event_ptr, EventType::kHostCallT);
 }
 
 bool TraceEnvironment::IsDriverTx(std::shared_ptr<Event> event_ptr) {
@@ -290,8 +290,8 @@ bool TraceEnvironment::is_eth_pack_related(std::shared_ptr<Event> event_ptr) {
     return false;
   }
 
-  return is_type(event_ptr, EventType::NicTx_t) or
-         is_type(event_ptr, EventType::NicRx_t);
+  return is_type(event_ptr, EventType::kNicTxT) or
+         is_type(event_ptr, EventType::kNicRxT);
 }
 
 bool TraceEnvironment::is_msix_related(std::shared_ptr<Event> event_ptr) {
@@ -300,8 +300,8 @@ bool TraceEnvironment::is_msix_related(std::shared_ptr<Event> event_ptr) {
     return false;
   }
 
-  return is_type(event_ptr, EventType::NicMsix_t) or
-         is_type(event_ptr, EventType::HostMsiX_t);
+  return is_type(event_ptr, EventType::kNicMsixT) or
+         is_type(event_ptr, EventType::kHostMsiXT);
 }
 
 bool TraceEnvironment::IsKernelTx(std::shared_ptr<Event> event_ptr) {

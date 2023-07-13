@@ -36,6 +36,12 @@ HostSpanner::CreateTraceStartingSpan(std::shared_ptr<concurrencpp::executor> res
       //std::cout << "host tryna eceive receive update. Current queue: " << std::endl;
       //from_nic_receives_queue_->display(resume_executor, std::cout);
 
+      // TODO: some syscalls receive multiple events
+      // TODO: when the syscall shall be connected to one make a stupid poll as for now
+      // TODO: then peek the queue to check if there are more nic events with a smaller timestamp than the host call
+      // TODO: are there are more take these events as well?
+      // TODO:  -> make copies of the host call and connect the copies to these additional host calls/ call spans
+
       std::cout << "host try poll nic receive" << std::endl;
       auto context_opt = co_await from_nic_receives_queue_->pop(resume_executor);
       std::cout << "host polled nic receive" << std::endl;
@@ -121,7 +127,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
     co_return true;
   }
 
-  if (is_type(event_ptr, EventType::HostMmioW_t)) {
+  if (is_type(event_ptr, EventType::kHostMmioWT)) {
     pending_mmio_span = nullptr;
     for (auto it = pending_host_mmio_spans_.begin(); it != pending_host_mmio_spans_.end(); it++) {
       if ((*it)->IsAfterPci()) {
@@ -146,7 +152,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
       co_return false;
     }
 
-    assert(is_type(event_ptr, EventType::HostMmioW_t) or is_type(event_ptr, EventType::HostMmioR_t)
+    assert(is_type(event_ptr, EventType::kHostMmioWT) or is_type(event_ptr, EventType::kHostMmioRT)
                and "try to create mmio host span but event is neither read nor write");
 
     if (not pci_write_before_) {
@@ -206,11 +212,11 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   // TODO: investigate this case further
-  if (is_type(event_ptr, EventType::HostDmaC_t)) {
+  if (is_type(event_ptr, EventType::kHostDmaCT)) {
     std::cerr << "unexpected event: " << *event_ptr << std::endl;
     co_return false;
   }
-  assert(not is_type(event_ptr, EventType::HostDmaC_t) and "cannot start HostDmaSPan with Dma completion");
+  assert(not is_type(event_ptr, EventType::kHostDmaCT) and "cannot start HostDmaSPan with Dma completion");
   pending_dma = tracer_.StartSpanByParent<HostDmaSpan>(name_, con->GetNonEmptyParent(),
                                                        event_ptr, event_ptr->GetParserIdent());
   if (not pending_dma) {
@@ -291,33 +297,33 @@ HostSpanner::HostSpanner(std::string &&name, Tracer &tra, Timer &timer,
   auto handel_call = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelCall(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::HostCall_t, handel_call);
+  RegisterHandler(EventType::kHostCallT, handel_call);
 
   auto handel_mmio = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelMmio(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::HostMmioW_t, handel_mmio);
-  RegisterHandler(EventType::HostMmioR_t, handel_mmio);
-  RegisterHandler(EventType::HostMmioImRespPoW_t, handel_mmio);
-  RegisterHandler(EventType::HostMmioCW_t, handel_mmio);
-  RegisterHandler(EventType::HostMmioCR_t, handel_mmio);
+  RegisterHandler(EventType::kHostMmioWT, handel_mmio);
+  RegisterHandler(EventType::kHostMmioRT, handel_mmio);
+  RegisterHandler(EventType::kHostMmioImRespPoWT, handel_mmio);
+  RegisterHandler(EventType::kHostMmioCWT, handel_mmio);
+  RegisterHandler(EventType::kHostMmioCRT, handel_mmio);
 
   auto handel_dma = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelDma(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::HostDmaW_t, handel_dma);
-  RegisterHandler(EventType::HostDmaR_t, handel_dma);
-  RegisterHandler(EventType::HostDmaC_t, handel_dma);
+  RegisterHandler(EventType::kHostDmaWT, handel_dma);
+  RegisterHandler(EventType::kHostDmaRT, handel_dma);
+  RegisterHandler(EventType::kHostDmaCT, handel_dma);
 
   auto handel_misx = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelMsix(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::HostMsiX_t, handel_misx);
+  RegisterHandler(EventType::kHostMsiXT, handel_misx);
 
   auto handel_int = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelInt(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::HostPostInt_t, handel_int);
-  RegisterHandler(EventType::HostClearInt_t, handel_int);
+  RegisterHandler(EventType::kHostPostIntT, handel_int);
+  RegisterHandler(EventType::kHostClearIntT, handel_int);
 }
 

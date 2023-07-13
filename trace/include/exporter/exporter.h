@@ -687,88 +687,88 @@ class OtlpSpanExporter : public SpanExporter {
       throw_if_empty(action, "EndSpan action is null");
 
       switch (action->GetType()) {
-        case EventType::HostCall_t: {
+        case EventType::kHostCallT: {
           add_HostCall(span, std::static_pointer_cast<HostCall>(action));
           break;
         }
-        case EventType::HostMsiX_t: {
+        case EventType::kHostMsiXT: {
           add_HostMsiX(span, std::static_pointer_cast<HostMsiX>(action));
           break;
         }
-        case EventType::HostMmioW_t: {
+        case EventType::kHostMmioWT: {
           add_HostMmioW(span, std::static_pointer_cast<HostMmioW>(action));
           break;
         }
-        case EventType::HostMmioR_t: {
+        case EventType::kHostMmioRT: {
           add_HostMmioR(span, std::static_pointer_cast<HostMmioR>(action));
           break;
         }
-        case EventType::HostMmioImRespPoW_t: {
+        case EventType::kHostMmioImRespPoWT: {
           add_HostMmioImRespPoW(span,
                                 std::static_pointer_cast<HostMmioImRespPoW>(action));
           break;
         }
-        case EventType::HostMmioCW_t: {
+        case EventType::kHostMmioCWT: {
           add_HostMmioCW(span, std::static_pointer_cast<HostMmioCW>(action));
           break;
         }
-        case EventType::HostMmioCR_t: {
+        case EventType::kHostMmioCRT: {
           add_HostMmioCR(span, std::static_pointer_cast<HostMmioCR>(action));
           break;
         }
-        case EventType::HostDmaW_t: {
+        case EventType::kHostDmaWT: {
           add_HostDmaW(span, std::static_pointer_cast<HostDmaW>(action));
           break;
         }
-        case EventType::HostDmaR_t: {
+        case EventType::kHostDmaRT: {
           add_HostDmaR(span, std::static_pointer_cast<HostDmaR>(action));
           break;
         }
-        case EventType::HostDmaC_t: {
+        case EventType::kHostDmaCT: {
           add_HostDmaC(span, std::static_pointer_cast<HostDmaC>(action));
           break;
         }
-        case EventType::HostPostInt_t: {
+        case EventType::kHostPostIntT: {
           add_HostPostInt(span, std::static_pointer_cast<HostPostInt>(action));
           break;
         }
-        case EventType::HostClearInt_t: {
+        case EventType::kHostClearIntT: {
           add_HostClearInt(span, std::static_pointer_cast<HostClearInt>(action));
           break;
         }
-        case EventType::NicDmaI_t: {
+        case EventType::kNicDmaIT: {
           add_NicDmaI(span, std::static_pointer_cast<NicDmaI>(action));
           break;
         }
-        case EventType::NicDmaEx_t: {
+        case EventType::kNicDmaExT: {
           add_NicDmaEx(span, std::static_pointer_cast<NicDmaEx>(action));
           break;
         }
-        case EventType::NicDmaCW_t: {
+        case EventType::kNicDmaCWT: {
           add_NicDmaCW(span, std::static_pointer_cast<NicDmaCW>(action));
           break;
         }
-        case EventType::NicDmaCR_t: {
+        case EventType::kNicDmaCRT: {
           add_NicDmaCR(span, std::static_pointer_cast<NicDmaCR>(action));
           break;
         }
-        case EventType::NicMmioR_t: {
+        case EventType::kNicMmioRT: {
           add_NicMmioR(span, std::static_pointer_cast<NicMmioR>(action));
           break;
         }
-        case EventType::NicMmioW_t: {
+        case EventType::kNicMmioWT: {
           add_NicMmioW(span, std::static_pointer_cast<NicMmioW>(action));
           break;
         }
-        case EventType::NicRx_t: {
+        case EventType::kNicRxT: {
           add_NicRx(span, std::static_pointer_cast<NicRx>(action));
           break;
         }
-        case EventType::NicTx_t: {
+        case EventType::kNicTxT: {
           add_NicTx(span, std::static_pointer_cast<NicTx>(action));
           break;
         }
-        case EventType::NicMsix_t: {
+        case EventType::kNicMsixT: {
           add_NicMsix(span, std::static_pointer_cast<NicMsix>(action));
           break;
         }
@@ -839,9 +839,9 @@ class OtlpSpanExporter : public SpanExporter {
 
     for (auto &event : to_transform->events_) {
       switch (event->get_type()) {
-        case EventType::HostMsiX_t:add_HostMsiX(msix_span, std::static_pointer_cast<HostMsiX>(event));
+        case EventType::kHostMsiXT:add_HostMsiX(msix_span, std::static_pointer_cast<HostMsiX>(event));
           break;
-        case EventType::HostDmaC_t:add_HostDmaC(msix_span, std::static_pointer_cast<HostDmaC>(event));
+        case EventType::kHostDmaCT:add_HostDmaC(msix_span, std::static_pointer_cast<HostDmaC>(event));
           break;
         default:throw_just("transform_HostMsixSpan unexpected event: ", *event);
       }
@@ -859,19 +859,19 @@ class OtlpSpanExporter : public SpanExporter {
 
     for (auto &event : to_transform->events_) {
       switch (event->get_type()) {
-        case EventType::HostMmioW_t:add_HostMmioW(mmio_span, std::static_pointer_cast<HostMmioW>(event));
+        case EventType::kHostMmioWT:add_HostMmioW(mmio_span, std::static_pointer_cast<HostMmioW>(event));
           break;
-        case EventType::HostMmioR_t:add_HostMmioR(mmio_span, std::static_pointer_cast<HostMmioR>(event));
+        case EventType::kHostMmioRT:add_HostMmioR(mmio_span, std::static_pointer_cast<HostMmioR>(event));
           break;
 
-        case EventType::HostMmioImRespPoW_t:
+        case EventType::kHostMmioImRespPoWT:
           add_HostMmioImRespPoW(mmio_span,
                                 std::static_pointer_cast<HostMmioImRespPoW>(event));
           break;
 
-        case EventType::HostMmioCW_t:add_HostMmioCW(mmio_span, std::static_pointer_cast<HostMmioCW>(event));
+        case EventType::kHostMmioCWT:add_HostMmioCW(mmio_span, std::static_pointer_cast<HostMmioCW>(event));
           break;
-        case EventType::HostMmioCR_t:add_HostMmioCR(mmio_span, std::static_pointer_cast<HostMmioCR>(event));
+        case EventType::kHostMmioCRT:add_HostMmioCR(mmio_span, std::static_pointer_cast<HostMmioCR>(event));
           break;
 
         default:throw_just("transform_HostMmioSpan unexpected event: ", *event);
@@ -890,13 +890,13 @@ class OtlpSpanExporter : public SpanExporter {
 
     for (auto &event : to_transform->events_) {
       switch (event->get_type()) {
-        case EventType::HostDmaW_t:add_HostDmaW(dma_span, std::static_pointer_cast<HostDmaW>(event));
+        case EventType::kHostDmaWT:add_HostDmaW(dma_span, std::static_pointer_cast<HostDmaW>(event));
           break;
 
-        case EventType::HostDmaR_t:add_HostDmaR(dma_span, std::static_pointer_cast<HostDmaR>(event));
+        case EventType::kHostDmaRT:add_HostDmaR(dma_span, std::static_pointer_cast<HostDmaR>(event));
           break;
 
-        case EventType::HostDmaC_t:add_HostDmaC(dma_span, std::static_pointer_cast<HostDmaC>(event));
+        case EventType::kHostDmaCT:add_HostDmaC(dma_span, std::static_pointer_cast<HostDmaC>(event));
           break;
 
         default:throw_just("transform_HostMsixSpan unexpected event: ", *event);
@@ -915,9 +915,9 @@ class OtlpSpanExporter : public SpanExporter {
 
     for (auto &event : to_transform->events_) {
       switch (event->get_type()) {
-        case EventType::HostPostInt_t:add_HostPostInt(int_span, std::static_pointer_cast<HostPostInt>(event));
+        case EventType::kHostPostIntT:add_HostPostInt(int_span, std::static_pointer_cast<HostPostInt>(event));
           break;
-        case EventType::HostClearInt_t:add_HostClearInt(int_span, std::static_pointer_cast<HostClearInt>(event));
+        case EventType::kHostClearIntT:add_HostClearInt(int_span, std::static_pointer_cast<HostClearInt>(event));
           break;
         default:throw_just("transform_HostIntSpan unexpected event: ", *event);
       }
@@ -935,13 +935,13 @@ class OtlpSpanExporter : public SpanExporter {
 
     for (auto &event : to_transform->events_) {
       switch (event->get_type()) {
-        case EventType::NicDmaI_t:add_NicDmaI(dma_span, std::static_pointer_cast<NicDmaI>(event));
+        case EventType::kNicDmaIT:add_NicDmaI(dma_span, std::static_pointer_cast<NicDmaI>(event));
           break;
-        case EventType::NicDmaEx_t:add_NicDmaEx(dma_span, std::static_pointer_cast<NicDmaEx>(event));
+        case EventType::kNicDmaExT:add_NicDmaEx(dma_span, std::static_pointer_cast<NicDmaEx>(event));
           break;
-        case EventType::NicDmaCW_t:add_NicDmaCW(dma_span, std::static_pointer_cast<NicDmaCW>(event));
+        case EventType::kNicDmaCWT:add_NicDmaCW(dma_span, std::static_pointer_cast<NicDmaCW>(event));
           break;
-        case EventType::NicDmaCR_t:add_NicDmaCR(dma_span, std::static_pointer_cast<NicDmaCR>(event));
+        case EventType::kNicDmaCRT:add_NicDmaCR(dma_span, std::static_pointer_cast<NicDmaCR>(event));
           break;
         default:throw_just("transform_NicDmaSpan unexpected event: ", *event);
       }
@@ -958,9 +958,9 @@ class OtlpSpanExporter : public SpanExporter {
     auto mmio_span = tracer_->StartSpan(span_name, attributes, span_opts);
 
     auto action = to_transform->action_;
-    if (is_type(action, EventType::NicMmioR_t)) {
+    if (is_type(action, EventType::kNicMmioRT)) {
       add_NicMmioR(mmio_span, std::static_pointer_cast<NicMmioR>(action));
-    } else if (is_type(action, EventType::NicMmioW_t)) {
+    } else if (is_type(action, EventType::kNicMmioWT)) {
       add_NicMmioW(mmio_span, std::static_pointer_cast<NicMmioW>(action));
     } else {
       throw_just("transform_NicMmioSpan unexpected event: ", *action);
@@ -977,9 +977,9 @@ class OtlpSpanExporter : public SpanExporter {
     auto eth_span = tracer_->StartSpan(span_name, attributes, span_opts);
 
     auto action = to_transform->tx_rx_;
-    if (is_type(action, EventType::NicRx_t)) {
+    if (is_type(action, EventType::kNicRxT)) {
       add_NicRx(eth_span, std::static_pointer_cast<NicRx>(action));
-    } else if (is_type(action, EventType::NicTx_t)) {
+    } else if (is_type(action, EventType::kNicTxT)) {
       add_NicTx(eth_span, std::static_pointer_cast<NicTx>(action));
     } else {
       throw_just("transform_NicEthSpan unexpected event: ", *action);
@@ -996,7 +996,7 @@ class OtlpSpanExporter : public SpanExporter {
     auto msix_span = tracer_->StartSpan(span_name, attributes, span_opts);
 
     auto action = to_transform->nic_msix_;
-    if (IsType(action, EventType::NicMsix_t)) {
+    if (IsType(action, EventType::kNicMsixT)) {
       add_NicMsix(msix_span, std::static_pointer_cast<NicMsix>(action));
     } else {
       throw_just("transform_NicMsixSpan unexpected event: ", *action);
@@ -1014,49 +1014,49 @@ class OtlpSpanExporter : public SpanExporter {
 
     auto action = to_transform->event_p_;
     switch (action->GetType()) {
-      case EventType::HostCall_t:add_HostCall(span, std::static_pointer_cast<HostCall>(action));
+      case EventType::kHostCallT:add_HostCall(span, std::static_pointer_cast<HostCall>(action));
         break;
-      case EventType::HostMsiX_t:add_HostMsiX(span, std::static_pointer_cast<HostMsiX>(action));
+      case EventType::kHostMsiXT:add_HostMsiX(span, std::static_pointer_cast<HostMsiX>(action));
         break;
-      case EventType::HostMmioW_t:add_HostMmioW(span, std::static_pointer_cast<HostMmioW>(action));
+      case EventType::kHostMmioWT:add_HostMmioW(span, std::static_pointer_cast<HostMmioW>(action));
         break;
-      case EventType::HostMmioR_t:add_HostMmioR(span, std::static_pointer_cast<HostMmioR>(action));
+      case EventType::kHostMmioRT:add_HostMmioR(span, std::static_pointer_cast<HostMmioR>(action));
         break;
-      case EventType::HostMmioImRespPoW_t:
+      case EventType::kHostMmioImRespPoWT:
         add_HostMmioImRespPoW(span,
                               std::static_pointer_cast<HostMmioImRespPoW>(action));
         break;
-      case EventType::HostMmioCW_t:add_HostMmioCW(span, std::static_pointer_cast<HostMmioCW>(action));
+      case EventType::kHostMmioCWT:add_HostMmioCW(span, std::static_pointer_cast<HostMmioCW>(action));
         break;
-      case EventType::HostMmioCR_t:add_HostMmioCR(span, std::static_pointer_cast<HostMmioCR>(action));
+      case EventType::kHostMmioCRT:add_HostMmioCR(span, std::static_pointer_cast<HostMmioCR>(action));
         break;
-      case EventType::HostDmaW_t:add_HostDmaW(span, std::static_pointer_cast<HostDmaW>(action));
+      case EventType::kHostDmaWT:add_HostDmaW(span, std::static_pointer_cast<HostDmaW>(action));
         break;
-      case EventType::HostDmaR_t:add_HostDmaR(span, std::static_pointer_cast<HostDmaR>(action));
+      case EventType::kHostDmaRT:add_HostDmaR(span, std::static_pointer_cast<HostDmaR>(action));
         break;
-      case EventType::HostDmaC_t:add_HostDmaC(span, std::static_pointer_cast<HostDmaC>(action));
+      case EventType::kHostDmaCT:add_HostDmaC(span, std::static_pointer_cast<HostDmaC>(action));
         break;
-      case EventType::HostPostInt_t:add_HostPostInt(span, std::static_pointer_cast<HostPostInt>(action));
+      case EventType::kHostPostIntT:add_HostPostInt(span, std::static_pointer_cast<HostPostInt>(action));
         break;
-      case EventType::HostClearInt_t:add_HostClearInt(span, std::static_pointer_cast<HostClearInt>(action));
+      case EventType::kHostClearIntT:add_HostClearInt(span, std::static_pointer_cast<HostClearInt>(action));
         break;
-      case EventType::NicDmaI_t:add_NicDmaI(span, std::static_pointer_cast<NicDmaI>(action));
+      case EventType::kNicDmaIT:add_NicDmaI(span, std::static_pointer_cast<NicDmaI>(action));
         break;
-      case EventType::NicDmaEx_t:add_NicDmaEx(span, std::static_pointer_cast<NicDmaEx>(action));
+      case EventType::kNicDmaExT:add_NicDmaEx(span, std::static_pointer_cast<NicDmaEx>(action));
         break;
-      case EventType::NicDmaCW_t:add_NicDmaCW(span, std::static_pointer_cast<NicDmaCW>(action));
+      case EventType::kNicDmaCWT:add_NicDmaCW(span, std::static_pointer_cast<NicDmaCW>(action));
         break;
-      case EventType::NicDmaCR_t:add_NicDmaCR(span, std::static_pointer_cast<NicDmaCR>(action));
+      case EventType::kNicDmaCRT:add_NicDmaCR(span, std::static_pointer_cast<NicDmaCR>(action));
         break;
-      case EventType::NicMmioR_t:add_NicMmioR(span, std::static_pointer_cast<NicMmioR>(action));
+      case EventType::kNicMmioRT:add_NicMmioR(span, std::static_pointer_cast<NicMmioR>(action));
         break;
-      case EventType::NicMmioW_t:add_NicMmioW(span, std::static_pointer_cast<NicMmioW>(action));
+      case EventType::kNicMmioWT:add_NicMmioW(span, std::static_pointer_cast<NicMmioW>(action));
         break;
-      case EventType::NicRx_t:add_NicRx(span, std::static_pointer_cast<NicRx>(action));
+      case EventType::kNicRxT:add_NicRx(span, std::static_pointer_cast<NicRx>(action));
         break;
-      case EventType::NicTx_t:add_NicTx(span, std::static_pointer_cast<NicTx>(action));
+      case EventType::kNicTxT:add_NicTx(span, std::static_pointer_cast<NicTx>(action));
         break;
-      case EventType::NicMsix_t:add_NicMsix(span, std::static_pointer_cast<NicMsix>(action));
+      case EventType::kNicMsixT:add_NicMsix(span, std::static_pointer_cast<NicMsix>(action));
         break;
       default:throw_just("transform_GenericSingleSpan unexpected event: ", *action);
     }

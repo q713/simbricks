@@ -268,7 +268,7 @@ int main(int argc, char *argv[]) {
   }
 
   auto server_host_task = [&]() {  // SERVER HOST PIPELINE
-    std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t, EventType::SimSendSync_t};
+    std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT, EventType::kSimSendSyncT};
     auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
@@ -292,8 +292,8 @@ int main(int argc, char *argv[]) {
   };
 
   auto client_host_task = [&]() {  // CLIENT HOST PIPELINE
-    std::set<EventType> to_filter{EventType::HostInstr_t, EventType::SimProcInEvent_t,
-                                  EventType::SimSendSync_t};
+    std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT,
+                                  EventType::kSimSendSyncT};
     auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
@@ -317,7 +317,7 @@ int main(int argc, char *argv[]) {
   };
 
   auto server_nic_task = [&]() {  // SERVER NIC PIPELINE
-    std::set<EventType> to_filter{EventType::SimProcInEvent_t, EventType::SimSendSync_t};
+    std::set<EventType> to_filter{EventType::kSimProcInEventT, EventType::kSimSendSyncT};
     auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
@@ -339,7 +339,7 @@ int main(int argc, char *argv[]) {
   };
 
   auto client_nic_task = [&]() {  // CLIENT NIC PIPELINE
-    std::set<EventType> to_filter{EventType::SimProcInEvent_t, EventType::SimSendSync_t};
+    std::set<EventType> to_filter{EventType::kSimProcInEventT, EventType::kSimSendSyncT};
     auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> bounds{

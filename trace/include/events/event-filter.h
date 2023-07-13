@@ -129,7 +129,7 @@ class EventTimestampFilter : public EventStreamActor {
 
  public:
   bool act_on(std::shared_ptr<Event> &event) override {
-    const uint64_t ts = event->timestamp_;
+    const uint64_t ts = event->GetTs();
 
     for (auto &boundary : event_time_boundaries_) {
       if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {

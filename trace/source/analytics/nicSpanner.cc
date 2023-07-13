@@ -70,7 +70,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
       tracer_.MarkSpanAsDone(name_, pending_dma);
-    } else if (is_type(event_ptr, EventType::NicDmaEx_t)) {
+    } else if (is_type(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
       std::cout << "nic try push dma" << std::endl;
       auto context = create_shared<Context>(
@@ -83,7 +83,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
     co_return true;
   }
 
-  if (not is_type(event_ptr, EventType::NicDmaI_t)) {
+  if (not is_type(event_ptr, EventType::kNicDmaIT)) {
     co_return false;
   }
 
@@ -96,7 +96,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   //--ts-lower-bound 1967446102500
   //1967446080000
 
-  assert(is_type(event_ptr, EventType::NicDmaI_t) and
+  assert(is_type(event_ptr, EventType::kNicDmaIT) and
       "try starting a new dma span with NON issue");
 
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(name_, last_causing_,
@@ -116,12 +116,12 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
 
   bool is_tx = false;
   std::shared_ptr<EventSpan> parent = nullptr;
-  if (is_type(event_ptr, EventType::NicTx_t)) {
+  if (is_type(event_ptr, EventType::kNicTxT)) {
     parent = last_causing_;
     is_tx = true;
     last_action_was_send_ = true;
 
-  } else if (is_type(event_ptr, EventType::NicRx_t)) {
+  } else if (is_type(event_ptr, EventType::kNicRxT)) {
     //auto con_opt = co_await from_network_queue_->pop(resume_executor);
     //throw_on(not con_opt.has_value(), context_is_null);
     //auto con = con_opt.value();
@@ -216,25 +216,25 @@ NicSpanner::NicSpanner(std::string &&name, Tracer &tra, Timer &timer,
   auto handel_mmio = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelMmio(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::NicMmioW_t, handel_mmio);
-  RegisterHandler(EventType::NicMmioR_t, handel_mmio);
+  RegisterHandler(EventType::kNicMmioWT, handel_mmio);
+  RegisterHandler(EventType::kNicMmioRT, handel_mmio);
 
   auto handel_dma = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelDma(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::NicDmaI_t, handel_dma);
-  RegisterHandler(EventType::NicDmaEx_t, handel_dma);
-  RegisterHandler(EventType::NicDmaCW_t, handel_dma);
-  RegisterHandler(EventType::NicDmaCR_t, handel_dma);
+  RegisterHandler(EventType::kNicDmaIT, handel_dma);
+  RegisterHandler(EventType::kNicDmaExT, handel_dma);
+  RegisterHandler(EventType::kNicDmaCWT, handel_dma);
+  RegisterHandler(EventType::kNicDmaCRT, handel_dma);
 
   auto handel_tx_rx = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelTxrx(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::NicTx_t, handel_tx_rx);
-  RegisterHandler(EventType::NicRx_t, handel_tx_rx);
+  RegisterHandler(EventType::kNicTxT, handel_tx_rx);
+  RegisterHandler(EventType::kNicRxT, handel_tx_rx);
 
   auto handel_msix = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelMsix(std::move(resume_executor), event_ptr);
   };
-  RegisterHandler(EventType::NicMsix_t, handel_msix);
+  RegisterHandler(EventType::kNicMsixT, handel_msix);
 }

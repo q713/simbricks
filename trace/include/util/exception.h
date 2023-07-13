@@ -55,7 +55,7 @@ inline const char* span_processor_null = "SpanProcessor is null";
 inline const char* trace_provider_null = "TracerProvider is null";
 
 template<typename Value>
-inline void throw_if_empty (std::shared_ptr<Value> &to_check, const char *message)
+inline void throw_if_empty (const std::shared_ptr<Value> &to_check, const char *message)
 {
   if (not to_check)
   {
@@ -64,12 +64,12 @@ inline void throw_if_empty (std::shared_ptr<Value> &to_check, const char *messag
 }
 
 template<typename Value>
-inline void throw_if_empty(std::shared_ptr<Value> &to_check, std::string&& message) {
+inline void throw_if_empty(const std::shared_ptr<Value> &to_check, std::string&& message) {
   throw_if_empty(to_check, message.c_str());
 }
 
 template<typename Value>
-inline void throw_if_empty (std::unique_ptr<Value> &to_check, const char *message)
+inline void throw_if_empty (const std::unique_ptr<Value> &to_check, const char *message)
 {
   if (not to_check)
   {
@@ -78,12 +78,18 @@ inline void throw_if_empty (std::unique_ptr<Value> &to_check, const char *messag
 }
 
 template<typename Value>
-inline void throw_if_empty (Value *to_check, const char *message)
+inline void throw_if_empty (const Value *to_check, const char *message)
 {
   if (not to_check)
   {
     throw std::runtime_error (message);
   }
+}
+
+template<typename Value>
+inline void throw_if_empty (const Value *to_check, std::string&& message)
+{
+  throw_if_empty(to_check, message.c_str());
 }
 
 inline void throw_on(bool should_throw, const char* message) {

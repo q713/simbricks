@@ -26,7 +26,7 @@
 
 void Event::Display(std::ostream &out) {
   out << GetName() << ": source_id=" << parser_identifier_
-     << ", source_name=" << parser_name_ << ", timestamp=" << timestamp_;
+      << ", source_name=" << parser_name_ << ", timestamp=" << timestamp_;
 }
 
 bool Event::Equal(const Event &other) {
@@ -56,7 +56,7 @@ void HostInstr::Display(std::ostream &out) {
 }
 
 bool HostInstr::Equal(const Event &other) {
-  if (not is_type(other, EventType::HostInstr_t)) {
+  if (not is_type(other, EventType::kHostInstrT)) {
     return false;
   }
   const HostInstr hinstr = static_cast<const HostInstr &>(other);
@@ -73,7 +73,7 @@ void HostCall::Display(std::ostream &out) {
 }
 
 bool HostCall::Equal(const Event &other) {
-  if (not is_type(other, EventType::HostCall_t)) {
+  if (not is_type(other, EventType::kHostCallT)) {
     return false;
   }
   const HostCall call = static_cast<const HostCall &>(other);
@@ -214,7 +214,7 @@ void HostMsiX::Display(std::ostream &out) {
 }
 
 bool HostMsiX::Equal(const Event &other) {
-  if (not is_type(other, EventType::HostMsiX_t)) {
+  if (not is_type(other, EventType::kHostMsiXT)) {
     return false;
   }
   const HostMsiX &msi = static_cast<const HostMsiX &>(other);
@@ -228,11 +228,11 @@ uint64_t HostMsiX::GetVec() const {
 void HostConf::Display(std::ostream &out) {
   Event::Display(out);
   out << ", dev=" << dev_ << ", func=" << func_ << ", reg=" << std::hex << reg_
-     << ", bytes=" << bytes_ << ", data=" << std::hex << data_;
+      << ", bytes=" << bytes_ << ", data=" << std::hex << data_;
 }
 
 bool HostConf::Equal(const Event &other) {
-  if (not is_type(other, EventType::HostConf_t)) {
+  if (not is_type(other, EventType::kHostConfT)) {
     return false;
   }
   const HostConf &hconf = static_cast<const HostConf &>(other);
@@ -290,7 +290,7 @@ void HostPciRW::Display(std::ostream &out) {
 }
 
 bool HostPciRW::Equal(const Event &other) {
-  if (not is_type(other, EventType::HostPciRW_t)) {
+  if (not is_type(other, EventType::kHostPciRWT)) {
     return false;
   }
   const HostPciRW &pci = static_cast<const HostPciRW &>(other);
@@ -316,7 +316,7 @@ void NicMsix::Display(std::ostream &out) {
 }
 
 bool NicMsix::Equal(const Event &other) {
-  if (not is_type(other, EventType::NicMsix_t)) {
+  if (not is_type(other, EventType::kNicMsixT)) {
     return false;
   }
   const NicMsix &msi = static_cast<const NicMsix &>(other);
@@ -334,7 +334,7 @@ bool NicMsix::IsX() const {
 void NicDma::Display(std::ostream &out) {
   Event::Display(out);
   out << ", id=" << std::hex << id_ << ", addr=" << std::hex << addr_
-     << ", size=" << len_;
+      << ", size=" << len_;
 }
 
 bool NicDma::Equal(const Event &other) {
@@ -364,7 +364,7 @@ void SetIX::Display(std::ostream &out) {
 }
 
 bool SetIX::Equal(const Event &other) {
-  if (not is_type(other, EventType::SetIX_t)) {
+  if (not is_type(other, EventType::kSetIXT)) {
     return false;
   }
   const SetIX &six = static_cast<const SetIX &>(other);
@@ -418,7 +418,7 @@ bool NicDmaCW::Equal(const Event &other) {
 void NicMmio::Display(std::ostream &out) {
   Event::Display(out);
   out << ", off=" << std::hex << off_ << ", len=" << len_ << ", val=" << std::hex
-     << val_;
+      << val_;
 }
 
 bool NicMmio::Equal(const Event &other) {
@@ -459,7 +459,7 @@ bool NicMmioW::Equal(const Event &other) {
 
 void NicTrx::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", len=" << len_;
+  out << ", len=" << len_ << ", is_read=" << is_read_;
 }
 
 bool NicTrx::Equal(const Event &other) {
@@ -467,7 +467,7 @@ bool NicTrx::Equal(const Event &other) {
   if (not trx) {
     return false;
   }
-  return len_ == trx->len_ and Event::Equal(*trx);
+  return len_ == trx->len_ and is_read_ == trx->is_read_ and Event::Equal(*trx);
 }
 
 uint16_t NicTrx::GetLen() const {
@@ -488,7 +488,7 @@ void NicRx::Display(std::ostream &out) {
 }
 
 bool NicRx::Equal(const Event &other) {
-  if (not is_type(other, EventType::NicRx_t)) {
+  if (not is_type(other, EventType::kNicRxT)) {
     return false;
   }
   const NicRx &rec = static_cast<const NicRx &>(other);

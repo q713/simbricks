@@ -95,6 +95,7 @@ class EventSpan {
   std::vector<std::shared_ptr<Event>> events_;
   bool is_pending_ = true;
   bool is_relevant_ = false;
+  bool is_copy_ = false;
 
   std::shared_ptr<TraceContext> trace_context_ = nullptr;
 
@@ -120,6 +121,16 @@ class EventSpan {
   }
 
  public:
+  void SetIsCopy(bool new_val) {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    is_copy_ = new_val;
+  }
+
+  bool IsCopy() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_copy_;
+  }
+
   size_t GetAmountEvents() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return events_.size();
@@ -261,6 +272,7 @@ class EventSpan {
         events_(other.events_),
         is_pending_(other.is_pending_),
         is_relevant_(other.is_relevant_),
+        is_copy_(true),
         trace_context_(other.trace_context_) {
     // NOTE: we make only a shallow copy
   }
@@ -988,8 +1000,8 @@ struct SpanPrinter
 
     std::optional<std::shared_ptr<EventSpan>> next_span_opt;
     std::shared_ptr<EventSpan> next_span = nullptr;
-    for (next_span_opt = co_await src_chan->pop(resume_executor); next_span_opt.has_value();
-         next_span_opt = co_await src_chan->pop(resume_executor)) {
+    for (next_span_opt = co_await src_chan->Pop(resume_executor); next_span_opt.has_value();
+         next_span_opt = co_await src_chan->Pop(resume_executor)) {
       next_span = next_span_opt.value();
       throw_if_empty(next_span, span_is_null);
       next_span->display(std::cout);

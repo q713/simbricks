@@ -35,7 +35,7 @@ concurrencpp::result<void> producer_loop(
     std::shared_ptr<concurrencpp::thread_pool_executor> tpe, Channel<int> &chan,
     int range_start, int range_end) {
   for (; range_start < range_end; ++range_start) {
-    bool could_write = co_await chan.push(tpe, range_start);
+    bool could_write = co_await chan.Push(tpe, range_start);
     if (not could_write) {
       co_return;
     }
@@ -46,14 +46,14 @@ concurrencpp::result<void> adder_loop(
     std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
     Channel<int> &chan_src, Channel<int> &chan_tar) {
   while (true) {
-    auto res_opt = co_await chan_src.pop(tpe);
+    auto res_opt = co_await chan_src.Pop(tpe);
     if (not res_opt) {
       co_return;
     }
 
     auto val = res_opt.value();
     val += 1;
-    if (not co_await chan_tar.push(tpe, val)) {
+    if (not co_await chan_tar.Push(tpe, val)) {
       co_return;
     }
   }
@@ -63,7 +63,7 @@ concurrencpp::result<void> consumer_loop(
     std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
     Channel<int> &chan) {
   while (true) {
-    auto res_opt = co_await chan.pop(tpe);
+    auto res_opt = co_await chan.Pop(tpe);
     if (not res_opt) {
       co_return;
     }
@@ -89,13 +89,13 @@ struct int_prod : public producer<int> {
     throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
 
     for (int i = start; i < end + start; i++) {
-      bool could_write = co_await tar_chan->push(resume_executor, i);
+      bool could_write = co_await tar_chan->Push(resume_executor, i);
       if (not could_write) {
         break;
       }
     }
 
-    co_await tar_chan->close_channel(resume_executor);
+    co_await tar_chan->CloseChannel(resume_executor);
     co_return;
   };
 };
@@ -108,11 +108,11 @@ struct int_cons : public consumer<int> {
                                            resume_executor_null);
     throw_if_empty<Channel<int>>(src_chan, channel_is_null);
 
-    auto int_opt = co_await src_chan->pop(resume_executor);
+    auto int_opt = co_await src_chan->Pop(resume_executor);
 
     while (int_opt.has_value()) {
       auto val = int_opt.value();
-      int_opt = co_await src_chan->pop(resume_executor);
+      int_opt = co_await src_chan->Pop(resume_executor);
       std::cout << "consumed: " << val << std::endl;
     }
 
@@ -137,14 +137,14 @@ struct int_chan_cons : public consumer<int> {
     throw_if_empty<Channel<int>>(src_chan, channel_is_null);
 
     std::optional<int> int_opt;
-    for (int_opt = co_await src_chan->pop(resume_executor); int_opt.has_value();
-         int_opt = co_await src_chan->pop(resume_executor)) {
+    for (int_opt = co_await src_chan->Pop(resume_executor); int_opt.has_value();
+         int_opt = co_await src_chan->Pop(resume_executor)) {
       int val = int_opt.value();
       auto c = to_collector_;
-      co_await c->push(resume_executor, val);
+      co_await c->Push(resume_executor, val);
     }
 
-    co_await to_collector_->close_channel(resume_executor);
+    co_await to_collector_->CloseChannel(resume_executor);
     co_return;
   };
 };
@@ -165,19 +165,19 @@ struct int_adder : public cpipe<int> {
     throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
     throw_if_empty<Channel<int>>(src_chan, channel_is_null);
 
-    auto int_opt = co_await src_chan->pop(resume_executor);
+    auto int_opt = co_await src_chan->Pop(resume_executor);
 
     while (int_opt.has_value()) {
       auto val = int_opt.value();
       val += to_add_;
-      bool could_write = co_await tar_chan->push(resume_executor, val);
+      bool could_write = co_await tar_chan->Push(resume_executor, val);
       if (not could_write) {
         break;
       }
-      int_opt = co_await src_chan->pop(resume_executor);
+      int_opt = co_await src_chan->Pop(resume_executor);
     }
 
-    co_await tar_chan->close_channel(resume_executor);
+    co_await tar_chan->CloseChannel(resume_executor);
     co_return;
   }
 };
@@ -198,15 +198,15 @@ struct int_transformer : public cpipe<int> {
     throw_if_empty<Channel<int>>(src_chan, channel_is_null);
 
     std::optional<int> int_opt;
-    for (int_opt = co_await src_chan->pop(resume_executor); int_opt.has_value();
-         int_opt = co_await src_chan->pop(resume_executor)) {
+    for (int_opt = co_await src_chan->Pop(resume_executor); int_opt.has_value();
+         int_opt = co_await src_chan->Pop(resume_executor)) {
       auto val = int_opt.value();
       val = transformer_(val);
-      if (not co_await tar_chan->push(resume_executor, val)) {
+      if (not co_await tar_chan->Push(resume_executor, val)) {
         break;
       }
     }
-    co_await tar_chan->close_channel(resume_executor);
+    co_await tar_chan->CloseChannel(resume_executor);
     co_return;
   }
 };
@@ -241,9 +241,9 @@ execute_ab_stream(std::shared_ptr<concurrencpp::executor> resume_excutor) {
   std::optional<int> int_opt;
   for (int index = 0; index < 20; index++) {
     if (index % 2 == 0) {
-      int_opt = co_await chan_a->pop(resume_excutor);
+      int_opt = co_await chan_a->Pop(resume_excutor);
     } else {
-      int_opt = co_await chan_b->pop(resume_excutor);
+      int_opt = co_await chan_b->Pop(resume_excutor);
     }
 
     if (int_opt.has_value()) {
@@ -278,7 +278,7 @@ prod_b(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<
 }
 
 concurrencpp::result<void>
-prod_a_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<TestTimer> &timer) {
+prod_a_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<Timer> &timer) {
   for (int i = 100; i < 1000; i += 100) {
     co_await timer->MoveForward(resume_executor, i);
     std::cout << "prod_a_test: " << i << std::endl;
@@ -288,7 +288,7 @@ prod_a_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared
 }
 
 concurrencpp::result<void>
-prod_b_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<TestTimer> &timer) {
+prod_b_test(std::shared_ptr<concurrencpp::executor> resume_executor, std::shared_ptr<Timer> &timer) {
   for (int i = 150; i < 1050; i += 100) {
     co_await timer->MoveForward(resume_executor, i);
     std::cout << "prod_b_test: " << i << std::endl;
@@ -321,9 +321,9 @@ int main() {
         adder_loop(thread_pool_executor, chan_src, chan_tar);
   }
   await_results(producers);
-  chan_src.close_channel(thread_pool_executor).get();
+  chan_src.CloseChannel(thread_pool_executor).get();
   await_results(adders);
-  chan_tar.close_channel(thread_pool_executor).get();
+  chan_tar.CloseChannel(thread_pool_executor).get();
   await_results(consumers);
 
   std::cout << "###############################" << std::endl;
@@ -390,7 +390,7 @@ int main() {
   std::cout << "############ BREAK ############" << std::endl;
   std::cout << "###############################" << std::endl;
 
-  auto testTimer = std::make_shared<TestTimer>(5);
+  auto testTimer = std::make_shared<Timer>(5);
   auto task_a_test = thread_pool_executor->submit(prod_a_test, thread_pool_executor, testTimer);
   auto task_a2_test = thread_pool_executor->submit(prod_a_test, thread_pool_executor, testTimer);
   auto task_a3_test = thread_pool_executor->submit(prod_a_test, thread_pool_executor, testTimer);

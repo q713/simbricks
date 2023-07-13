@@ -54,8 +54,8 @@ class EventChecker : public consumer<std::shared_ptr<Event>> {
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
     size_t cur_match = 0;
-    for (msg = co_await src_chan->pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->pop(resume_executor)) {
+    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
+         msg = co_await src_chan->Pop(resume_executor)) {
       event = msg.value();
       REQUIRE(event != nullptr);
       if (cur_match < to_macth_) {

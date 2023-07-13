@@ -33,6 +33,7 @@
 #include <exception>
 #include <iostream>
 #include <list>
+#include <functional>
 
 #include "concurrencpp/concurrencpp.h"
 #include "util/exception.h"
@@ -50,7 +51,7 @@ class Channel {
   bool poisened_ = false;
 
  public:
-  Channel() {};
+  explicit Channel() = default;
 
   Channel(const Channel<ValueType> &) = delete;
 
@@ -63,23 +64,23 @@ class Channel {
       Channel<ValueType> &&) noexcept = delete;
 
   concurrencpp::lazy_result<bool>
-  empty(std::shared_ptr<concurrencpp::executor> resume_executor) {
+  Empty(std::shared_ptr<concurrencpp::executor> resume_executor) {
     concurrencpp::scoped_async_lock guard = co_await channel_lock_.lock(resume_executor);
     co_return size_ == 0;
   }
 
   concurrencpp::lazy_result<size_t>
-  get_size(std::shared_ptr<concurrencpp::executor> resume_executor) {
+  GetSize(std::shared_ptr<concurrencpp::executor> resume_executor) {
     concurrencpp::scoped_async_lock guard = co_await channel_lock_.lock(resume_executor);
     co_return size_;
   }
 
   virtual concurrencpp::result<void>
-  display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) {
+  Display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) {
     co_return;
   }
 
-  concurrencpp::result<void> close_channel(
+  concurrencpp::result<void> CloseChannel(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
@@ -91,7 +92,7 @@ class Channel {
     channel_cv_.notify_all();
   }
 
-  concurrencpp::result<void> poisen_channel(
+  concurrencpp::result<void> PoisenChannel(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
@@ -103,25 +104,31 @@ class Channel {
     channel_cv_.notify_all();
   }
 
-  virtual concurrencpp::lazy_result<bool> push(
+  virtual concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
     co_return false;
   };
 
-  virtual concurrencpp::lazy_result<bool> try_push(
+  virtual concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
     co_return false;
   }
 
-  virtual concurrencpp::lazy_result<std::optional<ValueType>> pop(
+  virtual concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     co_return std::nullopt;
   }
 
-  virtual concurrencpp::lazy_result<std::optional<ValueType>> try_pop(
+  virtual concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
+    co_return std::nullopt;
+  }
+
+  virtual concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::function<bool(ValueType &)> &predicate) {
     co_return std::nullopt;
   }
 };
@@ -171,7 +178,7 @@ class BoundedChannel : public Channel<ValueType> {
       BoundedChannel<ValueType, Capacity> &&) noexcept = delete;
 
   concurrencpp::result<void>
-  display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) override {
+  Display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) override {
     concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
 
     out << "Channel:" << std::endl;
@@ -192,7 +199,7 @@ class BoundedChannel : public Channel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::lazy_result<bool> push(
+  concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -217,7 +224,7 @@ class BoundedChannel : public Channel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::lazy_result<bool> try_push(
+  concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -239,7 +246,7 @@ class BoundedChannel : public Channel<ValueType> {
   }
 
   // returns empty optional in case channel is poisened or empty
-  concurrencpp::lazy_result<std::optional<ValueType>> pop(
+  concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
@@ -270,7 +277,7 @@ class BoundedChannel : public Channel<ValueType> {
     co_return result;
   }
 
-  concurrencpp::lazy_result<std::optional<ValueType>> try_pop(
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty(resume_executor, resume_executor_null);
 
@@ -284,6 +291,34 @@ class BoundedChannel : public Channel<ValueType> {
     if (this->size_ == 0) {
       guard.unlock();
       this->channel_cv_.notify_all();
+      co_return std::nullopt;
+    }
+
+    auto result = perform_read();
+
+    guard.unlock();
+    this->channel_cv_.notify_all();
+
+    co_return std::move(result);
+  }
+
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::function<bool(ValueType &)> &predicate) override {
+    throw_if_empty(resume_executor, resume_executor_null);
+
+    concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
+
+    if (this->poisened_ or this->size_ == 0) {
+      guard.unlock();
+      this->channel_cv_.notify_all();
+      co_return std::nullopt;
+    }
+
+    assert(read_index_ < Capacity and "cannot read out of bound");
+    assert(read_index_ >= 0 and "cannot read out of bound");
+    ValueType &value = buffer_[read_index_];
+    if (not predicate(value)) {
       co_return std::nullopt;
     }
 
@@ -315,7 +350,7 @@ class UnBoundedChannel : public Channel<ValueType> {
       BoundedChannel<ValueType> &&) noexcept = delete;
 
   concurrencpp::result<void>
-  display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) override {
+  Display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) override {
     concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
 
     out << "Channel:" << std::endl;
@@ -330,7 +365,7 @@ class UnBoundedChannel : public Channel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::lazy_result<bool> push(
+  concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -353,17 +388,17 @@ class UnBoundedChannel : public Channel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::lazy_result<bool> try_push(
+  concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
     this->channel_cv_.notify_all();
-    co_return co_await push(resume_executor, std::move(value));
+    co_return co_await Push(resume_executor, std::move(value));
   }
 
   // returns empty optional in case channel is poisened or empty
-  concurrencpp::lazy_result<std::optional<ValueType>> pop(
+  concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
@@ -396,24 +431,45 @@ class UnBoundedChannel : public Channel<ValueType> {
     co_return result;
   }
 
-  concurrencpp::lazy_result<std::optional<ValueType>> try_pop(
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty(resume_executor, resume_executor_null);
 
     concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
 
-    if (this->poisened_) {
-      this->channel_cv_.notify_all();
-      co_return std::nullopt;
-    }
-
-    if (this->size_ == 0) {
+    if (this->poisened_ or this->size_ == 0) {
       guard.unlock();
       this->channel_cv_.notify_all();
       co_return std::nullopt;
     }
 
     auto result = buffer_.front();
+    buffer_.pop_front();
+    --(this->size_);
+
+    guard.unlock();
+    this->channel_cv_.notify_all();
+
+    co_return std::move(result);
+  }
+
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::function<bool(ValueType &)> &predicate) override {
+    throw_if_empty(resume_executor, resume_executor_null);
+
+    concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
+
+    if (this->poisened_ or this->size_ == 0) {
+      guard.unlock();
+      this->channel_cv_.notify_all();
+      co_return std::nullopt;
+    }
+
+    auto result = buffer_.front();
+    if (not predicate(result)) {
+      co_return std::nullopt;
+    }
     buffer_.pop_front();
     --(this->size_);
 
@@ -473,32 +529,32 @@ struct pipeline {
 template<typename ValueType>
 inline concurrencpp::result<void>
 run_pipeline_impl(std::shared_ptr<concurrencpp::executor> executor,
-                  pipeline<ValueType> &pl) {
+                  pipeline<ValueType> &pipeline) {
   throw_if_empty(executor, resume_executor_null);
 
-  const size_t amount_channels = pl.pipes_.size() + 1;
+  const size_t amount_channels = pipeline.pipes_.size() + 1;
   std::vector<std::shared_ptr<Channel<ValueType>>> channels{amount_channels};
   std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
   channels[0] = create_shared<BoundedChannel<ValueType>>(channel_is_null);
-  throw_if_empty(pl.prod_, producer_is_null);
-  tasks[0] = pl.prod_->produce(executor, channels[0]);
+  throw_if_empty(pipeline.prod_, producer_is_null);
+  tasks[0] = pipeline.prod_->produce(executor, channels[0]);
 
-  for (size_t index = 0; index < pl.pipes_.size(); index++) {
-    auto &pi = pl.pipes_[index];
-    throw_if_empty(pi, pipe_is_null);
+  for (size_t index = 0; index < pipeline.pipes_.size(); index++) {
+    auto &pipe = pipeline.pipes_[index];
+    throw_if_empty(pipe, pipe_is_null);
 
     channels[index + 1] = create_shared<BoundedChannel<ValueType>>(channel_is_null);
 
-    tasks[index + 1] = pi->process(executor, channels[index],
-                                   channels[index + 1]);
+    tasks[index + 1] = pipe->process(executor, channels[index],
+                                     channels[index + 1]);
   }
-  throw_if_empty(pl.cons_, consumer_is_null);
-  tasks[amount_channels] = pl.cons_->consume(executor,
-                                             channels[amount_channels - 1]);
+  throw_if_empty(pipeline.cons_, consumer_is_null);
+  tasks[amount_channels] = pipeline.cons_->consume(executor,
+                                                   channels[amount_channels - 1]);
 
   for (size_t index = 0; index < amount_channels; index++) {
     co_await tasks[index];
-    co_await channels[index]->close_channel(executor);
+    co_await channels[index]->CloseChannel(executor);
   }
   co_await tasks[amount_channels];
   co_return;
@@ -507,9 +563,9 @@ run_pipeline_impl(std::shared_ptr<concurrencpp::executor> executor,
 template<typename ValueType>
 inline void
 run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
-             pipeline<ValueType> &pl) {
+             pipeline<ValueType> &pipeline) {
   try {
-    run_pipeline_impl(executor, pl).get();
+    run_pipeline_impl(executor, pipeline).get();
   } catch (std::exception &exe) {
     std::cerr << exe.what() << std::endl;
   }
@@ -521,10 +577,10 @@ run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
              std::shared_ptr<producer<ValueType>> prod,
              std::vector<std::shared_ptr<cpipe<ValueType>>> &pipes,
              std::shared_ptr<consumer<ValueType>> cons) {
-  pipeline<ValueType> pi{prod, pipes, cons};
+  pipeline<ValueType> pipeline{prod, pipes, cons};
 
   try {
-    run_pipeline_impl(executor, pi).get();
+    run_pipeline_impl(executor, pipeline).get();
   } catch (std::exception &exe) {
     std::cerr << exe.what() << std::endl;
   }
@@ -548,8 +604,8 @@ run_pipelines(std::shared_ptr<concurrencpp::executor> executor, std::vector<pipe
   try {
     // create asynchronous(NOTE: asynchronous does not equal parallel) coroutines
     for (size_t index = 0; index < amount_tasks; index++) {
-      auto &pl = pipelines[index];
-      pipelns[index] = run_pipeline_impl(executor, pl);
+      auto &pipel = pipelines[index];
+      pipelns[index] = run_pipeline_impl(executor, pipel);
     }
     // suspend to get result
     for (size_t index = 0; index < amount_tasks; index++) {

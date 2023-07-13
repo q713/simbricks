@@ -224,8 +224,7 @@ class Tracer {
 
   // will create and add a new span to a trace using the context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParent(std::string &service_name,
-                                              std::shared_ptr<EventSpan> parent_span,
+  std::shared_ptr<SpanType> StartSpanByParent(std::shared_ptr<EventSpan> parent_span,
                                               std::shared_ptr<Event> starting_event,
                                               Args &&... args) {
     // guard potential access using a lock guard
@@ -272,6 +271,23 @@ class Tracer {
     InsertTrace(new_trace);
 
     return new_span;
+  }
+
+  void StartSpanSetParentContext(std::shared_ptr<EventSpan> &span_to_register,
+                                 std::shared_ptr<EventSpan> &parent_span) {
+    // guard potential access using a lock guard
+    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+
+    throw_if_empty(parent_span, "StartSpan(...) parent span is null");
+    auto parent_context = parent_span->GetContext();
+    throw_if_empty(parent_context, "StartSpan(...) parent context is null");
+    const uint64_t trace_id = parent_context->GetTraceId();
+
+    auto trace_context = RegisterCreateContext(trace_id, parent_span);
+    span_to_register->SetContext(trace_context, true);
+
+    // must add span to trace manually
+    AddSpanToTrace(trace_id, span_to_register);
   }
 
   explicit Tracer(simbricks::trace::SpanExporter &exporter) : exporter_(exporter) {};

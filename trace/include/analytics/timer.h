@@ -71,7 +71,7 @@ class Timer {
       waiters_.push(timestamp);
 
       if (cur_waiters_ == amount_waiters_ and waiters_.top() == timestamp) {
-        waiters_.pop();
+        waiters_.Pop();
         cur_waiters_--;
         co_return;
       }

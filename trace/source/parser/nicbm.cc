@@ -354,7 +354,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<NicMmioR> (timestamp, get_ident(),
                                                 get_name(), off, len, val);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("write("))
@@ -365,7 +365,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<NicMmioW> (timestamp, get_ident (),
                                                 get_name (), off, len, val);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("issuing dma"))
@@ -376,7 +376,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<NicDmaI> (timestamp, get_ident (),
                                                get_name (), op, addr, len);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("executing dma"))
@@ -387,7 +387,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<NicDmaEx> (timestamp, get_ident (),
                                                 get_name (), op, addr, len);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("enqueuing dma"))
@@ -398,7 +398,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<NicDmaEn> (timestamp, get_ident (),
                                                 get_name (), op, addr, len);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("completed dma"))
@@ -411,7 +411,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           }
           event_ptr = std::make_shared<NicDmaCR> (timestamp, get_ident (),
                                                   get_name (), op, addr, len);
-          co_await tar_chan->push (resume_executor, event_ptr);
+          co_await tar_chan->Push (resume_executor, event_ptr);
 
         } else if (line_reader_.consume_and_trim_till_string ("write"))
         {
@@ -421,7 +421,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           }
           event_ptr = std::make_shared<NicDmaCW> (timestamp, get_ident (),
                                                   get_name (), op, addr, len);
-          co_await tar_chan->push (resume_executor, event_ptr);
+          co_await tar_chan->Push (resume_executor, event_ptr);
         }
         continue;
 
@@ -445,7 +445,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<NicMsix> (timestamp, get_ident (),
                                                get_name (), vec, isX);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("eth"))
@@ -458,7 +458,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           }
           event_ptr = std::make_shared<NicTx> (timestamp, get_ident (),
                                                get_name (), len);
-          co_await tar_chan->push (resume_executor, event_ptr);
+          co_await tar_chan->Push (resume_executor, event_ptr);
           continue;
 
         } else if (line_reader_.consume_and_trim_till_string ("rx: port "))
@@ -471,7 +471,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           }
           event_ptr = std::make_shared<NicRx> (timestamp, get_ident (),
                                                get_name (), port, len);
-          co_await tar_chan->push (resume_executor, event_ptr);
+          co_await tar_chan->Push (resume_executor, event_ptr);
         }
         continue;
 
@@ -484,7 +484,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         }
         event_ptr = std::make_shared<SetIX> (timestamp, get_ident (),
                                              get_name (), addr);
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
 
       } else if (line_reader_.consume_and_trim_till_string ("dma write data"))

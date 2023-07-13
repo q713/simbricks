@@ -364,7 +364,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
       }
 
       throw_if_empty(event, event_is_null);
-      co_await tar_chan->push(resume_executor, event);
+      co_await tar_chan->Push(resume_executor, event);
     }
 
     co_return;

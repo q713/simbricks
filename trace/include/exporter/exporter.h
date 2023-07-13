@@ -609,6 +609,7 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("overall-transmit", BoolToString(old_span->IsOverallTx()));
     new_span->SetAttribute("overall-receive", BoolToString(old_span->IsOverallRx()));
     new_span->SetAttribute("fragmented", BoolToString(old_span->IsFragmented()));
+    new_span->SetAttribute("is-copy", BoolToString(old_span->IsCopy()));
   }
 
   void set_HostDmaSpanAttr(span_t &new_span, std::shared_ptr<HostDmaSpan> &old_span) {

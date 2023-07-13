@@ -44,7 +44,7 @@ struct int_prod : public producer<int> {
     throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
 
     for (int i = start; i < 3 + start; i++) {
-      bool could_write = co_await tar_chan->push(resume_executor, std::move(i));
+      bool could_write = co_await tar_chan->Push(resume_executor, std::move(i));
       if (not could_write) {
         break;
       }
@@ -68,11 +68,11 @@ struct int_cons : public consumer<int> {
                                            resume_executor_null);
     throw_if_empty<Channel<int>>(src_chan, channel_is_null);
 
-    auto int_opt = co_await src_chan->pop(resume_executor);
+    auto int_opt = co_await src_chan->Pop(resume_executor);
 
     while (int_opt.has_value()) {
       auto val = int_opt.value();
-      int_opt = co_await src_chan->pop(resume_executor);
+      int_opt = co_await src_chan->Pop(resume_executor);
       ss_ << prefix_ << "-consumed: " << val << std::endl;
     }
 
@@ -90,16 +90,16 @@ struct int_adder : public cpipe<int> {
     throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
     throw_if_empty<Channel<int>>(src_chan, channel_is_null);
 
-    auto int_opt = co_await src_chan->pop(resume_executor);
+    auto int_opt = co_await src_chan->Pop(resume_executor);
 
     while (int_opt.has_value()) {
       auto val = int_opt.value();
       val += 10;
-      bool could_write = co_await tar_chan->push(resume_executor, std::move(val));
+      bool could_write = co_await tar_chan->Push(resume_executor, std::move(val));
       if (not could_write) {
         break;
       }
-      int_opt = co_await src_chan->pop(resume_executor);
+      int_opt = co_await src_chan->Pop(resume_executor);
     }
 
     co_return;

@@ -53,14 +53,14 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     bool pass_on;
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
-    for(msg = co_await src_chan->pop(resume_executor); msg.has_value();
-        msg = co_await src_chan->pop(resume_executor)) {
+    for(msg = co_await src_chan->Pop(resume_executor); msg.has_value();
+        msg = co_await src_chan->Pop(resume_executor)) {
       event = msg.value();
       throw_if_empty(event, event_is_null);
 
       pass_on = act_on(event);
       if (pass_on) {
-        co_await tar_chan->push(resume_executor, event);
+        co_await tar_chan->Push(resume_executor, event);
       }
     }
     co_return;

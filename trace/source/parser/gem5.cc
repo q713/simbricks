@@ -373,7 +373,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #endif
         continue;
       }
-      co_await tar_chan->push (resume_executor, event_ptr);
+      co_await tar_chan->Push (resume_executor, event_ptr);
       continue;
     } else if (line_reader_.consume_and_trim_string ("system.switch_cpus:") &&
                component_table_.filter ("system.switch_cpus"))
@@ -388,7 +388,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #endif
         continue;
       }
-      co_await tar_chan->push (resume_executor, event_ptr);
+      co_await tar_chan->Push (resume_executor, event_ptr);
       continue;
 
     } else if (line_reader_.consume_and_trim_string ("system.pc"))
@@ -409,7 +409,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #endif
             continue;
           }
-          co_await tar_chan->push (resume_executor, event_ptr);
+          co_await tar_chan->Push (resume_executor, event_ptr);
           continue;
         } else if (component_table_.filter ("system.pc.pci_host"))
         {
@@ -424,7 +424,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #endif
             continue;
           }
-          co_await tar_chan->push (resume_executor, event_ptr);
+          co_await tar_chan->Push (resume_executor, event_ptr);
           continue;
         }
       } else if (line_reader_.consume_and_trim_string (".simbricks") &&
@@ -441,7 +441,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #endif
           continue;
         }
-        co_await tar_chan->push (resume_executor, event_ptr);
+        co_await tar_chan->Push (resume_executor, event_ptr);
         continue;
       }
     }

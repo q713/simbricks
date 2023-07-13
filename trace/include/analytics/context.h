@@ -131,6 +131,10 @@ class Context {
     throw_if_empty(parent_span, "trying to create Context, parent span is null");
   }
 
+  inline bool HasParent() {
+    return parent_span_ != nullptr;
+  }
+
   inline std::shared_ptr<EventSpan> &GetParent() {
     return parent_span_;
   };

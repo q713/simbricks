@@ -34,7 +34,7 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   assert(event_ptr and "event_ptr is null");
 
   std::cout << "nic try poll mmio" << std::endl;
-  auto con_opt = co_await from_host_queue_->pop(resume_executor);
+  auto con_opt = co_await from_host_queue_->Pop(resume_executor);
   throw_on(not con_opt.has_value(), context_is_null);
   auto con = con_opt.value();
   throw_if_empty(con, context_is_null);
@@ -46,7 +46,7 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   last_host_context_ = con;
 
   auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
-      name_, con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent());
+      con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent());
   if (not mmio_span) {
     std::cerr << "could not register mmio_span" << std::endl;
     co_return false;
@@ -75,7 +75,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
       std::cout << "nic try push dma" << std::endl;
       auto context = create_shared<Context>(
           "HandelDma could not create context", expectation::kDma, pending_dma);
-      throw_on(not co_await to_host_queue_->push(resume_executor, context),
+      throw_on(not co_await to_host_queue_->Push(resume_executor, context),
                could_not_push_to_context_queue);
       std::cout << "nic pushed dma" << std::endl;
     }
@@ -99,7 +99,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   assert(is_type(event_ptr, EventType::kNicDmaIT) and
       "try starting a new dma span with NON issue");
 
-  pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(name_, last_causing_,
+  pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(last_causing_,
                                                       event_ptr, event_ptr->GetParserIdent());
   if (not pending_dma) {
     std::cerr << "could not register new pending dma action" << std::endl;
@@ -122,7 +122,7 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     last_action_was_send_ = true;
 
   } else if (is_type(event_ptr, EventType::kNicRxT)) {
-    //auto con_opt = co_await from_network_queue_->pop(resume_executor);
+    //auto con_opt = co_await from_network_queue_->Pop(resume_executor);
     //throw_on(not con_opt.has_value(), context_is_null);
     //auto con = con_opt.value();
     //throw_on(is_expectation(con, expectation::kRx),
@@ -142,7 +142,7 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     eth_span = tracer_.StartSpan<NicEthSpan>(event_ptr, event_ptr->GetParserIdent());
   } else {
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
-        name_, parent, event_ptr, event_ptr->GetParserIdent());
+        parent, event_ptr, event_ptr->GetParserIdent());
   }
   if (not eth_span) {
     std::cerr << "could not register eth_span" << std::endl;
@@ -158,7 +158,7 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
 
     auto receive_context = create_shared<Context>(
         "could not create receive context to pass on to host", expectation::kRx, eth_span);
-    throw_on(not co_await to_host_receives_->push(resume_executor, receive_context),
+    throw_on(not co_await to_host_receives_->Push(resume_executor, receive_context),
              "HandelTxrx: could not write host receive context ");
   }
   //else {
@@ -176,7 +176,7 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   assert(event_ptr and "event_ptr is null");
 
   auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
-      name_, last_causing_, event_ptr, event_ptr->GetParserIdent());
+      last_causing_, event_ptr, event_ptr->GetParserIdent());
   if (not msix_span) {
     std::cerr << "could not register msix span" << std::endl;
     co_return false;
@@ -188,7 +188,7 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   std::cout << "nic try push msix" << std::endl;
   auto context = create_shared<Context>(
       "HandelMsix could not create context", expectation::kMsix, msix_span);
-  throw_on(not co_await to_host_queue_->push(resume_executor, context),
+  throw_on(not co_await to_host_queue_->Push(resume_executor, context),
            could_not_push_to_context_queue);
   std::cout << "nic pushed msix" << std::endl;
 

@@ -1142,8 +1142,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>> {
 
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
-    for (msg = co_await src_chan->pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->pop(resume_executor)) {
+    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
+         msg = co_await src_chan->Pop(resume_executor)) {
       event = msg.value();
       throw_if_empty(event, event_is_null);
       out_ << *event << std::endl;

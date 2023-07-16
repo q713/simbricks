@@ -44,9 +44,13 @@ concurrencpp::result<void> Spanner::consume(
 
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {
-      std::cout << "Spanner: could not find handler for event with type "
-                << event_ptr->GetType()
-                << std::endl;
+      std::cerr << "Spanner: could not find handler for the following event: ";
+      if (event_ptr) {
+        std::cerr << *event_ptr;
+      } else {
+        std::cerr << "null";
+      }
+      std::cerr << std::endl;
       continue;
     }
 

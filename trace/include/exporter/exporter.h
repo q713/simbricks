@@ -84,6 +84,8 @@ class NoOpExporter : public SpanExporter {
   }
 };
 
+// TODO: reduce the masive code duplication!!!!!!!!
+// TODO: consider using handler design instead of switching over types
 class OtlpSpanExporter : public SpanExporter {
 
   int64_t time_offset_ = 0;
@@ -473,6 +475,20 @@ class OtlpSpanExporter : public SpanExporter {
     span->AddEvent(type, ToSystemMicroseconds(event->GetTs()), attributes);
   }
 
+  void add_HostPciRW(span_t &span, std::shared_ptr<HostPciRW> event) {
+    const std::string type = GetTypeStr(event);
+    std::map<std::string, std::string> attributes;
+    add_HostPciRW(attributes, event);
+    span->AddEvent(type, ToSystemMicroseconds(event->GetTs()), attributes);
+  }
+
+  void add_HostConf(span_t &span, std::shared_ptr<HostConf> event) {
+    const std::string type = GetTypeStr(event);
+    std::map<std::string, std::string> attributes;
+    add_HostConf(attributes, event);
+    span->AddEvent(type, ToSystemMicroseconds(event->GetTs()), attributes);
+  }
+
   void add_HostCall(span_t &span, std::shared_ptr<HostCall> event) {
     auto type = GetTypeStr(event);
     std::map<std::string, std::string> attributes;
@@ -578,7 +594,7 @@ class OtlpSpanExporter : public SpanExporter {
     span->AddEvent(type, ToSystemMicroseconds(event->GetTs()), attributes);
   }
 
-  void add_NicMsix(span_t &span, std::shared_ptr<NicMsix> event) {
+  void add_NicMsix(span_t &span, const std::shared_ptr<NicMsix>& event) {
     auto type = GetTypeStr(event);
     std::map<std::string, std::string> attributes;
     add_NicMsix(attributes, event);
@@ -609,7 +625,11 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("overall-transmit", BoolToString(old_span->IsOverallTx()));
     new_span->SetAttribute("overall-receive", BoolToString(old_span->IsOverallRx()));
     new_span->SetAttribute("fragmented", BoolToString(old_span->IsFragmented()));
-    new_span->SetAttribute("is-copy", BoolToString(old_span->IsCopy()));
+    const bool is_copy = old_span->IsCopy();
+    new_span->SetAttribute("is-copy", BoolToString(is_copy));
+    if (is_copy) {
+      new_span->SetAttribute("original-id", std::to_string(old_span->GetOriginalId()));
+    }
   }
 
   void set_HostDmaSpanAttr(span_t &new_span, std::shared_ptr<HostDmaSpan> &old_span) {
@@ -621,6 +641,11 @@ class OtlpSpanExporter : public SpanExporter {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
     new_span->SetAttribute("after-pci/pci-before", BoolToString(old_span->IsAfterPci()));
+  }
+
+  void set_HostPciSpanAttr(span_t &new_span, std::shared_ptr<HostPciSpan> &old_span) {
+    set_EventSpanAttr(new_span, old_span);
+    new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
   }
 
   void set_NicMmioSpanAttr(span_t &new_span, std::shared_ptr<NicMmioSpan> &old_span) {
@@ -648,6 +673,11 @@ class OtlpSpanExporter : public SpanExporter {
       case kHostMmio: {
         auto mmio_span = std::static_pointer_cast<HostMmioSpan>(to_end);
         set_HostMmioSpanAttr(span, mmio_span);
+        break;
+      }
+      case kHostPci: {
+        auto pci_span = std::static_pointer_cast<HostPciSpan>(to_end);
+        set_HostPciSpanAttr(span, pci_span);
         break;
       }
       case kHostDma: {
@@ -715,6 +745,14 @@ class OtlpSpanExporter : public SpanExporter {
         }
         case EventType::kHostMmioCRT: {
           add_HostMmioCR(span, std::static_pointer_cast<HostMmioCR>(action));
+          break;
+        }
+        case EventType::kHostPciRWT: {
+          add_HostPciRW(span, std::static_pointer_cast<HostPciRW>(action));
+          break;
+        }
+        case EventType::kHostConfT: {
+          add_HostConf(span, std::static_pointer_cast<HostConf>(action));
           break;
         }
         case EventType::kHostDmaWT: {

@@ -27,6 +27,7 @@
 
 #include <iostream>
 #include <memory>
+#include <utility>
 #include <vector>
 #include <optional>
 #include <mutex>
@@ -52,6 +53,7 @@ enum span_type {
   kHostMmio,
   kHostDma,
   kHostInt,
+  kHostPci,
   kNicDma,
   kNicMmio,
   kNicEth,
@@ -70,6 +72,8 @@ inline std::ostream &operator<<(std::ostream &out, span_type type) {
     case span_type::kHostDma:out << "kHostDma";
       break;
     case span_type::kHostInt:out << "kHostInt";
+      break;
+    case span_type::kHostPci:out << "kHostPci";
       break;
     case span_type::kNicDma:out << "kNicDma";
       break;
@@ -95,8 +99,7 @@ class EventSpan {
   std::vector<std::shared_ptr<Event>> events_;
   bool is_pending_ = true;
   bool is_relevant_ = false;
-  bool is_copy_ = false;
-
+  std::shared_ptr<EventSpan> original_ = nullptr;
   std::shared_ptr<TraceContext> trace_context_ = nullptr;
 
   std::recursive_mutex span_mutex_;
@@ -121,14 +124,21 @@ class EventSpan {
   }
 
  public:
-  void SetIsCopy(bool new_val) {
+  void SetOriginal(const std::shared_ptr<EventSpan> &original) {
+    throw_if_empty(original, "EventSpan::SetOriginal: original is empty");
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    is_copy_ = new_val;
+    original_ = original;
   }
 
   bool IsCopy() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return is_copy_;
+    return original_ != nullptr;
+  }
+
+  uint64_t GetOriginalId() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    throw_if_empty(original_, "EventSpan::GetOriginalId: span is not a copy");
+    return original_->GetId();
   }
 
   size_t GetAmountEvents() {
@@ -272,7 +282,7 @@ class EventSpan {
         events_(other.events_),
         is_pending_(other.is_pending_),
         is_relevant_(other.is_relevant_),
-        is_copy_(true),
+        original_(other.original_),
         trace_context_(other.trace_context_) {
     // NOTE: we make only a shallow copy
   }
@@ -709,6 +719,70 @@ class HostMsixSpan : public EventSpan {
   }
 };
 
+class HostPciSpan : public EventSpan {
+  std::shared_ptr<Event> host_pci_rw_ = nullptr;
+  std::shared_ptr<Event> host_conf_rw_ = nullptr;
+  bool is_read_ = false;
+
+ public:
+  explicit HostPciSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
+      : EventSpan(trace_context, source_id, span_type::kHostPci) {
+  }
+
+  // NOTE: we make only a shallow copy
+  HostPciSpan(const HostPciSpan &other) = default;
+
+  EventSpan *clone() override {
+    return new HostPciSpan(*this);
+  }
+
+  ~HostPciSpan() override = default;
+
+  inline bool IsRead() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_read_;
+  }
+
+  inline bool IsWrite() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return not IsRead();
+  }
+
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+
+    if (not IsPotentialAdd(event_ptr)) {
+      return false;
+    }
+
+    if (is_type(event_ptr, EventType::kHostPciRWT)) {
+      if (host_pci_rw_) {
+        return false;
+      }
+      host_pci_rw_ = event_ptr;
+      is_pending_ = true;
+      is_read_ = std::static_pointer_cast<HostPciRW>(event_ptr)->IsRead();
+
+    } else if (is_type(event_ptr, EventType::kHostConfT)) {
+      if (not host_pci_rw_ or host_conf_rw_) {
+        return false;
+      }
+      auto conf_rw = std::static_pointer_cast<HostConf>(event_ptr);
+      if (conf_rw->IsRead() != is_read_) {
+        return false;
+      }
+      host_conf_rw_ = event_ptr;
+      is_pending_ = false;
+
+    } else {
+      return false;
+    }
+
+    events_.push_back(event_ptr);
+    return true;
+  }
+};
+
 class NicMsixSpan : public EventSpan {
   std::shared_ptr<Event> nic_msix_ = nullptr;
 
@@ -975,10 +1049,10 @@ inline bool IsType(std::shared_ptr<EventSpan> &span, span_type type) {
   return span->GetType() == type;
 }
 
-inline std::shared_ptr<EventSpan> clone_shared(const std::shared_ptr<EventSpan> &other) {
+inline std::shared_ptr<EventSpan> CloneShared(const std::shared_ptr<EventSpan> &other) {
   throw_if_empty(other, span_is_null);
   auto raw_ptr = other->clone();
-  throw_if_empty(raw_ptr, "EventSpan clone_shared: raw pointer is null");
+  throw_if_empty(raw_ptr, "EventSpan CloneShared: raw pointer is null");
   return std::shared_ptr<EventSpan>(raw_ptr);
 }
 

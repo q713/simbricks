@@ -6,7 +6,7 @@ To build the tracing library execute the following steps:
 ```
 git clone git@github.com:q713/simbricks.git
 git switch log-analysis
-git submodule update --init --recursive
+git submodule update --init
 cd trace
 ```
 

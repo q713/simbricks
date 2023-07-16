@@ -1121,7 +1121,7 @@ inline std::shared_ptr<Event> clone_shared(const std::shared_ptr<Event> &other) 
     return {};
   }
   auto raw_ptr = other->clone();
-  throw_if_empty(raw_ptr, "clone_shared: cloned raw pointer is null");
+  throw_if_empty(raw_ptr, "CloneShared: cloned raw pointer is null");
   return std::shared_ptr<Event>(raw_ptr);
 }
 

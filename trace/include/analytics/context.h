@@ -61,7 +61,7 @@ inline std::ostream &operator<<(std::ostream &out, expectation exp) {
 }
 
 class EventSpan;
-std::shared_ptr<EventSpan> clone_shared(const std::shared_ptr<EventSpan> &other);
+std::shared_ptr<EventSpan> CloneShared(const std::shared_ptr<EventSpan> &other);
 
 class TraceContext {
   // if parent is null it is a trace starting span
@@ -83,7 +83,7 @@ class TraceContext {
   TraceContext(const TraceContext &other) {
     trace_id_ = other.trace_id_;
     id_ = other.id_;
-    parent_ = clone_shared(other.parent_);
+    parent_ = CloneShared(other.parent_);
   }
 
   bool HasParent() {

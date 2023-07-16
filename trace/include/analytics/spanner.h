@@ -102,6 +102,8 @@ struct HostSpanner : public Spanner {
                        bool is_client);
 
  private:
+  concurrencpp::lazy_result<void> FinishPendingSpan(std::shared_ptr<concurrencpp::executor> resume_executor);
+
   concurrencpp::lazy_result<bool> CreateTraceStartingSpan(std::shared_ptr<concurrencpp::executor> resume_executor,
                                                           std::shared_ptr<Event> &starting_event,
                                                           bool fragmented);
@@ -109,8 +111,11 @@ struct HostSpanner : public Spanner {
   concurrencpp::lazy_result<bool> HandelCall(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
 
+  // NOTE: these two functions will push mmio expectations to the NIC site!!!
   concurrencpp::lazy_result<bool> HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
+  concurrencpp::lazy_result<bool> HandelPci(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                            std::shared_ptr<Event> &event_ptr);
 
   concurrencpp::lazy_result<bool> HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
                                             std::shared_ptr<Event> &event_ptr);
@@ -137,6 +142,7 @@ struct HostSpanner : public Spanner {
   std::shared_ptr<HostMsixSpan> pending_host_msix_span_ = nullptr;
   std::list<std::shared_ptr<HostDmaSpan>> pending_host_dma_spans_;
   std::list<std::shared_ptr<HostMmioSpan>> pending_host_mmio_spans_;
+  std::shared_ptr<HostPciSpan> pending_pci_spans_ = nullptr; // TODO: check if not multiple of those can be "in-flight"
 };
 
 struct NicSpanner : public Spanner {

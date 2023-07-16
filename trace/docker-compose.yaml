@@ -16,6 +16,8 @@ services:
     environment:
       - COLLECTOR_OTLP_ENABLED=true
     command: []
+    #depends_on:
+    #  - trace
 
 #docker run --rm --name jaeger \
 #  -e COLLECTOR_ZIPKIN_HOST_PORT=:9411 \\n  -e COLLECTOR_OTLP_ENABLED=true \\n  -p 6831:6831/udp \\n  -p 6832:6832/udp \\n  -p 5778:5778 \\n  -p 16686:16686 \\n  -p 4317:4317 \\n  -p 4318:4318 \\n  -p 14250:14250 \\n  -p 14268:14268 \\n  -p 14269:14269 \\n  -p 9411:9411 \\n  jaegertracing/all-in-one:latest\n

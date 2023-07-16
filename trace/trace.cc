@@ -118,6 +118,7 @@ int main(int argc, char *argv[]) {
     exit(EXIT_SUCCESS);
   }
 
+  // --ts-lower-bound 1967446102500
   uint64_t lower_bound =
       EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND;
   uint64_t upper_bound =
@@ -145,9 +146,9 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    simbricks::trace::OtlpSpanExporter
-        exporter{"http://localhost:4318/v1/traces", false, "trace"};
-    //simbricks::trace::NoOpExporter exporter;
+    //simbricks::trace::OtlpSpanExporter
+    //    exporter{"http://localhost:4318/v1/traces", false, "trace"};
+    simbricks::trace::NoOpExporter exporter;
 
     Tracer tracer{exporter};
 

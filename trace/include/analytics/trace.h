@@ -84,16 +84,13 @@ class Trace {
     const std::lock_guard<std::mutex> lock(mutex_);
     out << std::endl;
     out << "trace: id=" << id_ << std::endl;
-    out << "\t parent_span:" << std::endl;
-    if (parent_span_) {
-      parent_span_->display(out);
-    }
+    out << "\t parent_span:" << parent_span_ << std::endl;
     for (auto &span : spans_) {
       throw_if_empty(span.second, span_is_null);
       if (span.second.get() == parent_span_.get()) {
         continue;
       }
-      span.second->display(out);
+      out << span.second << std::endl;
     }
     out << std::endl;
   }

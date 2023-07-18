@@ -39,4 +39,23 @@ inline std::string BoolToString(bool boo) {
   return boo ? "true" : "false";
 }
 
+inline void WriteIdent(std::ostream &out, unsigned ident) {
+  if (ident == 0)
+    return;
+
+  for (size_t i = 0; i < ident; i++) {
+    out << "\t";
+  }
+}
+
+template<typename ObjT>
+inline std::ostream &operator<<(std::ostream& out, std::shared_ptr<ObjT>& to_write) {
+  if (to_write) {
+    out << *to_write;
+  } else {
+    out << "null";
+  }
+  return out;
+}
+
 #endif //SIMBRICKS_TRACE_UTILS_H_

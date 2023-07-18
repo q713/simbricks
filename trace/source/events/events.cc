@@ -26,7 +26,7 @@
 
 void Event::Display(std::ostream &out) {
   out << GetName() << ": source_id=" << parser_identifier_
-      << ", source_name=" << parser_name_ << ", timestamp=" << timestamp_;
+      << ", source_name=" << parser_name_ << ", timestamp=" << std::to_string(timestamp_);
 }
 
 bool Event::Equal(const Event &other) {

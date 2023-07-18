@@ -163,7 +163,7 @@ bool LineReader::parse_uint_trim(int base, uint64_t &target) {
   }
 
   char *end;
-  uint64_t num = std::strtoul(num_string.c_str(), &end, 16);
+  uint64_t num = std::strtoul(num_string.c_str(), &end, base);
   if (num == ULONG_MAX) {
     cur_reading_pos_ = old_reading_pos;
     return false;

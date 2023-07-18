@@ -62,6 +62,7 @@ inline std::ostream &operator<<(std::ostream &out, expectation exp) {
 
 class EventSpan;
 std::shared_ptr<EventSpan> CloneShared(const std::shared_ptr<EventSpan> &other);
+std::ostream &operator<<(std::ostream &out, std::shared_ptr<EventSpan> &span);
 
 class TraceContext {
   // if parent is null it is a trace starting span
@@ -148,6 +149,13 @@ class Context {
     return expectation_;
   }
 
+  void Display(std::ostream &out) {
+    out << "Context: " << "expectation=" << expectation_;
+    out << ", parent_span={" << std::endl;
+    out << parent_span_ << std::endl;
+    out << "}";
+  }
+
 };
 
 inline std::shared_ptr<TraceContext> clone_shared(const std::shared_ptr<TraceContext> &other) {
@@ -161,6 +169,11 @@ inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
     return false;
   }
   return true;
+}
+
+inline std::ostream &operator<<(std::ostream &out, Context &con) {
+  con.Display(out);
+  return out;
 }
 
 #endif  // SIMBRICKS_TRACE_CONTEXT_QUEUE_H_

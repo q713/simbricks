@@ -142,7 +142,7 @@ struct HostSpanner : public Spanner {
   std::shared_ptr<HostMsixSpan> pending_host_msix_span_ = nullptr;
   std::list<std::shared_ptr<HostDmaSpan>> pending_host_dma_spans_;
   std::list<std::shared_ptr<HostMmioSpan>> pending_host_mmio_spans_;
-  std::shared_ptr<HostPciSpan> pending_pci_spans_ = nullptr; // TODO: check if not multiple of those can be "in-flight"
+  std::shared_ptr<HostPciSpan> pending_pci_span_;
 };
 
 struct NicSpanner : public Spanner {

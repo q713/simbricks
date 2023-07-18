@@ -202,31 +202,25 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
 concurrencpp::lazy_result<bool> HostSpanner::HandelPci(std::shared_ptr<concurrencpp::executor> resume_executor,
                                                        std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
-  if (pending_pci_spans_) {
-    assert(is_type(event_ptr, EventType::kHostConfT)
-               and "HostSpanner::HandelPci: found second pci action in flight");
-    bool could_be_added = pending_pci_spans_->AddToSpan(event_ptr);
+  if (pending_pci_span_ and is_type(event_ptr, EventType::kHostConfT)) {
+    bool could_be_added = pending_pci_span_->AddToSpan(event_ptr);
     throw_on(not could_be_added, "HostSpanner::HandelPci: could not add event to pending pci span");
-    assert(pending_pci_spans_->IsComplete() and "HostSpanner::HandelPci: span is not complete but should be");
-    tracer_.MarkSpanAsDone(name_, pending_pci_spans_);
+    assert(pending_pci_span_->IsComplete() and "HostSpanner::HandelPci: span is not complete but should be");
+    tracer_.MarkSpanAsDone(name_, pending_pci_span_);
     co_return true;
   }
 
   assert(is_type(event_ptr, EventType::kHostPciRWT)
              and "HostSpanner::HandelPci: event is no pci starting event");
-  auto new_pci_span =
+  if (pending_pci_span_) {
+    tracer_.MarkSpanAsDone(name_, pending_pci_span_);
+  }
+
+  pending_pci_span_ =
       tracer_.StartSpanByParent<HostPciSpan>(pending_host_call_span_, event_ptr, event_ptr->GetParserIdent());
-  if (not new_pci_span) {
+  if (not pending_pci_span_) {
     co_return false;
   }
-  pending_pci_spans_ = new_pci_span;
-
-  auto context = create_shared<Context>("HostSpanner::HandelPci could not create context",
-                                        expectation::kMmio, pending_pci_spans_);
-  //std::cout << "host try push mmio pci" << std::endl;
-  bool could_push = co_await to_nic_queue_->Push(resume_executor, context);
-  throw_on(not could_push, "HostSpanner::HandelPci could not to nic that mmio is expected due to pci");
-  //std::cout << "host pushed pci" << std::endl;
 
   co_return true;
 }

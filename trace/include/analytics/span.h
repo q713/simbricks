@@ -37,15 +37,7 @@
 #include "events/events.h"
 #include "env/traceEnvironment.h"
 #include "analytics/context.h"
-
-inline void WriteIdent(std::ostream &out, unsigned ident) {
-  if (ident == 0)
-    return;
-
-  for (size_t i = 0; i < ident; i++) {
-    out << "\t";
-  }
-}
+#include "util/utils.h"
 
 enum span_type {
   kHostCall,
@@ -106,24 +98,26 @@ class EventSpan {
 
   inline static const char *tc_null_ = "try setting std::shared_ptr<TraceContext> which is null";
 
- private:
-  virtual void display(std::ostream &out, unsigned ident) {
-    WriteIdent(out, ident);
-    out << "id: " << static_cast<unsigned long long>(id_);
-    out << ", source_id: " << static_cast<unsigned long long>(source_id_);
-    out << ", kind: " << type_ << std::endl;
-    WriteIdent(out, ident);
-    // TODO: fix
-    //out << "has parent? " << (parent_ != nullptr) << std::endl;
-    WriteIdent(out, ident);
-    out << std::endl;
-    for (const std::shared_ptr<Event> &event : events_) {
-      WriteIdent(out, ident);
-      out << *event << std::endl;
+ public:
+  virtual void Display(std::ostream &out) {
+    out << "id: " << std::to_string(id_);
+    out << ", source_id: " << std::to_string(source_id_);
+    out << ", kind: " << type_;
+    if (not events_.empty()) {
+      out << ", starting_event={" << events_.front() << "}";
+      out << ", ending_event={" << events_.back() << "}";
     }
+    // TODO: fix
+    //WriteIdent(out, ident);
+    //out << "has parent? " << (parent_ != nullptr) << std::endl;
+    //WriteIdent(out, ident);
+    //out << std::endl;
+    //for (const std::shared_ptr<Event> &event : events_) {
+    //  WriteIdent(out, ident);
+    //  out << *event << std::endl;
+    //}
   }
 
- public:
   void SetOriginal(const std::shared_ptr<EventSpan> &original) {
     throw_if_empty(original, "EventSpan::SetOriginal: original is empty");
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
@@ -152,11 +146,6 @@ class EventSpan {
       return nullptr;
     }
     return events_[index];
-  }
-
-  inline virtual void display(std::ostream &out) {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    display(out, 0);
   }
 
   inline uint64_t GetId() {
@@ -316,11 +305,6 @@ class EventSpan {
     return true;
   }
 };
-
-inline std::ostream &operator<<(std::ostream &out, EventSpan &span) {
-  span.display(out);
-  return out;
-}
 
 class HostCallSpan : public EventSpan {
   std::shared_ptr<Event> call_span_entry_ = nullptr;
@@ -1065,6 +1049,20 @@ inline std::string GetTypeStr(std::shared_ptr<EventSpan> &span) {
   return std::move(sss.str());
 }
 
+inline std::ostream &operator<<(std::ostream& out, EventSpan& span) {
+  span.Display(out);
+  return out;
+}
+
+inline std::ostream &operator<<(std::ostream& out, std::shared_ptr<EventSpan>& span) {
+  if (span) {
+    out << *span;
+  } else {
+    out << "null";
+  }
+  return out;
+}
+
 struct SpanPrinter
     : public consumer<std::shared_ptr<EventSpan>> {
   concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
@@ -1078,7 +1076,7 @@ struct SpanPrinter
          next_span_opt = co_await src_chan->Pop(resume_executor)) {
       next_span = next_span_opt.value();
       throw_if_empty(next_span, span_is_null);
-      next_span->display(std::cout);
+      std::cout << next_span << std::endl;
     }
 
     co_return;

@@ -76,7 +76,9 @@ class Channel {
   }
 
   virtual concurrencpp::result<void>
-  Display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) {
+  Display(std::shared_ptr<concurrencpp::executor> resume_executor,
+          std::ostream &out,
+          std::function<std::ostream &(std::ostream &, ValueType &)> &value_printer) {
     co_return;
   }
 
@@ -178,7 +180,9 @@ class BoundedChannel : public Channel<ValueType> {
       BoundedChannel<ValueType, Capacity> &&) noexcept = delete;
 
   concurrencpp::result<void>
-  Display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) override {
+  Display(std::shared_ptr<concurrencpp::executor> resume_executor,
+          std::ostream &out,
+          std::function<std::ostream &(std::ostream &, ValueType &)> &value_printer) override {
     concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
 
     out << "Channel:" << std::endl;
@@ -191,9 +195,9 @@ class BoundedChannel : public Channel<ValueType> {
     out << "Buffer={" << std::endl;
     size_t index = 0;
     while (this->size_ > 0 and index < this->size_) {
-      auto val = buffer_[read_index_ + index % Capacity];
+      auto &val = buffer_[read_index_ + index % Capacity];
       ++index;
-      out << val << std::endl;
+      value_printer(out, val) << std::endl;
     }
     out << "}" << std::endl;
   }
@@ -350,7 +354,9 @@ class UnBoundedChannel : public Channel<ValueType> {
       BoundedChannel<ValueType> &&) noexcept = delete;
 
   concurrencpp::result<void>
-  Display(std::shared_ptr<concurrencpp::executor> resume_executor, std::ostream &out) override {
+  Display(std::shared_ptr<concurrencpp::executor> resume_executor,
+          std::ostream &out,
+          std::function<std::ostream &(std::ostream &, ValueType &)> &value_printer) override {
     concurrencpp::scoped_async_lock guard = co_await this->channel_lock_.lock(resume_executor);
 
     out << "Channel:" << std::endl;
@@ -358,8 +364,8 @@ class UnBoundedChannel : public Channel<ValueType> {
     out << "closed=" << this->closed_ << std::endl;
     out << "poisened=" << this->poisened_ << std::endl;
     out << "Buffer={" << std::endl;
-    for (const auto &val : buffer_) {
-      std::cout << val << std::endl;
+    for (auto &val : buffer_) {
+      value_printer(out, val);
     }
     out << "}" << std::endl;
   }

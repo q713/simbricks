@@ -93,6 +93,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
       }
 
       std::shared_ptr<Event> event = nullptr;
+      auto &l_reader = line_reader_;
       uint64_t pc = 0, id = 0, addr = 0, size = 0, vec = 0, dev = 0, func = 0,
                bytes = 0, data = 0, reg = 0, offset = 0, len = 0, intr = 0,
                val = 0, bar = 0;

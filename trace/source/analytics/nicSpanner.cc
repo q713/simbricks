@@ -24,6 +24,9 @@
 
 #include <cassert>
 #include <memory>
+#include <functional>
+#include <iostream>
+#include <ostream>
 
 #include "analytics/spanner.h"
 #include "util/exception.h"
@@ -32,6 +35,14 @@ concurrencpp::lazy_result<bool>
 NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
                        std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
+
+  std::cout << "the nics mmio context queue before polling: " << std::endl;
+  std::function<std::ostream &(std::ostream &, std::shared_ptr<Context> &)>
+      printer = [](std::ostream &out, std::shared_ptr<Context> &val) -> std::ostream & {
+    out << val << std::endl;
+    return out;
+  };
+  co_await from_host_queue_->Display(resume_executor, std::cout, printer);
 
   //std::cout << "nic try poll mmio" << std::endl;
   auto con_opt = co_await from_host_queue_->Pop(resume_executor);
@@ -56,9 +67,9 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
     is_read = true;
   }
   if (is_read != p->IsRead()) {
-    std::cerr << "error" << std::endl;
+    std::cerr << "error! expected read context but got write context while handling the following event: " << *event_ptr
+              << std::endl;
   }
-
 
   auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
       con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent());

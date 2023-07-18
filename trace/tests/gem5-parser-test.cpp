@@ -59,7 +59,8 @@ class EventChecker : public consumer<std::shared_ptr<Event>> {
       event = msg.value();
       REQUIRE(event != nullptr);
       if (cur_match < to_macth_) {
-        REQUIRE(event->Equal(*expected_events_[cur_match]));
+        auto match = expected_events_[cur_match];
+        REQUIRE(event->Equal(*match));
       } else {
         // we got more events as expected
         REQUIRE(false);
@@ -82,10 +83,10 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
                                         test_file_path,
                                         comp_filter_client, client_lr);
   const std::vector<std::shared_ptr<Event>> to_match{
-      std::make_shared<HostMmioR>(0x1869691991749, gem5->get_ident(), parser_name, 41735887303304840, 0xc0080300, 4, 0, 0x80300),
-      std::make_shared<HostMmioR>(0x1869693118999, gem5->get_ident(), parser_name, 41735887303304840, 0xc0080300, 4, 0, 0x80300),
-      std::make_shared<HostMmioR>(0x1869699347625, gem5->get_ident(), parser_name, 41735887311083304, 0xc040000c, 4, 3, 0xc),
-      std::make_shared<HostMmioR>(0x1869699662249, gem5->get_ident(), parser_name, 41735887311083808, 0xc040001c, 4, 3, 0x1c)
+      std::make_shared<HostMmioR>(1869691991749, gem5->get_ident(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
+      std::make_shared<HostMmioR>(1869693118999, gem5->get_ident(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
+      std::make_shared<HostMmioR>(1869699347625, gem5->get_ident(), parser_name, 94469181901728, 0xc040000c, 4, 3, 0xc),
+      std::make_shared<HostMmioR>(1869699662249, gem5->get_ident(), parser_name, 94469181901920, 0xc040001c, 4, 3, 0x1c)
   };
   auto checker = std::make_shared<EventChecker>(to_match);
 

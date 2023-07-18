@@ -36,7 +36,7 @@ COPY . /usr/src
 ENV CC clang-$llvmver
 ENV CXX clang++-$llvmver
 
-RUN cmake -B build-docker -DWITH_OTLP_HTTP=ON -DBUILD_TESTING=OFF -G Ninja . && \
+RUN cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_OTLP=ON -DWITH_EXAMPLES_HTTP=ON -DWITH_OTLP_HTTP=ON -DBUILD_TESTING=OFF -B build-docker -G Ninja . && \
     cd build-docker && \
     ninja
 

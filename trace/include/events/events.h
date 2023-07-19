@@ -412,14 +412,14 @@ class HostMmioCW : public HostIdOp {
 class HostAddrSizeOp : public HostIdOp {
 
   uint64_t addr_;
-  uint64_t size_;
+  size_t size_;
 
  public:
   void Display(std::ostream &out) override;
 
   uint64_t GetAddr() const;
 
-  uint64_t GetSize() const;
+  size_t GetSize() const;
 
   Event *clone() override {
     return new HostAddrSizeOp(*this);
@@ -429,7 +429,7 @@ class HostAddrSizeOp : public HostIdOp {
   explicit HostAddrSizeOp(uint64_t ts, const size_t parser_identifier,
                           const std::string parser_name, EventType type,
                           std::string name, uint64_t id, uint64_t addr,
-                          uint64_t size)
+                          size_t size)
       : HostIdOp(ts, parser_identifier, parser_name, type,
                  std::move(name), id),
         addr_(addr),
@@ -445,7 +445,7 @@ class HostAddrSizeOp : public HostIdOp {
 
 class HostMmioOp : public HostAddrSizeOp {
 
-  uint64_t bar_;
+  int bar_;
   uint64_t offset_;
 
  public:
@@ -463,7 +463,7 @@ class HostMmioOp : public HostAddrSizeOp {
   explicit HostMmioOp(uint64_t ts, const size_t parser_identifier,
                       const std::string parser_name, EventType type,
                       std::string name, uint64_t id, uint64_t addr,
-                      uint64_t size, uint64_t bar, uint64_t offset)
+                      size_t size, int bar, uint64_t offset)
       : HostAddrSizeOp(ts, parser_identifier, parser_name, type,
                        std::move(name), id, addr, size), bar_(bar), offset_(offset) {
   }
@@ -477,7 +477,7 @@ class HostMmioR : public HostMmioOp {
  public:
   explicit HostMmioR(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t id, uint64_t addr,
-                     uint64_t size, uint64_t bar, uint64_t offset)
+                     size_t size, int bar, uint64_t offset)
       : HostMmioOp(ts, parser_identifier, parser_name,
                    EventType::kHostMmioRT, "HostMmioR", id, addr, size, bar,
                    offset) {
@@ -500,7 +500,7 @@ class HostMmioW : public HostMmioOp {
  public:
   explicit HostMmioW(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t id, uint64_t addr,
-                     uint64_t size, uint64_t bar, uint64_t offset)
+                     size_t size, int bar, uint64_t offset)
       : HostMmioOp(ts, parser_identifier, parser_name,
                    EventType::kHostMmioWT, "HostMmioW", id, addr, size, bar,
                    offset) {
@@ -544,7 +544,7 @@ class HostDmaR : public HostAddrSizeOp {
  public:
   explicit HostDmaR(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t id, uint64_t addr,
-                    uint64_t size)
+                    size_t size)
       : HostAddrSizeOp(ts, parser_identifier, parser_name,
                        EventType::kHostDmaRT, "HostDmaR", id, addr, size) {
   }
@@ -566,7 +566,7 @@ class HostDmaW : public HostAddrSizeOp {
  public:
   explicit HostDmaW(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t id, uint64_t addr,
-                    uint64_t size)
+                    size_t size)
       : HostAddrSizeOp(ts, parser_identifier, parser_name,
                        EventType::kHostDmaWT, "HostDmaW", id, addr, size) {
   }
@@ -616,14 +616,14 @@ class HostConf : public Event {
   uint64_t dev_;
   uint64_t func_;
   uint64_t reg_;
-  uint64_t bytes_;
+  size_t bytes_;
   uint64_t data_;
   bool is_read_;
 
  public:
   explicit HostConf(uint64_t ts, const size_t parser_identifier,
                     const std::string parser_name, uint64_t dev, uint64_t func,
-                    uint64_t reg, uint64_t bytes, uint64_t data, bool is_read)
+                    uint64_t reg, size_t bytes, uint64_t data, bool is_read)
       : Event(ts, parser_identifier, parser_name,
               EventType::kHostConfT,
               is_read ? "HostConfRead" : "HostConfWrite"),
@@ -653,7 +653,7 @@ class HostConf : public Event {
 
   uint64_t GetReg() const;
 
-  uint64_t GetBytes() const;
+  size_t GetBytes() const;
 
   uint64_t GetData() const;
 
@@ -705,14 +705,14 @@ class HostPostInt : public Event {
 class HostPciRW : public Event {
 
   uint64_t offset_;
-  uint64_t size_;
+  size_t size_;
   bool is_read_;
 
  public:
 
   explicit HostPciRW(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t offset,
-                     uint64_t size, bool is_read)
+                     size_t size, bool is_read)
       : Event(ts, parser_identifier, parser_name,
               EventType::kHostPciRWT, is_read ? "HostPciR" : "HostPciW"),
         offset_(offset),
@@ -734,7 +734,7 @@ class HostPciRW : public Event {
 
   uint64_t GetOffset() const;
 
-  uint64_t GetSize() const;
+  size_t GetSize() const;
 
   bool IsRead() const;
 };
@@ -776,7 +776,7 @@ class NicDma : public Event {
 
   uint64_t id_;
   uint64_t addr_;
-  uint64_t len_;
+  size_t len_;
 
  public:
 
@@ -786,7 +786,7 @@ class NicDma : public Event {
 
   uint64_t GetAddr() const;
 
-  uint64_t GetLen() const;
+  size_t GetLen() const;
 
   Event *clone() override {
     return new NicDma(*this);
@@ -795,7 +795,7 @@ class NicDma : public Event {
  protected:
   NicDma(uint64_t ts, const size_t parser_identifier,
          const std::string parser_name, EventType type, std::string name,
-         uint64_t id, uint64_t addr, uint64_t len)
+         uint64_t id, uint64_t addr, size_t len)
       : Event(ts, parser_identifier, parser_name, type,
               std::move(name)),
         id_(id),
@@ -842,7 +842,7 @@ class NicDmaI : public NicDma {
  public:
   NicDmaI(uint64_t ts, const size_t parser_identifier,
           const std::string parser_name, uint64_t id, uint64_t addr,
-          uint64_t len)
+          size_t len)
       : NicDma(ts, parser_identifier, parser_name,
                EventType::kNicDmaIT, "NicDmaI", id, addr, len) {
   }
@@ -864,7 +864,7 @@ class NicDmaEx : public NicDma {
  public:
   NicDmaEx(uint64_t ts, const size_t parser_identifier,
            const std::string parser_name, uint64_t id, uint64_t addr,
-           uint64_t len)
+           size_t len)
       : NicDma(ts, parser_identifier, parser_name,
                EventType::kNicDmaExT, "NicDmaEx", id, addr, len) {
   }
@@ -886,7 +886,7 @@ class NicDmaEn : public NicDma {
  public:
   NicDmaEn(uint64_t ts, const size_t parser_identifier,
            const std::string parser_name, uint64_t id, uint64_t addr,
-           uint64_t len)
+           size_t len)
       : NicDma(ts, parser_identifier, parser_name,
                EventType::kNicDmaEnT, "NicDmaEn", id, addr, len) {
   }
@@ -908,7 +908,7 @@ class NicDmaCR : public NicDma {
  public:
   NicDmaCR(uint64_t ts, const size_t parser_identifier,
            const std::string parser_name, uint64_t id, uint64_t addr,
-           uint64_t len)
+           size_t len)
       : NicDma(ts, parser_identifier, parser_name,
                EventType::kNicDmaCRT, "NicDmaCR", id, addr, len) {
   }
@@ -930,7 +930,7 @@ class NicDmaCW : public NicDma {
  public:
   NicDmaCW(uint64_t ts, const size_t parser_identifier,
            const std::string parser_name, uint64_t id, uint64_t addr,
-           uint64_t len)
+           size_t len)
       : NicDma(ts, parser_identifier, parser_name,
                EventType::kNicDmaCWT, "NicDmaCW", id, addr, len) {
   }
@@ -951,7 +951,7 @@ class NicDmaCW : public NicDma {
 class NicMmio : public Event {
 
   uint64_t off_;
-  uint64_t len_;
+  size_t len_;
   uint64_t val_;
 
  public:
@@ -960,7 +960,7 @@ class NicMmio : public Event {
 
   uint64_t GetOff() const;
 
-  uint64_t GetLen() const;
+  size_t GetLen() const;
 
   uint64_t GetVal() const;
 
@@ -971,7 +971,7 @@ class NicMmio : public Event {
  protected:
   NicMmio(uint64_t ts, const size_t parser_identifier,
           const std::string parser_name, EventType type, std::string name,
-          uint64_t off, uint64_t len, uint64_t val)
+          uint64_t off, size_t len, uint64_t val)
       : Event(ts, parser_identifier, parser_name, type,
               std::move(name)),
         off_(off),
@@ -989,7 +989,7 @@ class NicMmio : public Event {
 class NicMmioR : public NicMmio {
  public:
   NicMmioR(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t off, uint64_t len,
+           const std::string parser_name, uint64_t off, size_t len,
            uint64_t val)
       : NicMmio(ts, parser_identifier, parser_name,
                 EventType::kNicMmioRT, "NicMmioR", off, len, val) {
@@ -1011,7 +1011,7 @@ class NicMmioR : public NicMmio {
 class NicMmioW : public NicMmio {
  public:
   NicMmioW(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t off, uint64_t len,
+           const std::string parser_name, uint64_t off, size_t len,
            uint64_t val)
       : NicMmio(ts, parser_identifier, parser_name,
                 EventType::kNicMmioWT, "NicMmioW", off, len, val) {
@@ -1031,14 +1031,14 @@ class NicMmioW : public NicMmio {
 };
 
 class NicTrx : public Event {
-  uint16_t len_;
+  size_t len_;
   bool is_read_;
 
  public:
 
   void Display(std::ostream &out) override;
 
-  uint16_t GetLen() const;
+  size_t GetLen() const;
 
   bool IsRead() const {
     return is_read_;
@@ -1051,7 +1051,7 @@ class NicTrx : public Event {
  protected:
   NicTrx(uint64_t ts, const size_t parser_identifier,
          const std::string parser_name, EventType type, std::string name,
-         uint16_t len, bool is_read)
+         size_t len, bool is_read)
       : Event(ts, parser_identifier, parser_name, type,
               std::move(name)),
         len_(len), is_read_(is_read) {
@@ -1067,7 +1067,7 @@ class NicTrx : public Event {
 class NicTx : public NicTrx {
  public:
   NicTx(uint64_t ts, const size_t parser_identifier,
-        const std::string parser_name, uint16_t len)
+        const std::string parser_name, size_t len)
       : NicTrx(ts, parser_identifier, parser_name,
                EventType::kNicTxT, "NicTx", len, false) {
   }
@@ -1086,11 +1086,11 @@ class NicTx : public NicTrx {
 };
 
 class NicRx : public NicTrx {
-  uint64_t port_;
+  int port_;
 
  public:
   NicRx(uint64_t ts, const size_t parser_identifier,
-        const std::string parser_name, uint64_t port, uint16_t len)
+        const std::string parser_name, int port, size_t len)
       : NicTrx(ts, parser_identifier, parser_name,
                EventType::kNicRxT, "NicRx", len, true),
         port_(port) {
@@ -1108,7 +1108,7 @@ class NicRx : public NicTrx {
 
   bool Equal(const Event &other) override;
 
-  uint64_t GetPort() const;
+  int GetPort() const;
 };
 
 inline std::ostream &operator<<(std::ostream &out, Event &event) {

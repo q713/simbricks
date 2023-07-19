@@ -34,9 +34,9 @@
 #endif
 
 bool SymsFilter::parse_address(uint64_t &address) {
-  line_reader_.trimL();
+  line_reader_.TrimL();
 
-  if (!line_reader_.parse_uint_trim(16, address)) {
+  if (!line_reader_.ParseUintTrim(16, address)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not parse address out of line '%s'\n",
              component_.c_str(), line_reader_.get_raw_line().c_str());
@@ -53,9 +53,9 @@ bool SymsFilter::parse_address(uint64_t &address) {
 }
 
 bool SymsFilter::parse_name(std::string &name) {
-  line_reader_.trimL();
+  line_reader_.TrimL();
   name =
-      line_reader_.extract_and_substr_until(sim_string_utils::is_alnum_dot_bar);
+      line_reader_.ExtractAndSubstrUntil(sim_string_utils::is_alnum_dot_bar);
 
   if (name.empty()) {
 #ifdef SYMS_DEBUG_
@@ -102,7 +102,7 @@ const std::string *SymsFilter::filter(uint64_t address) {
 }
 
 bool SymsFilter::skip_syms_fags() {
-  line_reader_.trimL();
+  line_reader_.TrimL();
   // flags are devided into 7 groups
   if (line_reader_.cur_length() < 8) {
 #ifdef SYMS_DEBUG_
@@ -113,25 +113,25 @@ bool SymsFilter::skip_syms_fags() {
 #endif
     return false;
   }
-  line_reader_.move_forward(7);
+  line_reader_.MoveForward(7);
   return true;
 }
 
 bool SymsFilter::skip_syms_section() {
-  line_reader_.trimL();
-  line_reader_.trimTillWhitespace();
+  line_reader_.TrimL();
+  line_reader_.TrimTillWhitespace();
   return true;
 }
 
 bool SymsFilter::skip_syms_alignment() {
-  line_reader_.trimL();
-  line_reader_.trimTillWhitespace();
+  line_reader_.TrimL();
+  line_reader_.TrimTillWhitespace();
   return true;
 }
 
 bool SymsFilter::load_syms(const std::string &file_path,
                            uint64_t address_offset) {
-  if (!line_reader_.open_file(file_path)) {
+  if (!line_reader_.OpenFile(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", component_.c_str());
 #endif
@@ -140,8 +140,8 @@ bool SymsFilter::load_syms(const std::string &file_path,
 
   uint64_t address = 0;
   std::string name = "";
-  while (line_reader_.next_line()) {
-    line_reader_.trimL();
+  while (line_reader_.NextLine()) {
+    line_reader_.TrimL();
 
     // parse address
     if (!parse_address(address)) {
@@ -183,7 +183,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
 }
 
 bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
-  if (!line_reader_.open_file(file_path)) {
+  if (!line_reader_.OpenFile(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", component_.c_str());
 #endif
@@ -192,12 +192,12 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
 
   uint64_t address = 0;
   std::string symbol = "";
-  while (line_reader_.next_line()) {
+  while (line_reader_.NextLine()) {
 #ifdef SYMS_DEBUG_
     DFLOGIN("%s: found line: %s\n", component_.c_str(),
             line_reader_.get_raw_line().c_str());
 #endif
-    line_reader_.trimL();
+    line_reader_.TrimL();
 
     // parse address
     if (!parse_address(address)) {
@@ -209,8 +209,8 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
     }
 
     if (!line_reader_.consume_and_trim_string(" <") || !parse_name(symbol) ||
-        !line_reader_.consume_and_trim_char('>') ||
-        !line_reader_.consume_and_trim_char(':')) {
+        !line_reader_.ConsumeAndTrimChar('>') ||
+        !line_reader_.ConsumeAndTrimChar(':')) {
 #ifdef SYMS_DEBUG_
       DFLOGERR("%s: could not parse label from line '%s'\n", component_.c_str(),
                line_reader_.get_raw_line().c_str());
@@ -236,7 +236,7 @@ Num:    Value             Size  Type      Bind    Vis      Ndx  Name
 */
 bool SymsFilter::load_elf(const std::string &file_path,
                           uint64_t address_offset) {
-  if (!line_reader_.open_file(file_path)) {
+  if (!line_reader_.OpenFile(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", component_.c_str());
 #endif
@@ -245,12 +245,12 @@ bool SymsFilter::load_elf(const std::string &file_path,
 
   // the first 3 lines do not contain interesting information
   for (int i = 0; i < 3; i++)
-    line_reader_.next_line();
+    line_reader_.NextLine();
 
   uint64_t address = 0;
   std::string label = "";
-  while (line_reader_.next_line()) {
-    line_reader_.trimL();
+  while (line_reader_.NextLine()) {
+    line_reader_.TrimL();
     if (!line_reader_.skip_till_whitespace()) {  // Num
       continue;
     }
@@ -265,9 +265,9 @@ bool SymsFilter::load_elf(const std::string &file_path,
     }
 
     // skip yet uninteresting values of ELF format
-    line_reader_.trimL();
+    line_reader_.TrimL();
     line_reader_.skip_till_whitespace();  // Size
-    line_reader_.trimL();
+    line_reader_.TrimL();
     if (line_reader_.consume_and_trim_string("FILE") ||
         line_reader_.consume_and_trim_string(
             "OBJECT")) {  // no files/objects in table
@@ -275,13 +275,13 @@ bool SymsFilter::load_elf(const std::string &file_path,
     } else {
       line_reader_.skip_till_whitespace();  // Type
     }
-    line_reader_.trimL();
+    line_reader_.TrimL();
     line_reader_.skip_till_whitespace();  // Bind
-    line_reader_.trimL();
+    line_reader_.TrimL();
     line_reader_.skip_till_whitespace();  // Vis
-    line_reader_.trimL();
+    line_reader_.TrimL();
     line_reader_.skip_till_whitespace();  // Ndx
-    line_reader_.trimL();
+    line_reader_.TrimL();
 
     // parse name
     if (!parse_name(label)) {  // Name

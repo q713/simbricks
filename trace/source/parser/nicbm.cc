@@ -55,7 +55,7 @@ bool NicBmParser::parse_sync_info (bool &sync_pcie, bool &sync_eth)
 {
   if (line_reader_.consume_and_trim_till_string ("sync_pci"))
   {
-    if (!line_reader_.consume_and_trim_char ('='))
+    if (!line_reader_.ConsumeAndTrimChar('='))
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
@@ -64,10 +64,10 @@ bool NicBmParser::parse_sync_info (bool &sync_pcie, bool &sync_eth)
       return false;
     }
 
-    if (line_reader_.consume_and_trim_char ('1'))
+    if (line_reader_.ConsumeAndTrimChar('1'))
     {
       sync_pcie = true;
-    } else if (line_reader_.consume_and_trim_char ('0'))
+    } else if (line_reader_.ConsumeAndTrimChar('0'))
     {
       sync_pcie = false;
     } else
@@ -88,7 +88,7 @@ bool NicBmParser::parse_sync_info (bool &sync_pcie, bool &sync_eth)
       return false;
     }
 
-    if (!line_reader_.consume_and_trim_char ('='))
+    if (!line_reader_.ConsumeAndTrimChar('='))
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
@@ -97,10 +97,10 @@ bool NicBmParser::parse_sync_info (bool &sync_pcie, bool &sync_eth)
       return false;
     }
 
-    if (line_reader_.consume_and_trim_char ('1'))
+    if (line_reader_.ConsumeAndTrimChar('1'))
     {
       sync_eth = true;
-    } else if (line_reader_.consume_and_trim_char ('0'))
+    } else if (line_reader_.ConsumeAndTrimChar('0'))
     {
       sync_eth = false;
     } else
@@ -124,7 +124,7 @@ bool NicBmParser::parse_mac_address (uint64_t &mac_address)
 {
   if (line_reader_.consume_and_trim_till_string ("mac_addr"))
   {
-    if (!line_reader_.consume_and_trim_char ('='))
+    if (!line_reader_.ConsumeAndTrimChar('='))
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: mac_addr line '%s' has wrong format\n", name_.c_str(),
@@ -142,7 +142,7 @@ bool NicBmParser::parse_mac_address (uint64_t &mac_address)
   return false;
 }
 
-bool NicBmParser::parse_off_len_val_comma (uint64_t &off, uint64_t &len,
+bool NicBmParser::parse_off_len_val_comma (uint64_t &off, size_t &len,
                                            uint64_t &val)
 {
   // parse off
@@ -161,7 +161,7 @@ bool NicBmParser::parse_off_len_val_comma (uint64_t &off, uint64_t &len,
 
   // parse len
   if (!line_reader_.consume_and_trim_till_string ("len=") ||
-      !line_reader_.parse_uint_trim (10, len))
+      !line_reader_.ParseUintTrim(10, len))
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse len= in line '%s'\n", name_.c_str(),
@@ -188,7 +188,7 @@ bool NicBmParser::parse_off_len_val_comma (uint64_t &off, uint64_t &len,
 }
 
 bool NicBmParser::parse_op_addr_len_pending (uint64_t &op, uint64_t &addr,
-                                             uint64_t &len, uint64_t &pending,
+                                             size_t &len, uint64_t &pending,
                                              bool with_pending)
 {
   // parse op
@@ -221,7 +221,7 @@ bool NicBmParser::parse_op_addr_len_pending (uint64_t &op, uint64_t &addr,
 
   // parse len
   if (!line_reader_.consume_and_trim_till_string ("len ") ||
-      !line_reader_.parse_uint_trim (10, len))
+      !line_reader_.ParseUintTrim(10, len))
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse len in line '%s'\n", name_.c_str(),
@@ -237,7 +237,7 @@ bool NicBmParser::parse_op_addr_len_pending (uint64_t &op, uint64_t &addr,
 
   // parse pending
   if (!line_reader_.consume_and_trim_till_string ("pending ") ||
-      !line_reader_.parse_uint_trim (10, pending))
+      !line_reader_.ParseUintTrim(10, pending))
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse pending in line '%s'\n", name_.c_str(),
@@ -256,7 +256,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   throw_if_empty (resume_executor, resume_executor_null);
   throw_if_empty (tar_chan, channel_is_null);
 
-  if (!line_reader_.open_file (log_file_path_))
+  if (!line_reader_.OpenFile(log_file_path_))
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not create reader\n", name_.c_str());
@@ -269,7 +269,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   bool sync_eth = false;
 
   // parse mac address and sync informations
-  if (line_reader_.next_line ())
+  if (line_reader_.NextLine())
   {
     if (!parse_mac_address (mac_address))
     {
@@ -279,7 +279,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
     DFLOGIN("%s: found mac_addr=%lx\n", name_.c_str(), mac_address);
 #endif
   }
-  if (line_reader_.next_line ())
+  if (line_reader_.NextLine())
   {
     if (!parse_sync_info (sync_pci, sync_eth))
     {
@@ -292,11 +292,13 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   std::shared_ptr<Event> event_ptr;
-  uint64_t timestamp, off, val, op, addr, vec, len, pending, port;
+  uint64_t timestamp, off, val, op, addr, vec, pending;
+  int port;
+  size_t len;
   // parse the actual events of interest
-  while (line_reader_.next_line ())
+  while (line_reader_.NextLine())
   {
-    line_reader_.trimL ();
+    line_reader_.TrimL();
     if (line_reader_.consume_and_trim_till_string (
             "exit main_time"))
     {  // end of event loop
@@ -439,7 +441,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
         {
           continue;
         }
-        if (!line_reader_.parse_uint_trim (10, vec))
+        if (!line_reader_.ParseUintTrim(10, vec))
         {
           continue;
         }
@@ -452,7 +454,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       {
         if (line_reader_.consume_and_trim_till_string ("tx: len "))
         {
-          if (!line_reader_.parse_uint_trim (10, len))
+          if (!line_reader_.ParseUintTrim(10, len))
           {
             continue;
           }
@@ -463,9 +465,9 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 
         } else if (line_reader_.consume_and_trim_till_string ("rx: port "))
         {
-          if (!line_reader_.parse_uint_trim (10, port)
+          if (!line_reader_.ParseInt(port)
               || !line_reader_.consume_and_trim_till_string ("len ")
-              || !line_reader_.parse_uint_trim (10, len))
+              || !line_reader_.ParseUintTrim(10, len))
           {
             continue;
           }

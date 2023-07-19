@@ -37,7 +37,7 @@ std::shared_ptr<Event> Gem5Parser::parse_global_event (uint64_t timestamp)
   // 1473190510000: global: simbricks: processInEvent
   if (line_reader_.consume_and_trim_till_string ("simbricks:"))
   {
-    line_reader_.trimL ();
+    line_reader_.TrimL();
     if (line_reader_.consume_and_trim_string ("processInEvent"))
     {
       return std::make_shared<SimProcInEvent> (timestamp, get_ident (),
@@ -61,7 +61,7 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
 
   uint64_t addr;
   if (!line_reader_.consume_and_trim_till_string ("0x") ||
-      !line_reader_.parse_uint_trim (16, addr))
+      !line_reader_.ParseUintTrim(16, addr))
   {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGWARN("%s: could not parse address from line '%s'\n", name_.c_str(),
@@ -70,10 +70,10 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
     return nullptr;
   }
 
-  line_reader_.trimL ();
-  if (line_reader_.consume_and_trim_char (':'))
+  line_reader_.TrimL();
+  if (line_reader_.ConsumeAndTrimChar(':'))
   {
-    line_reader_.trimL ();
+    line_reader_.TrimL();
     // NOTE: purposely ignored lines
     if (line_reader_.consume_and_trim_string ("NOP") ||
         line_reader_.consume_and_trim_string ("MFENCE") ||
@@ -83,7 +83,7 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
     }
   }
 
-  if (line_reader_.consume_and_trim_char ('.'))
+  if (line_reader_.ConsumeAndTrimChar('.'))
   {
     // TODO: gather micro operation information? if yes, which informations?
     return std::make_shared<HostInstr> (timestamp, get_ident (), get_name (),
@@ -115,14 +115,15 @@ Gem5Parser::parse_system_pc_pci_host (uint64_t timestamp)
   // TODO: parse  system.pc.pci_host
   // 1369143199499: system.pc.pci_host: 00:00.0: read: offset=0x4, size=0x2
 
-  uint64_t offset, size;
+  uint64_t offset;
+  size_t size;
   bool is_read = line_reader_.consume_and_trim_till_string ("read: offset=0x");
   if (is_read ||
       line_reader_.consume_and_trim_till_string ("write: offset=0x"))
   {
-    if (line_reader_.parse_uint_trim (16, offset) &&
+    if (line_reader_.ParseUintTrim(16, offset) &&
         line_reader_.consume_and_trim_string (", size=0x") &&
-        line_reader_.parse_uint_trim (16, size))
+        line_reader_.ParseUintTrim(16, size))
     {
       return std::make_shared<HostPciRW> (timestamp, get_ident (), get_name (),
                                           offset, size, is_read);
@@ -143,7 +144,7 @@ Gem5Parser::parse_system_pc_pci_host_interface (uint64_t timestamp)
   {
     return nullptr;
   }
-  line_reader_.trimL ();
+  line_reader_.TrimL();
 
   if (line_reader_.consume_and_trim_string ("clearInt"))
   {
@@ -165,7 +166,7 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
   {
     return nullptr;
   }
-  line_reader_.trimL ();
+  line_reader_.TrimL();
 
   // TODO: parse simbricks
   // 1369143037374: system.pc.simbricks _0: readConfig:  dev 0 func 0 reg 0x3d 1
@@ -176,29 +177,30 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
   // 0x1 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4
   // 2 bytes: data = 0x6
 
-  uint64_t dev, func, reg, bytes, data, bar, offset;
+  uint64_t dev, func, reg, bytes, data, offset;
+  int bar;
   bool is_readConf = line_reader_.consume_and_trim_string ("readConfig:");
   if (is_readConf || line_reader_.consume_and_trim_string ("writeConfig:"))
   {
-    line_reader_.trimL ();
+    line_reader_.TrimL();
     if (line_reader_.consume_and_trim_string ("dev ") &&
-        line_reader_.parse_uint_trim (10, dev) &&
+        line_reader_.ParseUintTrim(10, dev) &&
         line_reader_.consume_and_trim_string (" func ") &&
-        line_reader_.parse_uint_trim (10, func) &&
+        line_reader_.ParseUintTrim(10, func) &&
         line_reader_.consume_and_trim_string (" reg 0x") &&
-        line_reader_.parse_uint_trim (16, reg) &&
-        line_reader_.consume_and_trim_char (' ') &&
-        line_reader_.parse_uint_trim (10, bytes) &&
+        line_reader_.ParseUintTrim(16, reg) &&
+        line_reader_.ConsumeAndTrimChar(' ') &&
+        line_reader_.ParseUintTrim(10, bytes) &&
         line_reader_.consume_and_trim_string (" bytes: data = "))
     {
       if (line_reader_.consume_and_trim_string ("0x") &&
-          line_reader_.parse_uint_trim (16, data))
+          line_reader_.ParseUintTrim(16, data))
       {
         return std::make_shared<HostConf> (timestamp, get_ident (),
                                            get_name (), dev,
                                            func, reg, bytes, data,
                                            is_readConf);
-      } else if (line_reader_.consume_and_trim_char ('0'))
+      } else if (line_reader_.ConsumeAndTrimChar('0'))
       {
         return std::make_shared<HostConf> (timestamp, get_ident (),
                                            get_name (), dev,
@@ -207,20 +209,21 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
     }
   } else if (line_reader_.consume_and_trim_string ("simbricks-pci:"))
   {
-    uint64_t id, addr, size, vec;
-    line_reader_.trimL ();
+    uint64_t id, addr, vec;
+    size_t size;
+    line_reader_.TrimL();
     if (line_reader_.consume_and_trim_string ("received "))
     {
       if (line_reader_.consume_and_trim_string ("write ") &&
           line_reader_.consume_and_trim_string ("completion id ") &&
-          line_reader_.parse_uint_trim (10, id))
+          line_reader_.ParseUintTrim(10, id))
       {
         return std::make_shared<HostMmioCW> (timestamp, get_ident (),
                                              get_name (),
                                              id);
       } else if (line_reader_.consume_and_trim_string ("read ") &&
                  line_reader_.consume_and_trim_string ("completion id ") &&
-                 line_reader_.parse_uint_trim (10, id))
+          line_reader_.ParseUintTrim(10, id))
       {
         return std::make_shared<HostMmioCR> (timestamp, get_ident (),
                                              get_name (),
@@ -228,21 +231,21 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
       } else if (line_reader_.consume_and_trim_string ("DMA "))
       {
         if (line_reader_.consume_and_trim_string ("write id ") &&
-            line_reader_.parse_uint_trim (10, id) &&
+            line_reader_.ParseUintTrim(10, id) &&
             line_reader_.consume_and_trim_string (" addr ") &&
-            line_reader_.parse_uint_trim (16, addr) &&
+            line_reader_.ParseUintTrim(16, addr) &&
             line_reader_.consume_and_trim_string (" size ") &&
-            line_reader_.parse_uint_trim (10, size))
+            line_reader_.ParseUintTrim(10, size))
         {
           return std::make_shared<HostDmaW> (timestamp, get_ident (),
                                              get_name (),
                                              id, addr, size);
         } else if (line_reader_.consume_and_trim_string ("read id ") &&
-                   line_reader_.parse_uint_trim (10, id) &&
+            line_reader_.ParseUintTrim(10, id) &&
                    line_reader_.consume_and_trim_string (" addr ") &&
-                   line_reader_.parse_uint_trim (16, addr) &&
+            line_reader_.ParseUintTrim(16, addr) &&
                    line_reader_.consume_and_trim_string (" size ") &&
-                   line_reader_.parse_uint_trim (10, size))
+            line_reader_.ParseUintTrim(10, size))
         {
           return std::make_shared<HostDmaR> (timestamp, get_ident (),
                                              get_name (),
@@ -250,7 +253,7 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
         }
       } else if (
               line_reader_.consume_and_trim_till_string ("MSI-X intr vec ") &&
-              line_reader_.parse_uint_trim (10, vec))
+                  line_reader_.ParseUintTrim(10, vec))
       {
         return std::make_shared<HostMsiX> (timestamp, get_ident (),
                                            get_name (),
@@ -273,15 +276,15 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
                                                     get_name ());
       }
 
-      if (isReadWrite != 0 && line_reader_.parse_uint_trim (16, addr) &&
+      if (isReadWrite != 0 && line_reader_.ParseUintTrim(16, addr) &&
           line_reader_.consume_and_trim_string (" size ") &&
-          line_reader_.parse_uint_trim (10, size) &&
+          line_reader_.ParseUintTrim(10, size) &&
           line_reader_.consume_and_trim_string (" id ") &&
-          line_reader_.parse_uint_trim (10, id) &&
+          line_reader_.ParseUintTrim(10, id) &&
           line_reader_.consume_and_trim_string (" bar ") &&
-          line_reader_.parse_uint_trim (10, bar) &&
+          line_reader_.ParseInt(bar) &&
           line_reader_.consume_and_trim_string (" offs ") &&
-          line_reader_.parse_uint_trim (16, offset))
+          line_reader_.ParseUintTrim(16, offset))
       {
         if (isReadWrite == 1)
         {
@@ -296,7 +299,7 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
         }
       }
     } else if (line_reader_.consume_and_trim_string ("completed DMA id ") &&
-               line_reader_.parse_uint_trim (10, id))
+        line_reader_.ParseUintTrim(10, id))
     {
       return std::make_shared<HostDmaC> (timestamp, get_ident (), get_name (),
                                          id);
@@ -309,9 +312,9 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
 
 std::shared_ptr<Event> Gem5Parser::parse_simbricks_event (uint64_t timestamp)
 {
-  if (line_reader_.consume_and_trim_char (':'))
+  if (line_reader_.ConsumeAndTrimChar(':'))
   {
-    line_reader_.trimL ();
+    line_reader_.TrimL();
     if (line_reader_.consume_and_trim_string ("processInEvent"))
     {
       return std::make_shared<SimProcInEvent> (timestamp, get_ident (),
@@ -333,7 +336,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   throw_if_empty (resume_executor, resume_executor_null);
   throw_if_empty (tar_chan, channel_is_null);
 
-  if (!line_reader_.open_file (log_file_path_))
+  if (!line_reader_.OpenFile(log_file_path_))
   {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGERR("%s: could not create reader\n", name_.c_str());
@@ -344,7 +347,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   std::shared_ptr<Event> event_ptr;
   std::string component;
   uint64_t timestamp;
-  while (line_reader_.next_line ())
+  while (line_reader_.NextLine())
   {
     if (!parse_timestamp (timestamp))
     {
@@ -354,11 +357,11 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #endif
       continue;
     }
-    if (!line_reader_.consume_and_trim_char (':'))
+    if (!line_reader_.ConsumeAndTrimChar(':'))
     {
       continue;
     }
-    line_reader_.trimL ();
+    line_reader_.TrimL();
 
     // call parsing function based on component
     if (line_reader_.consume_and_trim_string ("global:") &&

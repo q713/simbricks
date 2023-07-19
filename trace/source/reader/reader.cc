@@ -24,7 +24,7 @@
 
 #include "reader/reader.h"
 
-bool LineReader::open_file(const std::string &file_path) {
+bool LineReader::OpenFile(const std::string &file_path) {
   close_input();
   input_stream_.open(file_path, std::ios_base::in | std::ios_base::binary);
   if (!input_stream_.is_open()) {
@@ -37,7 +37,7 @@ bool LineReader::open_file(const std::string &file_path) {
   return is_valid();
 }
 
-bool LineReader::next_line() {
+bool LineReader::NextLine() {
   bool found = false;
   while (!found) {
     if (input_stream_.eof() || !is_valid()) {
@@ -61,7 +61,7 @@ bool LineReader::next_line() {
   return true;
 }
 
-bool LineReader::move_forward(size_t steps) {
+bool LineReader::MoveForward(size_t steps) {
   if (is_empty() || cur_length() < steps)
     return false;
 
@@ -69,7 +69,7 @@ bool LineReader::move_forward(size_t steps) {
   return true;
 }
 
-void LineReader::trimL() {
+void LineReader::TrimL() {
   if (is_empty())
     return;
 
@@ -80,7 +80,7 @@ void LineReader::trimL() {
   }
 }
 
-void LineReader::trimTillWhitespace() {
+void LineReader::TrimTillWhitespace() {
   if (is_empty())
     return;
 
@@ -90,7 +90,7 @@ void LineReader::trimTillWhitespace() {
     cur_reading_pos_ = std::distance(cur_line_.begin(), till);
 }
 
-std::string LineReader::extract_and_substr_until(
+std::string LineReader::ExtractAndSubstrUntil(
     std::function<bool(unsigned char)> &predicate) {
   std::stringstream extract_builder;
   while (!is_empty()) {
@@ -104,7 +104,7 @@ std::string LineReader::extract_and_substr_until(
   return extract_builder.str();
 }
 
- bool LineReader::skip_till(std::function<bool(unsigned char)> &predicate) {
+ bool LineReader::SkipTill(std::function<bool(unsigned char)> &predicate) {
   if (is_empty()) {
     return false;
   }
@@ -121,7 +121,7 @@ std::string LineReader::extract_and_substr_until(
   return false;
  }
 
-bool LineReader::trim_till_consume(const std::string &tc, bool strict) {
+bool LineReader::TrimTillConsume(const std::string &tc, bool strict) {
   if (is_empty() || cur_length() < tc.length()) {
     return false;
   }
@@ -136,7 +136,7 @@ bool LineReader::trim_till_consume(const std::string &tc, bool strict) {
   return true;
 }
 
-bool LineReader::consume_and_trim_char(const char to_consume) {
+bool LineReader::ConsumeAndTrimChar(const char to_consume) {
   if (is_empty()) {
     return false;
   }
@@ -148,27 +148,43 @@ bool LineReader::consume_and_trim_char(const char to_consume) {
   return true;
 }
 
-bool LineReader::parse_uint_trim(int base, uint64_t &target) {
+bool LineReader::ParseUintTrim(int base, uint64_t &target) {
   if (is_empty() or (base != 10 and base != 16)) {
     return false;
   }
   auto pred =
       base == 10 ? sim_string_utils::is_num : sim_string_utils::is_alnum;
 
-  size_t old_reading_pos = cur_reading_pos_;
-  std::string num_string = extract_and_substr_until(pred);
+  const size_t old_reading_pos = cur_reading_pos_;
+  const std::string num_string = ExtractAndSubstrUntil(pred);
   if (num_string.empty()) {
     cur_reading_pos_ = old_reading_pos;
     return false;
   }
 
   char *end;
-  uint64_t num = std::strtoul(num_string.c_str(), &end, base);
+  const uint64_t num = std::strtoul(num_string.c_str(), &end, base);
   if (num == ULONG_MAX) {
     cur_reading_pos_ = old_reading_pos;
     return false;
   }
 
   target = num;
+  return true;
+}
+
+bool LineReader::ParseInt(int &target) {
+  if (is_empty()) {
+    return false;
+  }
+
+  const size_t old_reading_pos = cur_reading_pos_;
+  const std::string num_string = ExtractAndSubstrUntil(sim_string_utils::is_num);
+  if (num_string.empty()) {
+    cur_reading_pos_ = old_reading_pos;
+    return false;
+  }
+
+  target = std::stoi(num_string);
   return true;
 }

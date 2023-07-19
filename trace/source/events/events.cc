@@ -25,8 +25,10 @@
 #include "events/events.h"
 
 void Event::Display(std::ostream &out) {
-  out << GetName() << ": source_id=" << parser_identifier_
-      << ", source_name=" << parser_name_ << ", timestamp=" << std::to_string(timestamp_);
+  out << GetName();
+  out << ": source_id=" << parser_identifier_;
+  out << ", source_name=" << parser_name_;
+  out << ", timestamp=" << std::to_string(timestamp_);
 }
 
 bool Event::Equal(const Event &other) {
@@ -96,7 +98,7 @@ bool HostMmioImRespPoW::Equal(const Event &other) {
 
 void HostIdOp::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", id=" << id_;
+  out << ", id=" << std::to_string(id_);
 }
 
 bool HostIdOp::Equal(const Event &other) {
@@ -128,7 +130,8 @@ bool HostMmioCW::Equal(const Event &other) {
 
 void HostAddrSizeOp::Display(std::ostream &out) {
   HostIdOp::Display(out);
-  out << ", addr=" << std::hex << addr_ << ", size=" << size_;
+  out << ", addr=" << std::hex << addr_;
+  out << ", size=" << size_;
 }
 
 bool HostAddrSizeOp::Equal(const Event &other) {
@@ -143,13 +146,14 @@ uint64_t HostAddrSizeOp::GetAddr() const {
   return addr_;
 }
 
-uint64_t HostAddrSizeOp::GetSize() const {
+size_t HostAddrSizeOp::GetSize() const {
   return size_;
 }
 
 void HostMmioOp::Display(std::ostream &out) {
   HostAddrSizeOp::Display(out);
-  out << ", bar=" << bar_ << std::hex << ", offset=" << offset_;
+  out << ", bar=" << bar_;
+  out << ", offset=" << std::hex << offset_;
 }
 
 bool HostMmioOp::Equal(const Event &other) {
@@ -210,7 +214,7 @@ bool HostDmaW::Equal(const Event &other) {
 
 void HostMsiX::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", vec=" << vec_;
+  out << ", vec=" << std::to_string(vec_);
 }
 
 bool HostMsiX::Equal(const Event &other) {
@@ -227,8 +231,11 @@ uint64_t HostMsiX::GetVec() const {
 
 void HostConf::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", dev=" << dev_ << ", func=" << func_ << ", reg=" << std::hex << reg_
-      << ", bytes=" << bytes_ << ", data=" << std::hex << data_;
+  out << ", dev=" << std::hex << dev_;
+  out << ", func=" << std::hex << func_;
+  out << ", reg=" << std::hex << reg_;
+  out << ", bytes=" << bytes_;
+  out << ", data=" << std::hex << data_;
 }
 
 bool HostConf::Equal(const Event &other) {
@@ -256,7 +263,7 @@ uint64_t HostConf::GetReg() const {
   return reg_;
 }
 
-uint64_t HostConf::GetBytes() const {
+size_t HostConf::GetBytes() const {
   return bytes_;
 }
 
@@ -286,7 +293,8 @@ bool HostPostInt::Equal(const Event &other) {
 
 void HostPciRW::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", offset=" << std::hex << offset_ << ", size=" << std::hex << size_;
+  out << ", offset=" << std::hex << offset_;
+  out << ", size=" << size_;
 }
 
 bool HostPciRW::Equal(const Event &other) {
@@ -302,7 +310,7 @@ uint64_t HostPciRW::GetOffset() const {
   return offset_;
 }
 
-uint64_t HostPciRW::GetSize() const {
+size_t HostPciRW::GetSize() const {
   return size_;
 }
 
@@ -312,7 +320,7 @@ bool HostPciRW::IsRead() const {
 
 void NicMsix::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", vec=" << vec_;
+  out << ", vec=" << std::to_string(vec_);
 }
 
 bool NicMsix::Equal(const Event &other) {
@@ -333,8 +341,9 @@ bool NicMsix::IsX() const {
 
 void NicDma::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", id=" << std::hex << id_ << ", addr=" << std::hex << addr_
-      << ", size=" << len_;
+  out << ", id=" << std::to_string(id_);
+  out << ", addr=" << std::hex << addr_;
+  out << ", size=" << len_;
 }
 
 bool NicDma::Equal(const Event &other) {
@@ -354,7 +363,7 @@ uint64_t NicDma::GetAddr() const {
   return addr_;
 }
 
-uint64_t NicDma::GetLen() const {
+size_t NicDma::GetLen() const {
   return len_;
 }
 
@@ -417,8 +426,9 @@ bool NicDmaCW::Equal(const Event &other) {
 
 void NicMmio::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", off=" << std::hex << off_ << ", len=" << len_ << ", val=" << std::hex
-      << val_;
+  out << ", off=" << std::hex << off_;
+  out << ", len=" << len_;
+  out << ", val=" << std::hex << val_;
 }
 
 bool NicMmio::Equal(const Event &other) {
@@ -433,7 +443,7 @@ uint64_t NicMmio::GetOff() const {
   return off_;
 }
 
-uint64_t NicMmio::GetLen() const {
+size_t NicMmio::GetLen() const {
   return len_;
 }
 
@@ -459,7 +469,8 @@ bool NicMmioW::Equal(const Event &other) {
 
 void NicTrx::Display(std::ostream &out) {
   Event::Display(out);
-  out << ", len=" << len_ << ", is_read=" << is_read_;
+  out << ", len=" << len_;
+  out << ", is_read=" << (is_read_ ? "true" : "false");
 }
 
 bool NicTrx::Equal(const Event &other) {
@@ -470,7 +481,7 @@ bool NicTrx::Equal(const Event &other) {
   return len_ == trx->len_ and is_read_ == trx->is_read_ and Event::Equal(*trx);
 }
 
-uint16_t NicTrx::GetLen() const {
+size_t NicTrx::GetLen() const {
   return len_;
 }
 
@@ -484,7 +495,7 @@ bool NicTx::Equal(const Event &other) {
 
 void NicRx::Display(std::ostream &out) {
   NicTrx::Display(out);
-  out << ", port=" << port_;
+  out << ", port=" << std::to_string(port_);
 }
 
 bool NicRx::Equal(const Event &other) {
@@ -495,7 +506,7 @@ bool NicRx::Equal(const Event &other) {
   return port_ == rec.port_ and NicTrx::Equal(rec);
 }
 
-uint64_t NicRx::GetPort() const {
+int NicRx::GetPort() const {
   return port_;
 }
 

@@ -85,44 +85,46 @@ class LineReader {
     return cur_length() <= 0;
   }
 
-  bool open_file(const std::string &file_path);
+  bool OpenFile(const std::string &file_path);
 
-  bool next_line();
+  bool NextLine();
 
-  bool move_forward(size_t steps);
+  bool MoveForward(size_t steps);
 
-  void trimL();
+  void TrimL();
 
-  void trimTillWhitespace();
+  void TrimTillWhitespace();
 
-  std::string extract_and_substr_until(
+  std::string ExtractAndSubstrUntil(
       std::function<bool(unsigned char)> &predicate);
 
   bool extract_and_substr_until_into(
       std::string &target, std::function<bool(unsigned char)> &predicate) {
-    target = extract_and_substr_until(predicate);
+    target = ExtractAndSubstrUntil(predicate);
     return not target.empty();
   }
 
-  bool skip_till(std::function<bool(unsigned char)> &predicate);
+  bool SkipTill(std::function<bool(unsigned char)> &predicate);
 
   bool skip_till_whitespace() {
-    return skip_till(sim_string_utils::is_space);
+    return SkipTill(sim_string_utils::is_space);
   }
 
-  bool trim_till_consume(const std::string &tc, bool strict);
+  bool TrimTillConsume(const std::string &tc, bool strict);
 
   inline bool consume_and_trim_till_string(const std::string &to_consume) {
-    return trim_till_consume(to_consume, false);
+    return TrimTillConsume(to_consume, false);
   }
 
   inline bool consume_and_trim_string(const std::string &to_consume) {
-    return trim_till_consume(to_consume, true);
+    return TrimTillConsume(to_consume, true);
   }
 
-  bool consume_and_trim_char(const char to_consume);
+  bool ConsumeAndTrimChar(const char to_consume);
 
-  bool parse_uint_trim(int base, uint64_t &target);
+  bool ParseUintTrim(int base, uint64_t &target);
+
+  bool ParseInt(int &target);
 };
 
 /*

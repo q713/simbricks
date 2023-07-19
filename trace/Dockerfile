@@ -1,3 +1,27 @@
+#
+# Copyright 2022 Max Planck Institute for Software Systems, and
+# National University of Singapore
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
 # syntax=docker/dockerfile:1
 FROM ubuntu:22.04
 
@@ -40,5 +64,14 @@ RUN cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_OTLP=ON -DWITH_EXAMPLES_HTTP=ON -DWITH
     cd build-docker && \
     ninja
 
+# In case you want to mount any specific folder on your host system lig a folder containing log files you can "mount" \
+# (it is not a real mount) may "mount" the folder as follows. Changes in that folder will not propagate to the host.
+# When inteded to really mount e.g. a folder see belows run command.
+#ADD <path on host folder that shall be mounted> <path inside docker container>
+
 # TODO: execute the actual tracing utility
 CMD [ "/bin/bash" ]
+
+# The dockerfile CAN be executed as follows
+# 1) docker build -t trace .
+# 2) docker run (-v /<host directory to mount>:<directoey mounted into>) -it trace

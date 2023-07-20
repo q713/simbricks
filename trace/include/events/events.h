@@ -1116,7 +1116,7 @@ inline std::ostream &operator<<(std::ostream &out, Event &event) {
   return out;
 }
 
-inline std::shared_ptr<Event> clone_shared(const std::shared_ptr<Event> &other) {
+inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
   if (not other) {
     return {};
   }
@@ -1159,9 +1159,9 @@ struct EventComperator {
   }
 };
 
-bool is_type(std::shared_ptr<Event> &event_ptr, EventType type);
+bool IsType(std::shared_ptr<Event> &event_ptr, EventType type);
 
-bool is_type(const Event &event, EventType type);
+bool IsType(const Event &event, EventType type);
 
 inline std::string GetTypeStr(std::shared_ptr<Event> event) {
   if (not event) {

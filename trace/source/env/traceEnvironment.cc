@@ -26,7 +26,7 @@
 
 std::mutex TraceEnvironment::trace_env_mutex_;
 
-string_internalizer TraceEnvironment::internalizer_;
+StringInternalizer TraceEnvironment::internalizer_;
 
 std::set<const std::string *> TraceEnvironment::linux_net_func_indicator_;
 
@@ -53,7 +53,7 @@ std::vector<std::shared_ptr<SymsFilter>> TraceEnvironment::symbol_tables_;
 const std::string *TraceEnvironment::get_call_func(
     // NOTE: when calling this function the lock must be already held
     std::shared_ptr<Event> event_ptr) {
-  if (not event_ptr or not is_type(event_ptr, EventType::kHostCallT)) {
+  if (not event_ptr or not IsType(event_ptr, EventType::kHostCallT)) {
     return nullptr;
   }
   auto call = std::static_pointer_cast<HostCall>(event_ptr);
@@ -82,102 +82,102 @@ void TraceEnvironment::initialize() {
   dma_related_event_t_.insert(EventType::kNicDmaCWT);
   dma_related_event_t_.insert(EventType::kNicDmaCRT);
 
-  linux_net_func_indicator_.insert(internalizer_.internalize("__sys_socket"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("__sys_socket"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__x64_sys_socket"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("sock_create"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("__sys_bind"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("__x64_sys_bind"));
+      internalizer_.Internalize("__x64_sys_socket"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("sock_create"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("__sys_bind"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("__x64_sys_bind"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__x64_sys_connect"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("__sys_connect"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("tcp_release_cb"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("tcp_init_sock"));
+      internalizer_.Internalize("__x64_sys_connect"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("__sys_connect"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("tcp_release_cb"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("tcp_init_sock"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_init_xmit_timers"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("tcp_v4_connect"));
+      internalizer_.Internalize("tcp_init_xmit_timers"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("tcp_v4_connect"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("ip_route_output_key_hash"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("tcp_connect"));
+      internalizer_.Internalize("ip_route_output_key_hash"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("tcp_connect"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_fastopen_defer_connect"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("ipv4_dst_check"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("tcp_sync_mss"));
+      internalizer_.Internalize("tcp_fastopen_defer_connect"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("ipv4_dst_check"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("tcp_sync_mss"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_initialize_rcv_mss"));
+      internalizer_.Internalize("tcp_initialize_rcv_mss"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_write_queue_purge"));
+      internalizer_.Internalize("tcp_write_queue_purge"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_clear_retrans"));
+      internalizer_.Internalize("tcp_clear_retrans"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_transmit_skb"));
+      internalizer_.Internalize("tcp_transmit_skb"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__tcp_transmit_skb"));
+      internalizer_.Internalize("__tcp_transmit_skb"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("tcp_v4_send_check"));
+      internalizer_.Internalize("tcp_v4_send_check"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__tcp_v4_send_check"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("ip_queue_xmit"));
+      internalizer_.Internalize("__tcp_v4_send_check"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("ip_queue_xmit"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__ip_queue_xmit"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("ip_local_out"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("__ip_local_out"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("ip_output"));
+      internalizer_.Internalize("__ip_queue_xmit"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("ip_local_out"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("__ip_local_out"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("ip_output"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__ip_finish_output"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("dev_queue_xmit"));
+      internalizer_.Internalize("__ip_finish_output"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("dev_queue_xmit"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("__dev_queue_xmit"));
+      internalizer_.Internalize("__dev_queue_xmit"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("skb_network_protocol"));
-  linux_net_func_indicator_.insert(internalizer_.internalize("eth_type_vlan"));
+      internalizer_.Internalize("skb_network_protocol"));
+  linux_net_func_indicator_.insert(internalizer_.Internalize("eth_type_vlan"));
   linux_net_func_indicator_.insert(
-      internalizer_.internalize("netdev_start_xmit"));
+      internalizer_.Internalize("netdev_start_xmit"));
 
   driver_func_indicator_.insert(
-      internalizer_.internalize("i40e_features_check"));
+      internalizer_.Internalize("i40e_features_check"));
   driver_func_indicator_.insert(
-      internalizer_.internalize("i40e_lan_xmit_frame"));
+      internalizer_.Internalize("i40e_lan_xmit_frame"));
   driver_func_indicator_.insert(
-      internalizer_.internalize("i40e_maybe_stop_tx"));
-  driver_func_indicator_.insert(internalizer_.internalize("vlan_get_protocol"));
+      internalizer_.Internalize("i40e_maybe_stop_tx"));
+  driver_func_indicator_.insert(internalizer_.Internalize("vlan_get_protocol"));
   driver_func_indicator_.insert(
-      internalizer_.internalize("dma_map_single_attrs"));
+      internalizer_.Internalize("dma_map_single_attrs"));
   driver_func_indicator_.insert(
-      internalizer_.internalize("dma_map_page_attrs"));
+      internalizer_.Internalize("dma_map_page_attrs"));
   driver_func_indicator_.insert(
-      internalizer_.internalize("i40e_maybe_stop_tx"));
+      internalizer_.Internalize("i40e_maybe_stop_tx"));
 
   // TODO: make sure these are correct
-  kernel_tx_indicator_.insert(internalizer_.internalize("__sys_sendto"));
-  kernel_tx_indicator_.insert(internalizer_.internalize("__sys_sendmsg"));
-  kernel_tx_indicator_.insert(internalizer_.internalize("__sys_sendto"));
-  kernel_tx_indicator_.insert(internalizer_.internalize("__sys_sendto"));
-  kernel_tx_indicator_.insert(internalizer_.internalize("dev_hard_start_xmit"));
-  kernel_tx_indicator_.insert(internalizer_.internalize("netdev_start_xmit"));
-  kernel_tx_indicator_.insert(internalizer_.internalize("dev_queue_xmit"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("__sys_sendto"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("__sys_sendmsg"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("__sys_sendto"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("__sys_sendto"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("dev_hard_start_xmit"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("netdev_start_xmit"));
+  kernel_tx_indicator_.insert(internalizer_.Internalize("dev_queue_xmit"));
 
   // TODO: make sure these are correct
-  //kernel_rx_indicator_.insert(internalizer_.internalize("recvfrom"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("__sys_recvmsg"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("___sys_recvmsg"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("__x64_sys_recvmsg"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("ip_recv"));
-  kernel_rx_indicator_.insert(internalizer_.internalize("ip_list_rcv"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("netif_receive_skb"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("netif_rx"));
-  //kernel_rx_indicator_.insert(internalizer_.internalize("net_rx_action"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("recvfrom"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("__sys_recvmsg"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("___sys_recvmsg"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("__x64_sys_recvmsg"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("ip_recv"));
+  kernel_rx_indicator_.insert(internalizer_.Internalize("ip_list_rcv"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("netif_receive_skb"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("netif_rx"));
+  //kernel_rx_indicator_.insert(internalizer_.Internalize("net_rx_action"));
 
-  pci_write_indicators_.insert(internalizer_.internalize("pci_msix_write_vector_ctrl"));
-  pci_write_indicators_.insert(internalizer_.internalize("__pci_write_msi_msg"));
+  pci_write_indicators_.insert(internalizer_.Internalize("pci_msix_write_vector_ctrl"));
+  pci_write_indicators_.insert(internalizer_.Internalize("__pci_write_msi_msg"));
 
-  driver_tx_indicator_.insert(internalizer_.internalize("i40e_lan_xmit_frame"));
+  driver_tx_indicator_.insert(internalizer_.Internalize("i40e_lan_xmit_frame"));
 
-  driver_rx_indicator_.insert(internalizer_.internalize("i40e_napi_poll"));
-  driver_rx_indicator_.insert(internalizer_.internalize("i40e_finalize_xdp_rx"));
+  driver_rx_indicator_.insert(internalizer_.Internalize("i40e_napi_poll"));
+  driver_rx_indicator_.insert(internalizer_.Internalize("i40e_finalize_xdp_rx"));
 
-  sys_entry_.insert(internalizer_.internalize("entry_SYSCALL_64"));
-  sys_entry_.insert(internalizer_.internalize("error_entry"));
+  sys_entry_.insert(internalizer_.Internalize("entry_SYSCALL_64"));
+  sys_entry_.insert(internalizer_.Internalize("error_entry"));
 }
 
 bool TraceEnvironment::add_symbol_table(const std::string component,
@@ -187,7 +187,7 @@ bool TraceEnvironment::add_symbol_table(const std::string component,
                                         std::set<std::string> symbol_filter) {
   const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   static uint64_t next_id = 0;
-  auto filter_ptr = SymsFilter::create(++next_id, component,
+  auto filter_ptr = SymsFilter::Create(++next_id, component,
                                        file_path, address_offset, type,
                                        std::move(symbol_filter), internalizer_);
 
@@ -213,10 +213,10 @@ TraceEnvironment::symtable_filter(uint64_t address) {
     return std::make_pair(nullptr, nullptr);
   }
 
-  for (std::shared_ptr<SymsFilter> symt : symbol_tables_) {
-    const std::string *symbol = symt->filter(address);
+  for (const std::shared_ptr<SymsFilter> &symt : symbol_tables_) {
+    const std::string *symbol = symt->Filter(address);
     if (symbol) {
-      return std::make_pair(symbol, &symt->get_component());
+      return std::make_pair(symbol, &symt->GetComponent());
     }
   }
 
@@ -228,7 +228,7 @@ bool TraceEnvironment::is_call_pack_related(std::shared_ptr<Event> event_ptr) {
   if (not event_ptr) {
     return false;
   }
-  return is_type(event_ptr, EventType::kHostCallT);
+  return IsType(event_ptr, EventType::kHostCallT);
 }
 
 bool TraceEnvironment::IsDriverTx(std::shared_ptr<Event> event_ptr) {
@@ -256,7 +256,7 @@ bool TraceEnvironment::is_pci_msix_desc_addr(
   if (not func) {
     return false;
   }
-  return func == internalizer_.internalize("pci_msix_desc_addr");
+  return func == internalizer_.Internalize("pci_msix_desc_addr");
 }
 
 bool TraceEnvironment::is_pci_write(std::shared_ptr<Event> event_ptr) {
@@ -290,8 +290,8 @@ bool TraceEnvironment::is_eth_pack_related(std::shared_ptr<Event> event_ptr) {
     return false;
   }
 
-  return is_type(event_ptr, EventType::kNicTxT) or
-         is_type(event_ptr, EventType::kNicRxT);
+  return IsType(event_ptr, EventType::kNicTxT) or
+      IsType(event_ptr, EventType::kNicRxT);
 }
 
 bool TraceEnvironment::is_msix_related(std::shared_ptr<Event> event_ptr) {
@@ -300,8 +300,8 @@ bool TraceEnvironment::is_msix_related(std::shared_ptr<Event> event_ptr) {
     return false;
   }
 
-  return is_type(event_ptr, EventType::kNicMsixT) or
-         is_type(event_ptr, EventType::kHostMsiXT);
+  return IsType(event_ptr, EventType::kNicMsixT) or
+      IsType(event_ptr, EventType::kHostMsiXT);
 }
 
 bool TraceEnvironment::IsKernelTx(std::shared_ptr<Event> event_ptr) {
@@ -347,7 +347,7 @@ bool TraceEnvironment::is_socket_connect(std::shared_ptr<Event> event_ptr) {
   if (not func) {
     return false;
   }
-  return func == internalizer_.internalize("__sys_connect");
+  return func == internalizer_.Internalize("__sys_connect");
 }
 
 bool TraceEnvironment::IsSysEntry(std::shared_ptr<Event> event_ptr) {

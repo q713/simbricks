@@ -46,9 +46,9 @@ class LogParser : public producer<std::shared_ptr<Event>>
     const std::string log_file_path_;
     LineReader &line_reader_;
 
-    bool parse_timestamp (uint64_t &timestamp);
+    bool ParseTimestamp (uint64_t &timestamp);
 
-    bool parse_address (uint64_t &address);
+    bool ParseAddress (uint64_t &address);
 
   public:
     explicit LogParser (const std::string name,
@@ -61,12 +61,12 @@ class LogParser : public producer<std::shared_ptr<Event>>
               line_reader_ (line_reader)
     {};
 
-    inline uint64_t get_ident () const
+    inline uint64_t GetIdent () const
     {
       return identifier_;
     }
 
-    inline std::string get_name ()
+    inline std::string GetName () const
     {
       return name_;
     }
@@ -84,18 +84,18 @@ class Gem5Parser : public LogParser
     ComponentFilter &component_table_;
 
   protected:
-    std::shared_ptr<Event> parse_global_event (uint64_t timestamp);
+    std::shared_ptr<Event> ParseGlobalEvent (uint64_t timestamp);
 
-    std::shared_ptr<Event> parse_system_switch_cpus (uint64_t timestamp);
+    std::shared_ptr<Event> ParseSystemSwitchCpus (uint64_t timestamp);
 
-    std::shared_ptr<Event> parse_system_pc_pci_host (uint64_t timestamp);
+    std::shared_ptr<Event> ParseSystemPcPciHost (uint64_t timestamp);
 
     std::shared_ptr<Event>
-    parse_system_pc_pci_host_interface (uint64_t timestamp);
+    ParseSystemPcPciHostInterface (uint64_t timestamp);
 
-    std::shared_ptr<Event> parse_system_pc_simbricks (uint64_t timestamp);
+    std::shared_ptr<Event> ParseSystemPcSimbricks (uint64_t timestamp);
 
-    std::shared_ptr<Event> parse_simbricks_event (uint64_t timestamp);
+    std::shared_ptr<Event> ParseSimbricksEvent (uint64_t timestamp);
 
   public:
 
@@ -117,14 +117,14 @@ class Gem5Parser : public LogParser
 class NicBmParser : public LogParser
   {
   protected:
-    bool parse_off_len_val_comma (uint64_t &off, size_t &len, uint64_t &val);
+    bool ParseOffLenValComma (uint64_t &off, size_t &len, uint64_t &val);
 
-    bool parse_op_addr_len_pending (uint64_t &op, uint64_t &addr, size_t &len,
-                                    size_t &pending, bool with_pending);
+    bool ParseOpAddrLenPending (uint64_t &op, uint64_t &addr, size_t &len,
+                                size_t &pending, bool with_pending);
 
-    bool parse_mac_address (uint64_t &address);
+    bool ParseMacAddress (uint64_t &address);
 
-    bool parse_sync_info (bool &sync_pcie, bool &sync_eth);
+    bool ParseSyncInfo (bool &sync_pcie, bool &sync_eth);
 
   public:
 

@@ -38,7 +38,7 @@
 class TraceEnvironment {
   static std::mutex trace_env_mutex_;
 
-  static string_internalizer internalizer_;
+  static StringInternalizer internalizer_;
 
   static std::set<const std::string *> linux_net_func_indicator_;
 
@@ -68,7 +68,7 @@ class TraceEnvironment {
  public:
   static void initialize();
 
-  inline static string_internalizer &get_internalizer() {
+  inline static StringInternalizer &get_internalizer() {
     return internalizer_;
   }
 
@@ -109,7 +109,7 @@ class TraceEnvironment {
   inline static const std::string *internalize_additional(
       const std::string &symbol) {
     //std::lock_guard<std::mutex> lock(trace_env_mutex_);
-    return internalizer_.internalize(symbol);
+    return internalizer_.Internalize(symbol);
   }
 
   static bool add_symbol_table(const std::string identifier,

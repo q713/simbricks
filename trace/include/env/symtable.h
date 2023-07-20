@@ -35,7 +35,7 @@
 #include "reader/reader.h"
 #include "env/stringInternalizer.h"
 
-enum FilterType { Syms, S, Elf };
+enum FilterType { kSyms, kS, kElf };
 
 class SymsFilter {
  protected:
@@ -44,29 +44,29 @@ class SymsFilter {
   LineReader line_reader_;
   std::set<std::string> symbol_filter_;
   std::unordered_map<uint64_t, const std::string *> symbol_table_;
-  string_internalizer &i_;
+  StringInternalizer &i_;
 
   explicit SymsFilter(uint64_t id, const std::string component,
                       std::set<std::string> symbol_filter,
-                      string_internalizer &i)
+                      StringInternalizer &i)
       : id_(id),
         component_(std::move(component)),
         line_reader_(true),
         symbol_filter_(std::move(symbol_filter)),
         i_(i){};
 
-  bool parse_address(uint64_t &address);
+  bool ParseAddress(uint64_t &address);
 
-  bool parse_name(std::string &name);
+  bool ParseName(std::string &name);
 
-  bool add_to_sym_table(uint64_t address, const std::string &name,
-                        uint64_t address_offset);
+  bool AddToSymTable(uint64_t address, const std::string &name,
+                     uint64_t address_offset);
 
-  bool skip_syms_fags();
+  bool SkipSymsFags();
 
-  bool skip_syms_section();
+  bool SkipSymsSection();
 
-  bool skip_syms_alignment();
+  bool SkipSymsAlignment();
 
   /*
    * This class is used to parse a symbol table given in ELF format.
@@ -77,7 +77,7 @@ class SymsFilter {
    * linux_image'. It is later used to translate gem5 output into a human
    * readble form.
    */
-  bool load_syms(const std::string &file_path, uint64_t address_offset);
+  bool LoadSyms(const std::string &file_path, uint64_t address_offset);
 
   /*
    * This class is used to parse a symbol table given in the following format:
@@ -88,20 +88,20 @@ class SymsFilter {
    * linux_image'. It is later used to translate gem5 output into a human
    * readble form.
    */
-  bool load_s(const std::string &file_path, uint64_t address_offset);
+  bool LoadS(const std::string &file_path, uint64_t address_offset);
 
-  bool load_elf(const std::string &file_path, uint64_t address_offset);
+  bool LoadElf(const std::string &file_path, uint64_t address_offset);
 
  public:
-  inline uint64_t &get_ident() {
+  inline uint64_t &GetIdent() {
     return id_;
   }
 
-  inline const std::string &get_component() {
+  inline const std::string &GetComponent() {
     return component_;
   }
 
-  std::unordered_map<uint64_t, const std::string *> &get_sym_table() {
+  std::unordered_map<uint64_t, const std::string *> &GetSymTable() {
     return symbol_table_;
   }
 
@@ -109,25 +109,25 @@ class SymsFilter {
    * Filter function for later usage in parser.
    * Get in address and receive label for address.
    */
-  const std::string *filter(uint64_t address);
+  const std::string *Filter(uint64_t address);
 
-  static std::shared_ptr<SymsFilter> create(
+  static std::shared_ptr<SymsFilter> Create(
       uint64_t id, const std::string component, const std::string &file_path,
-      uint64_t address_offset, FilterType type, string_internalizer &i) {
-    return SymsFilter::create(id, std::move(component), file_path,
+      uint64_t address_offset, FilterType type, StringInternalizer &i) {
+    return SymsFilter::Create(id, std::move(component), file_path,
                               address_offset, type, {}, i);
   }
 
-  static std::shared_ptr<SymsFilter> create(
+  static std::shared_ptr<SymsFilter> Create(
       uint64_t id, const std::string component, const std::string &file_path,
       uint64_t address_offset, FilterType type,
-      std::set<std::string> symbol_filter, string_internalizer &i);
+      std::set<std::string> symbol_filter, StringInternalizer &i);
 
   friend std::ostream &operator<<(std::ostream &os, SymsFilter &filter) {
     os << std::endl << std::endl;
     os << "Symbol Table Filter:";
     os << std::endl << std::endl;
-    auto &table = filter.get_sym_table();
+    auto &table = filter.GetSymTable();
     os << "There were " << table.size() << " many entries found";
     os << std::endl << std::endl;
     for (auto &entry : table) {

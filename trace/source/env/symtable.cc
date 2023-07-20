@@ -33,7 +33,7 @@
   #include <cassert>
 #endif
 
-bool SymsFilter::parse_address(uint64_t &address) {
+bool SymsFilter::ParseAddress(uint64_t &address) {
   line_reader_.TrimL();
 
   if (!line_reader_.ParseUintTrim(16, address)) {
@@ -44,7 +44,7 @@ bool SymsFilter::parse_address(uint64_t &address) {
     return false;
   }
 
-  if (line_reader_.get_raw_line().compare("ffffffff81600000") == 0) {
+  if (line_reader_.GetRawLine().compare("ffffffff81600000") == 0) {
     std::cout << "found interesting line" << std::endl;
     std::cout << "address: " << std::hex << address << std::endl;
   }
@@ -52,7 +52,7 @@ bool SymsFilter::parse_address(uint64_t &address) {
   return true;
 }
 
-bool SymsFilter::parse_name(std::string &name) {
+bool SymsFilter::ParseName(std::string &name) {
   line_reader_.TrimL();
   name =
       line_reader_.ExtractAndSubstrUntil(sim_string_utils::is_alnum_dot_bar);
@@ -67,8 +67,8 @@ bool SymsFilter::parse_name(std::string &name) {
   return true;
 }
 
-bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
-                                  uint64_t address_offset) {
+bool SymsFilter::AddToSymTable(uint64_t address, const std::string &name,
+                               uint64_t address_offset) {
   auto in_set = symbol_filter_.find(name);
   if (!symbol_filter_.empty() && in_set == symbol_filter_.end()) {
 #ifdef SYMS_DEBUG_
@@ -78,7 +78,7 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
     return false;
   }
 
-  const std::string *sym_ptr = i_.internalize(name);
+  const std::string *sym_ptr = i_.Internalize(name);
   auto pair =
       symbol_table_.insert(std::make_pair(address_offset + address, sym_ptr));
   if (!pair.second) {
@@ -92,7 +92,7 @@ bool SymsFilter::add_to_sym_table(uint64_t address, const std::string &name,
   return true;
 }
 
-const std::string *SymsFilter::filter(uint64_t address) {
+const std::string *SymsFilter::Filter(uint64_t address) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
     return symbol->second;
@@ -101,10 +101,10 @@ const std::string *SymsFilter::filter(uint64_t address) {
   return {};
 }
 
-bool SymsFilter::skip_syms_fags() {
+bool SymsFilter::SkipSymsFags() {
   line_reader_.TrimL();
   // flags are devided into 7 groups
-  if (line_reader_.cur_length() < 8) {
+  if (line_reader_.CurLength() < 8) {
 #ifdef SYMS_DEBUG_
     DFLOGWARN(
         "%s: line has not more than 7 chars (flags), hence it is the wrong "
@@ -117,20 +117,20 @@ bool SymsFilter::skip_syms_fags() {
   return true;
 }
 
-bool SymsFilter::skip_syms_section() {
+bool SymsFilter::SkipSymsSection() {
   line_reader_.TrimL();
   line_reader_.TrimTillWhitespace();
   return true;
 }
 
-bool SymsFilter::skip_syms_alignment() {
+bool SymsFilter::SkipSymsAlignment() {
   line_reader_.TrimL();
   line_reader_.TrimTillWhitespace();
   return true;
 }
 
-bool SymsFilter::load_syms(const std::string &file_path,
-                           uint64_t address_offset) {
+bool SymsFilter::LoadSyms(const std::string &file_path,
+                          uint64_t address_offset) {
   if (!line_reader_.OpenFile(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", component_.c_str());
@@ -144,7 +144,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
     line_reader_.TrimL();
 
     // parse address
-    if (!parse_address(address)) {
+    if (!ParseAddress(address)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse address from line '%s'\n",
                 component_.c_str(), line_reader_.get_raw_line().c_str());
@@ -153,7 +153,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
     }
 
     // skip yet uninteresting values of ELF format
-    if (!skip_syms_fags() || !skip_syms_section() || !skip_syms_alignment()) {
+    if (!SkipSymsFags() || !SkipSymsSection() || !SkipSymsAlignment()) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN(
           "%s: line '%s' seems to have wrong format regarding flags, section "
@@ -164,7 +164,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
     }
 
     // parse name
-    if (!parse_name(name)) {
+    if (!ParseName(name)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse name from line '%s'\n", component_.c_str(),
                 line_reader_.get_raw_line().c_str());
@@ -172,7 +172,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
       continue;
     }
 
-    if (!add_to_sym_table(address, name, address_offset)) {
+    if (!AddToSymTable(address, name, address_offset)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table.\n",
                 component_.c_str(), address, name.c_str());
@@ -182,7 +182,7 @@ bool SymsFilter::load_syms(const std::string &file_path,
   return true;
 }
 
-bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
+bool SymsFilter::LoadS(const std::string &file_path, uint64_t address_offset) {
   if (!line_reader_.OpenFile(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", component_.c_str());
@@ -200,7 +200,7 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
     line_reader_.TrimL();
 
     // parse address
-    if (!parse_address(address)) {
+    if (!ParseAddress(address)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse address from line '%s'\n",
                 component_.c_str(), line_reader_.get_raw_line().c_str());
@@ -208,7 +208,7 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
       continue;
     }
 
-    if (!line_reader_.consume_and_trim_string(" <") || !parse_name(symbol) ||
+    if (!line_reader_.ConsumeAndTrimString(" <") || !ParseName(symbol) ||
         !line_reader_.ConsumeAndTrimChar('>') ||
         !line_reader_.ConsumeAndTrimChar(':')) {
 #ifdef SYMS_DEBUG_
@@ -218,7 +218,7 @@ bool SymsFilter::load_s(const std::string &file_path, uint64_t address_offset) {
       continue;
     }
 
-    if (!add_to_sym_table(address, symbol, address_offset)) {
+    if (!AddToSymTable(address, symbol, address_offset)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table\n",
                 component_.c_str(), address, symbol.c_str());
@@ -234,8 +234,8 @@ Num:    Value             Size  Type      Bind    Vis      Ndx  Name
 0:      0000000000000000     0  NOTYPE    LOCAL   DEFAULT  UND
 1:      ffffffff81000000     0  SECTION   LOCAL   DEFAULT    1
 */
-bool SymsFilter::load_elf(const std::string &file_path,
-                          uint64_t address_offset) {
+bool SymsFilter::LoadElf(const std::string &file_path,
+                         uint64_t address_offset) {
   if (!line_reader_.OpenFile(file_path)) {
 #ifdef SYMS_DEBUG_
     DFLOGERR("%s: could not create reader\n", component_.c_str());
@@ -251,12 +251,12 @@ bool SymsFilter::load_elf(const std::string &file_path,
   std::string label = "";
   while (line_reader_.NextLine()) {
     line_reader_.TrimL();
-    if (!line_reader_.skip_till_whitespace()) {  // Num
+    if (!line_reader_.SkipTillWhitespace()) {  // Num
       continue;
     }
 
     // parse address
-    if (!parse_address(address)) {  // Value
+    if (!ParseAddress(address)) {  // Value
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse address from line '%s'\n",
                 component_.c_str(), line_reader_.get_raw_line().c_str());
@@ -266,25 +266,25 @@ bool SymsFilter::load_elf(const std::string &file_path,
 
     // skip yet uninteresting values of ELF format
     line_reader_.TrimL();
-    line_reader_.skip_till_whitespace();  // Size
+    line_reader_.SkipTillWhitespace();  // Size
     line_reader_.TrimL();
-    if (line_reader_.consume_and_trim_string("FILE") ||
-        line_reader_.consume_and_trim_string(
+    if (line_reader_.ConsumeAndTrimString("FILE") ||
+        line_reader_.ConsumeAndTrimString(
             "OBJECT")) {  // no files/objects in table
       continue;
     } else {
-      line_reader_.skip_till_whitespace();  // Type
+      line_reader_.SkipTillWhitespace();  // Type
     }
     line_reader_.TrimL();
-    line_reader_.skip_till_whitespace();  // Bind
+    line_reader_.SkipTillWhitespace();  // Bind
     line_reader_.TrimL();
-    line_reader_.skip_till_whitespace();  // Vis
+    line_reader_.SkipTillWhitespace();  // Vis
     line_reader_.TrimL();
-    line_reader_.skip_till_whitespace();  // Ndx
+    line_reader_.SkipTillWhitespace();  // Ndx
     line_reader_.TrimL();
 
     // parse name
-    if (!parse_name(label)) {  // Name
+    if (!ParseName(label)) {  // Name
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not parse name from line '%s'\n", component_.c_str(),
                 line_reader_.get_raw_line().c_str());
@@ -292,7 +292,7 @@ bool SymsFilter::load_elf(const std::string &file_path,
       continue;
     }
 
-    if (!add_to_sym_table(address, label, address_offset)) {
+    if (!AddToSymTable(address, label, address_offset)) {
 #ifdef SYMS_DEBUG_
       DFLOGWARN("%s: could not insert new val '[%u] = %s' into sym table.\n",
                 component_.c_str(), address, label.c_str());
@@ -302,10 +302,10 @@ bool SymsFilter::load_elf(const std::string &file_path,
   return true;
 }
 
-std::shared_ptr<SymsFilter> SymsFilter::create(
+std::shared_ptr<SymsFilter> SymsFilter::Create(
     uint64_t id, const std::string component, const std::string &file_path,
     uint64_t address_offset, FilterType type,
-    std::set<std::string> symbol_filter, string_internalizer &i) {
+    std::set<std::string> symbol_filter, StringInternalizer &i) {
   std::shared_ptr<SymsFilter> filter{
       new SymsFilter{id, std::move(component), std::move(symbol_filter), i}};
   if (not filter) {
@@ -313,19 +313,19 @@ std::shared_ptr<SymsFilter> SymsFilter::create(
   }
 
   switch (type) {
-    case S:
-      if (not filter->load_s(file_path, address_offset)) {
+    case kS:
+      if (not filter->LoadS(file_path, address_offset)) {
         return nullptr;
       }
       break;
-    case Elf:
-      if (not filter->load_elf(file_path, address_offset)) {
+    case kElf:
+      if (not filter->LoadElf(file_path, address_offset)) {
         return nullptr;
       }
       break;
-    case Syms:
+    case kSyms:
     default:
-      if (not filter->load_syms(file_path, address_offset)) {
+      if (not filter->LoadSyms(file_path, address_offset)) {
         return nullptr;
       }
       break;

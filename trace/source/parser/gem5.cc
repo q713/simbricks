@@ -32,27 +32,27 @@
 #include "util/string_util.h"
 #include "util/exception.h"
 
-std::shared_ptr<Event> Gem5Parser::parse_global_event (uint64_t timestamp)
+std::shared_ptr<Event> Gem5Parser::ParseGlobalEvent (uint64_t timestamp)
 {
   // 1473190510000: global: simbricks: processInEvent
-  if (line_reader_.consume_and_trim_till_string ("simbricks:"))
+  if (line_reader_.ConsumeAndTrimTillString("simbricks:"))
   {
     line_reader_.TrimL();
-    if (line_reader_.consume_and_trim_string ("processInEvent"))
+    if (line_reader_.ConsumeAndTrimString("processInEvent"))
     {
-      return std::make_shared<SimProcInEvent> (timestamp, get_ident (),
-                                               get_name ());
-    } else if (line_reader_.consume_and_trim_string ("sending sync message"))
+      return std::make_shared<SimProcInEvent> (timestamp, GetIdent(),
+                                               GetName());
+    } else if (line_reader_.ConsumeAndTrimString("sending sync message"))
     {
-      return std::make_shared<SimSendSync> (timestamp, get_ident (),
-                                            get_name ());
+      return std::make_shared<SimSendSync> (timestamp, GetIdent(),
+                                            GetName());
     }
   }
   return nullptr;
 }
 
 std::shared_ptr<Event>
-Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
+Gem5Parser::ParseSystemSwitchCpus (uint64_t timestamp)
 {
   // 1473191502750: system.switch_cpus: A0 T0 : 0xffffffff81001bc0    :
   // verw_Mw_or_Rv (unimplemented) : No_OpClass :system.switch_cpus:
@@ -60,7 +60,7 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
   // IntAlu :
 
   uint64_t addr;
-  if (!line_reader_.consume_and_trim_till_string ("0x") ||
+  if (!line_reader_.ConsumeAndTrimTillString("0x") ||
       !line_reader_.ParseUintTrim(16, addr))
   {
 #ifdef PARSER_DEBUG_GEM5_
@@ -75,9 +75,9 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
   {
     line_reader_.TrimL();
     // NOTE: purposely ignored lines
-    if (line_reader_.consume_and_trim_string ("NOP") ||
-        line_reader_.consume_and_trim_string ("MFENCE") ||
-        line_reader_.consume_and_trim_string ("LFENCE"))
+    if (line_reader_.ConsumeAndTrimString("NOP") ||
+        line_reader_.ConsumeAndTrimString("MFENCE") ||
+        line_reader_.ConsumeAndTrimString("LFENCE"))
     {
       return nullptr;
     }
@@ -86,7 +86,7 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
   if (line_reader_.ConsumeAndTrimChar('.'))
   {
     // TODO: gather micro operation information? if yes, which informations?
-    return std::make_shared<HostInstr> (timestamp, get_ident (), get_name (),
+    return std::make_shared<HostInstr> (timestamp, GetIdent(), GetName(),
                                         addr);
   } else
   {
@@ -101,7 +101,7 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
       return nullptr;
     }
 
-    return std::make_shared<HostCall> (timestamp, get_ident (), get_name (),
+    return std::make_shared<HostCall> (timestamp, GetIdent(), GetName(),
                                        addr,
                                        sym_s, comp);
   }
@@ -110,22 +110,22 @@ Gem5Parser::parse_system_switch_cpus (uint64_t timestamp)
 }
 
 std::shared_ptr<Event>
-Gem5Parser::parse_system_pc_pci_host (uint64_t timestamp)
+Gem5Parser::ParseSystemPcPciHost (uint64_t timestamp)
 {
   // TODO: parse  system.pc.pci_host
   // 1369143199499: system.pc.pci_host: 00:00.0: read: offset=0x4, size=0x2
 
   uint64_t offset;
   size_t size;
-  bool is_read = line_reader_.consume_and_trim_till_string ("read: offset=0x");
+  bool is_read = line_reader_.ConsumeAndTrimTillString("read: offset=0x");
   if (is_read ||
-      line_reader_.consume_and_trim_till_string ("write: offset=0x"))
+      line_reader_.ConsumeAndTrimTillString("write: offset=0x"))
   {
     if (line_reader_.ParseUintTrim(16, offset) &&
-        line_reader_.consume_and_trim_string (", size=0x") &&
+        line_reader_.ConsumeAndTrimString(", size=0x") &&
         line_reader_.ParseUintTrim(16, size))
     {
-      return std::make_shared<HostPciRW> (timestamp, get_ident (), get_name (),
+      return std::make_shared<HostPciRW> (timestamp, GetIdent(), GetName(),
                                           offset, size, is_read);
     }
   }
@@ -134,35 +134,35 @@ Gem5Parser::parse_system_pc_pci_host (uint64_t timestamp)
 }
 
 std::shared_ptr<Event>
-Gem5Parser::parse_system_pc_pci_host_interface (uint64_t timestamp)
+Gem5Parser::ParseSystemPcPciHostInterface (uint64_t timestamp)
 {
   // TODO: parse system.pc.pci_host.interface
   // 1473338125374: system.pc.pci_host.interface[00:04.0]: clearInt
   // 1473659826000: system.pc.pci_host.interface[00:04.0]: postInt
   // 1473661882374: system.pc.pci_host.interface[00:04.0]: clearInt
-  if (!line_reader_.skip_till_whitespace ())
+  if (!line_reader_.SkipTillWhitespace())
   {
     return nullptr;
   }
   line_reader_.TrimL();
 
-  if (line_reader_.consume_and_trim_string ("clearInt"))
+  if (line_reader_.ConsumeAndTrimString("clearInt"))
   {
-    return std::make_shared<HostClearInt> (timestamp, get_ident (),
-                                           get_name ());
-  } else if (line_reader_.consume_and_trim_string ("postInt"))
+    return std::make_shared<HostClearInt> (timestamp, GetIdent(),
+                                           GetName());
+  } else if (line_reader_.ConsumeAndTrimString("postInt"))
   {
-    return std::make_shared<HostPostInt> (timestamp, get_ident (),
-                                          get_name ());
+    return std::make_shared<HostPostInt> (timestamp, GetIdent(),
+                                          GetName());
   }
 
   return nullptr;
 }
 
 std::shared_ptr<Event>
-Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
+Gem5Parser::ParseSystemPcSimbricks (uint64_t timestamp)
 {
-  if (!line_reader_.skip_till_whitespace ())
+  if (!line_reader_.SkipTillWhitespace())
   {
     return nullptr;
   }
@@ -179,129 +179,129 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
 
   uint64_t dev, func, reg, bytes, data, offset;
   int bar;
-  bool is_readConf = line_reader_.consume_and_trim_string ("readConfig:");
-  if (is_readConf || line_reader_.consume_and_trim_string ("writeConfig:"))
+  bool is_readConf = line_reader_.ConsumeAndTrimString("readConfig:");
+  if (is_readConf || line_reader_.ConsumeAndTrimString("writeConfig:"))
   {
     line_reader_.TrimL();
-    if (line_reader_.consume_and_trim_string ("dev ") &&
+    if (line_reader_.ConsumeAndTrimString("dev ") &&
         line_reader_.ParseUintTrim(10, dev) &&
-        line_reader_.consume_and_trim_string (" func ") &&
+        line_reader_.ConsumeAndTrimString(" func ") &&
         line_reader_.ParseUintTrim(10, func) &&
-        line_reader_.consume_and_trim_string (" reg 0x") &&
+        line_reader_.ConsumeAndTrimString(" reg 0x") &&
         line_reader_.ParseUintTrim(16, reg) &&
         line_reader_.ConsumeAndTrimChar(' ') &&
         line_reader_.ParseUintTrim(10, bytes) &&
-        line_reader_.consume_and_trim_string (" bytes: data = "))
+        line_reader_.ConsumeAndTrimString(" bytes: data = "))
     {
-      if (line_reader_.consume_and_trim_string ("0x") &&
+      if (line_reader_.ConsumeAndTrimString("0x") &&
           line_reader_.ParseUintTrim(16, data))
       {
-        return std::make_shared<HostConf> (timestamp, get_ident (),
-                                           get_name (), dev,
+        return std::make_shared<HostConf> (timestamp, GetIdent(),
+                                           GetName(), dev,
                                            func, reg, bytes, data,
                                            is_readConf);
       } else if (line_reader_.ConsumeAndTrimChar('0'))
       {
-        return std::make_shared<HostConf> (timestamp, get_ident (),
-                                           get_name (), dev,
+        return std::make_shared<HostConf> (timestamp, GetIdent(),
+                                           GetName(), dev,
                                            func, reg, bytes, 0, is_readConf);
       }
     }
-  } else if (line_reader_.consume_and_trim_string ("simbricks-pci:"))
+  } else if (line_reader_.ConsumeAndTrimString("simbricks-pci:"))
   {
     uint64_t id, addr, vec;
     size_t size;
     line_reader_.TrimL();
-    if (line_reader_.consume_and_trim_string ("received "))
+    if (line_reader_.ConsumeAndTrimString("received "))
     {
-      if (line_reader_.consume_and_trim_string ("write ") &&
-          line_reader_.consume_and_trim_string ("completion id ") &&
+      if (line_reader_.ConsumeAndTrimString("write ") &&
+          line_reader_.ConsumeAndTrimString("completion id ") &&
           line_reader_.ParseUintTrim(10, id))
       {
-        return std::make_shared<HostMmioCW> (timestamp, get_ident (),
-                                             get_name (),
+        return std::make_shared<HostMmioCW> (timestamp, GetIdent(),
+                                             GetName(),
                                              id);
-      } else if (line_reader_.consume_and_trim_string ("read ") &&
-                 line_reader_.consume_and_trim_string ("completion id ") &&
+      } else if (line_reader_.ConsumeAndTrimString("read ") &&
+          line_reader_.ConsumeAndTrimString("completion id ") &&
           line_reader_.ParseUintTrim(10, id))
       {
-        return std::make_shared<HostMmioCR> (timestamp, get_ident (),
-                                             get_name (),
+        return std::make_shared<HostMmioCR> (timestamp, GetIdent(),
+                                             GetName(),
                                              id);
-      } else if (line_reader_.consume_and_trim_string ("DMA "))
+      } else if (line_reader_.ConsumeAndTrimString("DMA "))
       {
-        if (line_reader_.consume_and_trim_string ("write id ") &&
+        if (line_reader_.ConsumeAndTrimString("write id ") &&
             line_reader_.ParseUintTrim(10, id) &&
-            line_reader_.consume_and_trim_string (" addr ") &&
+            line_reader_.ConsumeAndTrimString(" addr ") &&
             line_reader_.ParseUintTrim(16, addr) &&
-            line_reader_.consume_and_trim_string (" size ") &&
+            line_reader_.ConsumeAndTrimString(" size ") &&
             line_reader_.ParseUintTrim(10, size))
         {
-          return std::make_shared<HostDmaW> (timestamp, get_ident (),
-                                             get_name (),
+          return std::make_shared<HostDmaW> (timestamp, GetIdent(),
+                                             GetName(),
                                              id, addr, size);
-        } else if (line_reader_.consume_and_trim_string ("read id ") &&
+        } else if (line_reader_.ConsumeAndTrimString("read id ") &&
             line_reader_.ParseUintTrim(10, id) &&
-                   line_reader_.consume_and_trim_string (" addr ") &&
+            line_reader_.ConsumeAndTrimString(" addr ") &&
             line_reader_.ParseUintTrim(16, addr) &&
-                   line_reader_.consume_and_trim_string (" size ") &&
+            line_reader_.ConsumeAndTrimString(" size ") &&
             line_reader_.ParseUintTrim(10, size))
         {
-          return std::make_shared<HostDmaR> (timestamp, get_ident (),
-                                             get_name (),
+          return std::make_shared<HostDmaR> (timestamp, GetIdent(),
+                                             GetName(),
                                              id, addr, size);
         }
       } else if (
-              line_reader_.consume_and_trim_till_string ("MSI-X intr vec ") &&
+          line_reader_.ConsumeAndTrimTillString("MSI-X intr vec ") &&
                   line_reader_.ParseUintTrim(10, vec))
       {
-        return std::make_shared<HostMsiX> (timestamp, get_ident (),
-                                           get_name (),
+        return std::make_shared<HostMsiX> (timestamp, GetIdent(),
+                                           GetName(),
                                            vec);
       }
 
-    } else if (line_reader_.consume_and_trim_string ("sending "))
+    } else if (line_reader_.ConsumeAndTrimString("sending "))
     {
       int isReadWrite = 0;
-      if (line_reader_.consume_and_trim_string ("read addr "))
+      if (line_reader_.ConsumeAndTrimString("read addr "))
       {
         isReadWrite = 1;
-      } else if (line_reader_.consume_and_trim_string ("write addr "))
+      } else if (line_reader_.ConsumeAndTrimString("write addr "))
       {
         isReadWrite = -1;
-      } else if (line_reader_.consume_and_trim_string (
-              "immediate response for posted write"))
+      } else if (line_reader_.ConsumeAndTrimString(
+          "immediate response for posted write"))
       {
-        return std::make_shared<HostMmioImRespPoW> (timestamp, get_ident (),
-                                                    get_name ());
+        return std::make_shared<HostMmioImRespPoW> (timestamp, GetIdent(),
+                                                    GetName());
       }
 
       if (isReadWrite != 0 && line_reader_.ParseUintTrim(16, addr) &&
-          line_reader_.consume_and_trim_string (" size ") &&
+          line_reader_.ConsumeAndTrimString(" size ") &&
           line_reader_.ParseUintTrim(10, size) &&
-          line_reader_.consume_and_trim_string (" id ") &&
+          line_reader_.ConsumeAndTrimString(" id ") &&
           line_reader_.ParseUintTrim(10, id) &&
-          line_reader_.consume_and_trim_string (" bar ") &&
+          line_reader_.ConsumeAndTrimString(" bar ") &&
           line_reader_.ParseInt(bar) &&
-          line_reader_.consume_and_trim_string (" offs ") &&
+          line_reader_.ConsumeAndTrimString(" offs ") &&
           line_reader_.ParseUintTrim(16, offset))
       {
         if (isReadWrite == 1)
         {
-          return std::make_shared<HostMmioR> (timestamp, get_ident (),
-                                              get_name (),
+          return std::make_shared<HostMmioR> (timestamp, GetIdent(),
+                                              GetName(),
                                               id, addr, size, bar, offset);
         } else
         {
-          return std::make_shared<HostMmioW> (timestamp, get_ident (),
-                                              get_name (),
+          return std::make_shared<HostMmioW> (timestamp, GetIdent(),
+                                              GetName(),
                                               id, addr, size, bar, offset);
         }
       }
-    } else if (line_reader_.consume_and_trim_string ("completed DMA id ") &&
+    } else if (line_reader_.ConsumeAndTrimString("completed DMA id ") &&
         line_reader_.ParseUintTrim(10, id))
     {
-      return std::make_shared<HostDmaC> (timestamp, get_ident (), get_name (),
+      return std::make_shared<HostDmaC> (timestamp, GetIdent(), GetName(),
                                          id);
     }
     // sending immediate response for posted write
@@ -310,19 +310,19 @@ Gem5Parser::parse_system_pc_simbricks (uint64_t timestamp)
   return nullptr;
 }
 
-std::shared_ptr<Event> Gem5Parser::parse_simbricks_event (uint64_t timestamp)
+std::shared_ptr<Event> Gem5Parser::ParseSimbricksEvent (uint64_t timestamp)
 {
   if (line_reader_.ConsumeAndTrimChar(':'))
   {
     line_reader_.TrimL();
-    if (line_reader_.consume_and_trim_string ("processInEvent"))
+    if (line_reader_.ConsumeAndTrimString("processInEvent"))
     {
-      return std::make_shared<SimProcInEvent> (timestamp, get_ident (),
-                                               get_name ());
-    } else if (line_reader_.consume_and_trim_string ("sending sync message"))
+      return std::make_shared<SimProcInEvent> (timestamp, GetIdent(),
+                                               GetName());
+    } else if (line_reader_.ConsumeAndTrimString("sending sync message"))
     {
-      return std::make_shared<SimSendSync> (timestamp, get_ident (),
-                                            get_name ());
+      return std::make_shared<SimSendSync> (timestamp, GetIdent(),
+                                            GetName());
     }
   }
 
@@ -349,7 +349,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   uint64_t timestamp;
   while (line_reader_.NextLine())
   {
-    if (!parse_timestamp (timestamp))
+    if (!ParseTimestamp(timestamp))
     {
 #ifdef PARSER_DEBUG_GEM5_
       DFLOGWARN("%s: could not parse timestamp from line '%s'\n", name_.c_str(),
@@ -364,10 +364,10 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
     line_reader_.TrimL();
 
     // call parsing function based on component
-    if (line_reader_.consume_and_trim_string ("global:") &&
+    if (line_reader_.ConsumeAndTrimString("global:") &&
         component_table_.filter ("global"))
     {
-      event_ptr = parse_global_event (timestamp);
+      event_ptr = ParseGlobalEvent(timestamp);
       if (!event_ptr)
       {
 #ifdef PARSER_DEBUG_GEM5_
@@ -378,10 +378,10 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       }
       co_await tar_chan->Push (resume_executor, event_ptr);
       continue;
-    } else if (line_reader_.consume_and_trim_string ("system.switch_cpus:") &&
+    } else if (line_reader_.ConsumeAndTrimString("system.switch_cpus:") &&
                component_table_.filter ("system.switch_cpus"))
     {
-      event_ptr = parse_system_switch_cpus (timestamp);
+      event_ptr = ParseSystemSwitchCpus(timestamp);
       if (!event_ptr)
       {
 #ifdef PARSER_DEBUG_GEM5_
@@ -394,14 +394,14 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       co_await tar_chan->Push (resume_executor, event_ptr);
       continue;
 
-    } else if (line_reader_.consume_and_trim_string ("system.pc"))
+    } else if (line_reader_.ConsumeAndTrimString("system.pc"))
     {
-      if (line_reader_.consume_and_trim_string (".pci_host"))
+      if (line_reader_.ConsumeAndTrimString(".pci_host"))
       {
-        if (line_reader_.consume_and_trim_string (".interface") &&
+        if (line_reader_.ConsumeAndTrimString(".interface") &&
             component_table_.filter ("system.pc.pci_host.interface"))
         {
-          event_ptr = parse_system_pc_pci_host_interface (timestamp);
+          event_ptr = ParseSystemPcPciHostInterface(timestamp);
           if (!event_ptr)
           {
 #ifdef PARSER_DEBUG_GEM5_
@@ -416,7 +416,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           continue;
         } else if (component_table_.filter ("system.pc.pci_host"))
         {
-          event_ptr = parse_system_pc_pci_host (timestamp);
+          event_ptr = ParseSystemPcPciHost(timestamp);
           if (!event_ptr)
           {
 #ifdef PARSER_DEBUG_GEM5_
@@ -430,10 +430,10 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           co_await tar_chan->Push (resume_executor, event_ptr);
           continue;
         }
-      } else if (line_reader_.consume_and_trim_string (".simbricks") &&
+      } else if (line_reader_.ConsumeAndTrimString(".simbricks") &&
                  component_table_.filter ("system.pc.simbricks"))
       {
-        event_ptr = parse_system_pc_simbricks (timestamp);
+        event_ptr = ParseSystemPcSimbricks(timestamp);
         if (!event_ptr)
         {
 #ifdef PARSER_DEBUG_GEM5_

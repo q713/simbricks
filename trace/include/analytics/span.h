@@ -378,7 +378,7 @@ class HostCallSpan : public EventSpan {
       return false;
     }
 
-    if (not is_type(event_ptr, EventType::kHostCallT)) {
+    if (not IsType(event_ptr, EventType::kHostCallT)) {
       return false;
     }
 
@@ -436,13 +436,13 @@ class HostIntSpan : public EventSpan {
       return false;
     }
 
-    if (is_type(event_ptr, EventType::kHostPostIntT)) {
+    if (IsType(event_ptr, EventType::kHostPostIntT)) {
       if (host_post_int_) {
         return false;
       }
       host_post_int_ = event_ptr;
 
-    } else if (is_type(event_ptr, EventType::kHostClearIntT)) {
+    } else if (IsType(event_ptr, EventType::kHostClearIntT)) {
       if (not host_post_int_ or host_clear_int_) {
         return false;
       }
@@ -498,7 +498,7 @@ class HostDmaSpan : public EventSpan {
           return false;
         }
 
-        is_read_ = is_type(event_ptr, EventType::kHostDmaRT);
+        is_read_ = IsType(event_ptr, EventType::kHostDmaRT);
         host_dma_execution_ = event_ptr;
         break;
       }
@@ -618,7 +618,7 @@ class HostMmioSpan : public EventSpan {
 
       case EventType::kHostMmioCWT:
       case EventType::kHostMmioCRT: {
-        if (is_type(event_ptr, EventType::kHostMmioCWT)) {
+        if (IsType(event_ptr, EventType::kHostMmioCWT)) {
           if (is_read_ or not host_mmio_issue_ or not im_mmio_resp_) {
             return false;
           }
@@ -675,14 +675,14 @@ class HostMsixSpan : public EventSpan {
       return false;
     }
 
-    if (is_type(event_ptr, EventType::kHostMsiXT)) {
+    if (IsType(event_ptr, EventType::kHostMsiXT)) {
       if (host_msix_) {
         return false;
       }
       host_msix_ = event_ptr;
       is_pending_ = true;
 
-    } else if (is_type(event_ptr, EventType::kHostDmaCT)) {
+    } else if (IsType(event_ptr, EventType::kHostDmaCT)) {
       if (not host_msix_ or host_dma_c_) {
         return false;
       }
@@ -739,7 +739,7 @@ class HostPciSpan : public EventSpan {
       return false;
     }
 
-    if (is_type(event_ptr, EventType::kHostPciRWT)) {
+    if (IsType(event_ptr, EventType::kHostPciRWT)) {
       if (host_pci_rw_) {
         return false;
       }
@@ -747,7 +747,7 @@ class HostPciSpan : public EventSpan {
       is_pending_ = true;
       is_read_ = std::static_pointer_cast<HostPciRW>(event_ptr)->IsRead();
 
-    } else if (is_type(event_ptr, EventType::kHostConfT)) {
+    } else if (IsType(event_ptr, EventType::kHostConfT)) {
       if (not host_pci_rw_ or host_conf_rw_) {
         return false;
       }
@@ -791,7 +791,7 @@ class NicMsixSpan : public EventSpan {
       return false;
     }
 
-    if (is_type(event_ptr, EventType::kNicMsixT)) {
+    if (IsType(event_ptr, EventType::kNicMsixT)) {
       if (nic_msix_) {
         return false;
       }
@@ -843,9 +843,9 @@ class NicMmioSpan : public EventSpan {
       return false;
     }
 
-    if (is_type(event_ptr, EventType::kNicMmioRT)) {
+    if (IsType(event_ptr, EventType::kNicMmioRT)) {
       is_read_ = true;
-    } else if (is_type(event_ptr, EventType::kNicMmioWT)) {
+    } else if (IsType(event_ptr, EventType::kNicMmioWT)) {
       is_read_ = false;
     } else {
       return false;
@@ -921,7 +921,7 @@ class NicDmaSpan : public EventSpan {
           return false;
         }
 
-        is_read_ = is_type(event_ptr, EventType::kNicDmaCRT);
+        is_read_ = IsType(event_ptr, EventType::kNicDmaCRT);
 
         auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
         auto comp = std::static_pointer_cast<NicDma>(event_ptr);
@@ -978,9 +978,9 @@ class NicEthSpan : public EventSpan {
       return false;
     }
 
-    if (is_type(event_ptr, EventType::kNicTxT)) {
+    if (IsType(event_ptr, EventType::kNicTxT)) {
       is_send_ = true;
-    } else if (is_type(event_ptr, EventType::kNicRxT)) {
+    } else if (IsType(event_ptr, EventType::kNicRxT)) {
       is_send_ = false;
     } else {
       return false;

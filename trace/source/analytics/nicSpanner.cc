@@ -61,7 +61,7 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   bool is_read = false;
-  if (is_type(event_ptr, EventType::kNicMmioWT)) {
+  if (IsType(event_ptr, EventType::kNicMmioWT)) {
     is_read = false;
   } else {
     is_read = true;
@@ -96,7 +96,7 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
       tracer_.MarkSpanAsDone(name_, pending_dma);
-    } else if (is_type(event_ptr, EventType::kNicDmaExT)) {
+    } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
       //std::cout << "nic try push dma" << std::endl;
       auto context = create_shared<Context>(
@@ -109,11 +109,11 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
     co_return true;
   }
 
-  if (not is_type(event_ptr, EventType::kNicDmaIT)) {
+  if (not IsType(event_ptr, EventType::kNicDmaIT)) {
     co_return false;
   }
 
-  assert(is_type(event_ptr, EventType::kNicDmaIT) and
+  assert(IsType(event_ptr, EventType::kNicDmaIT) and
       "try starting a new dma span with NON issue");
 
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(last_causing_,
@@ -133,7 +133,7 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
 
   std::shared_ptr<NicEthSpan> eth_span;
   std::shared_ptr<EventSpan> parent = nullptr;
-  if (is_type(event_ptr, EventType::kNicTxT)) {
+  if (IsType(event_ptr, EventType::kNicTxT)) {
     parent = last_causing_;
 
     if (not IsType(parent, span_type::kNicMmio)) {
@@ -153,7 +153,7 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     //  throw_on(not co_await to_network_queue_->push(resume_executor, context),
     //           "HandelTxrx: could not write network context ");
 
-  } else if (is_type(event_ptr, EventType::kNicRxT)) {
+  } else if (IsType(event_ptr, EventType::kNicRxT)) {
     //auto con_opt = co_await from_network_queue_->Pop(resume_executor);
     //throw_on(not con_opt.has_value(), context_is_null);
     //auto con = con_opt.value();

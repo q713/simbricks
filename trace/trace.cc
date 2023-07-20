@@ -172,7 +172,7 @@ int main(int argc, char *argv[]) {
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
     LineReader lr_h_s;
-    auto parser_h_s = EventStreamParser::create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
+    auto parser_h_s = EventStreamParser::Create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
     auto filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
     auto spanner_h_s =
@@ -187,7 +187,7 @@ int main(int argc, char *argv[]) {
     const pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pipeline_h_s, spanner_h_s};
 
     LineReader lr_h_c;
-    auto parser_h_c = EventStreamParser::create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
+    auto parser_h_c = EventStreamParser::Create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
     auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
     auto spanner_h_c =
@@ -202,7 +202,7 @@ int main(int argc, char *argv[]) {
     const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
 
     LineReader lr_n_s;
-    auto parser_n_s = EventStreamParser::create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
+    auto parser_n_s = EventStreamParser::Create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
     auto filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
     auto spanner_n_s =
@@ -218,7 +218,7 @@ int main(int argc, char *argv[]) {
     const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pipeline_n_s, spanner_n_s};
 
     LineReader lr_n_c;
-    auto parser_n_c = EventStreamParser::create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
+    auto parser_n_c = EventStreamParser::Create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
     auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
     auto spanner_n_c =
@@ -255,7 +255,7 @@ int main(int argc, char *argv[]) {
       !TraceEnvironment::add_symbol_table(
           "Linuxvm-Symbols",
           result["linux-dump-server-client"].as<std::string>(), 0,
-          FilterType::S)) {
+          FilterType::kS)) {
     std::cerr << "could not initialize symbol table linux-dump-server-client"
               << std::endl;
     exit(EXIT_FAILURE);
@@ -263,7 +263,7 @@ int main(int argc, char *argv[]) {
   if (result.count("nic-i40e-dump") &&
       !TraceEnvironment::add_symbol_table(
           "Nicdriver-Symbols", result["nic-i40e-dump"].as<std::string>(),
-          0xffffffffa0000000ULL, FilterType::S)) {
+          0xffffffffa0000000ULL, FilterType::kS)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
   }

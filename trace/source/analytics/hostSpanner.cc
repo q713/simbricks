@@ -151,7 +151,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
     co_return true;
   }
 
-  if (is_type(event_ptr, EventType::kHostMmioWT)) {
+  if (IsType(event_ptr, EventType::kHostMmioWT)) {
     pending_mmio_span = nullptr;
     for (auto it = pending_host_mmio_spans_.begin(); it != pending_host_mmio_spans_.end(); it++) {
       if ((*it)->IsAfterPci()) {
@@ -176,7 +176,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
       co_return false;
     }
 
-    assert(is_type(event_ptr, EventType::kHostMmioWT) or is_type(event_ptr, EventType::kHostMmioRT)
+    assert(IsType(event_ptr, EventType::kHostMmioWT) or IsType(event_ptr, EventType::kHostMmioRT)
                and "try to create mmio host span but event is neither read nor write");
 
     if (not pci_write_before_) {
@@ -202,7 +202,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
 concurrencpp::lazy_result<bool> HostSpanner::HandelPci(std::shared_ptr<concurrencpp::executor> resume_executor,
                                                        std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
-  if (pending_pci_span_ and is_type(event_ptr, EventType::kHostConfT)) {
+  if (pending_pci_span_ and IsType(event_ptr, EventType::kHostConfT)) {
     bool could_be_added = pending_pci_span_->AddToSpan(event_ptr);
     throw_on(not could_be_added, "HostSpanner::HandelPci: could not add event to pending pci span");
     assert(pending_pci_span_->IsComplete() and "HostSpanner::HandelPci: span is not complete but should be");
@@ -210,7 +210,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(std::shared_ptr<concurren
     co_return true;
   }
 
-  assert(is_type(event_ptr, EventType::kHostPciRWT)
+  assert(IsType(event_ptr, EventType::kHostPciRWT)
              and "HostSpanner::HandelPci: event is no pci starting event");
   if (pending_pci_span_) {
     tracer_.MarkSpanAsDone(name_, pending_pci_span_);
@@ -262,11 +262,11 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
 
   // TODO: investigate this case further
-  if (is_type(event_ptr, EventType::kHostDmaCT)) {
+  if (IsType(event_ptr, EventType::kHostDmaCT)) {
     std::cerr << "unexpected event: " << *event_ptr << std::endl;
     co_return false;
   }
-  assert(not is_type(event_ptr, EventType::kHostDmaCT) and "cannot start HostDmaSPan with Dma completion");
+  assert(not IsType(event_ptr, EventType::kHostDmaCT) and "cannot start HostDmaSPan with Dma completion");
   pending_dma = tracer_.StartSpanByParent<HostDmaSpan>(con->GetNonEmptyParent(),
                                                        event_ptr, event_ptr->GetParserIdent());
   if (not pending_dma) {

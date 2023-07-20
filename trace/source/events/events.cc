@@ -58,7 +58,7 @@ void HostInstr::Display(std::ostream &out) {
 }
 
 bool HostInstr::Equal(const Event &other) {
-  if (not is_type(other, EventType::kHostInstrT)) {
+  if (not IsType(other, EventType::kHostInstrT)) {
     return false;
   }
   const HostInstr hinstr = static_cast<const HostInstr &>(other);
@@ -75,7 +75,7 @@ void HostCall::Display(std::ostream &out) {
 }
 
 bool HostCall::Equal(const Event &other) {
-  if (not is_type(other, EventType::kHostCallT)) {
+  if (not IsType(other, EventType::kHostCallT)) {
     return false;
   }
   const HostCall call = static_cast<const HostCall &>(other);
@@ -218,7 +218,7 @@ void HostMsiX::Display(std::ostream &out) {
 }
 
 bool HostMsiX::Equal(const Event &other) {
-  if (not is_type(other, EventType::kHostMsiXT)) {
+  if (not IsType(other, EventType::kHostMsiXT)) {
     return false;
   }
   const HostMsiX &msi = static_cast<const HostMsiX &>(other);
@@ -239,7 +239,7 @@ void HostConf::Display(std::ostream &out) {
 }
 
 bool HostConf::Equal(const Event &other) {
-  if (not is_type(other, EventType::kHostConfT)) {
+  if (not IsType(other, EventType::kHostConfT)) {
     return false;
   }
   const HostConf &hconf = static_cast<const HostConf &>(other);
@@ -298,7 +298,7 @@ void HostPciRW::Display(std::ostream &out) {
 }
 
 bool HostPciRW::Equal(const Event &other) {
-  if (not is_type(other, EventType::kHostPciRWT)) {
+  if (not IsType(other, EventType::kHostPciRWT)) {
     return false;
   }
   const HostPciRW &pci = static_cast<const HostPciRW &>(other);
@@ -324,7 +324,7 @@ void NicMsix::Display(std::ostream &out) {
 }
 
 bool NicMsix::Equal(const Event &other) {
-  if (not is_type(other, EventType::kNicMsixT)) {
+  if (not IsType(other, EventType::kNicMsixT)) {
     return false;
   }
   const NicMsix &msi = static_cast<const NicMsix &>(other);
@@ -373,7 +373,7 @@ void SetIX::Display(std::ostream &out) {
 }
 
 bool SetIX::Equal(const Event &other) {
-  if (not is_type(other, EventType::kSetIXT)) {
+  if (not IsType(other, EventType::kSetIXT)) {
     return false;
   }
   const SetIX &six = static_cast<const SetIX &>(other);
@@ -499,7 +499,7 @@ void NicRx::Display(std::ostream &out) {
 }
 
 bool NicRx::Equal(const Event &other) {
-  if (not is_type(other, EventType::kNicRxT)) {
+  if (not IsType(other, EventType::kNicRxT)) {
     return false;
   }
   const NicRx &rec = static_cast<const NicRx &>(other);
@@ -510,10 +510,10 @@ int NicRx::GetPort() const {
   return port_;
 }
 
-bool is_type(const Event &event, EventType type) {
+bool IsType(const Event &event, EventType type) {
   return event.GetType() == type;
 }
 
-bool is_type(std::shared_ptr<Event> &event_ptr, EventType type) {
+bool IsType(std::shared_ptr<Event> &event_ptr, EventType type) {
   return event_ptr && event_ptr->GetType() == type;
 }

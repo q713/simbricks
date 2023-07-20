@@ -38,51 +38,52 @@ class LineReader {
   std::ifstream input_stream_;
   size_t line_number_ = 0;
   size_t cur_reading_pos_ = 0;
+  std::string::iterator cur_line_it_;
+  std::string::iterator cur_line_end_it_;
   std::string cur_line_;
   bool skip_empty_lines_ = true;
 
  public:
-  explicit LineReader() {
-  }
+  explicit LineReader() = default;
 
   explicit LineReader(bool skip_empty_lines)
       : skip_empty_lines_(skip_empty_lines) {
   }
 
-  void close_input() {
+  void CloseInput() {
     if (input_stream_.is_open()) {
       input_stream_.close();
     }
   }
 
   ~LineReader() {
-    close_input();
+    CloseInput();
   }
 
-  inline int ln() {
+  inline size_t LinenNumber() const {
     return line_number_;
   }
 
-  inline bool is_valid() {
+  inline bool IsValid() {
     return input_stream_.good();
   }
 
-  std::string get_cur_string() {
+  std::string GetCurString() {
     if (cur_reading_pos_ >= cur_line_.length())
       return "";
     return std::string(cur_line_.begin() + cur_reading_pos_, cur_line_.end());
   }
 
-  inline const std::string &get_raw_line() {
+  inline const std::string &GetRawLine() {
     return cur_line_;
   }
 
-  inline size_t cur_length() {
+  inline size_t CurLength() {
     return cur_line_.length() - cur_reading_pos_;
   }
 
-  inline bool is_empty() {
-    return cur_length() <= 0;
+  inline bool IsEmpty() {
+    return CurLength() <= 0;
   }
 
   bool OpenFile(const std::string &file_path);
@@ -98,7 +99,7 @@ class LineReader {
   std::string ExtractAndSubstrUntil(
       std::function<bool(unsigned char)> &predicate);
 
-  bool extract_and_substr_until_into(
+  bool ExtractAndSubstrUntilInto(
       std::string &target, std::function<bool(unsigned char)> &predicate) {
     target = ExtractAndSubstrUntil(predicate);
     return not target.empty();
@@ -106,21 +107,17 @@ class LineReader {
 
   bool SkipTill(std::function<bool(unsigned char)> &predicate);
 
-  bool skip_till_whitespace() {
+  bool SkipTillWhitespace() {
     return SkipTill(sim_string_utils::is_space);
   }
 
-  bool TrimTillConsume(const std::string &tc, bool strict);
+  //bool TrimTillConsume(const std::string &to_consume, bool strict);
 
-  inline bool consume_and_trim_till_string(const std::string &to_consume) {
-    return TrimTillConsume(to_consume, false);
-  }
+  bool ConsumeAndTrimTillString(const std::string &to_consume);
 
-  inline bool consume_and_trim_string(const std::string &to_consume) {
-    return TrimTillConsume(to_consume, true);
-  }
+  bool ConsumeAndTrimString(const std::string &to_consume);
 
-  bool ConsumeAndTrimChar(const char to_consume);
+  bool ConsumeAndTrimChar(char to_consume);
 
   bool ParseUintTrim(int base, uint64_t &target);
 
@@ -154,7 +151,7 @@ class GzLineReader : public Reader {
     }
   }
 
-  bool is_valid() override {
+  bool IsValid() override {
     return input_stream_ != nullptr && input_stream_->good();
   }
 

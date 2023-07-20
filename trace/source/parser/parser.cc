@@ -27,23 +27,23 @@
 #include "parser/parser.h"
 #include "util/log.h"
 
-bool LogParser::parse_timestamp(uint64_t &timestamp) {
+bool LogParser::ParseTimestamp(uint64_t &timestamp) {
   line_reader_.TrimL();
   if (!line_reader_.ParseUintTrim(10, timestamp)) {
 #ifdef PARSER_DEBUG_
     DFLOGERR("%s, could not parse string repr. of timestamp from line '%s'\n",
-             name_.c_str(), line_reader_.get_raw_line().c_str());
+             name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
   return true;
 }
 
-bool LogParser::parse_address(uint64_t &address) {
+bool LogParser::ParseAddress(uint64_t &address) {
   if (!line_reader_.ParseUintTrim(16, address)) {
 #ifdef PARSER_DEBUG_
     DFLOGERR("%s: could not parse address from line '%s'\n",
-             name_.c_str(), line_reader_.get_raw_line().c_str());
+             name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }

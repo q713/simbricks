@@ -38,14 +38,14 @@
 
 
 struct EventStreamParser : public producer<std::shared_ptr<Event>> {
-  bool parse_ident_name_ts(size_t &parser_ident, std::string &parser_name,
-                           uint64_t &ts) {
-    if (not line_reader_.consume_and_trim_string(": source_id=") or
+  bool ParseIdentNameTs(size_t &parser_ident, std::string &parser_name,
+                        uint64_t &ts) {
+    if (not line_reader_.ConsumeAndTrimString(": source_id=") or
         not line_reader_.ParseUintTrim(10, parser_ident)) {
       return false;
     }
 
-    if (!line_reader_.consume_and_trim_string(", source_name=")) {
+    if (!line_reader_.ConsumeAndTrimString(", source_name=")) {
       return false;
     }
     parser_name =
@@ -54,7 +54,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
       return false;
     }
 
-    if (!line_reader_.consume_and_trim_string(", timestamp=")) {
+    if (!line_reader_.ConsumeAndTrimString(", timestamp=")) {
       return false;
     }
     return line_reader_.ParseUintTrim(10, ts);
@@ -79,16 +79,16 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
       std::string event_name = line_reader_.ExtractAndSubstrUntil(pred);
       if (event_name.empty()) {
         std::cout << "could not parse event name: "
-                  << line_reader_.get_raw_line() << std::endl;
+                  << line_reader_.GetRawLine() << std::endl;
         continue;
       }
 
       uint64_t ts;
       size_t parser_ident;
       std::string parser_name;
-      if (not parse_ident_name_ts(parser_ident, parser_name, ts)) {
+      if (not ParseIdentNameTs(parser_ident, parser_name, ts)) {
         std::cout << "could not parse timestamp or source: "
-                  << line_reader_.get_raw_line() << std::endl;
+                  << line_reader_.GetRawLine() << std::endl;
         continue;
       }
 
@@ -106,7 +106,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         event = std::make_shared<SimProcInEvent>(ts, parser_ident, parser_name);
 
       } else if (event_name == "HostInstr") {
-        if (not line_reader_.consume_and_trim_string(", pc=") or
+        if (not line_reader_.ConsumeAndTrimString(", pc=") or
             not line_reader_.ParseUintTrim(16, pc)) {
           std::cout << "error parsing HostInstr" << std::endl;
           continue;
@@ -114,13 +114,13 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         event = std::make_shared<HostInstr>(ts, parser_ident, parser_name, pc);
 
       } else if (event_name == "HostCall") {
-        if (not line_reader_.consume_and_trim_string(", pc=") or
+        if (not line_reader_.ConsumeAndTrimString(", pc=") or
             not line_reader_.ParseUintTrim(16, pc) or
-            not line_reader_.consume_and_trim_string(", func=") or
-            not line_reader_.extract_and_substr_until_into(
+            not line_reader_.ConsumeAndTrimString(", func=") or
+            not line_reader_.ExtractAndSubstrUntilInto(
                 function, sim_string_utils::is_alnum_dot_bar) or
-            not line_reader_.consume_and_trim_string(", comp=") or
-            not line_reader_.extract_and_substr_until_into(
+            not line_reader_.ConsumeAndTrimString(", comp=") or
+            not line_reader_.ExtractAndSubstrUntilInto(
                 component, sim_string_utils::is_alnum_dot_bar)) {
           std::cout << "error parsing HostInstr" << std::endl;
           continue;
@@ -140,7 +140,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
       } else if (event_name == "HostMmioCR" or
                  event_name == "HostMmioCW" or
                  event_name == "HostDmaC") {
-        if (not line_reader_.consume_and_trim_string(", id=") or
+        if (not line_reader_.ConsumeAndTrimString(", id=") or
             not line_reader_.ParseUintTrim(10, id)) {
           std::cout << "error parsing HostMmioCR, HostMmioCW or HostDmaC"
                     << std::endl;
@@ -162,11 +162,11 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
                  event_name == "HostDmaR" or
                  event_name == "HostDmaW") {
         auto &lr = line_reader_; // TODO: parse id as hex?
-        if (not line_reader_.consume_and_trim_string(", id=") or
+        if (not line_reader_.ConsumeAndTrimString(", id=") or
             not line_reader_.ParseUintTrim(10, id) or
-            not line_reader_.consume_and_trim_string(", addr=") or
+            not line_reader_.ConsumeAndTrimString(", addr=") or
             not line_reader_.ParseUintTrim(16, addr) or
-            not line_reader_.consume_and_trim_string(", size=") or
+            not line_reader_.ConsumeAndTrimString(", size=") or
             not line_reader_.ParseUintTrim(10, size)) {
           std::cout
               << "error parsing HostMmioR, HostMmioW, HostDmaR or HostDmaW"
@@ -176,9 +176,9 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
         if (event_name == "HostMmioR" or
             event_name == "HostMmioW") {
-          if (not line_reader_.consume_and_trim_string(", bar=") or
+          if (not line_reader_.ConsumeAndTrimString(", bar=") or
               not line_reader_.ParseInt(bar) or
-              not line_reader_.consume_and_trim_string(", offset=") or
+              not line_reader_.ConsumeAndTrimString(", offset=") or
               not line_reader_.ParseUintTrim(16, offset) ){
             std::cout
               << "error parsing HostMmioR, HostMmioW bar or offset"
@@ -202,7 +202,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         }
 
       } else if (event_name == "HostMsiX") {
-        if (not line_reader_.consume_and_trim_string(", vec=") or
+        if (not line_reader_.ConsumeAndTrimString(", vec=") or
             not line_reader_.ParseUintTrim(10, vec)) {
           std::cout << "error parsing HostMsiX" << std::endl;
           continue;
@@ -211,15 +211,15 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
       } else if (event_name == "HostConfRead" or
                  event_name == "HostConfWrite") {
-        if (not line_reader_.consume_and_trim_string(", dev=") or
+        if (not line_reader_.ConsumeAndTrimString(", dev=") or
             not line_reader_.ParseUintTrim(16, dev) or
-            not line_reader_.consume_and_trim_string(", func=") or
+            not line_reader_.ConsumeAndTrimString(", func=") or
             not line_reader_.ParseUintTrim(16, func) or
-            not line_reader_.consume_and_trim_string(", reg=") or
+            not line_reader_.ConsumeAndTrimString(", reg=") or
             not line_reader_.ParseUintTrim(16, reg) or
-            not line_reader_.consume_and_trim_string(", bytes=") or
+            not line_reader_.ConsumeAndTrimString(", bytes=") or
             not line_reader_.ParseUintTrim(10, bytes) or
-            not line_reader_.consume_and_trim_string(", data=") or
+            not line_reader_.ConsumeAndTrimString(", data=") or
             not line_reader_.ParseUintTrim(16, data)) {
           std::cout << "error parsing HostConfRead or HostConfWrite"
                     << std::endl;
@@ -242,9 +242,9 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
       } else if (event_name == "HostPciR" or
                  event_name == "HostPciW") {
-        if (not line_reader_.consume_and_trim_string(", offset=") or
+        if (not line_reader_.ConsumeAndTrimString(", offset=") or
             not line_reader_.ParseUintTrim(16, offset) or
-            not line_reader_.consume_and_trim_string(", size=") or
+            not line_reader_.ConsumeAndTrimString(", size=") or
             not line_reader_.ParseUintTrim(10, size)) {
           std::cout << "error parsing HostPciR or HostPciW" << std::endl;
           continue;
@@ -260,7 +260,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
       } else if (event_name == "NicMsix" or
                  event_name == "NicMsi") {
-        if (not line_reader_.consume_and_trim_string(", vec=") or
+        if (not line_reader_.ConsumeAndTrimString(", vec=") or
             not line_reader_.ParseUintTrim(10, vec)) {
           std::cout << "error parsing NicMsix" << std::endl;
           continue;
@@ -275,7 +275,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         }
 
       } else if (event_name == "SetIX") {
-        if (not line_reader_.consume_and_trim_string(", interrupt=") or
+        if (not line_reader_.ConsumeAndTrimString(", interrupt=") or
             not line_reader_.ParseUintTrim(16, intr)) {
           std::cout << "error parsing NicMsix" << std::endl;
           continue;
@@ -287,11 +287,11 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
                  event_name == "NicDmaEn" or
                  event_name == "NicDmaCR" or
                  event_name == "NicDmaCW") {
-        if (not line_reader_.consume_and_trim_string(", id=") or
+        if (not line_reader_.ConsumeAndTrimString(", id=") or
             not line_reader_.ParseUintTrim(10, id) or
-            not line_reader_.consume_and_trim_string(", addr=") or
+            not line_reader_.ConsumeAndTrimString(", addr=") or
             not line_reader_.ParseUintTrim(16, addr) or
-            not line_reader_.consume_and_trim_string(", size=") or
+            not line_reader_.ConsumeAndTrimString(", size=") or
             not line_reader_.ParseUintTrim(10, len)) {
           std::cout << "error parsing NicDmaI, NicDmaEx, NicDmaEn, NicDmaCR or "
                        "NicDmaCW"
@@ -318,15 +318,15 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
       } else if (event_name == "NicMmioR" or
                  event_name == "NicMmioW") {
-        if (not line_reader_.consume_and_trim_string(", off=") or
+        if (not line_reader_.ConsumeAndTrimString(", off=") or
             not line_reader_.ParseUintTrim(16, offset) or
-            not line_reader_.consume_and_trim_string(", len=") or
+            not line_reader_.ConsumeAndTrimString(", len=") or
             not line_reader_.ParseUintTrim(10, len) or
-            not line_reader_.consume_and_trim_string(
+            not line_reader_.ConsumeAndTrimString(
                 ", val=")
             or not line_reader_.ParseUintTrim(16, val)) {
           std::cout << "error parsing NicMmioR or NicMmioW: "
-                    << line_reader_.get_raw_line() << std::endl;
+                    << line_reader_.GetRawLine() << std::endl;
           continue;
         }
 
@@ -339,7 +339,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         }
 
       } else if (event_name == "NicTx") {
-        if (not line_reader_.consume_and_trim_string(", len=") or
+        if (not line_reader_.ConsumeAndTrimString(", len=") or
             not line_reader_.ParseUintTrim(10, len)) {
           std::cout << "error parsing NicTx" << std::endl;
           continue;
@@ -347,9 +347,9 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         event = std::make_shared<NicTx>(ts, parser_ident, parser_name, len);
 
       } else if (event_name == "NicRx") {
-        if (not line_reader_.consume_and_trim_string(", len=") or
+        if (not line_reader_.ConsumeAndTrimString(", len=") or
             not line_reader_.ParseUintTrim(10, len) or
-            not line_reader_.consume_and_trim_string(", port=") or
+            not line_reader_.ConsumeAndTrimString(", port=") or
             not line_reader_.ParseInt(port)) {
           std::cout << "error parsing NicRx" << std::endl;
           continue;
@@ -369,7 +369,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
     co_return;
   };
 
-  static auto create(const std::string log_file_path,
+  static auto Create(const std::string log_file_path,
                                                    LineReader &line_reader) {
     auto parser = std::make_shared<EventStreamParser>(log_file_path, line_reader);
     throw_if_empty(parser, event_stream_parser_null);

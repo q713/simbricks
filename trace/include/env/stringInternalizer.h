@@ -29,36 +29,36 @@
 #include <unordered_set>
 #include <iostream>
 
-class string_internalizer {
+class StringInternalizer {
   std::unordered_set<std::string> symbol_set_;
 
  public:
-  string_internalizer() = default;
+  StringInternalizer() = default;
   
-  ~string_internalizer() = default;
+  ~StringInternalizer() = default;
 
-  const std::string * internalize(const std::string& symbol) {
+  const std::string * Internalize(const std::string& symbol) {
     const auto& it_b = symbol_set_.emplace(symbol);
     return std::addressof(*it_b.first);
   }
 
-  const std::string * internalize(const char *symbol) {
+  const std::string * Internalize(const char *symbol) {
     const auto& it_b = symbol_set_.emplace(symbol);
     return std::addressof(*it_b.first);
   }
 
-  void display(std::ostream &os) {
+  void Display(std::ostream &os) {
     os << std::endl;
     os << std::endl;
-    os << "string_internalizer: " << std::endl;
+    os << "StringInternalizer: " << std::endl;
     for (const std::string &internal : symbol_set_) {
       os <<  internal << std::endl;
     }
   }
 };
 
-inline std::ostream &operator<<(std::ostream &os, string_internalizer &internalizer) {
-  internalizer.display(os);
+inline std::ostream &operator<<(std::ostream &os, StringInternalizer &internalizer) {
+  internalizer.Display(os);
   return os;
 }
 

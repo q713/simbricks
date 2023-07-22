@@ -32,6 +32,7 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
   const uint64_t source_id = 1;
   const size_t parser_ident = 1;
   const std::string parser_name = "test";
+  std::string service_name = "test-service";
   auto trace_context = std::make_shared<TraceContext>(0);
 
   /*
@@ -43,7 +44,7 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
                                               parser_name, 94469376773312, 108000, 4, 0, 0);
     auto mmio_cr = std::make_shared<HostMmioCR>(1967469841374, parser_ident, parser_name, 94469376773312);
 
-    HostMmioSpan span{trace_context, source_id, false};
+    HostMmioSpan span{trace_context, source_id, service_name, 0};
 
     REQUIRE(span.IsPending());
     REQUIRE(span.AddToSpan(mmio_r));
@@ -63,7 +64,7 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
     auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967468841374, parser_ident, parser_name);
     auto mmio_cw = std::make_shared<HostMmioCW>(1967469841374, parser_ident, parser_name, 94469376773312);
 
-    HostMmioSpan span{trace_context, source_id, false};
+    HostMmioSpan span{trace_context, source_id, service_name, 0};
 
     REQUIRE(span.IsPending());
     REQUIRE(span.AddToSpan(mmio_w));
@@ -81,18 +82,44 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
   HostMmioImRespPoW: source_id=0, source_name=Gem5ClientParser, timestamp=1967473406749
   HostMmioR: source_id=0, source_name=Gem5ClientParser, timestamp=1967473531624, id=94469376953344, addr=c0400000, size=4, bar=0, offset=0
    */
-  SECTION("mmio write after pci with read to get write through") {
+  SECTION("mmio write cannot add additional read") {
     auto mmio_w = std::make_shared<HostMmioW>(1967473406749, parser_ident,
                                               parser_name, 94469376953344, 40001, 4, 0, 0);
     auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967473406749, parser_ident, parser_name);
     auto mmio_r = std::make_shared<HostMmioR>(1967473531624, parser_ident,
                                               parser_name, 94469376953344, 40000, 4, 0, 0);
 
-    HostMmioSpan span{trace_context, source_id, true};
+    HostMmioSpan span{trace_context, source_id, service_name, 0};
 
     REQUIRE(span.IsPending());
     REQUIRE(span.AddToSpan(mmio_w));
     REQUIRE(span.AddToSpan(mmio_imr));
+    REQUIRE_FALSE(span.AddToSpan(mmio_r));
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.IsPending());
+  }
+
+  SECTION("mmio write non device BAR number") {
+    auto mmio_w = std::make_shared<HostMmioW>(1967473406749, parser_ident,
+                                              parser_name, 94469376953344, 40001, 4, 3, 0);
+    auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967473406749, parser_ident, parser_name);
+
+    HostMmioSpan span{trace_context, source_id, service_name, 3};
+
+    REQUIRE(span.IsPending());
+    REQUIRE(span.AddToSpan(mmio_w));
+    REQUIRE(span.AddToSpan(mmio_imr));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
+  }
+
+  SECTION("mmio read no device BAR number") {
+    auto mmio_r = std::make_shared<HostMmioR>(1967473531624, parser_ident,
+                                              parser_name, 94469376953344, 40000, 4, 3, 0);
+
+    HostMmioSpan span{trace_context, source_id, service_name, 0};
+
+    REQUIRE(span.IsPending());
     REQUIRE(span.AddToSpan(mmio_r));
     REQUIRE(span.IsComplete());
     REQUIRE_FALSE(span.IsPending());
@@ -104,13 +131,14 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
   const uint64_t source_id = 1;
   const size_t parser_ident = 1;
   const std::string parser_name = "test";
+  std::string service_name = "test-service";
   auto trace_context = std::make_shared<TraceContext>(0);
 
   SECTION("msix followed by dma completion with id 0") {
     auto msix = std::make_shared<HostMsiX>(1967472876000, parser_ident, parser_name, 1);
     auto dma_c = std::make_shared<HostDmaC>(1967472982000, parser_ident, parser_name, 0);
 
-    HostMsixSpan span{trace_context, source_id};
+    HostMsixSpan span{trace_context, source_id, service_name};
 
     REQUIRE(span.IsPending());
     REQUIRE_FALSE(span.IsComplete());
@@ -123,7 +151,7 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
   SECTION("no msix but dma with id 0") {
     auto dma_c = std::make_shared<HostDmaC>(1967472982000, parser_ident, parser_name, 0);
 
-    HostMsixSpan span{trace_context, source_id};
+    HostMsixSpan span{trace_context, source_id, service_name};
 
     REQUIRE(span.IsPending());
     REQUIRE_FALSE(span.IsComplete());
@@ -134,7 +162,7 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
     auto msix = std::make_shared<HostMsiX>(1967472876000, parser_ident, parser_name, 1);
     auto dma_c = std::make_shared<HostDmaC>(1967471876000, parser_ident, parser_name, 94465281156144);
 
-    HostMsixSpan span{trace_context, source_id};
+    HostMsixSpan span{trace_context, source_id, service_name};
 
     REQUIRE(span.AddToSpan(msix));
     REQUIRE_FALSE(span.AddToSpan(dma_c));
@@ -146,7 +174,7 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
     auto msix = std::make_shared<HostMsiX>(1967472876000, parser_ident, parser_name, 1);
     auto dma_r = std::make_shared<HostDmaR>(1967471876000, parser_ident, parser_name, 0, 0, 0);
 
-    HostMsixSpan span{trace_context, source_id};
+    HostMsixSpan span{trace_context, source_id, service_name};
 
     REQUIRE(span.AddToSpan(msix));
     REQUIRE_FALSE(span.AddToSpan(dma_r));

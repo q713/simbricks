@@ -93,6 +93,7 @@ class EventSpan {
   bool is_relevant_ = false;
   std::shared_ptr<EventSpan> original_ = nullptr;
   std::shared_ptr<TraceContext> trace_context_ = nullptr;
+  std::string &service_name_;
 
   std::recursive_mutex span_mutex_;
 
@@ -116,6 +117,11 @@ class EventSpan {
     //  WriteIdent(out, ident);
     //  out << *event << std::endl;
     //}
+  }
+
+  std::string &GetServiceName() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return service_name_;
   }
 
   void SetOriginal(const std::shared_ptr<EventSpan> &original) {
@@ -256,11 +262,15 @@ class EventSpan {
 
   virtual ~EventSpan() = default;
 
-  explicit EventSpan(std::shared_ptr<TraceContext> trace_context, uint64_t source_id, span_type type)
+  explicit EventSpan(std::shared_ptr<TraceContext> trace_context,
+                     uint64_t source_id,
+                     span_type type,
+                     std::string &service_name)
       : id_(TraceEnvironment::GetNextSpanId()),
         source_id_(source_id),
         type_(type),
-        trace_context_(trace_context) {
+        trace_context_(trace_context),
+        service_name_(service_name) {
     throw_if_empty(trace_context, tc_null_);
   }
 
@@ -272,7 +282,8 @@ class EventSpan {
         is_pending_(other.is_pending_),
         is_relevant_(other.is_relevant_),
         original_(other.original_),
-        trace_context_(other.trace_context_) {
+        trace_context_(other.trace_context_),
+        service_name_(other.service_name_) {
     // NOTE: we make only a shallow copy
   }
 
@@ -316,8 +327,11 @@ class HostCallSpan : public EventSpan {
   bool is_fragmented_ = true;
 
  public:
-  explicit HostCallSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id, bool fragmented)
-      : EventSpan(trace_context, source_id, span_type::kHostCall), is_fragmented_(fragmented) {
+  explicit HostCallSpan(std::shared_ptr<TraceContext> &trace_context,
+                        uint64_t source_id,
+                        std::string &service_name,
+                        bool fragmented)
+      : EventSpan(trace_context, source_id, span_type::kHostCall, service_name), is_fragmented_(fragmented) {
   }
 
   // NOTE: we make only a shallow copy
@@ -416,8 +430,10 @@ class HostIntSpan : public EventSpan {
   std::shared_ptr<Event> host_clear_int_ = nullptr;
 
  public:
-  explicit HostIntSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kHostInt) {
+  explicit HostIntSpan(std::shared_ptr<TraceContext> &trace_context,
+                       uint64_t source_id,
+                       std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kHostInt, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -466,8 +482,10 @@ class HostDmaSpan : public EventSpan {
   std::shared_ptr<Event> host_dma_completion_ = nullptr;
 
  public:
-  explicit HostDmaSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kHostDma) {
+  explicit HostDmaSpan(std::shared_ptr<TraceContext> &trace_context,
+                       uint64_t source_id,
+                       std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kHostDma, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -532,16 +550,18 @@ class HostMmioSpan : public EventSpan {
   // issue, either host_mmio_w_ or host_mmio_r_
   std::shared_ptr<Event> host_mmio_issue_ = nullptr;
   bool is_read_ = false;
-  std::shared_ptr<Event> host_msi_read_resp_ = nullptr;
-  bool pci_before_ = false;
+  int bar_number_ = 0;
   std::shared_ptr<Event> im_mmio_resp_ = nullptr;
   // completion, either host_mmio_cw_ or host_mmio_cr_
   std::shared_ptr<Event> completion_ = nullptr;
 
  public:
-  explicit HostMmioSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id, bool pci_before)
-      : EventSpan(trace_context, source_id, span_type::kHostMmio),
-        pci_before_(pci_before) {
+  explicit HostMmioSpan(std::shared_ptr<TraceContext> &trace_context,
+                        uint64_t source_id,
+                        std::string &service_name,
+                        int bar_number)
+      : EventSpan(trace_context, source_id, span_type::kHostMmio, service_name),
+        bar_number_(bar_number) {
   }
 
   // NOTE: we make only a shallow copy
@@ -553,14 +573,14 @@ class HostMmioSpan : public EventSpan {
 
   ~HostMmioSpan() override = default;
 
-  inline bool IsAfterPci() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return pci_before_;
-  }
-
   inline bool IsRead() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_read_;
+  }
+
+  inline int GetBarNumber() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return bar_number_;
   }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
@@ -571,37 +591,21 @@ class HostMmioSpan : public EventSpan {
     }
 
     switch (event_ptr->GetType()) {
-      case EventType::kHostMmioWT: {
+      case EventType::kHostMmioWT:
+      case EventType::kHostMmioRT: {
         if (host_mmio_issue_) {
           return false;
         }
-        is_read_ = false;
+
+        is_read_ = IsType(event_ptr, EventType::kHostMmioRT);
+        auto mmio = std::static_pointer_cast<HostMmioOp>(event_ptr);
+        bar_number_ = mmio->GetBar();
         host_mmio_issue_ = event_ptr;
-        break;
-      }
-      case EventType::kHostMmioRT: {
-        if (host_mmio_issue_ and not pci_before_) {
-          return false;
-        }
 
-        if (pci_before_) {
-          if (is_read_ or not host_mmio_issue_ or not im_mmio_resp_) {
-            return false;
-          }
-
-          auto issue =
-              std::static_pointer_cast<HostAddrSizeOp>(host_mmio_issue_);
-          auto th = std::static_pointer_cast<HostMmioR>(event_ptr);
-          if (issue->GetId() != th->GetId()) {
-            return false;
-          }
-
-          host_msi_read_resp_ = event_ptr;
+        if (is_read_ and TraceEnvironment::IsMsixNotToDeviceBarNumber(bar_number_)) {
           is_pending_ = false;
-        } else {
-          is_read_ = true;
-          host_mmio_issue_ = event_ptr;
         }
+
         break;
       }
 
@@ -613,23 +617,32 @@ class HostMmioSpan : public EventSpan {
           return false;
         }
         im_mmio_resp_ = event_ptr;
+
+        if (TraceEnvironment::IsMsixNotToDeviceBarNumber(bar_number_)) {
+          is_pending_ = false;
+        }
+
         break;
       }
 
       case EventType::kHostMmioCWT:
       case EventType::kHostMmioCRT: {
+        if (TraceEnvironment::IsMsixNotToDeviceBarNumber(bar_number_)) {
+          return false;
+        }
+
+        if (not host_mmio_issue_) {
+          return false;
+        }
+
         if (IsType(event_ptr, EventType::kHostMmioCWT)) {
-          if (is_read_ or not host_mmio_issue_ or not im_mmio_resp_) {
+          if (is_read_ or not im_mmio_resp_) {
             return false;
           }
         } else {
-          if (not is_read_ or not host_mmio_issue_) {
+          if (not is_read_) {
             return false;
           }
-        }
-
-        if (pci_before_ or completion_) {
-          return false;
         }
 
         auto issue = std::static_pointer_cast<HostAddrSizeOp>(host_mmio_issue_);
@@ -655,8 +668,10 @@ class HostMsixSpan : public EventSpan {
   std::shared_ptr<Event> host_dma_c_ = nullptr;
 
  public:
-  explicit HostMsixSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kHostMsix) {
+  explicit HostMsixSpan(std::shared_ptr<TraceContext> &trace_context,
+                        uint64_t source_id,
+                        std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kHostMsix, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -709,8 +724,10 @@ class HostPciSpan : public EventSpan {
   bool is_read_ = false;
 
  public:
-  explicit HostPciSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kHostPci) {
+  explicit HostPciSpan(std::shared_ptr<TraceContext> &trace_context,
+                       uint64_t source_id,
+                       std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kHostPci, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -771,8 +788,8 @@ class NicMsixSpan : public EventSpan {
   std::shared_ptr<Event> nic_msix_ = nullptr;
 
  public:
-  NicMsixSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kNicMsix) {
+  NicMsixSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id, std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kNicMsix, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -813,8 +830,10 @@ class NicMmioSpan : public EventSpan {
   bool is_read_ = false;
 
  public:
-  explicit NicMmioSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kNicMmio) {
+  explicit NicMmioSpan(std::shared_ptr<TraceContext> &trace_context,
+                       uint64_t source_id,
+                       std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kNicMmio, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -868,8 +887,8 @@ class NicDmaSpan : public EventSpan {
   bool is_read_ = true;
 
  public:
-  explicit NicDmaSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kNicDma) {
+  explicit NicDmaSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id, std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kNicDma, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -948,8 +967,8 @@ class NicEthSpan : public EventSpan {
   bool is_send_ = false;
 
  public:
-  explicit NicEthSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kNicEth) {
+  explicit NicEthSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id, std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kNicEth, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -997,8 +1016,10 @@ class GenericSingleSpan : public EventSpan {
   std::shared_ptr<Event> event_p_ = nullptr;
 
  public:
-  explicit GenericSingleSpan(std::shared_ptr<TraceContext> &trace_context, uint64_t source_id)
-      : EventSpan(trace_context, source_id, span_type::kGenericSingle) {
+  explicit GenericSingleSpan(std::shared_ptr<TraceContext> &trace_context,
+                             uint64_t source_id,
+                             std::string &service_name)
+      : EventSpan(trace_context, source_id, span_type::kGenericSingle, service_name) {
   }
 
   // NOTE: we make only a shallow copy
@@ -1049,12 +1070,12 @@ inline std::string GetTypeStr(std::shared_ptr<EventSpan> &span) {
   return std::move(sss.str());
 }
 
-inline std::ostream &operator<<(std::ostream& out, EventSpan& span) {
+inline std::ostream &operator<<(std::ostream &out, EventSpan &span) {
   span.Display(out);
   return out;
 }
 
-inline std::ostream &operator<<(std::ostream& out, std::shared_ptr<EventSpan>& span) {
+inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<EventSpan> &span) {
   if (span) {
     out << *span;
   } else {

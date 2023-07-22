@@ -176,4 +176,9 @@ inline std::ostream &operator<<(std::ostream &out, Context &con) {
   return out;
 }
 
+inline std::ostream &PrintContextPtr(std::ostream &out, std::shared_ptr<Context> &context) {
+    out << *context << std::endl;
+    return out;
+}
+
 #endif  // SIMBRICKS_TRACE_CONTEXT_QUEUE_H_

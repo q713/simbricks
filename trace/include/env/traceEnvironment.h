@@ -153,6 +153,10 @@ class TraceEnvironment {
   static bool is_socket_connect(std::shared_ptr<Event> event_ptr);
 
   static bool IsSysEntry(std::shared_ptr<Event> event_ptr);
+
+  static bool IsMsixNotToDeviceBarNumber(int bar);
+
+  static bool IsToDeviceBarNumber(int bar);
 };
 
 #endif  // SIM_TRACE_CONFIG_VARS_H_

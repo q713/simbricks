@@ -167,7 +167,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_reader_.ConsumeAndTrimString(", addr=") or
             not line_reader_.ParseUintTrim(16, addr) or
             not line_reader_.ConsumeAndTrimString(", size=") or
-            not line_reader_.ParseUintTrim(10, size)) {
+            not line_reader_.ParseUintTrim(16, size)) {
           std::cout
               << "error parsing HostMmioR, HostMmioW, HostDmaR or HostDmaW"
               << std::endl;
@@ -292,7 +292,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_reader_.ConsumeAndTrimString(", addr=") or
             not line_reader_.ParseUintTrim(16, addr) or
             not line_reader_.ConsumeAndTrimString(", size=") or
-            not line_reader_.ParseUintTrim(10, len)) {
+            not line_reader_.ParseUintTrim(16, len)) {
           std::cout << "error parsing NicDmaI, NicDmaEx, NicDmaEn, NicDmaCR or "
                        "NicDmaCW"
                     << std::endl;
@@ -321,7 +321,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
         if (not line_reader_.ConsumeAndTrimString(", off=") or
             not line_reader_.ParseUintTrim(16, offset) or
             not line_reader_.ConsumeAndTrimString(", len=") or
-            not line_reader_.ParseUintTrim(10, len) or
+            not line_reader_.ParseUintTrim(16, len) or
             not line_reader_.ConsumeAndTrimString(
                 ", val=")
             or not line_reader_.ParseUintTrim(16, val)) {
@@ -340,7 +340,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
       } else if (event_name == "NicTx") {
         if (not line_reader_.ConsumeAndTrimString(", len=") or
-            not line_reader_.ParseUintTrim(10, len)) {
+            not line_reader_.ParseUintTrim(16, len)) {
           std::cout << "error parsing NicTx" << std::endl;
           continue;
         }
@@ -348,7 +348,8 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
 
       } else if (event_name == "NicRx") {
         if (not line_reader_.ConsumeAndTrimString(", len=") or
-            not line_reader_.ParseUintTrim(10, len) or
+            not line_reader_.ParseUintTrim(16, len) or
+            not line_reader_.ConsumeAndTrimString(", is_read=true") or
             not line_reader_.ConsumeAndTrimString(", port=") or
             not line_reader_.ParseInt(port)) {
           std::cout << "error parsing NicRx" << std::endl;

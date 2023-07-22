@@ -153,7 +153,7 @@ class Tracer {
     }
   }
 
-  void ExportWaitingForParentVec(std::string &service_name, std::shared_ptr<EventSpan> &parent) {
+  void ExportWaitingForParentVec(std::shared_ptr<EventSpan> &parent) {
     // NOTE: lock must be held when calling this method
     assert(parent and span_is_null);
     const uint64_t parent_id = parent->GetId();
@@ -163,14 +163,15 @@ class Tracer {
     }
     auto waiters = iter->second;
     for (auto &waiter : waiters) {
-      exporter_.ExportSpan(service_name, waiter);
+      exporter_.ExportSpan(waiter);
+      ExportWaitingForParentVec(waiter);
       MarkSpanAsExported(waiter);
     }
     waiting_list_.erase(parent_id);
   }
 
  public:
-  void MarkSpanAsDone(std::string &service_name, std::shared_ptr<EventSpan> span) {
+  void MarkSpanAsDone(std::shared_ptr<EventSpan> span) {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
@@ -183,8 +184,8 @@ class Tracer {
     throw_if_empty(trace, "MarkSpanAsDone trace is null");
 
     if (WasParentExported(span)) {
-      exporter_.ExportSpan(service_name, span);
-      ExportWaitingForParentVec(service_name, span);
+      exporter_.ExportSpan(span);
+      ExportWaitingForParentVec(span);
       MarkSpanAsExported(span);
       return;
     }
@@ -292,7 +293,37 @@ class Tracer {
 
   explicit Tracer(simbricks::trace::SpanExporter &exporter) : exporter_(exporter) {};
 
-  ~Tracer() = default;
+  //~Tracer() = default;
+  ~Tracer() {
+    //std::cout << "Ids that were already exported: ";
+    //for (const uint64_t id : already_exported_spans_) {
+    //  std::cout << std::to_string(id) << ", ";
+    //}
+    //std::cout << std::endl;
+
+    //for (const auto &entry : waiting_list_) {
+    //  std::cout << "id that is waited on: " << entry.first << std::endl;
+    //  std::cout << "ids that are still waiting: ";
+    //  for (const auto &waiter : entry.second) {
+    //    std::cout << waiter->GetId() << ", ";
+    //  }
+    //  std::cout << std::endl;
+    //}
+
+    std::cout << "ids that were exported but that still have waiters: " << std::endl;
+    for (auto exported : already_exported_spans_) {
+      auto iter = waiting_list_.find(exported);
+      if (iter == waiting_list_.end()) {
+        continue;
+      }
+
+      std::cout << "parent id = " << std::to_string(exported) << ", waiters = ";
+      for (auto &waiter : iter->second) {
+        std::cout << (waiter->IsComplete() ? "(complete!!!)" : "") << " " << waiter->GetId() << ", ";
+      }
+      std::cout << std::endl;
+    }
+  }
 };
 
 #endif  // SIMBRICKS_TRACE_TRACER_H_

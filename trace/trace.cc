@@ -146,17 +146,15 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    //simbricks::trace::OtlpSpanExporter
-    //    exporter{"http://localhost:4318/v1/traces", false, "trace"};
-    simbricks::trace::NoOpExporter exporter;
+    simbricks::trace::OtlpSpanExporter
+        exporter{"http://localhost:4318/v1/traces", false, "trace"};
+    //simbricks::trace::NoOpExporter exporter;
 
     Tracer tracer{exporter};
 
     constexpr size_t kAmountSources = 2;
     Timer timer{kAmountSources};
 
-    // TODO: Fix the error related to the timestamp
-    //       boundary when using the server site arts of everything!
 
     using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
     auto server_hn = create_shared<QueueT>(channel_is_null);

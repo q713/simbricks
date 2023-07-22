@@ -179,8 +179,8 @@ Gem5Parser::ParseSystemPcSimbricks (uint64_t timestamp)
 
   uint64_t dev, func, reg, bytes, data, offset;
   int bar;
-  bool is_readConf = line_reader_.ConsumeAndTrimString("readConfig:");
-  if (is_readConf || line_reader_.ConsumeAndTrimString("writeConfig:"))
+  const bool is_read_conf = line_reader_.ConsumeAndTrimString("readConfig:");
+  if (is_read_conf || line_reader_.ConsumeAndTrimString("writeConfig:"))
   {
     line_reader_.TrimL();
     if (line_reader_.ConsumeAndTrimString("dev ") &&
@@ -199,12 +199,12 @@ Gem5Parser::ParseSystemPcSimbricks (uint64_t timestamp)
         return std::make_shared<HostConf> (timestamp, GetIdent(),
                                            GetName(), dev,
                                            func, reg, bytes, data,
-                                           is_readConf);
+                                           is_read_conf);
       } else if (line_reader_.ConsumeAndTrimChar('0'))
       {
         return std::make_shared<HostConf> (timestamp, GetIdent(),
                                            GetName(), dev,
-                                           func, reg, bytes, 0, is_readConf);
+                                           func, reg, bytes, 0, is_read_conf);
       }
     }
   } else if (line_reader_.ConsumeAndTrimString("simbricks-pci:"))

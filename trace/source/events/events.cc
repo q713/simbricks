@@ -164,7 +164,7 @@ bool HostMmioOp::Equal(const Event &other) {
   return bar_ == mmioop->bar_ and offset_ == mmioop->offset_ and HostAddrSizeOp::Equal(*mmioop);
 }
 
-uint64_t HostMmioOp::GetBar() const {
+int HostMmioOp::GetBar() const {
   return bar_;
 }
 

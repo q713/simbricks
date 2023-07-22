@@ -62,11 +62,11 @@ class SpanExporter {
  public:
   SpanExporter() = default;
 
-  virtual void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) = 0;
+  virtual void StartSpan(std::shared_ptr<EventSpan> to_start) = 0;
 
   virtual void EndSpan(std::shared_ptr<EventSpan> to_end) = 0;
 
-  virtual void ExportSpan(std::string &service_name, std::shared_ptr<EventSpan> to_export) = 0;
+  virtual void ExportSpan(std::shared_ptr<EventSpan> to_export) = 0;
 };
 
 // special span exporter that doies nothing, may be useful for debugging purposes
@@ -74,13 +74,13 @@ class NoOpExporter : public SpanExporter {
  public:
   NoOpExporter() = default;
 
-  void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) override {
+  void StartSpan(std::shared_ptr<EventSpan> to_start) override {
   }
 
   void EndSpan(std::shared_ptr<EventSpan> to_end) override {
   }
 
-  void ExportSpan(std::string &service_name, std::shared_ptr<EventSpan> to_export) override {
+  void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
   }
 };
 
@@ -207,7 +207,7 @@ class OtlpSpanExporter : public SpanExporter {
     return opentelemetry::common::SystemTimestamp(time_point);
   }
 
-  void add_Event(std::map<std::string, std::string> &attributes, const std::shared_ptr<Event>& event) {
+  void add_Event(std::map<std::string, std::string> &attributes, const std::shared_ptr<Event> &event) {
     assert(event and "event is not null");
     const std::string type = GetTypeStr(event);
     attributes.insert({"timestamp", std::to_string(event->GetTs())});
@@ -216,17 +216,18 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"type", type});
   }
 
-  void add_SimSendSync(std::map<std::string, std::string> &attributes, const std::shared_ptr<SimSendSync>& event) {
+  void add_SimSendSync(std::map<std::string, std::string> &attributes, const std::shared_ptr<SimSendSync> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
-  void add_SimProcInEvent(std::map<std::string, std::string> &attributes, const std::shared_ptr<SimProcInEvent>& event) {
+  void add_SimProcInEvent(std::map<std::string, std::string> &attributes,
+                          const std::shared_ptr<SimProcInEvent> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
-  void add_HostInstr(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostInstr>& event) {
+  void add_HostInstr(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostInstr> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"pc", std::to_string(event->GetPc())});
@@ -239,62 +240,64 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"comp", *(event->GetComp())});
   }
 
-  void add_HostMmioImRespPoW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioImRespPoW>& event) {
+  void add_HostMmioImRespPoW(std::map<std::string, std::string> &attributes,
+                             const std::shared_ptr<HostMmioImRespPoW> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
-  void add_HostIdOp(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostIdOp>& event) {
+  void add_HostIdOp(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostIdOp> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"id", std::to_string(event->GetId())});
   }
 
-  void add_HostMmioCR(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioCR>& event) {
+  void add_HostMmioCR(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioCR> &event) {
     assert(event and "event is not null");
     add_HostIdOp(attributes, event);
   }
 
-  void add_HostMmioCW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioCW>& event) {
+  void add_HostMmioCW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioCW> &event) {
     assert(event and "event is not null");
     add_HostIdOp(attributes, event);
   }
 
-  void add_HostAddrSizeOp(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostAddrSizeOp>& event) {
+  void add_HostAddrSizeOp(std::map<std::string, std::string> &attributes,
+                          const std::shared_ptr<HostAddrSizeOp> &event) {
     assert(event and "event is not null");
     add_HostIdOp(attributes, event);
     attributes.insert({"addr", std::to_string(event->GetAddr())});
     attributes.insert({"size", std::to_string(event->GetSize())});
   }
 
-  void add_HostMmioOp(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioOp>& event) {
+  void add_HostMmioOp(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioOp> &event) {
     assert(event and "event is not null");
     add_HostAddrSizeOp(attributes, event);
     attributes.insert({"bar", std::to_string(event->GetBar())});
     attributes.insert({"offset", std::to_string(event->GetOffset())});
   }
 
-  void add_HostMmioR(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioR>& event) {
+  void add_HostMmioR(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioR> &event) {
     assert(event and "event is not null");
     add_HostMmioOp(attributes, event);
   }
 
-  void add_HostMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioW>& event) {
+  void add_HostMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostMmioW> &event) {
     assert(event and "event is not null");
     add_HostMmioOp(attributes, event);
   }
 
-  void add_HostDmaC(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostDmaC>& event) {
+  void add_HostDmaC(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostDmaC> &event) {
     assert(event and "event is not null");
     add_HostIdOp(attributes, event);
   }
 
-  void add_HostDmaR(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostDmaR>& event) {
+  void add_HostDmaR(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostDmaR> &event) {
     assert(event and "event is not null");
     add_HostAddrSizeOp(attributes, event);
   }
 
-  void add_HostDmaW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostDmaW>& event) {
+  void add_HostDmaW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostDmaW> &event) {
     assert(event and "event is not null");
     add_HostAddrSizeOp(attributes, event);
   }
@@ -305,7 +308,7 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"vec", std::to_string(event->GetVec())});
   }
 
-  void add_HostConf(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostConf>& event) {
+  void add_HostConf(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostConf> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"dev", std::to_string(event->GetDev())});
@@ -316,17 +319,17 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"is_read", event->IsRead() ? "true" : "false"});
   }
 
-  void add_HostClearInt(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostClearInt>& event) {
+  void add_HostClearInt(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostClearInt> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
-  void add_HostPostInt(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostPostInt>& event) {
+  void add_HostPostInt(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostPostInt> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
-  void add_HostPciRW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostPciRW>& event) {
+  void add_HostPciRW(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostPciRW> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"offset", std::to_string(event->GetOffset())});
@@ -334,14 +337,14 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"is_read", event->IsRead() ? "true" : "false"});
   }
 
-  void add_NicMsix(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMsix>& event) {
+  void add_NicMsix(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMsix> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"vec", std::to_string(event->GetVec())});
     attributes.insert({"isX", BoolToString(event->IsX())});
   }
 
-  void add_NicDma(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDma>& event) {
+  void add_NicDma(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDma> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"id", std::to_string(event->GetId())});
@@ -349,38 +352,38 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"len", std::to_string(event->GetLen())});
   }
 
-  void add_SetIX(std::map<std::string, std::string> &attributes, const std::shared_ptr<SetIX>& event) {
+  void add_SetIX(std::map<std::string, std::string> &attributes, const std::shared_ptr<SetIX> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"intr", std::to_string(event->GetIntr())});
   }
 
-  void add_NicDmaI(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaI>& event) {
+  void add_NicDmaI(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaI> &event) {
     assert(event and "event is not null");
     add_NicDma(attributes, event);
   }
 
-  void add_NicDmaEx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaEx>& event) {
+  void add_NicDmaEx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaEx> &event) {
     assert(event and "event is not null");
     add_NicDma(attributes, event);
   }
 
-  void add_NicDmaEn(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaEn>& event) {
+  void add_NicDmaEn(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaEn> &event) {
     assert(event and "event is not null");
     add_NicDma(attributes, event);
   }
 
-  void add_NicDmaCR(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaCR>& event) {
+  void add_NicDmaCR(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaCR> &event) {
     assert(event and "event is not null");
     add_NicDma(attributes, event);
   }
 
-  void add_NicDmaCW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaCW>& event) {
+  void add_NicDmaCW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicDmaCW> &event) {
     assert(event and "event is not null");
     add_NicDma(attributes, event);
   }
 
-  void add_NicMmio(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmio>& event) {
+  void add_NicMmio(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmio> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"off", std::to_string(event->GetOff())});
@@ -388,34 +391,34 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"val", std::to_string(event->GetVal())});
   }
 
-  void add_NicMmioR(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioR>& event) {
+  void add_NicMmioR(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioR> &event) {
     assert(event and "event is not null");
     add_NicMmio(attributes, event);
   }
 
-  void add_NicMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioW>& event) {
+  void add_NicMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioW> &event) {
     assert(event and "event is not null");
     add_NicMmio(attributes, event);
   }
 
-  void add_NicTrx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTrx>& event) {
+  void add_NicTrx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTrx> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"len", std::to_string(event->GetLen())});
   }
 
-  void add_NicTx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTx>& event) {
+  void add_NicTx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTx> &event) {
     assert(event and "event is not null");
     add_NicTrx(attributes, event);
   }
 
-  void add_NicRx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicRx>& event) {
+  void add_NicRx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicRx> &event) {
     assert(event and "event is not null");
     add_NicTrx(attributes, event);
     attributes.insert({"port", std::to_string(event->GetPort())});
   }
 
-  opentelemetry::trace::StartSpanOptions GetSpanStartOpts(const std::shared_ptr<EventSpan>& span) {
+  opentelemetry::trace::StartSpanOptions GetSpanStartOpts(const std::shared_ptr<EventSpan> &span) {
     opentelemetry::trace::StartSpanOptions span_options;
     if (span->HasParent()) {
       auto custom_context = span->GetContext();
@@ -431,7 +434,7 @@ class OtlpSpanExporter : public SpanExporter {
     return std::move(span_options);
   }
 
-  void end_span(const std::shared_ptr<EventSpan>& old_span, span_t &new_span) {
+  void end_span(const std::shared_ptr<EventSpan> &old_span, span_t &new_span) {
     assert(old_span and "old span is null");
     assert(new_span and "new span is null");
     opentelemetry::trace::EndSpanOptions end_opts;
@@ -644,7 +647,10 @@ class OtlpSpanExporter : public SpanExporter {
   void set_HostMmioSpanAttr(span_t &new_span, std::shared_ptr<HostMmioSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
-    new_span->SetAttribute("after-pci/pci-before", BoolToString(old_span->IsAfterPci()));
+    //new_span->SetAttribute("after-pci/pci-before", BoolToString(old_span->IsAfterPci()));
+    new_span->SetAttribute("BAR-number", std::to_string(old_span->GetBarNumber()));
+    new_span->SetAttribute("is-going-to-device",
+                           BoolToString(TraceEnvironment::IsToDeviceBarNumber(old_span->GetBarNumber())));
   }
 
   void set_HostPciSpanAttr(span_t &new_span, std::shared_ptr<HostPciSpan> &old_span) {
@@ -955,10 +961,10 @@ class OtlpSpanExporter : public SpanExporter {
     opentelemetry::trace::Provider::SetTracerProvider(none);
   }
 
-  void StartSpan(std::string &service_name, std::shared_ptr<EventSpan> to_start) override {
+  void StartSpan(std::shared_ptr<EventSpan> to_start) override {
     auto span_opts = GetSpanStartOpts(to_start);
     auto span_name = GetTypeStr(to_start);
-    auto tracer = GetTracerLazy(service_name);
+    auto tracer = GetTracerLazy(to_start->GetServiceName());
     auto span = tracer->StartSpan(span_name, span_opts);
     InsertNewSpan(to_start, span);
 
@@ -974,8 +980,8 @@ class OtlpSpanExporter : public SpanExporter {
     end_span(to_end, span);
   }
 
-  void ExportSpan(std::string &service_name, std::shared_ptr<EventSpan> to_export) override {
-    StartSpan(service_name, to_export);
+  void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
+    StartSpan(to_export);
     EndSpan(to_export);
   }
 };

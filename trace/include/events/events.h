@@ -451,7 +451,7 @@ class HostMmioOp : public HostAddrSizeOp {
  public:
   void Display(std::ostream &out) override;
 
-  uint64_t GetBar() const;
+  int GetBar() const;
 
   uint64_t GetOffset() const;
 

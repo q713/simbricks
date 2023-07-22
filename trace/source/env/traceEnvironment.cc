@@ -358,3 +358,13 @@ bool TraceEnvironment::IsSysEntry(std::shared_ptr<Event> event_ptr) {
   }
   return sys_entry_.contains(func);
 }
+
+bool TraceEnvironment::IsMsixNotToDeviceBarNumber(int bar) {
+  // 1, 2, 3, 4, 5 are currently expected to not end up within the device
+  return bar != 0;
+}
+
+bool TraceEnvironment::IsToDeviceBarNumber(int bar) {
+  // only 0 is currently expected to end up in the device
+  return bar == 0;
+}

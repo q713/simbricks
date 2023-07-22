@@ -34,7 +34,7 @@ HostSpanner::FinishPendingSpan(std::shared_ptr<concurrencpp::executor> resume_ex
   }
 
   if (not pending_host_call_span_->DoesKernelReceive()) {
-    tracer_.MarkSpanAsDone(name_, pending_host_call_span_);
+    tracer_.MarkSpanAsDone(pending_host_call_span_);
     co_return;
   }
 
@@ -55,7 +55,9 @@ HostSpanner::FinishPendingSpan(std::shared_ptr<concurrencpp::executor> resume_ex
   };
 
   while (context_opt) {
+    //std::cout << "host try poll on true nic receive" << std::endl;
     context_opt = co_await from_nic_receives_queue_->TryPopOnTrue(resume_executor, did_arrive_before_receive_syscall);
+    //std::cout << "host polled on true nic receive" << std::endl;
     if (not context_opt.has_value()) {
       break;
     }
@@ -64,10 +66,10 @@ HostSpanner::FinishPendingSpan(std::shared_ptr<concurrencpp::executor> resume_ex
     auto copy_span = CloneShared(pending_host_call_span_);
     copy_span->SetOriginal(pending_host_call_span_);
     tracer_.StartSpanSetParentContext(copy_span, context->GetNonEmptyParent());
-    tracer_.MarkSpanAsDone(name_, copy_span);
+    tracer_.MarkSpanAsDone(copy_span);
   }
 
-  tracer_.MarkSpanAsDone(name_, pending_host_call_span_);
+  tracer_.MarkSpanAsDone(pending_host_call_span_);
   co_return;
 }
 
@@ -77,7 +79,7 @@ HostSpanner::CreateTraceStartingSpan(std::shared_ptr<concurrencpp::executor> res
                                      bool fragmented) {
   co_await FinishPendingSpan(resume_executor);
   pending_host_call_span_ =
-      tracer_.StartSpan<HostCallSpan>(starting_event, starting_event->GetParserIdent(), fragmented);
+      tracer_.StartSpan<HostCallSpan>(starting_event, starting_event->GetParserIdent(), name_, fragmented);
   throw_if_empty(pending_host_call_span_, "could not register new pending_host_call_span_");
   last_trace_starting_span_ = pending_host_call_span_;
 
@@ -145,33 +147,18 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
   auto pending_mmio_span = iterate_add_erase<HostMmioSpan>(pending_host_mmio_spans_, event_ptr);
   if (pending_mmio_span) {
     if (pending_mmio_span->IsComplete()) {
-      tracer_.MarkSpanAsDone(name_, pending_mmio_span);
+      tracer_.MarkSpanAsDone(pending_mmio_span);
     }
 
     co_return true;
   }
 
-  if (IsType(event_ptr, EventType::kHostMmioWT)) {
-    pending_mmio_span = nullptr;
-    for (auto it = pending_host_mmio_spans_.begin(); it != pending_host_mmio_spans_.end(); it++) {
-      if ((*it)->IsAfterPci()) {
-        pending_mmio_span = *it;
-        pending_host_mmio_spans_.erase(it);
-        break;
-      }
-    }
-
-    if (pending_mmio_span) {
-      tracer_.MarkSpanAsDone(name_, pending_mmio_span);
-    }
-    pending_mmio_span = nullptr;
-  }
-
   if (not pending_mmio_span) {
     // create a pack that belongs to the trace of the current host call span
+    auto mmio = std::static_pointer_cast<HostMmioOp>(event_ptr);
     pending_mmio_span = tracer_.StartSpanByParent<HostMmioSpan>(pending_host_call_span_,
-                                                                event_ptr, event_ptr->GetParserIdent(),
-                                                                pci_write_before_);
+                                                                event_ptr, event_ptr->GetParserIdent(), name_,
+                                                                mmio->GetBar());
     if (not pending_mmio_span) {
       co_return false;
     }
@@ -179,7 +166,7 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
     assert(IsType(event_ptr, EventType::kHostMmioWT) or IsType(event_ptr, EventType::kHostMmioRT)
                and "try to create mmio host span but event is neither read nor write");
 
-    if (not pci_write_before_) {
+    if (not pci_write_before_ and TraceEnvironment::IsToDeviceBarNumber(pending_mmio_span->GetBarNumber())) {
       //std::cout << "host try push mmio" << std::endl;
       auto context = create_shared<Context>("HandelMmio could not create context",
                                             expectation::kMmio, pending_mmio_span);
@@ -192,6 +179,10 @@ HostSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
       //std::cout << "host pushed mmio" << std::endl;
     }
 
+    if (TraceEnvironment::IsMsixNotToDeviceBarNumber(pending_mmio_span->GetBarNumber())
+        and pending_mmio_span->IsComplete()) {
+      tracer_.MarkSpanAsDone(pending_mmio_span);
+    }
     pending_host_mmio_spans_.push_back(pending_mmio_span);
     co_return true;
   }
@@ -206,18 +197,19 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(std::shared_ptr<concurren
     bool could_be_added = pending_pci_span_->AddToSpan(event_ptr);
     throw_on(not could_be_added, "HostSpanner::HandelPci: could not add event to pending pci span");
     assert(pending_pci_span_->IsComplete() and "HostSpanner::HandelPci: span is not complete but should be");
-    tracer_.MarkSpanAsDone(name_, pending_pci_span_);
+    tracer_.MarkSpanAsDone(pending_pci_span_);
+    pending_pci_span_ = nullptr;
     co_return true;
   }
 
   assert(IsType(event_ptr, EventType::kHostPciRWT)
              and "HostSpanner::HandelPci: event is no pci starting event");
   if (pending_pci_span_) {
-    tracer_.MarkSpanAsDone(name_, pending_pci_span_);
+    tracer_.MarkSpanAsDone(pending_pci_span_);
   }
 
-  pending_pci_span_ =
-      tracer_.StartSpanByParent<HostPciSpan>(pending_host_call_span_, event_ptr, event_ptr->GetParserIdent());
+  pending_pci_span_ = tracer_.StartSpanByParent<HostPciSpan>(pending_host_call_span_,
+                                                             event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_pci_span_) {
     co_return false;
   }
@@ -233,7 +225,7 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   // check if we had an interrupt (msix) this belongs to
   if (pending_host_msix_span_ and pending_host_msix_span_->AddToSpan(event_ptr)) {
     assert(pending_host_msix_span_->IsComplete() and "pending_host_msix_span_ is not complete");
-    tracer_.MarkSpanAsDone(name_, pending_host_msix_span_);
+    tracer_.MarkSpanAsDone(pending_host_msix_span_);
     pending_host_msix_span_ = nullptr;
     co_return true;
   }
@@ -243,7 +235,7 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
                                      event_ptr);
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
-      tracer_.MarkSpanAsDone(name_, pending_dma);
+      tracer_.MarkSpanAsDone(pending_dma);
     }
     co_return true;
   }
@@ -268,7 +260,7 @@ HostSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
   }
   assert(not IsType(event_ptr, EventType::kHostDmaCT) and "cannot start HostDmaSPan with Dma completion");
   pending_dma = tracer_.StartSpanByParent<HostDmaSpan>(con->GetNonEmptyParent(),
-                                                       event_ptr, event_ptr->GetParserIdent());
+                                                       event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_dma) {
     co_return false;
   }
@@ -293,7 +285,7 @@ HostSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
 
   pending_host_msix_span_ =
       tracer_.StartSpanByParent<HostMsixSpan>(con->GetNonEmptyParent(),
-                                              event_ptr, event_ptr->GetParserIdent());
+                                              event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_host_msix_span_) {
     co_return false;
   }
@@ -310,7 +302,7 @@ HostSpanner::HandelInt([[maybe_unused]] std::shared_ptr<concurrencpp::executor> 
   if (not pending_host_int_span_) {
     pending_host_int_span_ =
         tracer_.StartSpanByParent<HostIntSpan>(pending_host_call_span_,
-                                               event_ptr, event_ptr->GetParserIdent());
+                                               event_ptr, event_ptr->GetParserIdent(), name_);
     if (not pending_host_int_span_) {
       co_return false;
     }
@@ -326,7 +318,7 @@ HostSpanner::HandelInt([[maybe_unused]] std::shared_ptr<concurrencpp::executor> 
     co_return false;
   }
 
-  tracer_.MarkSpanAsDone(name_, pending_host_int_span_);
+  tracer_.MarkSpanAsDone(pending_host_int_span_);
   pending_host_int_span_ = nullptr;
   co_return true;
 }

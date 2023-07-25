@@ -69,8 +69,8 @@ RUN cmake -DCMAKE_BUILD_TYPE=Debug -DWITH_OTLP=ON -DWITH_EXAMPLES_HTTP=ON -DWITH
 # When inteded to really mount e.g. a folder see belows run command.
 #ADD <path on host folder that shall be mounted> <path inside docker container>
 
-# TODO: execute the actual tracing utility
-CMD [ "/bin/bash" ]
+# when not runnig with compose, add here the command you want to run
+#CMD [ "/bin/bash" ]
 
 # The dockerfile CAN be executed as follows
 # 1) docker build -t trace .

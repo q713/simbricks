@@ -146,8 +146,10 @@ int main(int argc, char *argv[]) {
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
+    //const std::string jaeger_url = "http://localhost:4318/v1/traces";
+    std::string jaeger_url = "http://jaeger:4318/v1/traces";
     simbricks::trace::OtlpSpanExporter
-        exporter{"http://localhost:4318/v1/traces", false, "trace"};
+        exporter{jaeger_url, false, "trace"};
     //simbricks::trace::NoOpExporter exporter;
 
     Tracer tracer{exporter};

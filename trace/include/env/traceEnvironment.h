@@ -34,7 +34,8 @@
 #include "env/symtable.h"
 
 
-// TODO: add proper configuration support for the tracing environment!!!!
+// TODO: dont make this a singleton, pass it around as a reference/pointer!!!
+// TODO: add proper configuration (JSON?) support for the tracing environment!!!!
 class TraceEnvironment {
   static std::mutex trace_env_mutex_;
 

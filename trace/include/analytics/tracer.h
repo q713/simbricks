@@ -293,37 +293,7 @@ class Tracer {
 
   explicit Tracer(simbricks::trace::SpanExporter &exporter) : exporter_(exporter) {};
 
-  //~Tracer() = default;
-  ~Tracer() {
-    //std::cout << "Ids that were already exported: ";
-    //for (const uint64_t id : already_exported_spans_) {
-    //  std::cout << std::to_string(id) << ", ";
-    //}
-    //std::cout << std::endl;
-
-    //for (const auto &entry : waiting_list_) {
-    //  std::cout << "id that is waited on: " << entry.first << std::endl;
-    //  std::cout << "ids that are still waiting: ";
-    //  for (const auto &waiter : entry.second) {
-    //    std::cout << waiter->GetId() << ", ";
-    //  }
-    //  std::cout << std::endl;
-    //}
-
-    std::cout << "ids that were exported but that still have waiters: " << std::endl;
-    for (auto exported : already_exported_spans_) {
-      auto iter = waiting_list_.find(exported);
-      if (iter == waiting_list_.end()) {
-        continue;
-      }
-
-      std::cout << "parent id = " << std::to_string(exported) << ", waiters = ";
-      for (auto &waiter : iter->second) {
-        std::cout << (waiter->IsComplete() ? "(complete!!!)" : "") << " " << waiter->GetId() << ", ";
-      }
-      std::cout << std::endl;
-    }
-  }
+  ~Tracer() = default;
 };
 
 #endif  // SIMBRICKS_TRACE_TRACER_H_

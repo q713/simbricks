@@ -147,10 +147,10 @@ int main(int argc, char *argv[]) {
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
     //const std::string jaeger_url = "http://localhost:4318/v1/traces";
-    std::string jaeger_url = "http://jaeger:4318/v1/traces";
-    simbricks::trace::OtlpSpanExporter
-        exporter{jaeger_url, false, "trace"};
-    //simbricks::trace::NoOpExporter exporter;
+    //std::string jaeger_url = "http://jaeger:4318/v1/traces";
+    //simbricks::trace::OtlpSpanExporter
+    //    exporter{jaeger_url, false, "trace"};
+    simbricks::trace::NoOpExporter exporter;
 
     Tracer tracer{exporter};
 
@@ -233,7 +233,7 @@ int main(int argc, char *argv[]) {
                                   client_n_h_receive);
     const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
 
-    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c/*, pl_h_s, pl_n_s*/};
+    std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s};
     run_pipelines_parallel(thread_pool_executor, pipelines);
 
     exit(EXIT_SUCCESS);

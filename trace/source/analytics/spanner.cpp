@@ -39,8 +39,8 @@ concurrencpp::result<void> Spanner::consume(
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, event_is_null);
 
-    //std::cout << name_ << " try handel: " << *event_ptr << std::endl;
     co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
+    //std::cout << name_ << " try handel: " << *event_ptr << std::endl;
 
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {

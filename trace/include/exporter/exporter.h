@@ -57,7 +57,7 @@ namespace simbricks::trace {
 class SpanExporter {
 
  protected:
-  std::mutex exporter_mutex_;
+  std::recursive_mutex exporter_mutex_;
 
  public:
   SpanExporter() = default;
@@ -86,6 +86,7 @@ class NoOpExporter : public SpanExporter {
 
 // TODO: reduce the masive code duplication!!!!!!!!
 // TODO: consider using handler design instead of switching over types
+// TODO: make thread safe?!
 class OtlpSpanExporter : public SpanExporter {
 
   int64_t time_offset_ = 0;
@@ -695,6 +696,7 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void StartSpan(std::shared_ptr<EventSpan> to_start) override {
+    const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
     auto span_opts = GetSpanStartOpts(to_start);
     auto span_name = GetTypeStr(to_start);
     auto tracer = GetTracerLazy(to_start->GetServiceName());
@@ -707,6 +709,7 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void EndSpan(std::shared_ptr<EventSpan> to_end) override {
+    const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
     span_t span = GetSpan(to_end);
     set_Attr(span, to_end);
     add_Events(span, to_end);
@@ -714,6 +717,7 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
+    const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
     StartSpan(to_export);
     EndSpan(to_export);
   }

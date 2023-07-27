@@ -33,7 +33,6 @@
 #define SIMBRICKS_TRACE_TIMER_H_
 
 class Timer {
- protected:
   using ExecutorT = std::shared_ptr<concurrencpp::executor>;
   using ResultT = concurrencpp::result<void>;
 

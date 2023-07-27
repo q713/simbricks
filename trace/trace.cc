@@ -138,8 +138,8 @@ int main(int argc, char *argv[]) {
   TraceEnvironment::initialize();
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 1;
+  concurren_options.max_background_threads = 1;
+  concurren_options.max_cpu_threads = 6;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
@@ -154,9 +154,8 @@ int main(int argc, char *argv[]) {
 
     Tracer tracer{exporter};
 
-    constexpr size_t kAmountSources = 2;
+    constexpr size_t kAmountSources = 4;
     Timer timer{kAmountSources};
-
 
     using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
     auto server_hn = create_shared<QueueT>(channel_is_null);

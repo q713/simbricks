@@ -36,11 +36,11 @@ NicSpanner::HandelMmio(std::shared_ptr<concurrencpp::executor> resume_executor,
                        std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  std::cout << name_ << " nic try poll mmio" << std::endl;
+  //std::cout << name_ << " nic try poll mmio" << std::endl;
   auto con_opt = co_await from_host_queue_->Pop(resume_executor);
   auto con = OrElseThrow(con_opt, context_is_null);
   throw_if_empty(con, context_is_null);
-  std::cout << name_ << " nic polled mmio" << std::endl;
+  //std::cout << name_ << " nic polled mmio" << std::endl;
   if (not is_expectation(con, expectation::kMmio)) {
     std::cerr << "nic_spanner: could not poll mmio context" << std::endl;
     co_return false;
@@ -73,12 +73,12 @@ NicSpanner::HandelDma(std::shared_ptr<concurrencpp::executor> resume_executor,
       tracer_.MarkSpanAsDone(pending_dma);
     } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
-      std::cout << name_ << " nic try push dma" << std::endl;
+      //std::cout << name_ << " nic try push dma" << std::endl;
       auto context = create_shared<Context>(
           "HandelDma could not create context", expectation::kDma, pending_dma);
       throw_on(not co_await to_host_queue_->Push(resume_executor, context),
                could_not_push_to_context_queue);
-      std::cout << name_ << " nic pushed dma" << std::endl;
+      //std::cout << name_ << " nic pushed dma" << std::endl;
     }
 
     co_return true;
@@ -123,20 +123,21 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
-    std::cout << name_ << " NicSpanner::HandelTxrx: trying to push tx context to other side" << std::endl;
+    //std::cout << name_ << " NicSpanner::HandelTxrx: trying to push tx context to other side" << std::endl;
     auto context = create_shared<Context>(
-        "HandelTxrx: could not create context", expectation::kRx, parent);
+        "HandelTxrx: could not create context", expectation::kRx, eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
              "HandelTxrx: could not write network context ");
-    std::cout << name_ << " NicSpanner::HandelTxrx: pushed tx context to other side" << std::endl;
+    //std::cout << name_ << " NicSpanner::HandelTxrx: pushed tx context to other side" << std::endl;
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
-    std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context from other side" << std::endl;
+    //std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context from other side" << std::endl;
     auto con_opt = co_await from_network_queue_->Pop(resume_executor);
-    std::cout << name_ << " NicSpanner::HandelTxrx: pulled tx context from other side" << std::endl;
+    //std::cout << name_ << " NicSpanner::HandelTxrx: pulled tx context from other side" << std::endl;
     auto con = OrElseThrow(con_opt, context_is_null);
     throw_on(not is_expectation(con, expectation::kRx),
              "nic_spanner: received non kRx context");
+
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(con->GetNonEmptyParent(),
                                                      event_ptr,
                                                      event_ptr->GetParserIdent(), name_);
@@ -144,12 +145,12 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     last_action_was_send_ = false;
     last_causing_ = eth_span;
 
-    std::cout << name_ << " nic tryna push receive update." << std::endl;
+    //std::cout << name_ << " nic tryna push receive update." << std::endl;
     auto receive_context = create_shared<Context>(
         "could not create receive context to pass on to host", expectation::kRx, eth_span);
     throw_on(not co_await to_host_receives_->Push(resume_executor, receive_context),
              "NicSpanner::HandelTxrx: could not write host receive context ");
-    std::cout << name_ << " nic pushed receive update." << std::endl;
+    //std::cout << name_ << " nic pushed receive update." << std::endl;
 
   } else {
     std::cerr << "NicSpanner::HandelTxrx: unknown event type" << std::endl;
@@ -178,12 +179,12 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   assert(msix_span->IsComplete() and "msix span is not complete");
   tracer_.MarkSpanAsDone(msix_span);
 
-  std::cout << name_ << " nic try push msix" << std::endl;
+  //std::cout << name_ << " nic try push msix" << std::endl;
   auto context = create_shared<Context>(
       "HandelMsix could not create context", expectation::kMsix, msix_span);
   throw_on(not co_await to_host_queue_->Push(resume_executor, context),
            could_not_push_to_context_queue);
-  std::cout << name_ << " nic pushed msix" << std::endl;
+  //std::cout << name_ << " nic pushed msix" << std::endl;
 
   co_return true;
 }

@@ -30,8 +30,8 @@
 
 inline int64_t GetNowOffsetMicroseconds() {
   auto now = std::chrono::system_clock::now();
-  auto now_ms = std::chrono::time_point_cast<std::chrono::microseconds>(now);
-  auto value = now_ms.time_since_epoch();
+  auto now_ns = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
+  auto value = now_ns.time_since_epoch();
   return value.count();
 }
 
@@ -49,7 +49,7 @@ inline void WriteIdent(std::ostream &out, unsigned ident) {
 }
 
 template<typename ObjT>
-inline std::ostream &operator<<(std::ostream& out, std::shared_ptr<ObjT>& to_write) {
+inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<ObjT> &to_write) {
   if (to_write) {
     out << *to_write;
   } else {

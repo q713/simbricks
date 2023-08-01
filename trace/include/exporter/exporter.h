@@ -84,9 +84,6 @@ class NoOpExporter : public SpanExporter {
   }
 };
 
-// TODO: reduce the masive code duplication!!!!!!!!
-// TODO: consider using handler design instead of switching over types
-// TODO: make thread safe?!
 class OtlpSpanExporter : public SpanExporter {
 
   int64_t time_offset_ = 0;
@@ -108,8 +105,8 @@ class OtlpSpanExporter : public SpanExporter {
   std::unordered_map<std::string, tracer_t> tracer_map_;
   std::vector<provider_t> provider_;
 
-  using ts_steady = std::chrono::time_point<std::chrono::steady_clock, std::chrono::microseconds>;
-  using ts_system = std::chrono::time_point<std::chrono::system_clock, std::chrono::microseconds>;
+  using ts_steady = std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds>;
+  using ts_system = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>;
 
   void InsertNewContext(std::shared_ptr<TraceContext> &custom,
                         context_t &context) {
@@ -167,7 +164,8 @@ class OtlpSpanExporter : public SpanExporter {
         {"service.name", service_name}
     };
     auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
-    provider_t provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
+    const provider_t
+        provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
     throw_if_empty(provider, trace_provider_null);
 
     // Set the global trace provider
@@ -199,12 +197,14 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   opentelemetry::common::SteadyTimestamp ToSteadyMicroseconds(uint64_t timestamp) const {
-    const ts_steady time_point{std::chrono::microseconds{time_offset_ + (timestamp / 1000 / 1000)}};
+    const std::chrono::nanoseconds nano_sec(time_offset_ + timestamp);
+    const ts_steady time_point(nano_sec);
     return opentelemetry::common::SteadyTimestamp(time_point);
   }
 
   opentelemetry::common::SystemTimestamp ToSystemMicroseconds(uint64_t timestamp) const {
-    const ts_system time_point{std::chrono::microseconds{time_offset_ + (timestamp / 1000 / 1000)}};
+    const std::chrono::nanoseconds nano_sec(time_offset_ + timestamp);
+    const ts_system time_point(nano_sec);
     return opentelemetry::common::SystemTimestamp(time_point);
   }
 
@@ -670,16 +670,14 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
  public:
-  explicit OtlpSpanExporter(std::string &&url, bool batch_mode, std::string &&lib_name)
-      : SpanExporter() {
+  explicit OtlpSpanExporter(std::string &&url, bool batch_mode, std::string &&lib_name) {
     time_offset_ = GetNowOffsetMicroseconds();
     url_ = url;
     batch_mode_ = batch_mode;
     lib_name_ = lib_name;
   }
 
-  explicit OtlpSpanExporter(std::string &url, bool batch_mode, std::string &&lib_name)
-      : SpanExporter() {
+  explicit OtlpSpanExporter(std::string &url, bool batch_mode, std::string &&lib_name) {
     time_offset_ = GetNowOffsetMicroseconds();
     url_ = url;
     batch_mode_ = batch_mode;

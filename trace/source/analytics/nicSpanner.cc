@@ -141,7 +141,6 @@ NicSpanner::HandelTxrx(std::shared_ptr<concurrencpp::executor> resume_executor,
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(con->GetNonEmptyParent(),
                                                      event_ptr,
                                                      event_ptr->GetParserIdent(), name_);
-    //eth_span = tracer_.StartSpan<NicEthSpan>(event_ptr, event_ptr->GetParserIdent(), name_);
     last_action_was_send_ = false;
     last_causing_ = eth_span;
 

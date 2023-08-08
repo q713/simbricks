@@ -65,7 +65,7 @@ Gem5Parser::ParseSystemSwitchCpus (uint64_t timestamp)
   {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGWARN("%s: could not parse address from line '%s'\n", name_.c_str(),
-              line_reader_.get_raw_line().c_str());
+              line_reader_.GetRawLine().c_str());
 #endif
     return nullptr;
   }
@@ -85,7 +85,6 @@ Gem5Parser::ParseSystemSwitchCpus (uint64_t timestamp)
 
   if (line_reader_.ConsumeAndTrimChar('.'))
   {
-    // TODO: gather micro operation information? if yes, which informations?
     return std::make_shared<HostInstr> (timestamp, GetIdent(), GetName(),
                                         addr);
   } else
@@ -353,7 +352,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
     {
 #ifdef PARSER_DEBUG_GEM5_
       DFLOGWARN("%s: could not parse timestamp from line '%s'\n", name_.c_str(),
-                line_reader_.get_raw_line().c_str());
+                line_reader_.GetRawLine().c_str());
 #endif
       continue;
     }
@@ -372,7 +371,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       {
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN("%s: could not parse global event from line '%s'\n",
-                  name_.c_str(), line_reader_.get_raw_line().c_str());
+                  name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
         continue;
       }
@@ -387,7 +386,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 #ifdef PARSER_DEBUG_GEM5_
         DFLOGWARN(
             "%s: could not parse system.switch_cpus event from line '%s'\n",
-            name_.c_str(), line_reader_.get_raw_line().c_str());
+            name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
         continue;
       }
@@ -408,7 +407,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
             DFLOGWARN(
                 "%s: could not parse system.pc.pci_host.interface event from "
                 "line '%s'\n",
-                name_.c_str(), line_reader_.get_raw_line().c_str());
+                name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
             continue;
           }
@@ -423,7 +422,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
             DFLOGWARN(
                 "%s: could not parse system.pc.pci_host event from "
                 "line '%s'\n",
-                name_.c_str(), line_reader_.get_raw_line().c_str());
+                name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
             continue;
           }
@@ -440,7 +439,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
           DFLOGWARN(
               "%s: could not parse system.pc.simbricks event from line "
               "'%s'\n",
-              name_.c_str(), line_reader_.get_raw_line().c_str());
+              name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
           continue;
         }
@@ -451,7 +450,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
 
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGWARN("%s: could not parse event in line '%s'\n", name_.c_str(),
-              line_reader_.get_raw_line().c_str());
+              line_reader_.GetRawLine().c_str());
 #endif
   }
 

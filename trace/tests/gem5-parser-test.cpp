@@ -82,7 +82,7 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   auto gem5 = create_shared<Gem5Parser>(parser_is_null, parser_name,
                                         test_file_path,
                                         comp_filter_client, client_lr);
-  const std::vector<std::shared_ptr<Event>> to_match{
+  const std::vector<std::shared_ptr<Event>> to_match {
       std::make_shared<HostMmioR>(1869691991749,
                                   gem5->GetIdent(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
       std::make_shared<HostMmioR>(1869693118999,

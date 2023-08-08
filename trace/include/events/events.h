@@ -1125,8 +1125,18 @@ inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
   return std::shared_ptr<Event>(raw_ptr);
 }
 
-class EventPrinter : public consumer<std::shared_ptr<Event>> {
+bool IsType(std::shared_ptr<Event> &event_ptr, EventType type);
+
+bool IsType(const Event &event, EventType type);
+
+class EventPrinter : public consumer<std::shared_ptr<Event>>, 
+                     public cpipe<std::shared_ptr<Event>> {
   std::ostream &out_;
+
+  inline void print(const std::shared_ptr<Event>& event) {
+    throw_if_empty(event, event_is_null);
+    out_ << *event << std::endl;
+  }
 
  public:
 
@@ -1140,13 +1150,32 @@ class EventPrinter : public consumer<std::shared_ptr<Event>> {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);
 
-    std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
          msg = co_await src_chan->Pop(resume_executor)) {
-      event = msg.value();
-      throw_if_empty(event, event_is_null);
-      out_ << *event << std::endl;
+      const std::shared_ptr<Event> &event = OrElseThrow(
+        msg, "EventPrinter::print: no optional value given");
+      print(event);
+    }
+    co_return;
+  }
+
+  concurrencpp::result<void> process(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan,
+      std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan
+  ) override {
+    throw_if_empty(resume_executor, resume_executor_null);
+    throw_if_empty(src_chan, channel_is_null);
+
+    std::optional<std::shared_ptr<Event>> msg;
+    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
+         msg = co_await src_chan->Pop(resume_executor)) {
+      std::shared_ptr<Event> event = OrElseThrow(
+        msg, "EventPrinter::print: no optional value given");
+      print(event);
+      throw_on(co_await tar_chan->Push(resume_executor, event), 
+               "EventPrinter::process: Could not push to target channel");
     }
     co_return;
   }
@@ -1158,10 +1187,6 @@ struct EventComperator {
     return ev1->GetTs() > ev2->GetTs();
   }
 };
-
-bool IsType(std::shared_ptr<Event> &event_ptr, EventType type);
-
-bool IsType(const Event &event, EventType type);
 
 inline std::string GetTypeStr(std::shared_ptr<Event> event) {
   if (not event) {

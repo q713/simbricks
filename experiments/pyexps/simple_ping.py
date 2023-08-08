@@ -32,10 +32,18 @@ from simbricks.orchestration.nodeconfig import (
 )
 from simbricks.orchestration.simulators import Gem5Host, I40eNIC, SwitchNet
 
+
+#named_pipe_folder = "/usr/src/data-folder"
+named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir"
+gem5_server_pipe = f"{named_pipe_folder}/gem5-server-log-pipe.pipe"
+gem5_client_pipe = f"{named_pipe_folder}/gem5-client-log-pipe.pipe"
+nicbm_server_pipe = f"{named_pipe_folder}/nicbm-server-log-pipe.pipe"
+nicbm_client_pipe = f"{named_pipe_folder}/nicbm-client-log-pipe.pipe"
+
+# Start building the actual experiment
 e = Experiment(name='simple_ping')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
-gem5DebugStart = '--debug-start=1468431070625'
 gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
 
 # create client
@@ -45,15 +53,14 @@ client_config.app = PingClient(server_ip = '10.0.0.2', count=5)
 client = Gem5Host(client_config)
 client.name = 'client'
 client.wait = True  # wait for client simulator to finish execution
-gem5_client_log = '--debug-file /local/jakobg/simbricks-tracing-experiments/wrkdir/gem5-client-log.log' 
-#client.extra_main_args = [gem5_client_log, gem5DebugStart, gem5DebugFlags]
+gem5_client_log = f'--debug-file {gem5_client_pipe}' 
 client.extra_main_args = [gem5_client_log, gem5DebugFlags]
 client.variant = 'opt'
 e.add_host(client)
 
 # attach client's NIC
 client_nic = I40eNIC()
-client_nic.log_file = '/local/jakobg/simbricks-tracing-experiments/wrkdir/client-nic.log'
+client_nic.log_file = nicbm_client_pipe
 e.add_nic(client_nic)
 client.add_nic(client_nic)
 
@@ -63,15 +70,14 @@ server_config.ip = '10.0.0.2'
 server_config.app = IdleHost()
 server = Gem5Host(server_config)
 server.name = 'server'
-gem5_server_log = '--debug-file /local/jakobg/simbricks-tracing-experiments/wrkdir/gem5-server-log.log'
-#server.extra_main_args = [gem5_server_log, gem5DebugFlags, gem5DebugStart]
+gem5_server_log = f'--debug-file {gem5_server_pipe}'
 server.extra_main_args = [gem5_server_log, gem5DebugFlags]
 server.variant = 'opt'
 e.add_host(server)
 
 # attach server's NIC
 server_nic = I40eNIC()
-server_nic.log_file = '/local/jakobg/simbricks-tracing-experiments/wrkdir/server-nic.log'
+server_nic.log_file = nicbm_server_pipe
 e.add_nic(server_nic)
 server.add_nic(server_nic)
 

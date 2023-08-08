@@ -24,8 +24,16 @@
 
 #include "reader/reader.h"
 
+#include <filesystem>
+
 bool LineReader::OpenFile(const std::string &file_path) {
   CloseInput();
+  std::cout << "file_path: " << file_path << std::endl;
+  if (!std::filesystem::exists(file_path)) {
+    return false;
+  }
+
+  //input_stream_ = std::ifstream(file_path);
   input_stream_.open(file_path, std::ios_base::in | std::ios_base::binary);
   if (!input_stream_.is_open()) {
     return false;
@@ -180,6 +188,7 @@ bool LineReader::ConsumeAndTrimTillString(const std::string &to_consume) {
       cur_reading_pos_ = cur_reading_pos_ + consumed;
       return true;
     }
+    tf_start -= matched;
   }
 
   return false;

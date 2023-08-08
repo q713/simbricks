@@ -27,6 +27,7 @@
 
 #include <stdio.h>
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <memory>
@@ -37,27 +38,26 @@ namespace sim_log {
 
 #define SIMLOG 1
 
-enum StdTarget { to_err, to_out, to_file };
+enum StdTarget { to_err, to_out, to_file, to_pipe };
 
 class Log;
 
 using log_upt = std::unique_ptr<Log>;
 
-// TODO: add proper log levels (compile time)
 class Log {
  private:
-  Log(FILE *file, StdTarget target) : file_(file), target_(target) {
+  Log(FILE *file, const StdTarget target) : file_(file), target_(target) {
   }
 
-  // TODO: use ostream + std::fmt (c++20)
  public:
   std::mutex file_mutex_;
   FILE *file_;
-  StdTarget target_;
+  const StdTarget target_;
 
   ~Log() {
     file_mutex_.lock();
-    if (file_ != nullptr && target_ == StdTarget::to_file) {
+    if (file_ != nullptr &&
+        (target_ == StdTarget::to_file || target_ == StdTarget::to_pipe)) {
       fclose(file_);
     }
     file_mutex_.unlock();
@@ -74,7 +74,6 @@ class Log {
     return sim_log::log_upt(new sim_log::Log{out, target});
   }
 
-
   static log_upt createLog(const char *file_path) {
     if (file_path == nullptr) {
       fprintf(stderr, "error: file_path is null, fallback to stderr logging\n");
@@ -82,12 +81,14 @@ class Log {
     }
 
     FILE *file = fopen(file_path, "w");
+    const bool is_pipe = std::filesystem::is_fifo(file_path);
+    const StdTarget target = is_pipe ? StdTarget::to_pipe : StdTarget::to_file;
     if (file == nullptr) {
       fprintf(stderr, "error: cannot open file, fallback to stderr logging\n");
       return sim_log::Log::createLog(sim_log::StdTarget::to_err);
     }
 
-    return sim_log::log_upt(new Log{file, StdTarget::to_file});
+    return sim_log::log_upt(new Log{file, target});
   }
 };
 
@@ -151,7 +152,8 @@ class Logger {
       return;
     }
 
-    if (log->target_ == StdTarget::to_file) {
+    const StdTarget target = log->target_;
+    if (target == StdTarget::to_file || target == StdTarget::to_pipe) {
       std::lock_guard<std::mutex>(log->file_mutex_);
       this->log_internal(log->file_, format, args...);
     } else if (log->target_ == StdTarget::to_out) {
@@ -168,7 +170,8 @@ class Logger {
       return;
     }
 
-    if (log->target_ == StdTarget::to_file) {
+    const StdTarget target = log->target_;
+    if (target == StdTarget::to_file || target == StdTarget::to_pipe) {
       std::lock_guard<std::mutex>(log->file_mutex_);
       this->log_internal(log->file_, to_print);
     } else if (log->target_ == StdTarget::to_out) {

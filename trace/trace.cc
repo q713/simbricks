@@ -43,8 +43,8 @@
 #include "util/factory.h"
 #include "exporter/exporter.h"
 
-void create_open_file(std::ofstream &out, std::string filename) {
-  if (std::filesystem::exists(filename)) {
+void create_open_file(std::ofstream &out, std::string filename, bool allow_override) {
+  if (not allow_override and std::filesystem::exists(filename)) {
     std::stringstream error;
     error << "the file " << filename << " already exists, we will not overwrite it";
     throw std::runtime_error(error.str());
@@ -61,11 +61,12 @@ void create_open_file(std::ofstream &out, std::string filename) {
 
 std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
                                             cxxopts::ParseResult &result,
-                                            const std::string &option) {
+                                            const std::string &option,
+                                            bool allow_override) {
   std::shared_ptr<EventPrinter> printer;
   if (result.count(option) != 0) {
     try {
-      create_open_file(out, result[option].as<std::string>());
+      create_open_file(out, result[option].as<std::string>(), allow_override);
       printer = create_shared<EventPrinter>(printer_is_null, out);
     } catch (std::exception &exe) {
       std::cerr << "could not create printer: " << exe.what() << std::endl;
@@ -267,108 +268,73 @@ int main(int argc, char *argv[]) {
     exit(EXIT_FAILURE);
   }
 
-  auto server_host_task = [&]() {  // SERVER HOST PIPELINE
-    std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT, EventType::kSimSendSyncT};
-    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-
-    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
-        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
-
-    ComponentFilter comp_filter_server("ComponentFilter-Server");
-    LineReader server_lr;
-    auto gem5_server_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ServerParser",
-                                                     result["gem5-log-server"].as<std::string>(),
-                                                     comp_filter_server, server_lr);
-
-    std::ofstream out;
-    auto printer = createPrinter(out, result, "gem5-server-events");
-    if (not printer) {
-      exit(EXIT_FAILURE);
-    }
-
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
-    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5_server_par, pipes, printer);
-  };
-
-  auto client_host_task = [&]() {  // CLIENT HOST PIPELINE
-    std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT,
-                                  EventType::kSimSendSyncT};
-    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-
-    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
-        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
-
-    ComponentFilter comp_filter_client("ComponentFilter-Server");
-    LineReader client_lr;
-    auto gem5_client_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ClientParser",
-                                                     result["gem5-log-client"].as<std::string>(),
-                                                     comp_filter_client, client_lr);
-
-    std::ofstream out;
-    auto printer = createPrinter(out, result, "gem5-client-events");
-    if (not printer) {
-      exit(EXIT_FAILURE);
-    }
-
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
-    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5_client_par, pipes, printer);
-  };
-
-  auto server_nic_task = [&]() {  // SERVER NIC PIPELINE
-    std::set<EventType> to_filter{EventType::kSimProcInEventT, EventType::kSimSendSyncT};
-    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-
-    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
-        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
-
-    LineReader nic_ser_lr;
-    auto nic_ser_par = create_shared<NicBmParser>(parser_is_null, "NicbmServerParser",
-                                                  result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
-
-    std::ofstream out;
-    auto printer = createPrinter(out, result, "nicbm-server-events");
-    if (not printer) {
-      exit(EXIT_FAILURE);
-    }
-
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
-    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, nic_ser_par, pipes, printer);
-  };
-
-  auto client_nic_task = [&]() {  // CLIENT NIC PIPELINE
-    std::set<EventType> to_filter{EventType::kSimProcInEventT, EventType::kSimSendSyncT};
-    auto event_filter = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-
-    std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
-        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-    auto timestamp_filter = create_shared<EventTimestampFilter>(actor_is_null, bounds);
-
-    LineReader nic_cli_lr;
-    auto nic_cli_par = create_shared<NicBmParser>(parser_is_null, "NicbmClientParser",
-                                                  result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
-
-    std::ofstream out;
-    auto printer = createPrinter(out, result, "nicbm-client-events");
-    if (not printer) {
-      exit(EXIT_FAILURE);
-    }
-
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipes{timestamp_filter, event_filter};
-    run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, nic_cli_par, pipes, printer);
-  };
-
-  try {
-    server_host_task();
-    client_host_task();
-    server_nic_task();
-    client_nic_task();
-  } catch (const std::runtime_error &err) {
-    std::cerr << err.what() << std::endl;
+  // SERVER HOST PIPELINE
+  std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT, EventType::kSimSendSyncT};
+  auto event_filter_h_s = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
+  std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
+      EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+  auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, bounds);
+  ComponentFilter comp_filter_server("ComponentFilter-Server");
+  LineReader server_lr;
+  auto gem5_server_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ServerParser",
+                                                   result["gem5-log-server"].as<std::string>(),
+                                                   comp_filter_server, server_lr);
+  std::ofstream out_h_s;
+  auto printer_h_s = createPrinter(out_h_s, result, "gem5-server-events", true);
+  if (not printer_h_s) {
     exit(EXIT_FAILURE);
   }
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> server_host_pipes{timestamp_filter_h_s, event_filter_h_s};
+  const pipeline<std::shared_ptr<Event>> server_host_pipeline{gem5_server_par, server_host_pipes, printer_h_s};
+
+  // CLIENT HOST PIPELINE
+  auto event_filter_h_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
+  auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, bounds);
+  ComponentFilter comp_filter_client("ComponentFilter-Server");
+  LineReader client_lr;
+  auto gem5_client_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ClientParser",
+                                                   result["gem5-log-client"].as<std::string>(),
+                                                   comp_filter_client, client_lr);
+  std::ofstream out_h_c;
+  auto printer_h_c = createPrinter(out_h_c, result, "gem5-client-events", true);
+  if (not printer_h_c) {
+    exit(EXIT_FAILURE);
+  }
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> client_host_pipes{timestamp_filter_h_c, event_filter_h_c};
+  const pipeline<std::shared_ptr<Event>> client_host_pipeline{gem5_client_par, client_host_pipes, printer_h_c};
+
+  // SERVER NIC PIPELINE
+  auto event_filter_n_s = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
+  auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, bounds);
+  LineReader nic_ser_lr;
+  auto nic_ser_par = create_shared<NicBmParser>(parser_is_null, "NicbmServerParser",
+                                                result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
+  std::ofstream out_n_s;
+  auto printer_n_s = createPrinter(out_n_s, result, "nicbm-server-events", true);
+  if (not printer_n_s) {
+    exit(EXIT_FAILURE);
+  }
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> server_nic_pipes{timestamp_filter_n_s, event_filter_n_s};
+  const pipeline<std::shared_ptr<Event>> server_nic_pipeline{nic_ser_par, server_nic_pipes, printer_n_s};
+
+  // CLIENT NIC PIPELINE
+  auto event_filter_n_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
+  auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, bounds);
+  LineReader nic_cli_lr;
+  auto nic_cli_par = create_shared<NicBmParser>(parser_is_null, "NicbmClientParser",
+                                                result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
+
+  std::ofstream out_n_c;
+  auto printer_n_c = createPrinter(out_n_c, result, "nicbm-client-events", true);
+  if (not printer_n_c) {
+    exit(EXIT_FAILURE);
+  }
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> client_nic_pipes{timestamp_filter_n_c, event_filter_n_c};
+  const pipeline<std::shared_ptr<Event>> client_nic_pipeline{nic_cli_par, client_nic_pipes, printer_n_c};
+
+  std::vector<pipeline<std::shared_ptr<Event>>>
+      pipelines{server_host_pipeline, client_host_pipeline, server_nic_pipeline, client_nic_pipeline};
+  run_pipelines_parallel(thread_pool_executor, pipelines);
 
   exit(EXIT_SUCCESS);
 }

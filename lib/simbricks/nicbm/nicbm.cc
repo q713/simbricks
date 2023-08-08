@@ -626,13 +626,10 @@ int Runner::ParseArgs(int argc, char *argv[]) {
     }
 
 #ifdef DEBUG_NICBM
-    std::string log_file_path;
     sim_log::log_upt log;
 
     if (result.count("log-file-path")) {
-      // no copy needed, createLog will directly open the file and store the
-      // 'fd'
-      log_file_path = result["log-file-path"].as<std::string>();
+      std::string log_file_path = result["log-file-path"].as<std::string>();
       log_ = sim_log::Log::createLog(log_file_path.c_str());
     } else {
       log_ = sim_log::Log::createLog(sim_log::StdTarget::to_err);

@@ -22,7 +22,7 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// #define PARSER_DEBUG_NICBM_ 1
+//#define PARSER_DEBUG_NICBM_ 1
 
 #include "parser/parser.h"
 #include "util/log.h"
@@ -59,7 +59,7 @@ bool NicBmParser::ParseSyncInfo (bool &sync_pcie, bool &sync_eth)
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               name_.c_str(), line_reader_.get_cur_string().c_str());
+               name_.c_str(), line_reader_.GetCurString().c_str());
 #endif
       return false;
     }
@@ -74,7 +74,7 @@ bool NicBmParser::ParseSyncInfo (bool &sync_pcie, bool &sync_eth)
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               name_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
       return false;
     }
@@ -83,7 +83,7 @@ bool NicBmParser::ParseSyncInfo (bool &sync_pcie, bool &sync_eth)
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: could not find sync_eth in line '%s'\n",
-               name_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
       return false;
     }
@@ -92,7 +92,7 @@ bool NicBmParser::ParseSyncInfo (bool &sync_pcie, bool &sync_eth)
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               name_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
       return false;
     }
@@ -107,7 +107,7 @@ bool NicBmParser::ParseSyncInfo (bool &sync_pcie, bool &sync_eth)
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               name_.c_str(), line_reader_.get_raw_line().c_str());
+               name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
       return false;
     }
@@ -128,7 +128,7 @@ bool NicBmParser::ParseMacAddress (uint64_t &address)
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: mac_addr line '%s' has wrong format\n", name_.c_str(),
-               line_reader_.get_raw_line().c_str());
+               line_reader_.GetRawLine().c_str());
 #endif
       return false;
     }
@@ -150,7 +150,7 @@ bool NicBmParser::ParseOffLenValComma (uint64_t &off, size_t &len,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse off=0x in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -165,7 +165,7 @@ bool NicBmParser::ParseOffLenValComma (uint64_t &off, size_t &len,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse len= in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -175,7 +175,7 @@ bool NicBmParser::ParseOffLenValComma (uint64_t &off, size_t &len,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse off=0x in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -196,7 +196,7 @@ bool NicBmParser::ParseOpAddrLenPending (uint64_t &op, uint64_t &addr,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse op 0x in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -210,7 +210,7 @@ bool NicBmParser::ParseOpAddrLenPending (uint64_t &op, uint64_t &addr,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse addr in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -225,7 +225,7 @@ bool NicBmParser::ParseOpAddrLenPending (uint64_t &op, uint64_t &addr,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse len in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -241,7 +241,7 @@ bool NicBmParser::ParseOpAddrLenPending (uint64_t &op, uint64_t &addr,
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not parse pending in line '%s'\n", name_.c_str(),
-             line_reader_.get_raw_line().c_str());
+             line_reader_.GetRawLine().c_str());
 #endif
     return false;
   }
@@ -305,7 +305,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       // TODO: may parse nic statistics as well
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGIN("%s: found exit main_time %s\n", name_.c_str(),
-              line_reader_.get_raw_line().c_str());
+              line_reader_.GetRawLine().c_str());
 #endif
       continue;
     } else if (line_reader_.ConsumeAndTrimTillString(
@@ -325,7 +325,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: main line '%s' has wrong format\n", name_.c_str(),
-                 line_reader_.get_raw_line().c_str());
+                 line_reader_.GetRawLine().c_str());
 #endif
         continue;
       }
@@ -334,7 +334,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: could not parse timestamp in line '%s'",
-                 name_.c_str(), line_reader_.get_raw_line().c_str());
+                 name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
         continue;
       }
@@ -343,7 +343,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: line '%s' has wrong format for parsing event info",
-                 name_.c_str(), line_reader_.get_raw_line().c_str());
+                 name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
         continue;
       }
@@ -498,7 +498,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
       {
 #ifdef PARSER_DEBUG_NICBM_
         DFLOGERR("%s: line '%s' did not match any expected main line\n",
-                 name_.c_str(), line_reader_.get_raw_line().c_str());
+                 name_.c_str(), line_reader_.GetRawLine().c_str());
 #endif
         continue;
       }
@@ -506,7 +506,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
     {
 #ifdef PARSER_DEBUG_NICBM_
       DFLOGWARN("%s: could not parse given line '%s'\n", name_.c_str(),
-                line_reader_.get_raw_line().c_str());
+                line_reader_.GetRawLine().c_str());
 #endif
       continue;
     }

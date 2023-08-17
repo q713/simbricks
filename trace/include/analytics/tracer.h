@@ -170,6 +170,51 @@ class Tracer {
     waiting_list_.erase(parent_id);
   }
 
+  template<class SpanType, class... Args>
+  std::shared_ptr<SpanType> StartSpanByParentInternal(std::shared_ptr<EventSpan> parent_span,
+                                                      std::shared_ptr<Event> starting_event,
+                                                      Args &&... args) {
+    // NOTE: lock must be held when calling this method
+    assert(parent_span);
+    assert(starting_event);
+
+    auto parent_context = parent_span->GetContext();
+    const uint64_t trace_id = parent_context->GetTraceId();
+    auto trace_context = RegisterCreateContext(trace_id, parent_span);
+
+    auto new_span = create_shared<SpanType>(
+        "StartSpanByParentInternal(...) could not create a new span", trace_context, args...);
+    const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
+    throw_on(not was_added, "StartSpanByParentInternal(...) could not add first event");
+
+    // must add span to trace manually
+    AddSpanToTrace(trace_id, new_span);
+
+    return new_span;
+  }
+
+  template<class SpanType, class... Args>
+  std::shared_ptr<SpanType> StartSpanInternal(std::shared_ptr<Event> starting_event,
+                                              Args &&... args) {
+    // NOTE: lock must be held when calling this method
+    assert(starting_event);
+
+    uint64_t trace_id = TraceEnvironment::GetNextTraceId();
+    auto trace_context = RegisterCreateContext(trace_id, nullptr);
+
+    auto new_span = create_shared<SpanType>(
+        "StartSpanInternal(...) could not create a new span", trace_context, args...);
+    const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
+    throw_on(not was_added, "StartSpanInternal(...) could not add first event");
+
+    // TODO: not needed
+    auto new_trace = create_shared<Trace>(
+        "StartSpanInternal(...) could not create a new trace", trace_id, new_span);
+    InsertTrace(new_trace);
+
+    return new_span;
+  }
+
  public:
   void MarkSpanAsDone(std::shared_ptr<EventSpan> span) {
     // guard potential access using a lock guard
@@ -231,21 +276,23 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    throw_if_empty(parent_span, "StartSpan(...) parent span is null");
-    auto parent_context = parent_span->GetContext();
-    throw_if_empty(parent_context, "StartSpan(...) parent context is null");
-    const uint64_t trace_id = parent_context->GetTraceId();
+    throw_if_empty(starting_event, "StartSpanByParent(...) starting_event is null");
+    std::shared_ptr<SpanType> new_span = nullptr;
 
-    auto trace_context = RegisterCreateContext(trace_id, parent_span);
+    if (parent_span) {
+      throw_if_empty(parent_span->GetContext(),
+                     "StartSpanByParent(...) parent context is null");
+      new_span = StartSpanByParentInternal<SpanType, Args...>(
+          parent_span, starting_event, std::forward<Args>(args)...);
+    } else {
+      //std::cout << "StartSpanByParent: fallback to trace starting"
+      //             " span as no parent was given" << std::endl;
 
-    auto new_span = create_shared<SpanType>(
-        "StartSpan(Args &&... args) could not create a new span", trace_context, args...);
-    const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
-    throw_on(not was_added, "StartSpanByParent(...) could not add first event");
+      new_span = StartSpanInternal<SpanType, Args...>(starting_event,
+                                                      std::forward<Args>(args)...);
+    }
 
-    // must add span to trace manually
-    AddSpanToTrace(trace_id, new_span);
-
+    assert(new_span);
     return new_span;
   }
 
@@ -256,21 +303,10 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    uint64_t trace_id = TraceEnvironment::GetNextTraceId();
-
-    auto trace_context = RegisterCreateContext(trace_id, nullptr);
-
-    auto new_span = create_shared<SpanType>(
-        "StartSpan(...) could not create a new span", trace_context, args...);
-    const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
-    throw_on(not was_added, "StartSpan(...) could not add first event");
-
-    // span is here added to the trace
-    auto new_trace = create_shared<Trace>(
-        "StartSpan(...) could not create a new trace", trace_id, new_span);
-
-    InsertTrace(new_trace);
-
+    throw_if_empty(starting_event, "StartSpan(...) starting_event is null");
+    std::shared_ptr<SpanType> new_span = nullptr;
+    new_span = StartSpanInternal<SpanType, Args...>(starting_event, std::forward<Args>(args)...);
+    assert(new_span);
     return new_span;
   }
 

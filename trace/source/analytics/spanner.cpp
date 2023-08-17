@@ -33,14 +33,17 @@ concurrencpp::result<void> Spanner::consume(
   bool added = false;
   std::optional<std::shared_ptr<Event>> event_ptr_opt;
 
+  //size_t timer_key = co_await timer_.Register(resume_executor);
+
   for (event_ptr_opt = co_await src_chan->Pop(resume_executor); event_ptr_opt.has_value();
        event_ptr_opt = co_await src_chan->Pop(resume_executor)) {
 
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, event_is_null);
 
-    co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
-    //std::cout << name_ << " try handel: " << *event_ptr << std::endl;
+    //co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
+    //co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
+    std::cout << name_ << " try handel: " << *event_ptr << std::endl;
 
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {
@@ -62,7 +65,8 @@ concurrencpp::result<void> Spanner::consume(
     }
   }
 
-  co_await timer_.Done(resume_executor);
+  //co_await timer_.Done(resume_executor);
+  //co_await timer_.Done(resume_executor, timer_key);
 
   co_return;
 }

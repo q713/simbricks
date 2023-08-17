@@ -42,10 +42,11 @@ bool LineReader::OpenFile(const std::string &file_path) {
   cur_reading_pos_ = 0;
   line_number_ = 0;
 
-  return IsValid();
+  const bool valid = IsValid();
+  return valid;
 }
 
-bool LineReader::NextLine() {
+bool LineReader::NextLineSync() {
   bool found = false;
   while (!found) {
     if (input_stream_.eof() || !IsValid()) {
@@ -68,7 +69,42 @@ bool LineReader::NextLine() {
   cur_reading_pos_ = 0;
   cur_line_it_ = cur_line_.begin();
   cur_line_end_it_ = cur_line_.end();
+
   return true;
+}
+
+concurrencpp::lazy_result<bool>
+LineReader::NextLine() {
+  // switch execution to background executor
+  co_await concurrencpp::resume_on(background_executor_);
+
+  bool found = false;
+  while (!found) {
+    if (input_stream_.eof() || !IsValid()) {
+      co_return false;
+    }
+
+    std::getline(input_stream_, cur_line_);
+    if (input_stream_.fail()) {
+      co_return false;
+    }
+
+    ++line_number_;
+
+    if (skip_empty_lines_ and cur_line_.empty()) {
+      continue;
+    } else {
+      found = true;
+    }
+  }
+  cur_reading_pos_ = 0;
+  cur_line_it_ = cur_line_.begin();
+  cur_line_end_it_ = cur_line_.end();
+
+  // switch execution to foreground executor
+  co_await concurrencpp::resume_on(foreground_executor_);
+
+  co_return true;
 }
 
 bool LineReader::MoveForward(size_t steps) {
@@ -130,23 +166,6 @@ std::string LineReader::ExtractAndSubstrUntil(
 
   return false;
  }
-
-#if 0
-bool LineReader::TrimTillConsume(const std::string &to_consume, bool strict) {
-  if (IsEmpty() || CurLength() < to_consume.length()) {
-    return false;
-  }
-
-  auto sub_start = cur_line_.begin() + cur_reading_pos_;
-  auto start = std::search(sub_start, cur_line_.end(), to_consume.begin(), to_consume.end());
-  if (start == cur_line_.end() || (strict && start != sub_start)) {
-    return false;
-  }
-
-  cur_reading_pos_ = std::distance(cur_line_.begin(), start + to_consume.length());
-  return true;
-}
-#endif
 
 bool LineReader::ConsumeAndTrimTillString(const std::string &to_consume) {
   if (IsEmpty() || CurLength() < to_consume.length()) {

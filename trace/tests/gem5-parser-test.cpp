@@ -77,8 +77,14 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   const std::string test_file_path{"./tests/raw-logs/gem5-events-test.txt"};
   const std::string parser_name{"Gem5ClientParser"};
 
+  auto concurren_options = concurrencpp::runtime_options();
+  concurren_options.max_background_threads = 1;
+  concurren_options.max_cpu_threads = 1;
+  const concurrencpp::runtime runtime{concurren_options};
+
   ComponentFilter comp_filter_client("ComponentFilter-Server");
-  LineReader client_lr;
+  LineReader client_lr{runtime.background_executor(),
+                       runtime.thread_pool_executor()};
   auto gem5 = create_shared<Gem5Parser>(parser_is_null, parser_name,
                                         test_file_path,
                                         comp_filter_client, client_lr);
@@ -92,10 +98,6 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   };
   auto checker = std::make_shared<EventChecker>(to_match);
 
-  auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 1;
-  const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
   run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5, checker);
 

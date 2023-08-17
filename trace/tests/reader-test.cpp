@@ -24,17 +24,24 @@
 
 #include <catch2/catch_all.hpp>
 
+#include "corobelt/corobelt.h"
 #include "reader/reader.h"
 
 TEST_CASE("Test LineReader", "[LineReader]") {
 
-  LineReader line_reader;
+  auto concurren_options = concurrencpp::runtime_options();
+  concurren_options.max_background_threads = 1;
+  concurren_options.max_cpu_threads = 1;
+  const concurrencpp::runtime runtime{concurren_options};
+
+  LineReader line_reader{runtime.background_executor(),
+                         runtime.thread_pool_executor()};
   int int_target;
   uint64_t hex_target;
 
   REQUIRE(line_reader.OpenFile("tests/line-reader-test-files/simple.txt"));
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   line_reader.ParseInt(int_target);
   REQUIRE(int_target == 10);
   REQUIRE(line_reader.ConsumeAndTrimChar(' '));
@@ -43,33 +50,33 @@ TEST_CASE("Test LineReader", "[LineReader]") {
   line_reader.ParseInt(int_target);
   REQUIRE(int_target == 327846378);
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ConsumeAndTrimTillString("0x"));
   REQUIRE(line_reader.ParseUintTrim(16, hex_target));
   REQUIRE(hex_target == 0x23645);
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE_FALSE(line_reader.ConsumeAndTrimTillString("ks"));
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE_FALSE(line_reader.IsEmpty());
   REQUIRE(line_reader.ConsumeAndTrimString("Rathaus"));
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ConsumeAndTrimTillString("Rathaus"));
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ConsumeAndTrimTillString("Rathaus"));
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ConsumeAndTrimTillString("Rathaus"));
 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ConsumeAndTrimTillString("Rathaus"));
 
   // 1710532120875: system.switch_cpus: T0 : 0xffffffff814cf3c2    : mov        rax, GS:[0x1ac00]
   uint64_t timestamp, addr;
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ParseUintTrim(10, timestamp));
   REQUIRE(line_reader.ConsumeAndTrimChar(':'));
   line_reader.TrimL();
@@ -83,7 +90,7 @@ TEST_CASE("Test LineReader", "[LineReader]") {
 
 
   // 1710532121125: system.switch_cpus: T0 : 0xffffffff814cf3cb    : cmpxchg    DS:[rdi], rdx 
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ParseUintTrim(10, timestamp));
   REQUIRE(line_reader.ConsumeAndTrimChar(':'));
   line_reader.TrimL();
@@ -96,7 +103,7 @@ TEST_CASE("Test LineReader", "[LineReader]") {
   REQUIRE(0xffffffff814cf3cb == addr);
 
   // 1710969526625: system.switch_cpus: T0 : 0xffffffff81088093    : add     rax, GS:[rip + 0x7ef8d4d5]
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ParseUintTrim(10, timestamp));
   REQUIRE(line_reader.ConsumeAndTrimChar(':'));
   line_reader.TrimL();
@@ -109,7 +116,7 @@ TEST_CASE("Test LineReader", "[LineReader]") {
   REQUIRE(0xffffffff81088093 == addr);
 
   // 1710532121125: system.switch_cpus: T0 : 0xffffffff814cf3cb. 0 :   CMPXCHG_M_R : ldst   t1, DS:[rdi] : MemRead :  D=0xfff
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ParseUintTrim(10, timestamp));
   REQUIRE(line_reader.ConsumeAndTrimChar(':'));
   line_reader.TrimL();
@@ -121,7 +128,7 @@ TEST_CASE("Test LineReader", "[LineReader]") {
   REQUIRE(0xffffffff814cf3cb == addr);
 
   // 1710532121250: system.switch_cpus: T0 : 0xffffffff814cf3cb. 1 :   CMPXCHG_M_R : sub   t0, rax, t1 : IntAlu :  D=0x0000000000
-  REQUIRE(line_reader.NextLine());
+  REQUIRE(line_reader.NextLine().run().get());
   REQUIRE(line_reader.ParseUintTrim(10, timestamp));
   REQUIRE(line_reader.ConsumeAndTrimChar(':'));
   line_reader.TrimL();

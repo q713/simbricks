@@ -33,7 +33,6 @@
 #include "env/stringInternalizer.h"
 #include "env/symtable.h"
 
-
 // TODO: dont make this a singleton, pass it around as a reference/pointer!!!
 // TODO: add proper configuration (JSON?) support for the tracing environment!!!!
 class TraceEnvironment {
@@ -114,11 +113,15 @@ class TraceEnvironment {
   }
 
   static bool add_symbol_table(const std::string identifier,
+                               std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                               std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                                const std::string &file_path,
                                uint64_t address_offset, FilterType type,
                                std::set<std::string> symbol_filter);
 
   static bool add_symbol_table(const std::string identifier,
+                               std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                               std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                                const std::string &file_path,
                                uint64_t address_offset, FilterType type);
 

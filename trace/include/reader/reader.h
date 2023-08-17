@@ -30,11 +30,17 @@
 #include <fstream>
 #include <iostream>
 #include <string>
+#include <utility>
 
 #include "util/log.h"
 #include "util/string_util.h"
+#include "corobelt/corobelt.h"
 
 class LineReader {
+  using ExecutorT = std::shared_ptr<concurrencpp::thread_pool_executor>;
+
+  ExecutorT background_executor_;
+  ExecutorT foreground_executor_;
   std::ifstream input_stream_;
   size_t line_number_ = 0;
   size_t cur_reading_pos_ = 0;
@@ -44,10 +50,22 @@ class LineReader {
   bool skip_empty_lines_ = true;
 
  public:
-  explicit LineReader() = default;
+  explicit LineReader(ExecutorT background_executor,
+                      ExecutorT foreground_executor)
+      : background_executor_(std::move(background_executor)),
+        foreground_executor_(std::move(foreground_executor)) {
+    throw_if_empty(background_executor_, "LineReader: background executor empty");
+    throw_if_empty(foreground_executor_, "LineReader: foreground executor empty");
+  };
 
-  explicit LineReader(bool skip_empty_lines)
-      : skip_empty_lines_(skip_empty_lines) {
+  explicit LineReader(ExecutorT background_executor,
+                      ExecutorT foreground_executor,
+                      bool skip_empty_lines)
+      : background_executor_(std::move(background_executor)),
+        foreground_executor_(std::move(foreground_executor)),
+        skip_empty_lines_(skip_empty_lines) {
+    throw_if_empty(background_executor_, "LineReader: background executor empty");
+    throw_if_empty(foreground_executor_, "LineReader: foreground executor empty");
   }
 
   void CloseInput() {
@@ -88,7 +106,9 @@ class LineReader {
 
   bool OpenFile(const std::string &file_path);
 
-  bool NextLine();
+  bool NextLineSync();
+
+  concurrencpp::lazy_result<bool> NextLine();
 
   bool MoveForward(size_t steps);
 
@@ -110,8 +130,6 @@ class LineReader {
   bool SkipTillWhitespace() {
     return SkipTill(sim_string_utils::is_space);
   }
-
-  //bool TrimTillConsume(const std::string &to_consume, bool strict);
 
   bool ConsumeAndTrimTillString(const std::string &to_consume);
 

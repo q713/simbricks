@@ -1,4 +1,4 @@
-FROM simbricks/simbricks:latest
+FROM simbricks/simbricks:jakob
 RUN mv sims/external/gem5 sims/external/gem5-old \
  && git submodule update --init sims/external/gem5 \
  && make -j `nproc` sims/external/gem5/ready GEM5_VARIANT=opt \

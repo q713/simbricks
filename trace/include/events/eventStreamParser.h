@@ -70,7 +70,7 @@ struct EventStreamParser : public producer<std::shared_ptr<Event>> {
       co_return;
     }
 
-    while (line_reader_.NextLine()) {
+    while (co_await line_reader_.NextLine()) {
       line_reader_.TrimL();
 
       std::function<bool(unsigned char)> pred = [](unsigned char c) {

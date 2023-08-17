@@ -335,7 +335,8 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   throw_if_empty (resume_executor, resume_executor_null);
   throw_if_empty (tar_chan, channel_is_null);
 
-  if (!line_reader_.OpenFile(log_file_path_))
+  std::cout << "try open gem5" << std::endl;
+  if (not line_reader_.OpenFile(log_file_path_))
   {
 #ifdef PARSER_DEBUG_GEM5_
     DFLOGERR("%s: could not create reader\n", name_.c_str());
@@ -346,7 +347,7 @@ Gem5Parser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   std::shared_ptr<Event> event_ptr;
   std::string component;
   uint64_t timestamp;
-  while (line_reader_.NextLine())
+  while (co_await line_reader_.NextLine())
   {
     if (!ParseTimestamp(timestamp))
     {

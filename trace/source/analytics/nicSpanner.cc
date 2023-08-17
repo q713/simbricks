@@ -188,7 +188,7 @@ NicSpanner::HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
   co_return true;
 }
 
-NicSpanner::NicSpanner(std::string &&name, Tracer &tra, Timer &timer,
+NicSpanner::NicSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,

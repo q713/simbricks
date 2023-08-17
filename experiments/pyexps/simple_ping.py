@@ -33,8 +33,7 @@ from simbricks.orchestration.nodeconfig import (
 from simbricks.orchestration.simulators import Gem5Host, I40eNIC, SwitchNet
 
 
-#named_pipe_folder = "/usr/src/data-folder"
-named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir"
+named_pipe_folder = "/usr/src/data-folder"
 gem5_server_pipe = f"{named_pipe_folder}/gem5-server-log-pipe.pipe"
 gem5_client_pipe = f"{named_pipe_folder}/gem5-client-log-pipe.pipe"
 nicbm_server_pipe = f"{named_pipe_folder}/nicbm-server-log-pipe.pipe"

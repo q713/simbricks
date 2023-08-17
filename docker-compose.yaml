@@ -1,0 +1,70 @@
+#
+# Copyright 2022 Max Planck Institute for Software Systems, and
+# National University of Singapore
+#
+# Permission is hereby granted, free of charge, to any person obtaining
+# a copy of this software and associated documentation files (the
+# "Software"), to deal in the Software without restriction, including
+# without limitation the rights to use, copy, modify, merge, publish,
+# distribute, sublicense, and/or sell copies of the Software, and to
+# permit persons to whom the Software is furnished to do so, subject to
+# the following conditions:
+#
+# The above copyright notice and this permission notice shall be
+# included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+# CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+# TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+# SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+#
+
+version: '3'
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4318:4318" # HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    command: []
+
+  trace:
+    user: 24248:23700
+    build:
+      context: trace
+      dockerfile: Dockerfile.trace
+    container_name: trace
+    command:
+      - /bin/bash
+      - -c
+      - for i in {1..2}; do build-docker/trace --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-new-S.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-new-S.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
+    volumes:
+      - <path-to-workdirectory-containing-pipes>:/usr/src/data-folder
+      - <path-to-directory-containing-objdumps>:/usr/src/linux_dumbs
+    depends_on:
+      - jaeger
+    links:
+      - jaeger:jaeger
+
+  simbricks:
+    image: simbricks/simbricks-gem5opt:jakob
+    container_name: simbricks-test-opt
+    command:
+      - /bin/bash
+      - -c
+      - |
+        make convert-images-raw 
+        python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/simple_ping.py
+    volumes:
+      - <path-to-workdirectory-containing-pipes>:/usr/src/data-folder
+      - /dev/kvm:/dev/kvm
+    privileged: true
+    depends_on:
+      - trace
+

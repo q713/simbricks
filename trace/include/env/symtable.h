@@ -30,6 +30,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <utility>
 
 #include "util/log.h"
 #include "reader/reader.h"
@@ -47,13 +48,15 @@ class SymsFilter {
   StringInternalizer &i_;
 
   explicit SymsFilter(uint64_t id, const std::string component,
+                      std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                      std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                       std::set<std::string> symbol_filter,
                       StringInternalizer &i)
       : id_(id),
-        component_(std::move(component)),
-        line_reader_(true),
+        component_(component),
+        line_reader_(std::move(background_executor), std::move(foreground_executor), true),
         symbol_filter_(std::move(symbol_filter)),
-        i_(i){};
+        i_(i) {};
 
   bool ParseAddress(uint64_t &address);
 
@@ -112,14 +115,21 @@ class SymsFilter {
   const std::string *Filter(uint64_t address);
 
   static std::shared_ptr<SymsFilter> Create(
-      uint64_t id, const std::string component, const std::string &file_path,
+      uint64_t id, const std::string component,
+      std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+      std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
+      const std::string &file_path,
       uint64_t address_offset, FilterType type, StringInternalizer &i) {
-    return SymsFilter::Create(id, std::move(component), file_path,
+    return SymsFilter::Create(id, component, std::move(background_executor),
+                              std::move(foreground_executor), file_path,
                               address_offset, type, {}, i);
   }
 
   static std::shared_ptr<SymsFilter> Create(
-      uint64_t id, const std::string component, const std::string &file_path,
+      uint64_t id, const std::string component,
+      std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+      std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
+      const std::string &file_path,
       uint64_t address_offset, FilterType type,
       std::set<std::string> symbol_filter, StringInternalizer &i);
 

@@ -42,7 +42,8 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
   uint64_t id_;
   std::string name_;
   Tracer &tracer_;
-  Timer &timer_;
+  //Timer &timer_;
+  WeakTimer &timer_;
 
   using ExecutorT = std::shared_ptr<concurrencpp::executor>;
   using EventT = std::shared_ptr<Event>;
@@ -52,13 +53,14 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
   concurrencpp::result<void> consume(ExecutorT resume_executor, std::shared_ptr<Channel<EventT>> &src_chan) override;
 
-  explicit Spanner(std::string &&name, Tracer &tra, Timer &timer)
+  explicit Spanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer)
       : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer) {
   }
 
   explicit Spanner(std::string &&name,
                    Tracer &tra,
-                   Timer &timer,
+                   //Timer &timer,
+                   WeakTimer &timer,
                    std::unordered_map<EventType, HandlerT> &&handler)
       : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer), handler_(handler) {
   }
@@ -95,7 +97,7 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
 struct HostSpanner : public Spanner {
 
-  explicit HostSpanner(std::string &&name, Tracer &tra, Timer &timer,
+  explicit HostSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic,
                        std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_receives,
@@ -147,7 +149,7 @@ struct HostSpanner : public Spanner {
 
 struct NicSpanner : public Spanner {
 
-  explicit NicSpanner(std::string &&name, Tracer &tra, Timer &timer,
+  explicit NicSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,

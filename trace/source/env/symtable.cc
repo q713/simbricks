@@ -23,14 +23,15 @@
  */
 
 #include <functional>
+#include <utility>
 
 #include "env/symtable.h"
 #include "reader/reader.h"
 
 //#define SYMS_DEBUG_ 1
 #ifdef SYMS_DEBUG_
-  #include "util/string_util.h"
-  #include <cassert>
+#include "util/string_util.h"
+#include <cassert>
 #endif
 
 bool SymsFilter::ParseAddress(uint64_t &address) {
@@ -140,7 +141,7 @@ bool SymsFilter::LoadSyms(const std::string &file_path,
 
   uint64_t address = 0;
   std::string name = "";
-  while (line_reader_.NextLine()) {
+  while (line_reader_.NextLineSync()) {
     line_reader_.TrimL();
 
     // parse address
@@ -192,7 +193,7 @@ bool SymsFilter::LoadS(const std::string &file_path, uint64_t address_offset) {
 
   uint64_t address = 0;
   std::string symbol = "";
-  while (line_reader_.NextLine()) {
+  while (line_reader_.NextLineSync()) {
 #ifdef SYMS_DEBUG_
     DFLOGIN("%s: found line: %s\n", component_.c_str(),
             line_reader_.get_raw_line().c_str());
@@ -245,11 +246,11 @@ bool SymsFilter::LoadElf(const std::string &file_path,
 
   // the first 3 lines do not contain interesting information
   for (int i = 0; i < 3; i++)
-    line_reader_.NextLine();
+    line_reader_.NextLineSync();
 
   uint64_t address = 0;
   std::string label = "";
-  while (line_reader_.NextLine()) {
+  while (line_reader_.NextLineSync()) {
     line_reader_.TrimL();
     if (!line_reader_.SkipTillWhitespace()) {  // Num
       continue;
@@ -303,11 +304,15 @@ bool SymsFilter::LoadElf(const std::string &file_path,
 }
 
 std::shared_ptr<SymsFilter> SymsFilter::Create(
-    uint64_t id, const std::string component, const std::string &file_path,
+    uint64_t id, const std::string component,
+    std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+    std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
+    const std::string &file_path,
     uint64_t address_offset, FilterType type,
     std::set<std::string> symbol_filter, StringInternalizer &i) {
   std::shared_ptr<SymsFilter> filter{
-      new SymsFilter{id, std::move(component), std::move(symbol_filter), i}};
+      new SymsFilter{id, component, std::move(background_executor), std::move(foreground_executor),
+                     std::move(symbol_filter), i}};
   if (not filter) {
     return nullptr;
   }

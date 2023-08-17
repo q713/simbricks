@@ -1,4 +1,4 @@
-FROM simbricks/simbricks:latest
+FROM simbricks/simbricks:jakob
 RUN apt-get update \
  && apt-get install -y \
 	openssh-server \

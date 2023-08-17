@@ -139,98 +139,100 @@ int main(int argc, char *argv[]) {
   TraceEnvironment::initialize();
   // Init runtime and set threads to use --> IMPORTANT
   auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 1;
-  concurren_options.max_cpu_threads = 6;
+  concurren_options.max_background_threads = 6;
+  concurren_options.max_cpu_threads = 8;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
+  const auto background_executor = runtime.background_executor();
+
+  //const std::string jaeger_url = "http://localhost:4318/v1/traces";
+  std::string jaeger_url = "http://jaeger:4318/v1/traces";
+  simbricks::trace::OtlpSpanExporter
+      exporter{jaeger_url, false, "trace"};
+  // simbricks::trace::NoOpExporter exporter;
+
+  Tracer tracer{exporter};
+
+  constexpr size_t kAmountSources = 4;
+  //Timer timer{kAmountSources};
+  WeakTimer timer{kAmountSources};
+
+  using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
+  auto server_hn = create_shared<QueueT>(channel_is_null);
+  auto server_nh = create_shared<QueueT>(channel_is_null);
+  auto client_hn = create_shared<QueueT>(channel_is_null);
+  auto client_nh = create_shared<QueueT>(channel_is_null);
+  auto nic_cn = create_shared<QueueT>(channel_is_null);
+  auto nic_sn = create_shared<QueueT>(channel_is_null);
+  auto server_n_h_receive = create_shared<QueueT>(channel_is_null);
+  auto client_n_h_receive = create_shared<QueueT>(channel_is_null);
+
+  std::vector<EventTimestampFilter::EventTimeBoundary> timestamp_bounds{
+      EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
+
+  auto spanner_h_s = create_shared<HostSpanner>(spanner_is_null,
+                                                "Server-Host",
+                                                tracer,
+                                                timer,
+                                                server_hn,
+                                                server_nh,
+                                                server_n_h_receive,
+                                                false);
+
+  auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null,
+                                                "Client-Host",
+                                                tracer,
+                                                timer,
+                                                client_hn,
+                                                client_nh,
+                                                client_n_h_receive,
+                                                true);
+
+  auto spanner_n_s = create_shared<NicSpanner>(spanner_is_null,
+                                               "NIC-Server",
+                                               tracer,
+                                               timer,
+                                               nic_sn,
+                                               nic_cn,
+                                               server_nh,
+                                               server_hn,
+                                               server_n_h_receive);
+
+  auto spanner_n_c = create_shared<NicSpanner>(spanner_is_null,
+                                               "Client-NIC",
+                                               tracer,
+                                               timer,
+                                               nic_cn,
+                                               nic_sn,
+                                               client_nh,
+                                               client_hn,
+                                               client_n_h_receive);
 
   if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
       and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-    //const std::string jaeger_url = "http://localhost:4318/v1/traces";
-    //std::string jaeger_url = "http://jaeger:4318/v1/traces";
-    //simbricks::trace::OtlpSpanExporter
-    //    exporter{jaeger_url, false, "trace"};
-    simbricks::trace::NoOpExporter exporter;
-
-    Tracer tracer{exporter};
-
-    constexpr size_t kAmountSources = 4;
-    Timer timer{kAmountSources};
-
-    using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
-    auto server_hn = create_shared<QueueT>(channel_is_null);
-    auto server_nh = create_shared<QueueT>(channel_is_null);
-    auto client_hn = create_shared<QueueT>(channel_is_null);
-    auto client_nh = create_shared<QueueT>(channel_is_null);
-    auto nic_cn = create_shared<QueueT>(channel_is_null);
-    auto nic_sn = create_shared<QueueT>(channel_is_null);
-    auto server_n_h_receive = create_shared<QueueT>(channel_is_null);
-    auto client_n_h_receive = create_shared<QueueT>(channel_is_null);
-
-    std::vector<EventTimestampFilter::EventTimeBoundary> timestamp_bounds{
-        EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-
-    LineReader lr_h_s;
+    LineReader lr_h_s{background_executor, thread_pool_executor};
     auto parser_h_s = EventStreamParser::Create(result["gem5-server-event-stream"].as<std::string>(), lr_h_s);
     auto filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
-    auto spanner_h_s =
-        create_shared<HostSpanner>(spanner_is_null,
-                                   "Server-Host",
-                                   tracer,
-                                   timer,
-                                   server_hn,
-                                   server_nh,
-                                   server_n_h_receive,
-                                   false);
     const pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pipeline_h_s, spanner_h_s};
 
-    LineReader lr_h_c;
+    LineReader lr_h_c{background_executor, thread_pool_executor};
     auto parser_h_c = EventStreamParser::Create(result["gem5-client-event-stream"].as<std::string>(), lr_h_c);
     auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
-    auto spanner_h_c =
-        create_shared<HostSpanner>(spanner_is_null,
-                                   "Client-Host",
-                                   tracer,
-                                   timer,
-                                   client_hn,
-                                   client_nh,
-                                   client_n_h_receive,
-                                   true);
     const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
 
-    LineReader lr_n_s;
+    LineReader lr_n_s{background_executor, thread_pool_executor};
     auto parser_n_s = EventStreamParser::Create(result["nicbm-server-event-stream"].as<std::string>(), lr_n_s);
     auto filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
-    auto spanner_n_s =
-        create_shared<NicSpanner>(spanner_is_null,
-                                  "NIC-Server",
-                                  tracer,
-                                  timer,
-                                  nic_sn,
-                                  nic_cn,
-                                  server_nh,
-                                  server_hn,
-                                  server_n_h_receive);
     const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pipeline_n_s, spanner_n_s};
 
-    LineReader lr_n_c;
+    LineReader lr_n_c{background_executor, thread_pool_executor};
     auto parser_n_c = EventStreamParser::Create(result["nicbm-client-event-stream"].as<std::string>(), lr_n_c);
     auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
-    auto spanner_n_c =
-        create_shared<NicSpanner>(spanner_is_null,
-                                  "Client-NIC",
-                                  tracer,
-                                  timer,
-                                  nic_cn,
-                                  nic_sn,
-                                  client_nh,
-                                  client_hn,
-                                  client_n_h_receive);
     const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
 
     std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s};
@@ -254,6 +256,7 @@ int main(int argc, char *argv[]) {
   if (result.count("linux-dump-server-client") &&
       !TraceEnvironment::add_symbol_table(
           "Linuxvm-Symbols",
+          background_executor, thread_pool_executor,
           result["linux-dump-server-client"].as<std::string>(), 0,
           FilterType::kS)) {
     std::cerr << "could not initialize symbol table linux-dump-server-client"
@@ -262,7 +265,9 @@ int main(int argc, char *argv[]) {
   }
   if (result.count("nic-i40e-dump") &&
       !TraceEnvironment::add_symbol_table(
-          "Nicdriver-Symbols", result["nic-i40e-dump"].as<std::string>(),
+          "Nicdriver-Symbols", 
+          background_executor, thread_pool_executor,
+          result["nic-i40e-dump"].as<std::string>(),
           0xffffffffa0000000ULL, FilterType::kS)) {
     std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
     exit(EXIT_FAILURE);
@@ -271,11 +276,9 @@ int main(int argc, char *argv[]) {
   // SERVER HOST PIPELINE
   std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT, EventType::kSimSendSyncT};
   auto event_filter_h_s = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-  std::vector<EventTimestampFilter::EventTimeBoundary> bounds{
-      EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
-  auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, bounds);
+  auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
   ComponentFilter comp_filter_server("ComponentFilter-Server");
-  LineReader server_lr;
+  LineReader server_lr{background_executor, thread_pool_executor};
   auto gem5_server_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ServerParser",
                                                    result["gem5-log-server"].as<std::string>(),
                                                    comp_filter_server, server_lr);
@@ -284,14 +287,16 @@ int main(int argc, char *argv[]) {
   if (not printer_h_s) {
     exit(EXIT_FAILURE);
   }
-  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> server_host_pipes{timestamp_filter_h_s, event_filter_h_s};
-  const pipeline<std::shared_ptr<Event>> server_host_pipeline{gem5_server_par, server_host_pipes, printer_h_s};
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+      server_host_pipes{timestamp_filter_h_s, event_filter_h_s, printer_h_s};
+  const pipeline<std::shared_ptr<Event>> server_host_pipeline{
+      gem5_server_par, server_host_pipes, spanner_h_s};
 
   // CLIENT HOST PIPELINE
   auto event_filter_h_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-  auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, bounds);
+  auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
   ComponentFilter comp_filter_client("ComponentFilter-Server");
-  LineReader client_lr;
+  LineReader client_lr{background_executor, thread_pool_executor};
   auto gem5_client_par = create_shared<Gem5Parser>(parser_is_null, "Gem5ClientParser",
                                                    result["gem5-log-client"].as<std::string>(),
                                                    comp_filter_client, client_lr);
@@ -300,13 +305,15 @@ int main(int argc, char *argv[]) {
   if (not printer_h_c) {
     exit(EXIT_FAILURE);
   }
-  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> client_host_pipes{timestamp_filter_h_c, event_filter_h_c};
-  const pipeline<std::shared_ptr<Event>> client_host_pipeline{gem5_client_par, client_host_pipes, printer_h_c};
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+      client_host_pipes{timestamp_filter_h_c, event_filter_h_c, printer_h_c};
+  const pipeline<std::shared_ptr<Event>> client_host_pipeline{
+      gem5_client_par, client_host_pipes, spanner_h_c};
 
   // SERVER NIC PIPELINE
   auto event_filter_n_s = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-  auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, bounds);
-  LineReader nic_ser_lr;
+  auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+  LineReader nic_ser_lr{background_executor, thread_pool_executor};
   auto nic_ser_par = create_shared<NicBmParser>(parser_is_null, "NicbmServerParser",
                                                 result["nicbm-log-server"].as<std::string>(), nic_ser_lr);
   std::ofstream out_n_s;
@@ -314,26 +321,29 @@ int main(int argc, char *argv[]) {
   if (not printer_n_s) {
     exit(EXIT_FAILURE);
   }
-  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> server_nic_pipes{timestamp_filter_n_s, event_filter_n_s};
-  const pipeline<std::shared_ptr<Event>> server_nic_pipeline{nic_ser_par, server_nic_pipes, printer_n_s};
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+      server_nic_pipes{timestamp_filter_n_s, event_filter_n_s, printer_n_s};
+  const pipeline<std::shared_ptr<Event>> server_nic_pipeline{
+      nic_ser_par, server_nic_pipes, spanner_n_s};
 
   // CLIENT NIC PIPELINE
   auto event_filter_n_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-  auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, bounds);
-  LineReader nic_cli_lr;
+  auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+  LineReader nic_cli_lr{background_executor, thread_pool_executor};
   auto nic_cli_par = create_shared<NicBmParser>(parser_is_null, "NicbmClientParser",
                                                 result["nicbm-log-client"].as<std::string>(), nic_cli_lr);
-
   std::ofstream out_n_c;
   auto printer_n_c = createPrinter(out_n_c, result, "nicbm-client-events", true);
   if (not printer_n_c) {
     exit(EXIT_FAILURE);
   }
-  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> client_nic_pipes{timestamp_filter_n_c, event_filter_n_c};
-  const pipeline<std::shared_ptr<Event>> client_nic_pipeline{nic_cli_par, client_nic_pipes, printer_n_c};
+  std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+      client_nic_pipes{timestamp_filter_n_c, event_filter_n_c, printer_n_c};
+  const pipeline<std::shared_ptr<Event>> client_nic_pipeline{
+      nic_cli_par, client_nic_pipes, spanner_n_c};
 
   std::vector<pipeline<std::shared_ptr<Event>>>
-      pipelines{server_host_pipeline, client_host_pipeline, server_nic_pipeline, client_nic_pipeline};
+      pipelines{client_host_pipeline, client_nic_pipeline, server_host_pipeline, server_nic_pipeline};
   run_pipelines_parallel(thread_pool_executor, pipelines);
 
   exit(EXIT_SUCCESS);

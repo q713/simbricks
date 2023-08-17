@@ -256,7 +256,8 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   throw_if_empty (resume_executor, resume_executor_null);
   throw_if_empty (tar_chan, channel_is_null);
 
-  if (!line_reader_.OpenFile(log_file_path_))
+  std::cout << "try open nicbm" << std::endl;
+  if (not line_reader_.OpenFile(log_file_path_))
   {
 #ifdef PARSER_DEBUG_NICBM_
     DFLOGERR("%s: could not create reader\n", name_.c_str());
@@ -268,8 +269,8 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   bool sync_pci = false;
   bool sync_eth = false;
 
-  // parse mac address and sync informations
-  if (line_reader_.NextLine())
+  // parse mac address and sync information
+  if (co_await line_reader_.NextLine())
   {
     if (!ParseMacAddress(mac_address))
     {
@@ -279,7 +280,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
     DFLOGIN("%s: found mac_addr=%lx\n", name_.c_str(), mac_address);
 #endif
   }
-  if (line_reader_.NextLine())
+  if (co_await line_reader_.NextLine())
   {
     if (!ParseSyncInfo(sync_pci, sync_eth))
     {
@@ -296,7 +297,7 @@ NicBmParser::produce (std::shared_ptr<concurrencpp::executor> resume_executor,
   int port;
   size_t len;
   // parse the actual events of interest
-  while (line_reader_.NextLine())
+  while (co_await line_reader_.NextLine())
   {
     line_reader_.TrimL();
     if (line_reader_.ConsumeAndTrimTillString(

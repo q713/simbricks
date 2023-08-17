@@ -1153,8 +1153,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
          msg = co_await src_chan->Pop(resume_executor)) {
-      const std::shared_ptr<Event> &event = OrElseThrow(
-        msg, "EventPrinter::print: no optional value given");
+      const std::shared_ptr<Event> &event = msg.value();
       print(event);
     }
     co_return;
@@ -1167,14 +1166,15 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
   ) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);
+    throw_if_empty(tar_chan, channel_is_null);
 
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
          msg = co_await src_chan->Pop(resume_executor)) {
-      std::shared_ptr<Event> event = OrElseThrow(
-        msg, "EventPrinter::print: no optional value given");
+      std::shared_ptr<Event> event = msg.value();
       print(event);
-      throw_on(co_await tar_chan->Push(resume_executor, event), 
+      const bool was_pushed = co_await tar_chan->Push(resume_executor, event);
+      throw_on(not was_pushed, 
                "EventPrinter::process: Could not push to target channel");
     }
     co_return;

@@ -73,7 +73,7 @@ class Timer {
       concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
       co_await timer_cv_.await(resume_executor, guard, [this, timestamp]() {
         return (waiters_that_reached_maximum_ == amount_waiters_ and waiters_.top() == timestamp)
-               or (cur_maximum_ >= timestamp);
+            or (cur_maximum_ >= timestamp);
       });
       if (timestamp > cur_maximum_) {
         cur_maximum_ = timestamp;
@@ -84,6 +84,107 @@ class Timer {
 
     timer_cv_.notify_all();
   }
+};
+
+class WeakTimer {
+  using ExecutorT = std::shared_ptr<concurrencpp::executor>;
+  using KeyResT = concurrencpp::result<size_t>;
+  using VoidResT = concurrencpp::result<void>;
+
+ private:
+  concurrencpp::async_lock timer_lock_;
+  concurrencpp::async_condition_variable timer_cv_;
+  size_t amount_waiters_;
+  size_t next_key_ = 0;
+  std::vector<uint64_t> waiters_;
+  uint64_t cur_minimum_ = UINT64_MAX;
+  size_t registered_ = 0;
+  size_t waiters_that_reached_min_ = 0;
+  size_t still_needed_waiters_;
+
+  void ComputeMin() {
+    // NOTE: lock must be held when calling this method
+    cur_minimum_ = UINT64_MAX;
+    // O(n)... however probably much more efficient for small
+    // amount of waiters than "fancy" data structures
+    for (size_t index = 0; index < amount_waiters_; index++) {
+      if (waiters_[index] < cur_minimum_) {
+        cur_minimum_ = waiters_[index];
+      }
+    }
+  }
+
+ public:
+  explicit WeakTimer(size_t amount_waiters) : amount_waiters_(amount_waiters),
+                                              still_needed_waiters_(amount_waiters) {
+    throw_on(amount_waiters < 2,
+             "WeakTimer: must use more than one waiter, otherwise the timer is useless");
+    waiters_.resize(amount_waiters);
+  };
+
+  KeyResT Register(ExecutorT resume_executor) {
+    {
+      concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
+      throw_on(registered_ >= amount_waiters_, "Timer::Register: already AmountWaiters many waiters registered");
+      ++registered_;
+      size_t key = next_key_++;
+      waiters_[key] = UINT64_MAX;
+      if (registered_ == amount_waiters_) {
+        timer_cv_.notify_one();
+      }
+      co_return key;
+    }
+  }
+
+  VoidResT Done(ExecutorT resume_executor, size_t key) {
+    {
+      concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
+      --still_needed_waiters_;
+      waiters_[key] = UINT64_MAX;
+      ComputeMin();
+      timer_cv_.notify_all();
+    }
+  }
+
+  VoidResT MoveForward(ExecutorT resume_executor, size_t key, uint64_t timestamp) {
+    {
+      concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
+      throw_on(key >= amount_waiters_, "Timer::Register: try moving forward with illegal key");
+
+      // wait for all waiters to at least register
+      auto a = registered_;
+      co_await timer_cv_.await(resume_executor, guard, [this]() {
+        return registered_ == amount_waiters_;
+      });
+      waiters_[key] = timestamp;
+      // move forward if smaller than the current minimum/when being in the past
+      if (timestamp < cur_minimum_) {
+        ComputeMin();
+        timer_cv_.notify_all();
+        co_return;
+      }
+
+      ++waiters_that_reached_min_;
+      // find the minimum whenb all are waiting currently
+      if (waiters_that_reached_min_ == still_needed_waiters_) {
+        ComputeMin();
+        if (timestamp <= cur_minimum_) {
+          // if minimum return
+          --waiters_that_reached_min_;
+          co_return;
+        }
+        timer_cv_.notify_all();
+      }
+
+      // await being the minimum and notify others
+      co_await timer_cv_.await(resume_executor, guard, [this, timestamp]() {
+        return cur_minimum_ == timestamp;
+      });
+      --waiters_that_reached_min_;
+    }
+    co_return;
+  }
+
 };
 
 #endif // SIMBRICKS_TRACE_TIMER_H_

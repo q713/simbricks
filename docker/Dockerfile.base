@@ -1,4 +1,4 @@
-FROM simbricks/simbricks-build:latest
+FROM simbricks/simbricks-build:jakob
 COPY . /simbricks
 WORKDIR /simbricks
 RUN make -j `nproc` ENABLE_VERILATOR=y

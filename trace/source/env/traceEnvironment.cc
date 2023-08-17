@@ -24,6 +24,8 @@
 
 #include "env/traceEnvironment.h"
 
+#include <utility>
+
 std::mutex TraceEnvironment::trace_env_mutex_;
 
 StringInternalizer TraceEnvironment::internalizer_;
@@ -181,15 +183,18 @@ void TraceEnvironment::initialize() {
 }
 
 bool TraceEnvironment::add_symbol_table(const std::string component,
+                                        std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                                        std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                                         const std::string &file_path,
                                         uint64_t address_offset,
                                         FilterType type,
                                         std::set<std::string> symbol_filter) {
   const std::lock_guard<std::mutex> lock(trace_env_mutex_);
   static uint64_t next_id = 0;
-  auto filter_ptr = SymsFilter::Create(++next_id, component,
-                                       file_path, address_offset, type,
-                                       std::move(symbol_filter), internalizer_);
+  auto filter_ptr =
+      SymsFilter::Create(++next_id, component, std::move(background_executor), std::move(foreground_executor),
+                         file_path, address_offset, type,
+                         std::move(symbol_filter), internalizer_);
 
   if (not filter_ptr) {
     return false;
@@ -199,11 +204,18 @@ bool TraceEnvironment::add_symbol_table(const std::string component,
 }
 
 bool TraceEnvironment::add_symbol_table(const std::string identifier,
+                                        std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                                        std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                                         const std::string &file_path,
                                         uint64_t address_offset,
                                         FilterType type) {
-  return add_symbol_table(identifier, file_path, address_offset,
-                          type, {});
+  return add_symbol_table(identifier,
+                          std::move(background_executor),
+                          std::move(foreground_executor),
+                          file_path,
+                          address_offset,
+                          type,
+                          {});
 }
 
 std::pair<const std::string *, const std::string *>

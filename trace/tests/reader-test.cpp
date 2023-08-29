@@ -27,6 +27,165 @@
 #include "corobelt/corobelt.h"
 #include "reader/reader.h"
 
+
+TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
+
+  auto concurren_options = concurrencpp::runtime_options();
+  concurren_options.max_background_threads = 1;
+  concurren_options.max_cpu_threads = 1;
+  const concurrencpp::runtime runtime{concurren_options};
+
+  ReaderBuffer<10> reader_buffer{"test-reader-buffer", true};
+
+  int int_target;
+  uint64_t hex_target;
+  LineHandler line_handler;
+  std::pair<bool, LineHandler> bh_p;
+
+  REQUIRE_NOTHROW(reader_buffer.OpenFile("tests/line-reader-test-files/simple.txt"));
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ParseInt(int_target));
+  REQUIRE(int_target == 10);
+  REQUIRE(line_handler.ConsumeAndTrimChar(' '));
+  REQUIRE(line_handler.ConsumeAndTrimString("Hallo"));
+  REQUIRE(line_handler.ConsumeAndTrimChar(' '));
+  REQUIRE(line_handler.ParseInt(int_target));
+  REQUIRE(int_target == 327846378);
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
+  REQUIRE(line_handler.ParseUintTrim(16, hex_target));
+  REQUIRE(hex_target == 0x23645);
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE_FALSE(line_handler.ConsumeAndTrimTillString("ks"));
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE_FALSE(line_handler.IsEmpty());
+  REQUIRE(line_handler.ConsumeAndTrimString("Rathaus"));
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
+
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
+
+  // 1710532120875: system.switch_cpus: T0 : 0xffffffff814cf3c2    : mov        rax, GS:[0x1ac00]
+  uint64_t timestamp, addr;
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ParseUintTrim(10, timestamp));
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimString("system.switch_cpus:"));
+  REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
+  REQUIRE(line_handler.ParseUintTrim(16, addr));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  REQUIRE(1710532120875 == timestamp);
+  REQUIRE(0xffffffff814cf3c2 == addr);
+
+  // 1710532121125: system.switch_cpus: T0 : 0xffffffff814cf3cb    : cmpxchg    DS:[rdi], rdx
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ParseUintTrim(10, timestamp));
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimString("system.switch_cpus:"));
+  REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
+  REQUIRE(line_handler.ParseUintTrim(16, addr));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  REQUIRE(1710532121125 == timestamp);
+  REQUIRE(0xffffffff814cf3cb == addr);
+
+  // 1710969526625: system.switch_cpus: T0 : 0xffffffff81088093    : add     rax, GS:[rip + 0x7ef8d4d5]
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ParseUintTrim(10, timestamp));
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimString("system.switch_cpus:"));
+  REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
+  REQUIRE(line_handler.ParseUintTrim(16, addr));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  REQUIRE(1710969526625 == timestamp);
+  REQUIRE(0xffffffff81088093 == addr);
+
+  // 1710532121125: system.switch_cpus: T0 : 0xffffffff814cf3cb. 0 :   CMPXCHG_M_R : ldst   t1, DS:[rdi] : MemRead :  D=0xfff
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ParseUintTrim(10, timestamp));
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimString("system.switch_cpus:"));
+  REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
+  REQUIRE(line_handler.ParseUintTrim(16, addr));
+  REQUIRE(line_handler.ConsumeAndTrimChar('.'));
+  REQUIRE(1710532121125 == timestamp);
+  REQUIRE(0xffffffff814cf3cb == addr);
+
+  // 1710532121250: system.switch_cpus: T0 : 0xffffffff814cf3cb. 1 :   CMPXCHG_M_R : sub   t0, rax, t1 : IntAlu :  D=0x0000000000
+  REQUIRE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE(bh_p.first);
+  line_handler = bh_p.second;
+  REQUIRE(line_handler.ParseUintTrim(10, timestamp));
+  REQUIRE(line_handler.ConsumeAndTrimChar(':'));
+  line_handler.TrimL();
+  REQUIRE(line_handler.ConsumeAndTrimString("system.switch_cpus:"));
+  REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
+  REQUIRE(line_handler.ParseUintTrim(16, addr));
+  REQUIRE(line_handler.ConsumeAndTrimChar('.'));
+  REQUIRE(1710532121250 == timestamp);
+  REQUIRE(0xffffffff814cf3cb == addr);
+
+  REQUIRE_FALSE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE_FALSE(bh_p.first);
+}
+
+#if 0
 TEST_CASE("Test LineReader", "[LineReader]") {
 
   auto concurren_options = concurrencpp::runtime_options();
@@ -34,7 +193,8 @@ TEST_CASE("Test LineReader", "[LineReader]") {
   concurren_options.max_cpu_threads = 1;
   const concurrencpp::runtime runtime{concurren_options};
 
-  LineReader line_reader{runtime.background_executor(),
+  LineReader line_reader{"test-reader",
+                         runtime.background_executor(),
                          runtime.thread_pool_executor()};
   int int_target;
   uint64_t hex_target;
@@ -140,5 +300,5 @@ TEST_CASE("Test LineReader", "[LineReader]") {
   REQUIRE(0xffffffff814cf3cb == addr);
 
 }
-
+#endif
 

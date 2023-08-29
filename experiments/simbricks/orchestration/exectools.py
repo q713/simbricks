@@ -348,7 +348,7 @@ class LocalExecutor(Executor):
     def create_component(self, label, parts, **kwargs):
         return SimpleComponent(label, parts, **kwargs)
 
-    async def await_file(self, path, delay=0.05, verbose=False, timeout=30):
+    async def await_file(self, path, delay=0.05, verbose=False, timeout=500):
         if verbose:
             print(f'await_file({path})')
         t = 0

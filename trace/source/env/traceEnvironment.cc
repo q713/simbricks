@@ -184,6 +184,7 @@ void TraceEnvironment::initialize() {
 
 bool TraceEnvironment::add_symbol_table(const std::string component,
                                         std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                                        //std::shared_ptr<concurrencpp::thread_executor> background_executor,
                                         std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                                         const std::string &file_path,
                                         uint64_t address_offset,
@@ -205,6 +206,7 @@ bool TraceEnvironment::add_symbol_table(const std::string component,
 
 bool TraceEnvironment::add_symbol_table(const std::string identifier,
                                         std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
+                                        //std::shared_ptr<concurrencpp::thread_executor> background_executor,
                                         std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                                         const std::string &file_path,
                                         uint64_t address_offset,

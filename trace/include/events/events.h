@@ -1136,6 +1136,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
   inline void print(const std::shared_ptr<Event>& event) {
     throw_if_empty(event, event_is_null);
     out_ << *event << std::endl;
+    out_.flush();
   }
 
  public:
@@ -1156,6 +1157,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       const std::shared_ptr<Event> &event = msg.value();
       print(event);
     }
+
+    std::cout << "event printer exited" << std::endl;
     co_return;
   }
 
@@ -1177,6 +1180,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       throw_on(not was_pushed, 
                "EventPrinter::process: Could not push to target channel");
     }
+    std::cout << "event printer exited" << std::endl;
     co_return;
   }
 };

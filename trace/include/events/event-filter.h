@@ -63,6 +63,9 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
         co_await tar_chan->Push(resume_executor, event);
       }
     }
+
+    std::cout << "event actor exited" << std::endl;
+
     co_return;
   }
 

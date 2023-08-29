@@ -83,7 +83,58 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   const concurrencpp::runtime runtime{concurren_options};
 
   ComponentFilter comp_filter_client("ComponentFilter-Server");
-  LineReader client_lr{runtime.background_executor(),
+
+  ReaderBuffer<10> reader_buffer{"test-reader", true};
+  REQUIRE_NOTHROW(reader_buffer.OpenFile(test_file_path));
+
+  auto gem5 = create_shared<Gem5Parser>(parser_is_null,
+                                        runtime.thread_pool_executor(),
+                                        parser_name,
+                                        comp_filter_client);
+
+  std::shared_ptr<Event> parsed_event;
+  LineHandler line_handler;
+
+  const std::vector<std::shared_ptr<Event>> to_match{
+      std::make_shared<HostMmioR>(1869691991749,
+                                  gem5->GetIdent(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
+      std::make_shared<HostMmioR>(1869693118999,
+                                  gem5->GetIdent(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
+      std::make_shared<HostMmioR>(1869699347625, gem5->GetIdent(), parser_name, 94469181901728, 0xc040000c, 4, 3, 0xc),
+      std::make_shared<HostMmioR>(1869699662249, gem5->GetIdent(), parser_name, 94469181901920, 0xc040001c, 4, 3, 0x1c)
+  };
+
+  std::pair<bool, LineHandler> bh_p;
+  for (const auto &match : to_match) {
+    REQUIRE(reader_buffer.HasStillLine());
+    REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+    REQUIRE(bh_p.first);
+    line_handler = bh_p.second;
+    parsed_event = gem5->ParseEvent(line_handler).run().get();
+    REQUIRE(parsed_event);
+    REQUIRE(parsed_event->Equal(*match));
+  }
+
+  REQUIRE_FALSE(reader_buffer.HasStillLine());
+  REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
+  REQUIRE_FALSE(bh_p.first);
+}
+
+#if 0
+TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
+
+  const std::string test_file_path{"./tests/raw-logs/gem5-events-test.txt"};
+  const std::string parser_name{"Gem5ClientParser"};
+
+  auto concurren_options = concurrencpp::runtime_options();
+  concurren_options.max_background_threads = 1;
+  concurren_options.max_cpu_threads = 1;
+  const concurrencpp::runtime runtime{concurren_options};
+
+  ComponentFilter comp_filter_client("ComponentFilter-Server");
+
+  LineReader client_lr{"test-reader",
+                       runtime.background_executor(),
                        runtime.thread_pool_executor()};
   auto gem5 = create_shared<Gem5Parser>(parser_is_null, parser_name,
                                         test_file_path,
@@ -102,5 +153,6 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5, checker);
 
 }
+#endif
 
 

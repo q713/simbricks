@@ -34,23 +34,22 @@ services:
       - COLLECTOR_OTLP_ENABLED=true
     command: []
 
-  trace:
-    user: 24248:23700
-    build:
-      context: trace
-      dockerfile: Dockerfile.trace
-    container_name: trace
-    command:
-      - /bin/bash
-      - -c
-      - for i in {1..2}; do build-docker/trace --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-new-S.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-new-S.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
-    volumes:
-      - <path-to-workdirectory-containing-pipes>:/usr/src/data-folder
-      - <path-to-directory-containing-objdumps>:/usr/src/linux_dumbs
-    depends_on:
-      - jaeger
-    links:
-      - jaeger:jaeger
+  #trace:
+  #  build:
+  #    context: trace
+  #    dockerfile: Dockerfile.trace
+  #  container_name: trace
+  #  command:
+  #    - /bin/bash
+  #    - -c
+  #    - for i in {1..2}; do build-docker/trace --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-new-S.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-new-S.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
+  #  volumes:
+  #    - /home/jakob/uni/master/simbricks:/usr/src/data-folder
+  #    - /home/jakob/uni/master/simbricks/trace/tests/linux-dumps:/usr/src/linux_dumbs
+  #  depends_on:
+  #    - jaeger
+  #  links:
+  #    - jaeger:jaeger
 
   simbricks:
     image: simbricks/simbricks-gem5opt:jakob
@@ -62,9 +61,9 @@ services:
         make convert-images-raw 
         python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/simple_ping.py
     volumes:
-      - <path-to-workdirectory-containing-pipes>:/usr/src/data-folder
+      - /home/jakob/uni/master/simbricks:/usr/src/data-folder
       - /dev/kvm:/dev/kvm
     privileged: true
-    depends_on:
-      - trace
+    #depends_on:
+    #  - trace
 

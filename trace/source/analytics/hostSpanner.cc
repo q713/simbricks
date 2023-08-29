@@ -41,9 +41,9 @@ concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
   // std::cout << "host tryna eceive receive update. Current queue: " <<
   // std::endl; from_nic_receives_queue_->Display(resume_executor, std::cout);
 
-  // std::cout << name_ << " host try poll nic receive" << std::endl;
+  std::cout << name_ << " host try poll nic receive" << std::endl;
   auto context_opt = co_await from_nic_receives_queue_->Pop(resume_executor);
-  // std::cout << name_ << " host polled nic receive" << std::endl;
+  std::cout << name_ << " host polled nic receive" << std::endl;
   auto context = OrElseThrow(
       context_opt,
       "HostSpanner::CreateTraceStartingSpan could not receive rx context");
@@ -182,7 +182,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
 
     if (not pci_write_before_ and TraceEnvironment::IsToDeviceBarNumber(
                                       pending_mmio_span->GetBarNumber())) {
-      // std::cout << name_ << " host try push mmio" << std::endl;
+      std::cout << name_ << " host try push mmio" << std::endl;
       auto context =
           create_shared<Context>("HandelMmio could not create context",
                                  expectation::kMmio, pending_mmio_span);
@@ -191,7 +191,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
         // TODO: error
         // note: we will not return false as the span creation itself id work
       }
-      // std::cout << name_ << " host pushed mmio" << std::endl;
+      std::cout << name_ << " host pushed mmio" << std::endl;
     }
 
     if (TraceEnvironment::IsMsixNotToDeviceBarNumber(
@@ -262,11 +262,11 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
 
   // when receiving a dma, we expect to get a context from the nic simulator,
   // hence poll this context blocking!!
-  // std::cout << name_ << " host try poll dma" << std::endl;
+  std::cout << name_ << " host try poll dma: " << *event_ptr << std::endl;
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
   throw_on(not con_opt.has_value(), context_is_null);
   auto con = con_opt.value();
-  // std::cout << name_ << " host polled dma" << std::endl;
+  std::cout << name_ << " host polled dma" << std::endl;
   if (not is_expectation(con_opt.value(), expectation::kDma)) {
     std::cerr << "when polling for dma context, no dma context was fetched"
               << std::endl;
@@ -294,11 +294,11 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  // std::cout << name_ << " host try poll msix" << std::endl;
+  std::cout << name_ << " host try poll msix" << std::endl;
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
   throw_on(not con_opt.has_value(), context_is_null);
   auto con = con_opt.value();
-  // std::cout << name_ << " host polled msix" << std::endl;
+  std::cout << name_ << " host polled msix" << std::endl;
   if (not is_expectation(con, expectation::kMsix)) {
     std::cerr << "did not receive msix on context queue" << std::endl;
     co_return false;

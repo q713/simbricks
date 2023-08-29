@@ -39,8 +39,9 @@
 #include "concurrencpp/concurrencpp.h"
 #include "util/exception.h"
 #include "util/factory.h"
+#include "util/utils.h"
 
-template <typename ValueType>
+template<typename ValueType>
 class Channel {
  protected:
   concurrencpp::async_lock channel_lock_;
@@ -79,7 +80,7 @@ class Channel {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::ostream &out,
       std::function<std::ostream &(std::ostream &, ValueType &)>
-          &value_printer) {
+      &value_printer) {
     co_return;
   }
 
@@ -138,9 +139,8 @@ class Channel {
   }
 };
 
-template <typename ValueType, size_t Capacity = 30>
+template<typename ValueType, size_t Capacity = 30> requires SizeLagerZero<Capacity>
 class BoundedChannel : public Channel<ValueType> {
-  static_assert(Capacity > 0, "the channel must have a capacity of at least 1");
 
  private:
   ValueType buffer_[Capacity];
@@ -169,7 +169,7 @@ class BoundedChannel : public Channel<ValueType> {
   }
 
  public:
-  BoundedChannel() : Channel<ValueType>(){};
+  BoundedChannel() : Channel<ValueType>() {};
 
   BoundedChannel(const BoundedChannel<ValueType, Capacity> &) = delete;
 
@@ -185,7 +185,7 @@ class BoundedChannel : public Channel<ValueType> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::ostream &out,
       std::function<std::ostream &(std::ostream &, ValueType &)> &value_printer)
-      override {
+  override {
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
 
@@ -344,12 +344,12 @@ class BoundedChannel : public Channel<ValueType> {
   }
 };
 
-template <typename ValueType>
+template<typename ValueType>
 class UnBoundedChannel : public Channel<ValueType> {
   std::list<ValueType> buffer_;
 
  public:
-  UnBoundedChannel() : Channel<ValueType>(){};
+  UnBoundedChannel() : Channel<ValueType>() {};
 
   UnBoundedChannel(const BoundedChannel<ValueType> &) = delete;
 
@@ -365,7 +365,7 @@ class UnBoundedChannel : public Channel<ValueType> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::ostream &out,
       std::function<std::ostream &(std::ostream &, ValueType &)> &value_printer)
-      override {
+  override {
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
 
@@ -500,7 +500,7 @@ class UnBoundedChannel : public Channel<ValueType> {
   }
 };
 
-template <typename ValueType>
+template<typename ValueType>
 struct producer {
   explicit producer() = default;
 
@@ -511,7 +511,7 @@ struct producer {
   };
 };
 
-template <typename ValueType>
+template<typename ValueType>
 struct consumer {
   explicit consumer() = default;
 
@@ -522,7 +522,7 @@ struct consumer {
   };
 };
 
-template <typename ValueType>
+template<typename ValueType>
 struct cpipe {
   explicit cpipe() = default;
 
@@ -535,7 +535,7 @@ struct cpipe {
 };
 
 /* Wrapper class to allow passing multiple pipelines to method */
-template <typename ValueType>
+template<typename ValueType>
 struct pipeline {
   std::shared_ptr<producer<ValueType>> prod_;
   std::vector<std::shared_ptr<cpipe<ValueType>>> &pipes_;
@@ -548,7 +548,7 @@ struct pipeline {
   }
 };
 
-template <typename ValueType>
+template<typename ValueType>
 inline concurrencpp::result<void> run_pipeline_impl(
     std::shared_ptr<concurrencpp::executor> executor,
     pipeline<ValueType> &pipeline) {
@@ -557,8 +557,12 @@ inline concurrencpp::result<void> run_pipeline_impl(
   const size_t amount_channels = pipeline.pipes_.size() + 1;
   std::vector<std::shared_ptr<Channel<ValueType>>> channels{amount_channels};
   std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
+  //std::vector<concurrencpp::result<concurrencpp::result<void>>> tasks{amount_channels + 1};
   channels[0] = create_shared<BoundedChannel<ValueType>>(channel_is_null);
   throw_if_empty(pipeline.prod_, producer_is_null);
+  //tasks[0] = executor->submit([&](std::shared_ptr<Channel<ValueType>> tar) {
+  //  return pipeline.prod_->produce(executor, tar);
+  //}, channels[0]);
   tasks[0] = pipeline.prod_->produce(executor, channels[0]);
 
   for (size_t index = 0; index < pipeline.pipes_.size(); index++) {
@@ -568,14 +572,22 @@ inline concurrencpp::result<void> run_pipeline_impl(
     channels[index + 1] =
         create_shared<BoundedChannel<ValueType>>(channel_is_null);
 
+    //tasks[index + 1] = executor->submit([&](std::shared_ptr<Channel<ValueType>> src,
+    //                                        std::shared_ptr<Channel<ValueType>> tar) {
+    //  return pipe->process(executor, src, tar);
+    //}, channels[index], channels[index + 1]);
     tasks[index + 1] =
         pipe->process(executor, channels[index], channels[index + 1]);
   }
   throw_if_empty(pipeline.cons_, consumer_is_null);
+  //tasks[amount_channels] = executor->submit([&](std::shared_ptr<Channel<ValueType>> src) {
+  //  return pipeline.cons_->consume(executor, src);
+  //}, channels[amount_channels - 1]);
   tasks[amount_channels] =
       pipeline.cons_->consume(executor, channels[amount_channels - 1]);
 
   for (size_t index = 0; index < amount_channels; index++) {
+    //co_await co_await tasks[index];
     co_await tasks[index];
     co_await channels[index]->CloseChannel(executor);
   }
@@ -583,7 +595,16 @@ inline concurrencpp::result<void> run_pipeline_impl(
   co_return;
 }
 
-template <typename ValueType>
+template<typename ValueType>
+inline concurrencpp::result<void> run_pipeline_impl_parallel(
+    concurrencpp::executor_tag,
+    std::shared_ptr<concurrencpp::executor> executor,
+    pipeline<ValueType> &pipeline) {
+  co_await run_pipeline_impl(executor, pipeline);
+  co_return;
+}
+
+template<typename ValueType>
 inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
                          pipeline<ValueType> &pipeline) {
   try {
@@ -593,7 +614,7 @@ inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
   }
 }
 
-template <typename ValueType>
+template<typename ValueType>
 inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
                          std::shared_ptr<producer<ValueType>> prod,
                          std::vector<std::shared_ptr<cpipe<ValueType>>> &pipes,
@@ -607,7 +628,7 @@ inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
   }
 }
 
-template <typename ValueType>
+template<typename ValueType>
 inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
                          std::shared_ptr<producer<ValueType>> prod,
                          std::shared_ptr<consumer<ValueType>> cons) {
@@ -615,7 +636,7 @@ inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
   run_pipeline<ValueType>(executor, prod, dummy, cons);
 }
 
-template <typename ValueType>
+template<typename ValueType>
 inline void run_pipelines(std::shared_ptr<concurrencpp::executor> executor,
                           std::vector<pipeline<ValueType>> &pipelines) {
   size_t amount_tasks = pipelines.size();
@@ -637,24 +658,29 @@ inline void run_pipelines(std::shared_ptr<concurrencpp::executor> executor,
   }
 }
 
-template <typename ValueType>
+template<typename ValueType>
 inline void run_pipelines_parallel(
     std::shared_ptr<concurrencpp::executor> executor,
     std::vector<pipeline<ValueType>> &pipelines) {
   throw_if_empty(executor, resume_executor_null);
   size_t amount_tasks = pipelines.size();
-  std::vector<concurrencpp::result<concurrencpp::result<void>>> pipelns{
-      amount_tasks};
+  //std::vector<concurrencpp::result<concurrencpp::result<void>>> pipelns{
+  //    amount_tasks};
+  std::vector<concurrencpp::result<void>> pipelns{amount_tasks};
 
   // create asynchronous(NOTE: asynchronous does not equal parallel) coroutines
   for (size_t index = 0; index < amount_tasks; index++) {
-    pipelns[index] = executor->submit(run_pipeline_impl<ValueType>, executor,
-                                      pipelines[index]);
+    //pipelns[index] = executor->submit(run_pipeline_impl<ValueType>, executor,
+    //                                  pipelines[index]);
+    pipelns[index] = run_pipeline_impl_parallel({}, executor, pipelines[index]);
   }
   // suspend to get result
   for (size_t index = 0; index < amount_tasks; index++) {
-    pipelns[index].get().get();
+    pipelns[index].get();
+    std::cout << "one pipeline finished" << std::endl;
   }
+
+  std::cout << "all pipelines finished" << std::endl;
 }
 
 inline void await_results(std::vector<concurrencpp::result<void>> &results) {

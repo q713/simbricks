@@ -120,6 +120,9 @@ class ReaderBuffer {
   const std::string name_;
   const bool skip_empty_lines_;
   std::ifstream input_stream_;
+  constexpr static size_t kBufSize = 4096 * 64;
+  char *istream_buffer_ = nullptr;
+  FILE *file_ = nullptr;
   // TODO: introduce maximum size for strings a.k.a lines --> then use arena allocation to allocate these strings
   std::vector<LineHandler> buffer_{BufferSize};
   size_t cur_size_ = 0;
@@ -132,7 +135,7 @@ class ReaderBuffer {
   //  return buffered_line;
   //}
 
-  LineHandler& GetHandler() {
+  LineHandler &GetHandler() {
     assert(cur_size_ > 0 and cur_line_index_ < cur_size_);
     LineHandler &handler = buffer_[cur_line_index_];
     ++cur_line_index_;
@@ -170,6 +173,17 @@ class ReaderBuffer {
       // std::endl;
       std::string buf;
       std::getline(input_stream_, buf);
+
+      //size_t k_buf_size = 256;
+      //char line_buf[k_buf_size];
+      //char* c_buf = line_buf;
+      //assert(file_);
+      //size_t line_size = getline(&c_buf, &k_buf_size, file_);
+      //if (line_size < 1) {
+      //  std::cout << "could not read line" << std::endl;
+      //  break;
+      //}
+      //buf = c_buf;
       // std::cout << "got next line: " << std::this_thread::get_id() <<
       // std::endl;
 
@@ -197,6 +211,12 @@ class ReaderBuffer {
   }
 
   void Close() {
+    if (file_) {
+      fclose(file_);
+    }
+    if (istream_buffer_) {
+      delete[] istream_buffer_;
+    }
     if (input_stream_.is_open()) {
       input_stream_.close();
     }
@@ -230,9 +250,21 @@ class ReaderBuffer {
       : name_(name), skip_empty_lines_(skip_empty_lines) {
   }
 
-  void OpenFile(const std::string &file_path) {
+  void OpenFile(const std::string &file_path, bool is_named_pipe = false) {
     if (!std::filesystem::exists(file_path)) {
       throw_just("ReaderBuffer: the file path'", file_path, "' does not exist");
+    }
+    throw_on(input_stream_.is_open(), "ReaderBuffer:OpenFile: already opened file to read");
+    throw_on(file_, "ReaderBuffer:OpenFile: already opened file to read");
+
+    if (is_named_pipe) {
+      file_ = fopen(file_path.c_str(), "r");
+      throw_if_empty(file_, "ReaderBuffer: could not open file path");
+      const int fd = fileno(file_);
+      throw_on(fd == -1, "ReaderBuffer: could not obtain fd");
+      const int suc = fcntl(fd, F_SETPIPE_SZ, kBufSize);
+      throw_on(suc != kBufSize, "ReaderBuffer: could not change the size of the named pipe");
+      std::cout << file_path << ": increased named pipe size to " << suc << std::endl;
     }
 
     input_stream_ = std::ifstream(file_path);
@@ -244,6 +276,9 @@ class ReaderBuffer {
           "ReaderBuffer: the input stream of the file regarding file path'",
           file_path, "' is not good");
     }
+    istream_buffer_ = new char[kBufSize];
+    throw_on(not istream_buffer_, "ReaderBuffer: could not create istream buffer");
+    input_stream_.rdbuf()->pubsetbuf(istream_buffer_, kBufSize);
     std::cout << "ReaderBuffer::Open: opened file '" << file_path << "'" << std::endl;
   }
 

@@ -174,7 +174,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   concurrencpp::result<void>
   FillBuffer() {
     ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
-    line_handler_buffer.OpenFile(log_file_path_);
+    line_handler_buffer.OpenFile(log_file_path_, true);
 
     std::pair<bool, LineHandler> bh_p;
     std::shared_ptr<Event> event_ptr;

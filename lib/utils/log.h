@@ -100,11 +100,13 @@ class Logger {
   inline void log_internal(FILE *out, const char *format, Args... args) {
     fprintf(out, "%s", prefix_);
     fprintf(out, format, args...);
+    fflush(out);
   }
 
   inline void log_internal(FILE *out, const char *to_print) {
     fprintf(out, "%s", prefix_);
     fprintf(out, "%s", to_print);
+    fflush(out);
   }
 
   Logger(const char *prefix) : prefix_(prefix) {

@@ -28,6 +28,7 @@ import fcntl
 
 
 def create_named_pipe(names: list[str], size: int = 16, path: str = ""):
+    print("Start creation of named pipes")
     page_size = os.sysconf("SC_PAGESIZE")
     for name in names:
         if path != "":

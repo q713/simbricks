@@ -1180,6 +1180,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       throw_on(not was_pushed, 
                "EventPrinter::process: Could not push to target channel");
     }
+
+    co_await tar_chan->CloseChannel(resume_executor);
     std::cout << "event printer exited" << std::endl;
     co_return;
   }

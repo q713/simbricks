@@ -52,20 +52,27 @@ class LineHandler {
 
   inline void SetLine(std::string &&line) {
     cur_line_ = line;
-    cur_line_it_ = cur_line_.begin();
-    cur_line_end_it_ = cur_line_.end();
-    cur_reading_pos_ = 0;
+    ResetPos();
   }
 
   inline void SetLine(const std::string &line) {
     cur_line_ = line;
-    cur_line_it_ = cur_line_.begin();
-    cur_line_end_it_ = cur_line_.end();
-    cur_reading_pos_ = 0;
+    ResetPos();
+  }
+
+  // Use with care!
+  inline std::string &GetRawLineMut() {
+    return cur_line_;
   }
 
   inline const std::string &GetRawLine() {
     return cur_line_;
+  }
+
+  inline void ResetPos() {
+    cur_reading_pos_ = 0;
+    cur_line_it_ = cur_line_.begin();
+    cur_line_end_it_ = cur_line_.end();
   }
 
   inline std::string GetCurString() {
@@ -128,16 +135,10 @@ class ReaderBuffer {
   size_t cur_size_ = 0;
   size_t cur_line_index_ = 0;
 
-  //const std::string &GetLine() {
-  //  assert(cur_size_ > 0 and cur_line_index_ < cur_size_);
-  //  const std::string &buffered_line = buffer_[cur_line_index_];
-  //  ++cur_line_index_;
-  //  return buffered_line;
-  //}
-
-  LineHandler &GetHandler() {
+  LineHandler *GetHandler() {
     assert(cur_size_ > 0 and cur_line_index_ < cur_size_);
-    LineHandler &handler = buffer_[cur_line_index_];
+    LineHandler* handler = &buffer_[cur_line_index_];
+    assert(handler);
     ++cur_line_index_;
     return handler;
   }
@@ -155,8 +156,6 @@ class ReaderBuffer {
 
     size_t tries = 1;
     cur_size_ = 0;
-    // std::cout << name_ << " BufferSize: " << BufferSize << std::endl;
-    // std::cout << name_ << " start filling buffer" << std::endl;
     size_t index = 0;
     while (index < BufferSize) {
       if (not IsStreamStillGood()) {
@@ -169,23 +168,8 @@ class ReaderBuffer {
         break;
       }
 
-      // std::cout << "try to get next line: " << std::this_thread::get_id() <<
-      // std::endl;
-      std::string buf;
+      std::string &buf = buffer_[index].GetRawLineMut();
       std::getline(input_stream_, buf);
-
-      //size_t k_buf_size = 256;
-      //char line_buf[k_buf_size];
-      //char* c_buf = line_buf;
-      //assert(file_);
-      //size_t line_size = getline(&c_buf, &k_buf_size, file_);
-      //if (line_size < 1) {
-      //  std::cout << "could not read line" << std::endl;
-      //  break;
-      //}
-      //buf = c_buf;
-      // std::cout << "got next line: " << std::this_thread::get_id() <<
-      // std::endl;
 
       if (input_stream_.fail()) {
         if (tries > 0) {
@@ -201,12 +185,11 @@ class ReaderBuffer {
         continue;
       }
 
-      buffer_[index].SetLine(std::move(buf));
+      //buffer_[index].SetLine(std::move(buf));
+      buffer_[index].ResetPos();
       ++index;
       ++cur_size_;
     }
-    // std::cout << name_ << " read " << cur_size_ << " many values into reader
-    // buffer" << std::endl;
     cur_line_index_ = 0;
   }
 
@@ -228,16 +211,16 @@ class ReaderBuffer {
   }
 
   // TODO: return pointer a.k.a avoid copies + implement iterator!!
-  std::pair<bool, LineHandler> NextHandler() {
+  std::pair<bool, LineHandler *> NextHandler() {
     if (not HasStillLine()) {
-      return std::make_pair(false, buffer_[0]);
+      return std::make_pair(false, buffer_.data());
     }
 
     if (not StillBuffered()) {
       FillBuffer();
       // maybe we have nothing buffered but the stream still appears to be good
       if (not StillBuffered()) {
-        return std::make_pair(false, buffer_[0]);
+        return std::make_pair(false, buffer_.data());
       }
     }
 
@@ -247,7 +230,7 @@ class ReaderBuffer {
   }
 
   explicit ReaderBuffer(std::string name, const bool skip_empty_lines)
-      : name_(name), skip_empty_lines_(skip_empty_lines) {
+      : name_(std::move(name)), skip_empty_lines_(skip_empty_lines) {
   }
 
   void OpenFile(const std::string &file_path, bool is_named_pipe = false) {
@@ -258,13 +241,17 @@ class ReaderBuffer {
     throw_on(file_, "ReaderBuffer:OpenFile: already opened file to read");
 
     if (is_named_pipe) {
+      std::cout << "ReaderBuffer: try changing '" << file_path << "' size to " << kBufSize << std::endl;
       file_ = fopen(file_path.c_str(), "r");
       throw_if_empty(file_, "ReaderBuffer: could not open file path");
       const int fd = fileno(file_);
       throw_on(fd == -1, "ReaderBuffer: could not obtain fd");
       const int suc = fcntl(fd, F_SETPIPE_SZ, kBufSize);
-      throw_on(suc != kBufSize, "ReaderBuffer: could not change the size of the named pipe");
-      std::cout << file_path << ": increased named pipe size to " << suc << std::endl;
+      if (suc != kBufSize) {
+        std::cout << "ReaderBuffer: could not change '" << file_path << "' size to " << kBufSize << std::endl;
+      } else {
+        std::cout << "ReaderBuffer: changed size sucessfull" << std::endl;
+      }
     }
 
     input_stream_ = std::ifstream(file_path);

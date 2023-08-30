@@ -40,14 +40,14 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   int int_target;
   uint64_t hex_target;
   LineHandler line_handler;
-  std::pair<bool, LineHandler> bh_p;
+  std::pair<bool, LineHandler *> bh_p;
 
   REQUIRE_NOTHROW(reader_buffer.OpenFile("tests/line-reader-test-files/simple.txt"));
 
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ParseInt(int_target));
   REQUIRE(int_target == 10);
   REQUIRE(line_handler.ConsumeAndTrimChar(' '));
@@ -59,7 +59,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ConsumeAndTrimTillString("0x"));
   REQUIRE(line_handler.ParseUintTrim(16, hex_target));
   REQUIRE(hex_target == 0x23645);
@@ -67,38 +67,38 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE_FALSE(line_handler.ConsumeAndTrimTillString("ks"));
 
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE_FALSE(line_handler.IsEmpty());
   REQUIRE(line_handler.ConsumeAndTrimString("Rathaus"));
 
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
 
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
 
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
 
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ConsumeAndTrimTillString("Rathaus"));
 
   // 1710532120875: system.switch_cpus: T0 : 0xffffffff814cf3c2    : mov        rax, GS:[0x1ac00]
@@ -106,7 +106,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ParseUintTrim(10, timestamp));
   REQUIRE(line_handler.ConsumeAndTrimChar(':'));
   line_handler.TrimL();
@@ -122,7 +122,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ParseUintTrim(10, timestamp));
   REQUIRE(line_handler.ConsumeAndTrimChar(':'));
   line_handler.TrimL();
@@ -138,7 +138,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ParseUintTrim(10, timestamp));
   REQUIRE(line_handler.ConsumeAndTrimChar(':'));
   line_handler.TrimL();
@@ -154,7 +154,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ParseUintTrim(10, timestamp));
   REQUIRE(line_handler.ConsumeAndTrimChar(':'));
   line_handler.TrimL();
@@ -169,7 +169,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
   REQUIRE(reader_buffer.HasStillLine());
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE(bh_p.first);
-  line_handler = bh_p.second;
+  line_handler = *bh_p.second;
   REQUIRE(line_handler.ParseUintTrim(10, timestamp));
   REQUIRE(line_handler.ConsumeAndTrimChar(':'));
   line_handler.TrimL();

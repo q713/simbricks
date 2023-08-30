@@ -41,7 +41,7 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     return true;
   }
 
-  concurrencpp::result<void> process (
+  concurrencpp::result<void> process(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan,
       std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan)
@@ -53,8 +53,8 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     bool pass_on;
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;
-    for(msg = co_await src_chan->Pop(resume_executor); msg.has_value();
-        msg = co_await src_chan->Pop(resume_executor)) {
+    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
+         msg = co_await src_chan->Pop(resume_executor)) {
       event = msg.value();
       throw_if_empty(event, event_is_null);
 
@@ -64,6 +64,7 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
       }
     }
 
+    co_await tar_chan->CloseChannel(resume_executor);
     std::cout << "event actor exited" << std::endl;
 
     co_return;
@@ -145,6 +146,36 @@ class EventTimestampFilter : public EventStreamActor {
   explicit EventTimestampFilter(std::vector<EventTimeBoundary> &event_time_boundaries)
       : EventStreamActor(),
         event_time_boundaries_(event_time_boundaries) {
+  }
+};
+
+class HostCallFuncFilter : public EventStreamActor {
+  bool blacklist_;
+  std::set<const std::string *> list_;
+
+ public:
+
+  bool act_on(std::shared_ptr<Event> &event) override {
+    if (not IsType(event, EventType::kHostCallT)) {
+      return true;
+    }
+
+    const std::shared_ptr<HostCall> &call = std::static_pointer_cast<HostCall>(event);
+    if (blacklist_ and list_.contains(call->GetFunc())) {
+      return false;
+    } else if (not blacklist_ and not list_.contains(call->GetFunc())) {
+      return false;
+    }
+
+    return true;
+  }
+
+  explicit HostCallFuncFilter(const std::set<std::string> &list, bool blacklist = true)
+      : EventStreamActor(), blacklist_(blacklist) {
+    for (const std::string &str : list) {
+      const std::string *sym = TraceEnvironment::internalize_additional(str);
+      list_.insert(sym);
+    }
   }
 };
 

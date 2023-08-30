@@ -169,6 +169,11 @@ int main(int argc, char *argv[]) {
   //Timer timer{kAmountSources};
   WeakTimer timer{kAmountSources};
 
+  const std::set<std::string> blacklist_functions{
+      "match_strlcpy", "__const_udelay", "static_key_disable", "__put_page", "relock_page_lruvec_irqsave",
+      "xas_move_index", "xas_set_offset", "blk_account_io_merge_bio", "biovec_phys_mergeable.isra.0"
+  };
+
   using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
   auto server_hn = create_shared<QueueT>(channel_is_null);
   auto server_nh = create_shared<QueueT>(channel_is_null);
@@ -311,8 +316,9 @@ int main(int argc, char *argv[]) {
   if (not printer_h_s) {
     exit(EXIT_FAILURE);
   }
+  auto func_filter_h_s = create_shared<HostCallFuncFilter>(actor_is_null, blacklist_functions, true);
   std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-      server_host_pipes{timestamp_filter_h_s, event_filter_h_s, printer_h_s};
+      server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s, printer_h_s};
   const pipeline<std::shared_ptr<Event>> server_host_pipeline{
       gem5_ser_buf_pro, server_host_pipes, spanner_h_s};
   //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
@@ -341,8 +347,9 @@ int main(int argc, char *argv[]) {
   if (not printer_h_c) {
     exit(EXIT_FAILURE);
   }
+  auto func_filter_h_c = create_shared<HostCallFuncFilter>(actor_is_null, blacklist_functions, true);
   std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-      client_host_pipes{timestamp_filter_h_c, event_filter_h_c, printer_h_c};
+      client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c, printer_h_c};
   const pipeline<std::shared_ptr<Event>> client_host_pipeline{
       gem5_client_buf_pro, client_host_pipes, spanner_h_c};
   //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
@@ -382,7 +389,7 @@ int main(int argc, char *argv[]) {
   auto event_filter_n_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
   auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
   NicBmParser nicbm_client_par{thread_pool_executor,
-                            "NicbmClientParser"};
+                               "NicbmClientParser"};
   auto nicbm_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
       "BufferedEventProvider null",
       thread_pool_executor,

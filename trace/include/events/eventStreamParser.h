@@ -82,11 +82,11 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
     reader_buffer_.OpenFile(log_file_path_);
 
     while (reader_buffer_.HasStillLine()) { // TODO: for loop or let reader implement iterator...
-      std::pair<bool, LineHandler> bh_p = reader_buffer_.NextHandler();
+      const std::pair<bool, LineHandler *> bh_p = reader_buffer_.NextHandler();
       if (not bh_p.first) {
         break;
       }
-      LineHandler &line_handler = bh_p.second;
+      LineHandler &line_handler = *bh_p.second;
 
       line_handler.TrimL();
 

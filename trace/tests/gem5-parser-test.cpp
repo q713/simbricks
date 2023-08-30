@@ -104,12 +104,12 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
       std::make_shared<HostMmioR>(1869699662249, gem5->GetIdent(), parser_name, 94469181901920, 0xc040001c, 4, 3, 0x1c)
   };
 
-  std::pair<bool, LineHandler> bh_p;
+  std::pair<bool, LineHandler *> bh_p;
   for (const auto &match : to_match) {
     REQUIRE(reader_buffer.HasStillLine());
     REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
     REQUIRE(bh_p.first);
-    line_handler = bh_p.second;
+    line_handler = *bh_p.second;
     parsed_event = gem5->ParseEvent(line_handler).run().get();
     REQUIRE(parsed_event);
     REQUIRE(parsed_event->Equal(*match));

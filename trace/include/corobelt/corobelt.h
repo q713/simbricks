@@ -143,7 +143,7 @@ template<typename ValueType, size_t Capacity = 30> requires SizeLagerZero<Capaci
 class BoundedChannel : public Channel<ValueType> {
 
  private:
-  ValueType buffer_[Capacity];
+  std::vector<ValueType> buffer_{Capacity};
   size_t read_index_ = 0;
   size_t write_index_ = 0;
 
@@ -296,6 +296,7 @@ class BoundedChannel : public Channel<ValueType> {
         co_await this->channel_lock_.lock(resume_executor);
 
     if (this->poisened_) {
+      guard.unlock();
       this->channel_cv_.notify_all();
       co_return std::nullopt;
     }
@@ -668,16 +669,20 @@ inline void run_pipelines_parallel(
   //    amount_tasks};
   std::vector<concurrencpp::result<void>> pipelns{amount_tasks};
 
-  // create asynchronous(NOTE: asynchronous does not equal parallel) coroutines
-  for (size_t index = 0; index < amount_tasks; index++) {
-    //pipelns[index] = executor->submit(run_pipeline_impl<ValueType>, executor,
-    //                                  pipelines[index]);
-    pipelns[index] = run_pipeline_impl_parallel({}, executor, pipelines[index]);
-  }
-  // suspend to get result
-  for (size_t index = 0; index < amount_tasks; index++) {
-    pipelns[index].get();
-    std::cout << "one pipeline finished" << std::endl;
+  try {
+    // create asynchronous(NOTE: asynchronous does not equal parallel) coroutines
+    for (size_t index = 0; index < amount_tasks; index++) {
+      //pipelns[index] = executor->submit(run_pipeline_impl<ValueType>, executor,
+      //                                  pipelines[index]);
+      pipelns[index] = run_pipeline_impl_parallel({}, executor, pipelines[index]);
+    }
+    // suspend to get result
+    for (size_t index = 0; index < amount_tasks; index++) {
+      pipelns[index].get();
+      std::cout << "one pipeline finished" << std::endl;
+    }
+  } catch (std::exception &exe) {
+    std::cerr << exe.what() << std::endl;
   }
 
   std::cout << "all pipelines finished" << std::endl;

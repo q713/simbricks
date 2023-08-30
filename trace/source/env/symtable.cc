@@ -137,11 +137,11 @@ bool SymsFilter::LoadSyms(const std::string &file_path,
   uint64_t address = 0;
   std::string name = "";
   while (reader_buffer_.HasStillLine()) {
-    std::pair<bool, LineHandler> bh_p = reader_buffer_.NextHandler();
+    const std::pair<bool, LineHandler *> bh_p = reader_buffer_.NextHandler();
     if (not bh_p.first) {
       break;
     }
-    LineHandler &line_handler = bh_p.second;
+    LineHandler &line_handler = *bh_p.second;
     line_handler.TrimL();
 
     // parse address
@@ -189,11 +189,11 @@ bool SymsFilter::LoadS(const std::string &file_path, uint64_t address_offset) {
   uint64_t address = 0;
   std::string symbol;
   while (reader_buffer_.HasStillLine()) {
-    std::pair<bool, LineHandler> bh_p = reader_buffer_.NextHandler();
+    const std::pair<bool, LineHandler *> bh_p = reader_buffer_.NextHandler();
     if (not bh_p.first) {
       break;
     }
-    LineHandler &line_handler = bh_p.second;
+    LineHandler &line_handler = *bh_p.second;
 #ifdef SYMS_DEBUG_
     DFLOGIN("%s: found line: %s\n", component_.c_str(),
             line_reader_.get_raw_line().c_str());
@@ -247,11 +247,11 @@ bool SymsFilter::LoadElf(const std::string &file_path,
   uint64_t address = 0;
   std::string label = "";
   while (reader_buffer_.HasStillLine()) {
-    std::pair<bool, LineHandler> bh_p = reader_buffer_.NextHandler();
+    const std::pair<bool, LineHandler *> bh_p = reader_buffer_.NextHandler();
     if (not bh_p.first) {
       break;
     }
-    LineHandler &line_handler = bh_p.second;
+    LineHandler &line_handler = *bh_p.second;
     line_handler.TrimL();
     if (!line_handler.SkipTillWhitespace()) {  // Num
       continue;

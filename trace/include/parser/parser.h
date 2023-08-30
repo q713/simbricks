@@ -120,6 +120,172 @@ class NicBmParser : public LogParser {
   ParseEvent(LineHandler &line_handler) override;
 };
 
+template<typename ValueType, size_t BufferSize> requires SizeLagerZero<BufferSize>
+class NonCoroBufferedChannel {
+  std::mutex chan_numtex_;
+  std::condition_variable chan_cond_var_;
+
+  bool closed_ = false;
+  bool poisened_ = false;
+  std::vector<ValueType> buffer_{BufferSize};
+  size_t read_index_ = 0;
+  size_t write_index_ = 0;
+  size_t size_ = 0;
+
+  // NOTE: the lock must be held when calling this method
+  void perform_write(ValueType value) {
+    assert(this->size_ < BufferSize and "the channel should not be full here");
+    assert(write_index_ < BufferSize and "cannot write out of bound");
+    assert(write_index_ >= 0 and "cannot write out of bound");
+    buffer_[write_index_] = std::move(value);
+    write_index_ = (write_index_ + 1) % BufferSize;
+    ++(this->size_);
+  }
+
+  // NOTE: the lock must be held when calling this method
+  ValueType perform_read() {
+    assert(this->size_ > 0 and "the channel should not be empty here");
+    assert(read_index_ < BufferSize and "cannot read out of bound");
+    assert(read_index_ >= 0 and "cannot read out of bound");
+    auto result = std::move(buffer_[read_index_]);
+    read_index_ = (read_index_ + 1) % BufferSize;
+    --(this->size_);
+    return std::move(result);
+  }
+
+ public:
+
+  NonCoroBufferedChannel() = default;
+
+  NonCoroBufferedChannel(const NonCoroBufferedChannel<ValueType, BufferSize> &) = delete;
+
+  NonCoroBufferedChannel(NonCoroBufferedChannel<ValueType, BufferSize>
+                         &&) = delete;
+
+  NonCoroBufferedChannel<ValueType, BufferSize> &operator=(
+      const NonCoroBufferedChannel<ValueType, BufferSize> &) noexcept = delete;
+
+  NonCoroBufferedChannel<ValueType, BufferSize> &operator=(
+      NonCoroBufferedChannel<ValueType, BufferSize> &&) noexcept = delete;
+
+  bool Empty() {
+    std::lock_guard<std::mutex> guard{chan_numtex_};
+    return size_ == 0;
+  }
+
+  size_t GetSize() {
+    std::lock_guard<std::mutex> guard{chan_numtex_};
+    return size_;
+  }
+
+  void CloseChannel() {
+    {
+      std::lock_guard<std::mutex> guard{chan_numtex_};
+      closed_ = true;
+    }
+    chan_cond_var_.notify_all();
+  }
+
+  void PoisenChannel() {
+    {
+      std::lock_guard<std::mutex> guard{chan_numtex_};
+      poisened_ = true;
+    }
+    chan_cond_var_.notify_all();
+  }
+
+  // returns false if channel is closed or poisened
+  bool Push(ValueType value) {
+    {
+      std::unique_lock lock{chan_numtex_};
+      chan_cond_var_.wait(lock, [this] {
+        return this->closed_ or this->poisened_ or this->size_ < BufferSize;
+      });
+      if (closed_ or poisened_) {
+        chan_cond_var_.notify_all();
+        return false;
+      }
+      assert(not closed_ and "channel should not be closed here");
+      assert(not poisened_ and "channel should not be poisened here");
+
+      perform_write(std::move(value));
+    }
+
+    chan_cond_var_.notify_all();
+    return true;
+  }
+
+  // returns false if channel is closed or poisened
+  bool TryPush(ValueType value) {
+    {
+      std::lock_guard<std::mutex> guard{chan_numtex_};
+      if (closed_ or poisened_ or size_ >= BufferSize) {
+        co_return false;
+      }
+      assert(not closed_ and "channel should not be closed here");
+      assert(not poisened_ and "channel should not be poisened here");
+      perform_write(std::move(value));
+    }
+    chan_cond_var_.notify_all();
+    co_return true;
+  }
+
+  // returns empty optional in case channel is poisened or empty
+  std::optional<ValueType> Pop() {
+    std::unique_lock lock{chan_numtex_};
+    chan_cond_var_.wait(lock, [this] {
+      return poisened_ || closed_ || size_ > 0;
+    });
+    if (poisened_) {
+      chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+    assert(not poisened_ and "channel should not be poisened here");
+    if (size_ == 0) {
+      lock.unlock();
+      chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+    assert(size_ > 0 and "trying to read from empty channel");
+    auto result = perform_read();
+    lock.unlock();
+    chan_cond_var_.notify_all();
+    return result;
+  }
+
+  std::optional<ValueType> TryPop() {
+    std::unique_lock lock{chan_numtex_};
+    if (this->poisened_ or this->size_ == 0) {
+      lock.unlock();
+      chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+    auto result = perform_read();
+    lock.unlock();
+    chan_cond_var_.notify_all();
+    return std::move(result);
+  }
+
+  std::optional<ValueType> TryPopOnTrue(std::function<bool(ValueType &)> &predicate) {
+    std::unique_lock lock{chan_numtex_};
+    if (this->poisened_ or this->size_ == 0) {
+      lock.unlock();
+      chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+    assert(read_index_ < BufferSize and "cannot read out of bound");
+    assert(read_index_ >= 0 and "cannot read out of bound");
+    ValueType &value = buffer_[read_index_];
+    if (not predicate(value)) {
+      return std::nullopt;
+    }
+    auto result = perform_read();
+    lock.unlock();
+    chan_cond_var_.notify_all();
+    return std::move(result);
+  }
+};
+
 template<size_t LineBufferSize, size_t EventBufferSize> requires
 SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
 class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
@@ -130,7 +296,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   const std::string name_;
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
-  BoundedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
+  NonCoroBufferedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
 #if 0
   std::vector<std::shared_ptr<Event>> event_buffer_{EventBufferSize};
   size_t cur_buffer_index_ = 0;
@@ -176,21 +342,22 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
     line_handler_buffer.OpenFile(log_file_path_, true);
 
-    std::pair<bool, LineHandler> bh_p;
+    std::pair<bool, LineHandler *> bh_p;
     std::shared_ptr<Event> event_ptr;
     for (bh_p = line_handler_buffer.NextHandler(); bh_p.first; bh_p = line_handler_buffer.NextHandler()) {
       assert(bh_p.first);
-      LineHandler &line_handler = bh_p.second;
+      LineHandler &line_handler = *bh_p.second;
 
       event_ptr = co_await log_parser_.ParseEvent(line_handler);
       if (not event_ptr) {
         continue;
       }
 
-      co_await event_buffer_channel_.Push(executor_, event_ptr);
+      const bool could_push = event_buffer_channel_.Push(event_ptr);
+      throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel");
     }
 
-    co_await event_buffer_channel_.CloseChannel(executor_);
+    event_buffer_channel_.CloseChannel();
   }
 
 #if 0
@@ -245,8 +412,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
     std::optional<std::shared_ptr<Event>> event_opt;
     std::shared_ptr<Event> event_ptr = nullptr;
-    for (event_opt = co_await event_buffer_channel_.Pop(executor_); event_opt.has_value();
-         event_opt = co_await event_buffer_channel_.Pop(executor_)) {
+    for (event_opt = event_buffer_channel_.Pop(); event_opt.has_value();
+         event_opt = event_buffer_channel_.Pop()) {
       assert(event_opt.has_value());
       event_ptr = event_opt.value();
       const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);

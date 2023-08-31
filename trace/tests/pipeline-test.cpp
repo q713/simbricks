@@ -27,7 +27,7 @@
 #include <memory>
 #include <queue>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "util/exception.h"
 
 struct int_prod : public producer<int> {
@@ -38,10 +38,10 @@ struct int_prod : public producer<int> {
 
   concurrencpp::result<void> produce(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<int>> &tar_chan) override {
+      std::shared_ptr<CoroChannel<int>> &tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
-    throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
+    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
 
     for (int i = start; i < 3 + start; i++) {
       bool could_write = co_await tar_chan->Push(resume_executor, std::move(i));
@@ -63,10 +63,10 @@ struct int_cons : public consumer<int> {
 
   concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<int>> &src_chan) override {
+      std::shared_ptr<CoroChannel<int>> &src_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
-    throw_if_empty<Channel<int>>(src_chan, channel_is_null);
+    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
 
     auto int_opt = co_await src_chan->Pop(resume_executor);
 
@@ -83,12 +83,12 @@ struct int_cons : public consumer<int> {
 struct int_adder : public cpipe<int> {
   concurrencpp::result<void> process(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<int>> &src_chan,
-      std::shared_ptr<Channel<int>> &tar_chan) override {
+      std::shared_ptr<CoroChannel<int>> &src_chan,
+      std::shared_ptr<CoroChannel<int>> &tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
-    throw_if_empty<Channel<int>>(tar_chan, channel_is_null);
-    throw_if_empty<Channel<int>>(src_chan, channel_is_null);
+    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
+    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
 
     auto int_opt = co_await src_chan->Pop(resume_executor);
 

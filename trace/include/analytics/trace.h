@@ -32,13 +32,13 @@
 
 #include "util/exception.h"
 #include "analytics/span.h"
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "env/traceEnvironment.h"
 
 class Trace {
   std::mutex mutex_;
 
-  uint64_t id_;
+  uint64_t ident_;
   std::shared_ptr<EventSpan> parent_span_;
   // span_id -> span
   std::unordered_map<uint64_t, std::shared_ptr<EventSpan>> spans_;
@@ -46,7 +46,7 @@ class Trace {
  public:
 
   inline uint64_t GetId() const {
-    return id_;
+    return ident_;
   }
 
   auto GetSpansAndRemoveSpans() {
@@ -71,7 +71,7 @@ class Trace {
     return iter->second;
   }
 
-  bool AddSpan(std::shared_ptr<EventSpan> span) {
+  bool AddSpan(const std::shared_ptr<EventSpan>& span) {
     throw_if_empty(span, span_is_null);
 
     const std::lock_guard<std::mutex> lock(mutex_);
@@ -82,21 +82,21 @@ class Trace {
 
   void display(std::ostream &out) {
     const std::lock_guard<std::mutex> lock(mutex_);
-    out << std::endl;
-    out << "trace: id=" << id_ << std::endl;
-    out << "\t parent_span:" << parent_span_ << std::endl;
+    out << '\n';
+    out << "trace: id=" << ident_ << '\n';
+    out << "\t parent_span:" << parent_span_ << '\n';
     for (auto &span : spans_) {
       throw_if_empty(span.second, span_is_null);
       if (span.second.get() == parent_span_.get()) {
         continue;
       }
-      out << span.second << std::endl;
+      out << span.second << '\n';
     }
-    out << std::endl;
+    out << '\n';
   }
 
-  Trace(uint64_t id, std::shared_ptr<EventSpan> parent_span)
-      : id_(id), parent_span_(parent_span) {
+  Trace(uint64_t ident, std::shared_ptr<EventSpan> parent_span)
+      : ident_(ident), parent_span_(std::move(parent_span)) {
     throw_if_empty(parent_span, span_is_null);
     this->AddSpan(parent_span);
   }

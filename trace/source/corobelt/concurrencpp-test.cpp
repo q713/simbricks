@@ -27,7 +27,7 @@
 #include <queue>
 #include <functional>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "util/exception.h"
 #include "analytics/timer.h"
 

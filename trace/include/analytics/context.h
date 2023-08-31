@@ -37,7 +37,7 @@
 #include <mutex>
 
 #include "util/exception.h"
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "env/traceEnvironment.h"
 
 enum expectation { kTx, kRx, kDma, kMsix, kMmio };

@@ -33,7 +33,7 @@
 #include <mutex>
 
 #include "util/exception.h"
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "events/events.h"
 #include "env/traceEnvironment.h"
 #include "analytics/context.h"
@@ -1087,7 +1087,7 @@ inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<EventSpan> &s
 struct SpanPrinter
     : public consumer<std::shared_ptr<EventSpan>> {
   concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                     std::shared_ptr<Channel<std::shared_ptr<EventSpan>>> &src_chan) override {
+                                     std::shared_ptr<CoroChannel<std::shared_ptr<EventSpan>>> &src_chan) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);
 

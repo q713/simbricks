@@ -36,11 +36,11 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  std::cout << name_ << " nic try poll mmio" << std::endl;
+  //std::cout << name_ << " nic try poll mmio" << std::endl;
   auto con_opt = co_await from_host_queue_->Pop(resume_executor);
   auto con = OrElseThrow(con_opt, context_is_null);
   throw_if_empty(con, context_is_null);
-  std::cout << name_ << " nic polled mmio" << std::endl;
+  //std::cout << name_ << " nic polled mmio" << std::endl;
   if (not is_expectation(con, expectation::kMmio)) {
     std::cerr << "nic_spanner: could not poll mmio context" << std::endl;
     co_return false;
@@ -73,12 +73,12 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
       tracer_.MarkSpanAsDone(pending_dma);
     } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
-      std::cout << name_ << " nic try push dma" << std::endl;
+      //std::cout << name_ << " nic try push dma" << std::endl;
       auto context = create_shared<Context>(
           "HandelDma could not create context", expectation::kDma, pending_dma);
       throw_on(not co_await to_host_queue_->Push(resume_executor, context),
                could_not_push_to_context_queue);
-      std::cout << name_ << " nic pushed dma" << std::endl;
+      //std::cout << name_ << " nic pushed dma" << std::endl;
     }
 
     co_return true;
@@ -92,7 +92,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
   }
 
   assert(IsType(event_ptr, EventType::kNicDmaIT) and
-         "try starting a new dma span with NON issue");
+      "try starting a new dma span with NON issue");
 
   // TODO: maybe we need to write at this point into the queue
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(
@@ -124,21 +124,20 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
       std::cerr << "error" << std::endl;
     }
 
-    last_action_was_send_ = true;
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
-    std::cout
-        << name_
-        << " NicSpanner::HandelTxrx: trying to push tx context to other side"
-        << std::endl;
+    //std::cout
+    //    << name_
+    //    << " NicSpanner::HandelTxrx: trying to push tx context to other side"
+    //    << std::endl;
     auto context = create_shared<Context>(
         "HandelTxrx: could not create context", expectation::kRx, eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
              "HandelTxrx: could not write network context ");
-    std::cout << name_
-              << " NicSpanner::HandelTxrx: pushed tx context to other side"
-              << std::endl;
+    //std::cout << name_
+    //          << " NicSpanner::HandelTxrx: pushed tx context to other side"
+    //          << std::endl;
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
     // std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context
@@ -153,17 +152,16 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent(),
         name_);
-    last_action_was_send_ = false;
     last_causing_ = eth_span;
 
-    std::cout << name_ << " nic tryna push receive update." << std::endl;
+    //std::cout << name_ << " nic tryna push receive update." << std::endl;
     auto receive_context = create_shared<Context>(
         "could not create receive context to pass on to host", expectation::kRx,
         eth_span);
     throw_on(
         not co_await to_host_receives_->Push(resume_executor, receive_context),
         "NicSpanner::HandelTxrx: could not write host receive context ");
-    std::cout << name_ << " nic pushed receive update." << std::endl;
+    //std::cout << name_ << " nic pushed receive update." << std::endl;
 
   } else {
     std::cerr << "NicSpanner::HandelTxrx: unknown event type" << std::endl;
@@ -192,33 +190,34 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
   assert(msix_span->IsComplete() and "msix span is not complete");
   tracer_.MarkSpanAsDone(msix_span);
 
-  std::cout << name_ << " nic try push msix" << std::endl;
+  //std::cout << name_ << " nic try push msix" << std::endl;
   auto context = create_shared<Context>("HandelMsix could not create context",
                                         expectation::kMsix, msix_span);
   throw_on(not co_await to_host_queue_->Push(resume_executor, context),
            could_not_push_to_context_queue);
-  std::cout << name_ << " nic pushed msix" << std::endl;
+  //std::cout << name_ << " nic pushed msix" << std::endl;
 
   co_return true;
 }
 
 NicSpanner::NicSpanner(
     std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
-    std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
-    std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
-    std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
-    std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host,
-    std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_receives)
+    std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
+    std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
+    std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,
+    std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host,
+    std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_receives)
     : Spanner(std::move(name), tra, timer),
-      to_network_queue_(to_network),
-      from_network_queue_(from_network),
-      to_host_queue_(to_host),
-      from_host_queue_(from_host),
-      to_host_receives_(to_host_receives) {
-  throw_if_empty(to_network, queue_is_null);
-  throw_if_empty(from_network, queue_is_null);
-  throw_if_empty(to_host, queue_is_null);
-  throw_if_empty(from_host, queue_is_null);
+      to_network_queue_(std::move(to_network)),
+      from_network_queue_(std::move(from_network)),
+      to_host_queue_(std::move(to_host)),
+      from_host_queue_(std::move(from_host)),
+      to_host_receives_(std::move(to_host_receives)) {
+  throw_if_empty(to_network_queue_, queue_is_null);
+  throw_if_empty(from_network_queue_, queue_is_null);
+  throw_if_empty(to_host_queue_, queue_is_null);
+  throw_if_empty(from_host_queue_, queue_is_null);
+  throw_if_empty(to_host_receives_, queue_is_null);
 
   auto handel_mmio = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelMmio(std::move(resume_executor), event_ptr);

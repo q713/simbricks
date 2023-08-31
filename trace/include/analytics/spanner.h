@@ -26,7 +26,7 @@
 #include <memory>
 #include <utility>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "events/events.h"
 #include "util/exception.h"
 #include "analytics/context.h"
@@ -51,7 +51,7 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
   using HandlerT = std::function<LazyResultT(ExecutorT, EventT &)>;
   std::unordered_map<EventType, HandlerT> handler_;
 
-  concurrencpp::result<void> consume(ExecutorT resume_executor, std::shared_ptr<Channel<EventT>> &src_chan) override;
+  concurrencpp::result<void> consume(ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> &src_chan) override;
 
   explicit Spanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer)
       : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer) {
@@ -98,10 +98,9 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 struct HostSpanner : public Spanner {
 
   explicit HostSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
-                       std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic,
-                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic,
-                       std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_receives,
-                       bool is_client);
+                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic,
+                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic,
+                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives);
 
  private:
   concurrencpp::lazy_result<void> FinishPendingSpan(std::shared_ptr<concurrencpp::executor> resume_executor);
@@ -128,15 +127,10 @@ struct HostSpanner : public Spanner {
   concurrencpp::lazy_result<bool> HandelInt(std::shared_ptr<concurrencpp::executor> resume_executor,
                                             std::shared_ptr<Event> &event_ptr);
 
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_queue_;
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_nic_receives_queue_;
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_nic_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic_queue_;
 
-  bool is_client_;
-
-  size_t expected_xmits_ = 0;
-  bool found_transmit_ = false;
-  bool found_receive_ = false;
   bool pci_write_before_ = false;
   std::shared_ptr<HostCallSpan> last_trace_starting_span_ = nullptr;
   std::shared_ptr<HostCallSpan> pending_host_call_span_ = nullptr;
@@ -150,11 +144,11 @@ struct HostSpanner : public Spanner {
 struct NicSpanner : public Spanner {
 
   explicit NicSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host,
-                      std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_receives);
+                      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
+                      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
+                      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,
+                      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host,
+                      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_receives);
 
  private:
 
@@ -170,15 +164,14 @@ struct NicSpanner : public Spanner {
   concurrencpp::lazy_result<bool> HandelMsix(std::shared_ptr<concurrencpp::executor> resume_executor,
                                              std::shared_ptr<Event> &event_ptr);
 
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_network_queue_;
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_network_queue_;
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_queue_;
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> from_host_queue_;
-  std::shared_ptr<Channel<std::shared_ptr<Context>>> to_host_receives_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host_queue_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_receives_;
 
   std::shared_ptr<Context> last_host_context_ = nullptr;
   std::shared_ptr<EventSpan> last_causing_ = nullptr;
-  bool last_action_was_send_ = false;
 
   std::list<std::shared_ptr<NicDmaSpan>> pending_nic_dma_spans_;
 };

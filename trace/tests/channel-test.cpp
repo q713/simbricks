@@ -24,7 +24,7 @@
 
 #include <catch2/catch_all.hpp>
 #include <memory>
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 
 TEST_CASE("Test BoundedChannel", "[BoundedChannel]") {
   auto concurren_options = concurrencpp::runtime_options();
@@ -34,7 +34,7 @@ TEST_CASE("Test BoundedChannel", "[BoundedChannel]") {
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
   const size_t capacity = 3;
-  BoundedChannel<int, capacity> channel_to_test;
+  CoroBoundedChannel<int, capacity> channel_to_test;
 
   SECTION("can push into channel") {
     REQUIRE(channel_to_test.Push(thread_pool_executor, 1).run().get());
@@ -101,7 +101,7 @@ TEST_CASE("Test UnBoundedChannel", "[UnBoundedChannel]") {
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
   const size_t to_test_size{10};
-  UnBoundedChannel<int> channel_to_test;
+  CoroUnBoundedChannel<int> channel_to_test;
 
   SECTION("channel does not change order and size is correct") {
     REQUIRE(channel_to_test.Push(thread_pool_executor, 1).run().get());

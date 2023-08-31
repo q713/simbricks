@@ -29,7 +29,7 @@
 #include <string>
 #include <vector>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "env/symtable.h"
 #include "env/traceEnvironment.h"
 #include "events/event-filter.h"
@@ -174,7 +174,7 @@ int main(int argc, char *argv[]) {
       "xas_move_index", "xas_set_offset", "blk_account_io_merge_bio", "biovec_phys_mergeable.isra.0"
   };
 
-  using QueueT = UnBoundedChannel<std::shared_ptr<Context>>;
+  using QueueT = CoroUnBoundedChannel<std::shared_ptr<Context>>;
   auto server_hn = create_shared<QueueT>(channel_is_null);
   auto server_nh = create_shared<QueueT>(channel_is_null);
   auto client_hn = create_shared<QueueT>(channel_is_null);
@@ -193,8 +193,7 @@ int main(int argc, char *argv[]) {
                                                 timer,
                                                 server_hn,
                                                 server_nh,
-                                                server_n_h_receive,
-                                                false);
+                                                server_n_h_receive);
 
   auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null,
                                                 "Client-Host",
@@ -202,8 +201,7 @@ int main(int argc, char *argv[]) {
                                                 timer,
                                                 client_hn,
                                                 client_nh,
-                                                client_n_h_receive,
-                                                true);
+                                                client_n_h_receive);
 
   auto spanner_n_s = create_shared<NicSpanner>(spanner_is_null,
                                                "NIC-Server",
@@ -417,7 +415,7 @@ int main(int argc, char *argv[]) {
       pipelines{client_host_pipeline, client_nic_pipeline, server_host_pipeline, server_nic_pipeline};
   run_pipelines_parallel(thread_pool_executor, pipelines);
 
-  std::cout << "runtime goes out of scope!!!!!" << std::endl;
+  // std::cout << "runtime goes out of scope!!!!!" << std::endl;
 
   exit(EXIT_SUCCESS);
 }

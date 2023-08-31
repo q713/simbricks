@@ -96,7 +96,7 @@ set(TRACE_LIB_HEADER_FILES
         include/util/factory.h
         include/util/utils.h
         # coroutine wrappers
-        include/corobelt/corobelt.h
+        include/sync/corobelt.h
         # reader
         include/reader/reader.h
         # parser
@@ -186,7 +186,7 @@ target_link_libraries(${UNIT_TESTS_TARGET} PUBLIC ${PROJECT_NAME})
 #######################################
 set(TEST_SRC
         include/util/exception.h
-        include/corobelt/corobelt.h
+        include/sync/corobelt.h
         source/corobelt/concurrencpp-test.cpp
         )
 set(TEST_TAR concurrencpp-test)

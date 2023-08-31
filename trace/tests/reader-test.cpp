@@ -24,7 +24,7 @@
 
 #include <catch2/catch_all.hpp>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "reader/reader.h"
 
 

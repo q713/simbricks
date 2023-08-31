@@ -30,7 +30,7 @@
 #include <unordered_map>
 #include <set>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "events/events.h"
 #include "analytics/span.h"
 #include "analytics/trace.h"
@@ -62,13 +62,11 @@ class Tracer {
 
   std::shared_ptr<Trace> GetTrace(uint64_t trace_id) {
     // NOTE: the lock must be held when calling this method
-    //const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
-
-    auto it = traces_.find(trace_id);
-    if (it == traces_.end()) {
+    auto iter = traces_.find(trace_id);
+    if (iter == traces_.end()) {
       return {};
     }
-    std::shared_ptr<Trace> target_trace = it->second;
+    std::shared_ptr<Trace> target_trace = iter->second;
     return target_trace;
   }
 
@@ -92,15 +90,15 @@ class Tracer {
 
   std::shared_ptr<TraceContext> GetContext(uint64_t trace_context_id) {
     // NOTE: lock must be held when calling this method
-    auto it = contexts_.find(trace_context_id);
-    if (it == contexts_.end()) {
+    auto iter = contexts_.find(trace_context_id);
+    if (iter == contexts_.end()) {
       return {};
     }
 
-    return it->second;
+    return iter->second;
   }
 
-  void AddSpanToTrace(uint64_t trace_id, std::shared_ptr<EventSpan> span_ptr) {
+  void AddSpanToTrace(uint64_t trace_id, const std::shared_ptr<EventSpan>& span_ptr) {
     // NOTE: lock must be held when calling this method
 
     auto target_trace = GetTrace(trace_id);
@@ -171,7 +169,7 @@ class Tracer {
   }
 
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParentInternal(std::shared_ptr<EventSpan> parent_span,
+  std::shared_ptr<SpanType> StartSpanByParentInternal(const std::shared_ptr<EventSpan> &parent_span,
                                                       std::shared_ptr<Event> starting_event,
                                                       Args &&... args) {
     // NOTE: lock must be held when calling this method
@@ -238,7 +236,7 @@ class Tracer {
     MarkSpanAsWaitingForParent(span);
   }
 
-  void AddParentLazily(std::shared_ptr<EventSpan> span, std::shared_ptr<EventSpan> &parent_span) {
+  void AddParentLazily(const std::shared_ptr<EventSpan> &span, std::shared_ptr<EventSpan> &parent_span) {
     throw_if_empty(span, span_is_null);
     throw_if_empty(parent_span, spanner_is_null);
 
@@ -277,7 +275,7 @@ class Tracer {
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
     throw_if_empty(starting_event, "StartSpanByParent(...) starting_event is null");
-    std::shared_ptr<SpanType> new_span = nullptr;
+    std::shared_ptr<SpanType> new_span;
 
     if (parent_span) {
       throw_if_empty(parent_span->GetContext(),

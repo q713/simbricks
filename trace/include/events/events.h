@@ -35,7 +35,7 @@
 #include <type_traits>
 
 #include "util/exception.h"
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "util/log.h"
 
 #define DEBUG_EVENT_ ;
@@ -1146,7 +1146,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
 
   concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan
+      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &src_chan
   ) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);
@@ -1164,8 +1164,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
 
   concurrencpp::result<void> process(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan
+      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &src_chan,
+      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &tar_chan
   ) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);

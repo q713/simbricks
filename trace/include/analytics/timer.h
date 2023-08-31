@@ -26,7 +26,7 @@
 #include <queue>
 #include <functional>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "events/events.h"
 
 #ifndef SIMBRICKS_TRACE_TIMER_H_

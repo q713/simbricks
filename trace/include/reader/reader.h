@@ -36,7 +36,7 @@
 #include <thread>
 #include <utility>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "util/log.h"
 #include "util/string_util.h"
 #include "util/utils.h"

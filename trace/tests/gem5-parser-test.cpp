@@ -26,7 +26,7 @@
 #include <vector>
 #include <memory>
 
-#include "corobelt/corobelt.h"
+#include "sync/corobelt.h"
 #include "util/componenttable.h"
 #include "reader/reader.h"
 #include "parser/parser.h"
@@ -49,7 +49,7 @@ class EventChecker : public consumer<std::shared_ptr<Event>> {
 
   concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<Channel<std::shared_ptr<Event>>> &src_chan
+      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &src_chan
   ) override {
     std::shared_ptr<Event> event;
     std::optional<std::shared_ptr<Event>> msg;

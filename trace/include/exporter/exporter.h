@@ -86,7 +86,7 @@ class NoOpExporter : public SpanExporter {
 
 class OtlpSpanExporter : public SpanExporter {
 
-  int64_t time_offset_ = 0;
+  const int64_t time_offset_;
   std::string url_;
   bool batch_mode_ = false;
   std::string lib_name_;
@@ -105,6 +105,7 @@ class OtlpSpanExporter : public SpanExporter {
   std::unordered_map<std::string, tracer_t> tracer_map_;
   std::vector<provider_t> provider_;
 
+  static constexpr int kPicoToNanoDenominator = 1000;
   using ts_steady = std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds>;
   using ts_system = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>;
 
@@ -196,14 +197,14 @@ class OtlpSpanExporter : public SpanExporter {
     return span;
   }
 
-  opentelemetry::common::SteadyTimestamp ToSteadyMicroseconds(uint64_t timestamp) const {
-    const std::chrono::nanoseconds nano_sec(time_offset_ + timestamp);
+  opentelemetry::common::SteadyTimestamp ToSteadyNanoseconds(uint64_t timestamp_pico) const {
+    const std::chrono::nanoseconds nano_sec(time_offset_ / kPicoToNanoDenominator + timestamp_pico);
     const ts_steady time_point(nano_sec);
     return opentelemetry::common::SteadyTimestamp(time_point);
   }
 
-  opentelemetry::common::SystemTimestamp ToSystemMicroseconds(uint64_t timestamp) const {
-    const std::chrono::nanoseconds nano_sec(time_offset_ + timestamp);
+  opentelemetry::common::SystemTimestamp ToSystemNanoseconds(uint64_t timestamp_pico) const {
+    const std::chrono::nanoseconds nano_sec(time_offset_ / kPicoToNanoDenominator + timestamp_pico);
     const ts_system time_point(nano_sec);
     return opentelemetry::common::SystemTimestamp(time_point);
   }
@@ -429,8 +430,8 @@ class OtlpSpanExporter : public SpanExporter {
       auto open_context = GetContext(parent_context);
       span_options.parent = open_context;
     }
-    span_options.start_system_time = ToSystemMicroseconds(span->GetStartingTs());
-    span_options.start_steady_time = ToSteadyMicroseconds(span->GetStartingTs());
+    span_options.start_system_time = ToSystemNanoseconds(span->GetStartingTs());
+    span_options.start_steady_time = ToSteadyNanoseconds(span->GetStartingTs());
 
     return std::move(span_options);
   }
@@ -439,7 +440,7 @@ class OtlpSpanExporter : public SpanExporter {
     assert(old_span and "old span is null");
     assert(new_span and "new span is null");
     opentelemetry::trace::EndSpanOptions end_opts;
-    end_opts.end_steady_time = ToSteadyMicroseconds(old_span->GetCompletionTs());
+    end_opts.end_steady_time = ToSteadyNanoseconds(old_span->GetCompletionTs());
     new_span->End(end_opts);
     RemoveSpan(old_span);
   }
@@ -665,23 +666,17 @@ class OtlpSpanExporter : public SpanExporter {
         }
       }
 
-      span->AddEvent(type, ToSystemMicroseconds(action->GetTs()), attributes);
+      span->AddEvent(type, ToSystemNanoseconds(action->GetTs()), attributes);
     }
   }
 
  public:
-  explicit OtlpSpanExporter(std::string &&url, bool batch_mode, std::string &&lib_name) {
-    time_offset_ = GetNowOffsetMicroseconds();
-    url_ = url;
-    batch_mode_ = batch_mode;
-    lib_name_ = lib_name;
+  explicit OtlpSpanExporter(std::string &&url, bool batch_mode, std::string &&lib_name)
+      : time_offset_(GetNowOffsetMicroseconds()), url_(url), batch_mode_(batch_mode), lib_name_(lib_name) {
   }
 
-  explicit OtlpSpanExporter(std::string &url, bool batch_mode, std::string &&lib_name) {
-    time_offset_ = GetNowOffsetMicroseconds();
-    url_ = url;
-    batch_mode_ = batch_mode;
-    lib_name_ = lib_name;
+  explicit OtlpSpanExporter(std::string &url, bool batch_mode, std::string &&lib_name)
+      : time_offset_(GetNowOffsetMicroseconds()), url_(url), batch_mode_(batch_mode), lib_name_(lib_name) {
   }
 
   ~OtlpSpanExporter() {

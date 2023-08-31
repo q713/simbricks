@@ -157,9 +157,9 @@ int main(int argc, char *argv[]) {
 
   //const std::string jaeger_url = "http://localhost:4318/v1/traces";
   std::string jaeger_url = "http://jaeger:4318/v1/traces";
-  //simbricks::trace::OtlpSpanExporter
-  //    exporter{jaeger_url, false, "trace"};
-  simbricks::trace::NoOpExporter exporter;
+  simbricks::trace::OtlpSpanExporter
+      exporter{jaeger_url, false, "trace"};
+  //simbricks::trace::NoOpExporter exporter;
 
   Tracer tracer{exporter};
 

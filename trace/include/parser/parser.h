@@ -37,6 +37,7 @@
 #include "events/events.h"
 #include "reader/reader.h"
 #include "env/traceEnvironment.h"
+#include "analytics/timer.h"
 
 class LogParser {
 
@@ -131,6 +132,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
   NonCoroBufferedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
+  WeakTimer &timer_;
 
   concurrencpp::result<void>
   FillBuffer() {
@@ -161,13 +163,15 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
                                  std::shared_ptr<concurrencpp::thread_executor> thread_executor,
                                  const std::string name,
                                  const std::string log_file_path,
-                                 LogParser &log_parser)
+                                 LogParser &log_parser,
+                                 WeakTimer &timer_)
       : producer<std::shared_ptr<Event>>(),
         executor_(std::move(executor)),
         background_executor_(std::move(background_executor)),
         thread_executor_(std::move(thread_executor)),
         log_file_path_(log_file_path),
-        log_parser_(log_parser) {
+        log_parser_(log_parser),
+        timer_(timer_) {
     //, line_handler_buffer_(ReaderBuffer<LineBufferSize>{name, true}) {
     throw_if_empty(executor_,
                    "BufferedEventProvider::BufferedEventProvider: executor is null");
@@ -189,17 +193,23 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
       return FillBuffer();
     });
 
+    size_t timer_key = co_await timer_.Register(resume_executor);
+
     std::optional<std::shared_ptr<Event>> event_opt;
     std::shared_ptr<Event> event_ptr = nullptr;
     for (event_opt = event_buffer_channel_.Pop(); event_opt.has_value();
          event_opt = event_buffer_channel_.Pop()) {
       assert(event_opt.has_value());
       event_ptr = event_opt.value();
+
+      co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
+
       const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);
       throw_on(not could_push,
                "BufferedEventProvider::process: unable to push next event to target channel");
     }
 
+    co_await timer_.Done(resume_executor, timer_key);
     co_await co_await producer_task;
     co_await tar_chan->CloseChannel(resume_executor);
     std::cout << "BufferedEventProvider exits" << std::endl;

@@ -136,7 +136,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
     if (not pending_host_call_span_) {
       std::cerr << "found new syscall entry, could not add "
                    "pending_host_call_span_"
-                << std::endl;
+                << '\n';
       co_return false;
     }
 
@@ -183,8 +183,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
           create_shared<Context>("HandelMmio could not create context",
                                  expectation::kMmio, pending_mmio_span);
       if (not co_await to_nic_queue_->Push(resume_executor, context)) {
-        std::cerr << "could not push to nic that mmio is expected" << std::endl;
-        // TODO: error
+        std::cerr << "could not push to nic that mmio is expected" << '\n';
         // note: we will not return false as the span creation itself id work
       }
       //std::cout << name_ << " host pushed mmio" << std::endl;
@@ -265,13 +264,13 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
   //std::cout << name_ << " host polled dma" << std::endl;
   if (not is_expectation(con_opt.value(), expectation::kDma)) {
     std::cerr << "when polling for dma context, no dma context was fetched"
-              << std::endl;
+              << '\n';
     co_return false;
   }
 
   // TODO: investigate this case further
   if (IsType(event_ptr, EventType::kHostDmaCT)) {
-    std::cerr << "unexpected event: " << *event_ptr << std::endl;
+    std::cerr << "unexpected event: " << *event_ptr << '\n';
     co_return false;
   }
   assert(not IsType(event_ptr, EventType::kHostDmaCT) and
@@ -296,7 +295,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
   auto con = con_opt.value();
   //std::cout << name_ << " host polled msix" << std::endl;
   if (not is_expectation(con, expectation::kMsix)) {
-    std::cerr << "did not receive msix on context queue" << std::endl;
+    std::cerr << "did not receive msix on context queue" << '\n';
     co_return false;
   }
 
@@ -339,7 +338,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelInt(
 }
 
 HostSpanner::HostSpanner(
-    std::string &&name, Tracer &tra, Timer &timer /*WeakTimer &timer*/,
+    std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives)

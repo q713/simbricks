@@ -165,13 +165,14 @@ int main(int argc, char *argv[]) {
 
   constexpr size_t kAmountSources = 4;
   constexpr size_t kLineBufferSize = 1;
-  constexpr size_t kEventBufferSize = 60'000'000;
-  Timer timer{kAmountSources};
-  //WeakTimer timer{kAmountSources};
+  constexpr size_t kEventBufferSize = 100'000'000;
+  //Timer timer{kAmountSources};
+  WeakTimer timer{kAmountSources};
 
   const std::set<std::string> blacklist_functions{
       "match_strlcpy", "__const_udelay", "static_key_disable", "__put_page", "relock_page_lruvec_irqsave",
-      "xas_move_index", "xas_set_offset", "blk_account_io_merge_bio", "biovec_phys_mergeable.isra.0"
+      "xas_move_index", "xas_set_offset", "blk_account_io_merge_bio", "biovec_phys_mergeable.isra.0", "vmalloc_node",
+      "__kfifo_poke_n", "__count_numa_events.isra.0"
   };
 
   using QueueT = CoroUnBoundedChannel<std::shared_ptr<Context>>;
@@ -307,7 +308,8 @@ int main(int argc, char *argv[]) {
       thread_executor,
       "Gem5ServerEventProvider",
       result["gem5-log-server"].as<std::string>(),
-      gem5_server_par
+      gem5_server_par,
+      timer
   );
   std::ofstream out_h_s;
   auto printer_h_s = createPrinter(out_h_s, result, "gem5-server-events", true);
@@ -338,7 +340,8 @@ int main(int argc, char *argv[]) {
       thread_executor,
       "Gem5ClientEventProvider",
       result["gem5-log-client"].as<std::string>(),
-      gem5_client_par
+      gem5_client_par,
+      timer
   );
   std::ofstream out_h_c;
   auto printer_h_c = createPrinter(out_h_c, result, "gem5-client-events", true);
@@ -367,7 +370,8 @@ int main(int argc, char *argv[]) {
       thread_executor,
       "NicbmServerEventProvider",
       result["nicbm-log-server"].as<std::string>(),
-      nicbm_ser_par
+      nicbm_ser_par,
+      timer
   );
   std::ofstream out_n_s;
   auto printer_n_s = createPrinter(out_n_s, result, "nicbm-server-events", true);
@@ -395,7 +399,8 @@ int main(int argc, char *argv[]) {
       thread_executor,
       "NicbmClientEventProvider",
       result["nicbm-log-client"].as<std::string>(),
-      nicbm_client_par
+      nicbm_client_par,
+      timer
   );
   std::ofstream out_n_c;
   auto printer_n_c = createPrinter(out_n_c, result, "nicbm-client-events", true);

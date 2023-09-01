@@ -128,7 +128,7 @@ class ReaderBuffer {
   const bool skip_empty_lines_;
   std::ifstream input_stream_;
   constexpr static size_t kPageSize = 4096;
-  constexpr static size_t kBufSize = kPageSize * 256;
+  constexpr static size_t kBufSize = kPageSize * 64;//* 256;
   char *istream_buffer_ = nullptr;
   FILE *file_ = nullptr;
   // TODO: introduce maximum size for strings a.k.a lines --> then use arena allocation to allocate these strings

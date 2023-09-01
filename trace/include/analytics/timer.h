@@ -25,6 +25,7 @@
 #include <memory>
 #include <queue>
 #include <functional>
+#include <set>
 
 #include "sync/corobelt.h"
 #include "events/events.h"
@@ -101,6 +102,7 @@ class WeakTimer {
   size_t registered_ = 0;
   size_t waiters_that_reached_min_ = 0;
   size_t still_needed_waiters_;
+  std::set<size_t> active_waiters_;
 
   void ComputeMin() {
     // NOTE: lock must be held when calling this method
@@ -123,17 +125,23 @@ class WeakTimer {
   };
 
   KeyResT Register(ExecutorT resume_executor) {
+    size_t key;
+    bool last_to_register;
     {
       concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
       throw_on(registered_ >= amount_waiters_, "Timer::Register: already AmountWaiters many waiters registered");
       ++registered_;
-      size_t key = next_key_++;
+      key = next_key_++;
       waiters_[key] = UINT64_MAX;
-      if (registered_ == amount_waiters_) {
-        timer_cv_.notify_one();
-      }
-      co_return key;
+      last_to_register = registered_ == amount_waiters_;
     }
+
+    if (last_to_register) {
+      std::cout << "WeakTimer::Register: all waiters registered!!" << std::endl;
+      timer_cv_.notify_all();
+    }
+
+    co_return key;
   }
 
   VoidResT Done(ExecutorT resume_executor, size_t key) {
@@ -142,8 +150,10 @@ class WeakTimer {
       --still_needed_waiters_;
       waiters_[key] = UINT64_MAX;
       ComputeMin();
-      timer_cv_.notify_all();
+      std::cout << "WeakTimer::Done: only " << still_needed_waiters_ << " waiters left" << std::endl;
     }
+
+    timer_cv_.notify_all();
   }
 
   VoidResT MoveForward(ExecutorT resume_executor, size_t key, uint64_t timestamp) {
@@ -152,33 +162,43 @@ class WeakTimer {
       throw_on(key >= amount_waiters_, "Timer::Register: try moving forward with illegal key");
 
       // wait for all waiters to at least register
-      auto a = registered_;
-      co_await timer_cv_.await(resume_executor, guard, [this]() {
-        return registered_ == amount_waiters_;
-      });
+      //co_await timer_cv_.await(resume_executor, guard, [this]() {
+      //  return registered_ == amount_waiters_;
+      //});
+      if (not active_waiters_.contains(key)) {
+        const auto marked_active = active_waiters_.insert(key);
+        throw_on(not marked_active.second, "WeakTimer::MoveForward: could not mark waiter as active");
+      }
       waiters_[key] = timestamp;
       // move forward if smaller than the current minimum/when being in the past
       if (timestamp < cur_minimum_) {
-        ComputeMin();
+        guard.unlock();
         timer_cv_.notify_all();
         co_return;
       }
 
       ++waiters_that_reached_min_;
-      // find the minimum whenb all are waiting currently
-      if (waiters_that_reached_min_ == still_needed_waiters_) {
-        ComputeMin();
-        if (timestamp <= cur_minimum_) {
-          // if minimum return
-          --waiters_that_reached_min_;
-          co_return;
-        }
-        timer_cv_.notify_all();
-      }
+      // find the minimum when all are waiting currently
+      ComputeMin();
+      //if (waiters_that_reached_min_ == still_needed_waiters_) {
+      //  ComputeMin();
+      //  if (timestamp <= cur_minimum_) {
+      //    // if minimum return
+      //    --waiters_that_reached_min_;
+      //    guard.unlock();
+      //    timer_cv_.notify_all();
+      //    co_return;
+      //  }
+      //}
+    }
 
+    timer_cv_.notify_all();
+
+    {
+      concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
       // await being the minimum and notify others
       co_await timer_cv_.await(resume_executor, guard, [this, timestamp]() {
-        return cur_minimum_ == timestamp;
+        return cur_minimum_ >= timestamp and waiters_that_reached_min_ == active_waiters_.size();
       });
       --waiters_that_reached_min_;
     }

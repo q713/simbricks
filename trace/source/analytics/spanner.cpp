@@ -41,9 +41,9 @@ concurrencpp::result<void> Spanner::consume(
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, event_is_null);
 
-    co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
-    // co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
-    // std::cout << name_ << " try handel: " << *event_ptr << std::endl;
+    std::cout << name_ << " try handel: " << *event_ptr << std::endl;
+    //co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
+    //co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
 
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {
@@ -65,10 +65,10 @@ concurrencpp::result<void> Spanner::consume(
     }
   }
 
-  co_await timer_.Done(resume_executor);
-  // co_await timer_.Done(resume_executor, timer_key);
+  //co_await timer_.Done(resume_executor);
+  //co_await timer_.Done(resume_executor, timer_key);
 
-  // std::cout << "event spanner exited" << std::endl;
+  std::cout << "event spanner exited" << std::endl;
 
   co_return;
 }

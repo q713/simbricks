@@ -28,7 +28,7 @@
 #ifndef SIMBRICKS_TRACE_UTILS_H_
 #define SIMBRICKS_TRACE_UTILS_H_
 
-inline int64_t GetNowOffsetMicroseconds() {
+inline int64_t GetNowOffsetNanoseconds() {
   auto now = std::chrono::system_clock::now();
   auto now_ns = std::chrono::time_point_cast<std::chrono::nanoseconds>(now);
   auto value = now_ns.time_since_epoch();

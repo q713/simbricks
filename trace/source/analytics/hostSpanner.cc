@@ -120,6 +120,11 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
   throw_if_empty(pending_host_call_span_, span_is_null);
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
     pci_write_before_ = TraceEnvironment::is_pci_write(event_ptr);
+
+    if (pending_host_call_span_->DoesDriverTransmit()) {
+      std::cout << "Host Driver Transmit found!!!!!!" << '\n';
+    }
+
     co_return true;
 
   } else if (pending_host_call_span_->IsComplete()) {
@@ -334,7 +339,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelInt(
 }
 
 HostSpanner::HostSpanner(
-    std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
+    std::string &&name, Tracer &tra, Timer &timer /*WeakTimer &timer*/,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives)

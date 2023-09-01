@@ -40,7 +40,7 @@ struct producer {
 
   virtual concurrencpp::result<void> produce(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<ValueType>> &tar_chan) {
+      std::shared_ptr<CoroChannel<ValueType>> tar_chan) {
     co_return;
   };
 };
@@ -51,7 +51,7 @@ struct consumer {
 
   virtual concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<ValueType>> &src_chan) {
+      std::shared_ptr<CoroChannel<ValueType>> src_chan) {
     co_return;
   };
 };
@@ -62,8 +62,8 @@ struct cpipe {
 
   virtual concurrencpp::result<void> process(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<ValueType>> &src_chan,
-      std::shared_ptr<CoroChannel<ValueType>> &tar_chan) {
+      std::shared_ptr<CoroChannel<ValueType>> src_chan,
+      std::shared_ptr<CoroChannel<ValueType>> tar_chan) {
     co_return;
   }
 };

@@ -87,7 +87,7 @@ class NoOpExporter : public SpanExporter {
 class OtlpSpanExporter : public SpanExporter {
 
   const int64_t time_offset_;
-  std::string url_;
+  const std::string url_;
   bool batch_mode_ = false;
   std::string lib_name_;
 
@@ -671,11 +671,11 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
  public:
-  explicit OtlpSpanExporter(std::string &&url, bool batch_mode, std::string &&lib_name)
+  explicit OtlpSpanExporter(const std::string &&url, bool batch_mode, std::string &&lib_name)
       : time_offset_(GetNowOffsetMicroseconds()), url_(url), batch_mode_(batch_mode), lib_name_(lib_name) {
   }
 
-  explicit OtlpSpanExporter(std::string &url, bool batch_mode, std::string &&lib_name)
+  explicit OtlpSpanExporter(const std::string &url, bool batch_mode, std::string &&lib_name)
       : time_offset_(GetNowOffsetMicroseconds()), url_(url), batch_mode_(batch_mode), lib_name_(lib_name) {
   }
 

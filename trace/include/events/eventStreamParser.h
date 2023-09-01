@@ -42,7 +42,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
   const std::string log_file_path_;
   ReaderBuffer<10> reader_buffer_;
 
-  bool ParseIdentNameTs(LineHandler &line_handler, size_t &parser_ident,
+  static bool ParseIdentNameTs(LineHandler &line_handler, size_t &parser_ident,
                         std::string &parser_name, uint64_t &ts) {
     if (not line_handler.ConsumeAndTrimString(": source_id=") or
         not line_handler.ParseUintTrim(10, parser_ident)) {
@@ -75,7 +75,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
   }
   
   concurrencpp::result<void> produce(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                     std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &tar_chan) override {
+                                     std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(tar_chan, channel_is_null);
 
@@ -96,7 +96,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       std::string event_name = line_handler.ExtractAndSubstrUntil(pred);
       if (event_name.empty()) {
         std::cout << "could not parse event name: "
-                  << line_handler.GetRawLine() << std::endl;
+                  << line_handler.GetRawLine() << '\n';
         continue;
       }
 
@@ -105,7 +105,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       std::string parser_name;
       if (not ParseIdentNameTs(line_handler, parser_ident, parser_name, ts)) {
         std::cout << "could not parse timestamp or source: "
-                  << line_handler.GetRawLine() << std::endl;
+                  << line_handler.GetRawLine() << '\n';
         continue;
       }
 
@@ -125,7 +125,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       } else if (event_name == "HostInstr") {
         if (not line_handler.ConsumeAndTrimString(", pc=") or
             not line_handler.ParseUintTrim(16, pc)) {
-          std::cout << "error parsing HostInstr" << std::endl;
+          std::cout << "error parsing HostInstr" << '\n';
           continue;
         }
         event = std::make_shared<HostInstr>(ts, parser_ident, parser_name, pc);
@@ -139,16 +139,16 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ConsumeAndTrimString(", comp=") or
             not line_handler.ExtractAndSubstrUntilInto(
                 component, sim_string_utils::is_alnum_dot_bar)) {
-          std::cout << "error parsing HostInstr" << std::endl;
+          std::cout << "error parsing HostInstr" << '\n';
           continue;
         }
-        const std::string *func =
+        const std::string *func_ptr =
             TraceEnvironment::internalize_additional(function);
         const std::string *comp =
             TraceEnvironment::internalize_additional(component);
 
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
-                                           func, comp);
+                                           func_ptr, comp);
 
       } else if (event_name == "HostMmioImRespPoW") {
         event =
@@ -160,7 +160,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
         if (not line_handler.ConsumeAndTrimString(", id=") or
             not line_handler.ParseUintTrim(10, id)) {
           std::cout << "error parsing HostMmioCR, HostMmioCW or HostDmaC"
-                    << std::endl;
+                    << '\n';
           continue;
         }
 
@@ -186,7 +186,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ParseUintTrim(16, size)) {
           std::cout
               << "error parsing HostMmioR, HostMmioW, HostDmaR or HostDmaW"
-              << std::endl;
+              << '\n';
           continue;
         }
 
@@ -198,7 +198,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
               not line_handler.ParseUintTrim(16, offset)) {
             std::cout
                 << "error parsing HostMmioR, HostMmioW bar or offset"
-                << std::endl;
+                << '\n';
             continue;
           }
 
@@ -220,7 +220,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       } else if (event_name == "HostMsiX") {
         if (not line_handler.ConsumeAndTrimString(", vec=") or
             not line_handler.ParseUintTrim(10, vec)) {
-          std::cout << "error parsing HostMsiX" << std::endl;
+          std::cout << "error parsing HostMsiX" << '\n';
           continue;
         }
         event = std::make_shared<HostMsiX>(ts, parser_ident, parser_name, vec);
@@ -238,7 +238,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ConsumeAndTrimString(", data=") or
             not line_handler.ParseUintTrim(16, data)) {
           std::cout << "error parsing HostConfRead or HostConfWrite"
-                    << std::endl;
+                    << '\n';
           continue;
         }
 
@@ -262,7 +262,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ParseUintTrim(16, offset) or
             not line_handler.ConsumeAndTrimString(", size=") or
             not line_handler.ParseUintTrim(10, size)) {
-          std::cout << "error parsing HostPciR or HostPciW" << std::endl;
+          std::cout << "error parsing HostPciR or HostPciW" << '\n';
           continue;
         }
 
@@ -278,7 +278,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
           event_name == "NicMsi") {
         if (not line_handler.ConsumeAndTrimString(", vec=") or
             not line_handler.ParseUintTrim(10, vec)) {
-          std::cout << "error parsing NicMsix" << std::endl;
+          std::cout << "error parsing NicMsix" << '\n';
           continue;
         }
 
@@ -293,7 +293,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       } else if (event_name == "SetIX") {
         if (not line_handler.ConsumeAndTrimString(", interrupt=") or
             not line_handler.ParseUintTrim(16, intr)) {
-          std::cout << "error parsing NicMsix" << std::endl;
+          std::cout << "error parsing NicMsix" << '\n';
           continue;
         }
         event = std::make_shared<SetIX>(ts, parser_ident, parser_name, intr);
@@ -311,7 +311,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ParseUintTrim(16, len)) {
           std::cout << "error parsing NicDmaI, NicDmaEx, NicDmaEn, NicDmaCR or "
                        "NicDmaCW"
-                    << std::endl;
+                    << '\n';
           continue;
         }
 
@@ -341,7 +341,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ConsumeAndTrimString(", val=")
             or not line_handler.ParseUintTrim(16, val)) {
           std::cout << "error parsing NicMmioR or NicMmioW: "
-                    << line_handler.GetRawLine() << std::endl;
+                    << line_handler.GetRawLine() << '\n';
           continue;
         }
 
@@ -356,7 +356,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       } else if (event_name == "NicTx") {
         if (not line_handler.ConsumeAndTrimString(", len=") or
             not line_handler.ParseUintTrim(16, len)) {
-          std::cout << "error parsing NicTx" << std::endl;
+          std::cout << "error parsing NicTx" << '\n';
           continue;
         }
         event = std::make_shared<NicTx>(ts, parser_ident, parser_name, len);
@@ -367,14 +367,14 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ConsumeAndTrimString(", is_read=true") or
             not line_handler.ConsumeAndTrimString(", port=") or
             not line_handler.ParseInt(port)) {
-          std::cout << "error parsing NicRx" << std::endl;
+          std::cout << "error parsing NicRx" << '\n';
           continue;
         }
         event = std::make_shared<NicRx>(ts, parser_ident,
                                         parser_name, len, addr);
 
       } else {
-        std::cout << "unknown event found, it will be skipped" << std::endl;
+        std::cout << "unknown event found, it will be skipped" << '\n';
         continue;
       }
 

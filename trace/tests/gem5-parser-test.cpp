@@ -34,44 +34,6 @@
 #include "events/events.h"
 #include "util/exception.h"
 
-class EventChecker : public consumer<std::shared_ptr<Event>> {
-
-  const size_t to_macth_;
-  std::vector<std::shared_ptr<Event>> expected_events_;
-
- public:
-
-  explicit EventChecker(std::vector<std::shared_ptr<Event>> expected_events)
-      : consumer<std::shared_ptr<Event>>(),
-        to_macth_(expected_events.size()),
-        expected_events_(std::move(expected_events)) {
-  }
-
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &src_chan
-  ) override {
-    std::shared_ptr<Event> event;
-    std::optional<std::shared_ptr<Event>> msg;
-    size_t cur_match = 0;
-    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->Pop(resume_executor)) {
-      event = msg.value();
-      REQUIRE(event != nullptr);
-      if (cur_match < to_macth_) {
-        auto match = expected_events_[cur_match];
-        REQUIRE(event->Equal(*match));
-      } else {
-        // we got more events as expected
-        REQUIRE(false);
-      }
-      ++cur_match;
-    }
-    REQUIRE(cur_match == to_macth_);
-    co_return;
-  }
-};
-
 TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
 
   const std::string test_file_path{"./tests/raw-logs/gem5-events-test.txt"};

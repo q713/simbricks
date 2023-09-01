@@ -30,6 +30,7 @@
 #include <list>
 #include <memory>
 #include <optional>
+#include <functional>
 
 #include "util/exception.h"
 #include "util/utils.h"
@@ -258,9 +259,9 @@ class CoroChannel {
 
   CoroChannel(CoroChannel<ValueType> &&) = delete;
 
-  virtual CoroChannel<ValueType> &operator=(const CoroChannel<ValueType> &) noexcept = delete;
+  CoroChannel<ValueType> &operator=(const CoroChannel<ValueType> &) noexcept = delete;
 
-  virtual CoroChannel<ValueType> &operator=(CoroChannel<ValueType> &&) noexcept = delete;
+  CoroChannel<ValueType> &operator=(CoroChannel<ValueType> &&) noexcept = delete;
 
   concurrencpp::lazy_result<bool> Empty(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
@@ -419,6 +420,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
         return this->closed_ or this->poisened_ or this->size_ < Capacity;
       });
       if (this->closed_ or this->poisened_) {
+        guard.unlock();
         this->channel_cv_.notify_all();
         co_return false;
       }
@@ -557,10 +559,10 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
   CoroUnBoundedChannel(CoroChannel<ValueType> &&) = delete;
 
   CoroUnBoundedChannel<ValueType> &operator=(
-      const CoroChannel<ValueType> &) noexcept = delete;
+      const CoroUnBoundedChannel<ValueType> &) noexcept = delete;
 
   CoroUnBoundedChannel<ValueType> &operator=(
-      CoroChannel<ValueType> &&) noexcept = delete;
+      CoroUnBoundedChannel<ValueType> &&) noexcept = delete;
 
   concurrencpp::result<void> Display(
       std::shared_ptr<concurrencpp::executor> resume_executor,
@@ -571,9 +573,9 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
         co_await this->channel_lock_.lock(resume_executor);
 
     out << "Channel:" << '\n';
-    out << "size=" << this->size_ << std::endl;
-    out << "closed=" << this->closed_ << std::endl;
-    out << "poisened=" << this->poisened_ << std::endl;
+    out << "size=" << this->size_ << '\n';
+    out << "closed=" << this->closed_ << '\n';
+    out << "poisened=" << this->poisened_ << '\n';
     out << "Buffer={" << '\n';
     for (auto &val : buffer_) {
       value_printer(out, val);

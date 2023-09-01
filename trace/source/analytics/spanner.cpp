@@ -25,7 +25,7 @@
 #include "analytics/spanner.h"
 
 concurrencpp::result<void> Spanner::consume(
-    ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> &src_chan) {
+    ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> src_chan) {
   throw_if_empty(resume_executor, resume_executor_null);
   throw_if_empty(src_chan, channel_is_null);
 
@@ -41,7 +41,7 @@ concurrencpp::result<void> Spanner::consume(
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, event_is_null);
 
-    // co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
+    co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
     // co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
     // std::cout << name_ << " try handel: " << *event_ptr << std::endl;
 
@@ -53,7 +53,7 @@ concurrencpp::result<void> Spanner::consume(
       } else {
         std::cerr << "null";
       }
-      std::cerr << std::endl;
+      std::cerr << '\n';
       continue;
     }
 
@@ -61,11 +61,11 @@ concurrencpp::result<void> Spanner::consume(
     added = co_await handler(resume_executor, event_ptr);
     if (not added) {
       std::cout << "found event that could not be added to a pack: "
-                << *event_ptr << std::endl;
+                << *event_ptr << '\n';
     }
   }
 
-  // co_await timer_.Done(resume_executor);
+  co_await timer_.Done(resume_executor);
   // co_await timer_.Done(resume_executor, timer_key);
 
   // std::cout << "event spanner exited" << std::endl;

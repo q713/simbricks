@@ -38,7 +38,7 @@ struct int_prod : public producer<int> {
 
   concurrencpp::result<void> produce(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<int>> &tar_chan) override {
+      std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
     throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
@@ -63,7 +63,7 @@ struct int_cons : public consumer<int> {
 
   concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<int>> &src_chan) override {
+      std::shared_ptr<CoroChannel<int>> src_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
     throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
@@ -83,8 +83,8 @@ struct int_cons : public consumer<int> {
 struct int_adder : public cpipe<int> {
   concurrencpp::result<void> process(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<int>> &src_chan,
-      std::shared_ptr<CoroChannel<int>> &tar_chan) override {
+      std::shared_ptr<CoroChannel<int>> src_chan,
+      std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            resume_executor_null);
     throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);

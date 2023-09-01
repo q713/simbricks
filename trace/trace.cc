@@ -156,18 +156,18 @@ int main(int argc, char *argv[]) {
   throw_if_empty(thread_executor, resume_executor_null);
 
   //const std::string jaeger_url = "http://localhost:4318/v1/traces";
-  std::string jaeger_url = "http://jaeger:4318/v1/traces";
-  simbricks::trace::OtlpSpanExporter
-      exporter{jaeger_url, false, "trace"};
-  //simbricks::trace::NoOpExporter exporter;
+  const std::string jaeger_url = "http://jaeger:4318/v1/traces";
+  //simbricks::trace::OtlpSpanExporter
+  //    exporter{jaeger_url, false, "trace"};
+  simbricks::trace::NoOpExporter exporter;
 
   Tracer tracer{exporter};
 
   constexpr size_t kAmountSources = 4;
   constexpr size_t kLineBufferSize = 1;
-  constexpr size_t kEventBufferSize = 35'000'000;
-  //Timer timer{kAmountSources};
-  WeakTimer timer{kAmountSources};
+  constexpr size_t kEventBufferSize = 60'000'000;
+  Timer timer{kAmountSources};
+  //WeakTimer timer{kAmountSources};
 
   const std::set<std::string> blacklist_functions{
       "match_strlcpy", "__const_udelay", "static_key_disable", "__put_page", "relock_page_lruvec_irqsave",

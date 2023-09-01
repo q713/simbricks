@@ -61,6 +61,7 @@ inline void throw_if_empty (const std::shared_ptr<Value> &to_check, const char *
   if (not to_check)
   {
     std::cout << "exception thrown" << std::endl;
+    std::cout << message << std::endl;
     //std::terminate();
     throw std::runtime_error (message);
   }
@@ -77,6 +78,7 @@ inline void throw_if_empty (const std::unique_ptr<Value> &to_check, const char *
   if (not to_check)
   {
     std::cout << "exception thrown" << std::endl;
+    std::cout << message << std::endl;
     //std::terminate();
     throw std::runtime_error (message);
   }
@@ -88,6 +90,7 @@ inline void throw_if_empty (const Value *to_check, const char *message)
   if (not to_check)
   {
     std::cout << "exception thrown" << std::endl;
+    std::cout << message << std::endl;
     //std::terminate();
     throw std::runtime_error (message);
   }
@@ -102,6 +105,7 @@ inline void throw_if_empty (const Value *to_check, std::string&& message)
 inline void throw_on(bool should_throw, const char* message) {
   if (should_throw) {
     std::cout << "exception thrown" << std::endl;
+    std::cout << message << std::endl;
     //std::terminate();
     throw std::runtime_error (message);
   }
@@ -134,8 +138,10 @@ inline void throw_just(Args&&... args) {
     message_builder << args;
   } (), ...);
   std::cout << "exception thrown" << std::endl;
-  //std::terminate();
-  throw std::runtime_error(message_builder.str());
+  std::string message{message_builder.str()};
+  std::cout << message << std::endl;
+//std::terminate();
+  throw std::runtime_error(message);
 }
 
 

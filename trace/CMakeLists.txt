@@ -38,14 +38,6 @@ else()
     add_compile_options(-O2)
 endif()
 
-#####################################
-# Fixme: Workaround for the server build
-#####################################
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -pthread")
-#set(CMAKE_EXE_LINKER_FLAGS "-stdlib=libc++")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -stdlib=libc++ -pthread")
-#set(CMAKE_EXE_LINKER_FLAGS "-L/usr/lib/llvm-17/lib/ -stdlib=libc++")
-
 #######################################
 # Required C standard
 #######################################
@@ -95,6 +87,8 @@ set(TRACE_LIB_HEADER_FILES
         include/util/log.h
         include/util/factory.h
         include/util/utils.h
+        # channel abstractions
+        include/sync/channel.h
         # coroutine wrappers
         include/sync/corobelt.h
         # reader
@@ -186,6 +180,7 @@ target_link_libraries(${UNIT_TESTS_TARGET} PUBLIC ${PROJECT_NAME})
 #######################################
 set(TEST_SRC
         include/util/exception.h
+        include/sync/channel.h
         include/sync/corobelt.h
         source/corobelt/concurrencpp-test.cpp
         )
@@ -206,19 +201,4 @@ set(TRACE_SRC_FILES
    )
 add_executable(trace ${TRACE_SRC_FILES})
 target_link_libraries(trace ${PROJECT_NAME})
-
-
-#######################################
-# dummy executable
-#######################################
-set(DUMMY_FILES
-        dummy.cpp)
-add_executable(dummy ${DUMMY_FILES})
-target_link_libraries(dummy PUBLIC
-        opentelemetry_trace
-        opentelemetry_api
-        opentelemetry_exporter_otlp_http
-        opentelemetry_exporter_ostream_span
-        ${PROJECT_NAME}
-)
 

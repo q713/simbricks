@@ -131,45 +131,6 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
   NonCoroBufferedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
-#if 0
-  std::vector<std::shared_ptr<Event>> event_buffer_{EventBufferSize};
-  size_t cur_buffer_index_ = 0;
-  size_t cur_size_ = 0;
-
-  inline bool StillBuffered() const {
-    return cur_size_ > 0 and cur_buffer_index_ < cur_size_;
-  }
-
-  concurrencpp::lazy_result<bool>
-  FillBuffer() {
-    co_await concurrencpp::resume_on(background_executor_);
-
-    cur_buffer_index_ = 0;
-    cur_size_ = 0;
-
-    size_t index = 0;
-    while (index < EventBufferSize) {
-      std::pair<bool, LineHandler> bh_p = line_handler_buffer_.NextHandler();
-      if (not bh_p.first) {
-        break;
-      }
-      LineHandler &handler =  bh_p.second;
-
-      std::shared_ptr<Event> event_ptr = co_await log_parser_.ParseEvent(handler);
-      if (not event_ptr) {
-        continue;
-      }
-
-      event_buffer_[index] = event_ptr;
-      ++index;
-      ++cur_size_;
-    }
-
-    co_await concurrencpp::resume_on(executor_);
-
-    co_return StillBuffered();
-  }
-#endif
 
   concurrencpp::result<void>
   FillBuffer() {
@@ -193,22 +154,6 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
     event_buffer_channel_.CloseChannel();
   }
-
-#if 0
-  concurrencpp::lazy_result<bool>
-  GetNextEvent(std::shared_ptr<Event> &target) {
-    if (not StillBuffered()) {
-      if (not co_await FillBuffer()) {
-        co_return false;
-      }
-    }
-
-    assert(cur_size_ > 0 and cur_buffer_index_ < cur_size_);
-    target = event_buffer_[cur_buffer_index_];
-    ++cur_buffer_index_;
-    co_return true;
-  }
-#endif
 
  public:
   explicit BufferedEventProvider(std::shared_ptr<concurrencpp::thread_pool_executor> executor,
@@ -236,7 +181,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
   concurrencpp::result<void>
   produce(std::shared_ptr<concurrencpp::executor> resume_executor,
-          std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &tar_chan) override {
+          std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
     throw_if_empty(resume_executor, "BufferedEventProvider::process: resume executor is null");
     throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null");
 
@@ -260,133 +205,6 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     std::cout << "BufferedEventProvider exits" << std::endl;
     co_return;
   }
-
-#if 0
-  concurrencpp::result<void>
-  produce(std::shared_ptr<concurrencpp::executor> resume_executor,
-          std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override {
-    throw_if_empty(resume_executor, "BufferedEventProvider::process: resume executor is null");
-    throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null");
-
-    line_handler_buffer_.OpenFile(log_file_path_);
-
-    std::shared_ptr<Event> event_ptr = nullptr;
-    while (co_await GetNextEvent(event_ptr)) {
-      assert(event_ptr and "BufferedEventProvider::process: event pointer is null");
-      const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);
-      throw_on(not could_push,
-               "BufferedEventProvider::process: unable to push next event to target channel");
-    }
-
-    std::cout << "BufferedEventProvider exits" << std::endl;
-    co_return;
-  }
-#endif
 };
-
-#if 0
-class LogParser : public producer<std::shared_ptr<Event>>
-  {
-  protected:
-    const std::string name_;
-    const uint64_t identifier_;
-    const std::string log_file_path_;
-    LineReader &line_reader_;
-
-    bool ParseTimestamp (uint64_t &timestamp);
-
-    bool ParseAddress (uint64_t &address);
-
-  public:
-    explicit LogParser (const std::string name,
-                        const std::string log_file_path,
-                        LineReader &line_reader)
-            : producer<std::shared_ptr<Event>> (),
-              name_ (name),
-              identifier_ (TraceEnvironment::GetNextParserId()),
-              log_file_path_ (log_file_path),
-              line_reader_ (line_reader)
-    {};
-
-    inline uint64_t GetIdent () const
-    {
-      return identifier_;
-    }
-
-    inline std::string GetName () const
-    {
-      return name_;
-    }
-
-    virtual concurrencpp::result<void>
-    produce (std::shared_ptr<concurrencpp::executor> resume_executor,
-             std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override
-    {
-      co_return;
-    }
-  };
-
-class Gem5Parser : public LogParser
-  {
-    ComponentFilter &component_table_;
-
-  protected:
-    std::shared_ptr<Event> ParseGlobalEvent (uint64_t timestamp);
-
-    std::shared_ptr<Event> ParseSystemSwitchCpus (uint64_t timestamp);
-
-    std::shared_ptr<Event> ParseSystemPcPciHost (uint64_t timestamp);
-
-    std::shared_ptr<Event>
-    ParseSystemPcPciHostInterface (uint64_t timestamp);
-
-    std::shared_ptr<Event> ParseSystemPcSimbricks (uint64_t timestamp);
-
-    std::shared_ptr<Event> ParseSimbricksEvent (uint64_t timestamp);
-
-  public:
-
-    explicit Gem5Parser (const std::string name,
-                         const std::string log_file_path,
-                         ComponentFilter &component_table,
-                         LineReader &line_reader)
-            : LogParser (name, log_file_path,
-                         line_reader),
-              component_table_ (component_table)
-    {
-    }
-
-    concurrencpp::result<void>
-    produce (std::shared_ptr<concurrencpp::executor> resume_executor,
-             std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override;
-  };
-
-class NicBmParser : public LogParser
-  {
-  protected:
-    bool ParseOffLenValComma (uint64_t &off, size_t &len, uint64_t &val);
-
-    bool ParseOpAddrLenPending (uint64_t &op, uint64_t &addr, size_t &len,
-                                size_t &pending, bool with_pending);
-
-    bool ParseMacAddress (uint64_t &address);
-
-    bool ParseSyncInfo (bool &sync_pcie, bool &sync_eth);
-
-  public:
-
-    explicit NicBmParser (const std::string name,
-                          const std::string log_file_path,
-                          LineReader &line_reader)
-            : LogParser (name, log_file_path,
-                         line_reader)
-    {
-    }
-
-    concurrencpp::result<void>
-    produce (std::shared_ptr<concurrencpp::executor> resume_executor,
-             std::shared_ptr<Channel<std::shared_ptr<Event>>> &tar_chan) override;
-  };
-#endif
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

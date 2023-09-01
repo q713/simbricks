@@ -1087,7 +1087,7 @@ inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<EventSpan> &s
 struct SpanPrinter
     : public consumer<std::shared_ptr<EventSpan>> {
   concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                     std::shared_ptr<CoroChannel<std::shared_ptr<EventSpan>>> &src_chan) override {
+                                     std::shared_ptr<CoroChannel<std::shared_ptr<EventSpan>>> src_chan) override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(src_chan, channel_is_null);
 
@@ -1097,7 +1097,7 @@ struct SpanPrinter
          next_span_opt = co_await src_chan->Pop(resume_executor)) {
       next_span = next_span_opt.value();
       throw_if_empty(next_span, span_is_null);
-      std::cout << next_span << std::endl;
+      std::cout << next_span << '\n';
     }
 
     co_return;

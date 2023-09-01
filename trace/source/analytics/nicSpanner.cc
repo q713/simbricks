@@ -201,7 +201,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
 }
 
 NicSpanner::NicSpanner(
-    std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
+    std::string &&name, Tracer &tra, Timer &timer /*WeakTimer &timer*/,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,

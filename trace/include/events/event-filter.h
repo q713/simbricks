@@ -43,8 +43,8 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
 
   concurrencpp::result<void> process(
       std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &src_chan,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> &tar_chan)
+      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
+      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan)
   override {
     throw_if_empty(resume_executor, resume_executor_null);
     throw_if_empty(tar_chan, channel_is_null);

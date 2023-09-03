@@ -34,12 +34,14 @@ class MemTest(nodec.AppConfig):
 
     def run_cmds(self, node):
         return [
-            f'busybox devmem 0x{self.addr:x} 64 0x42',
+            f'busybox devmem 0x{self.addr:x} 64 0x1234567834567890',
+            f'busybox devmem 0x{self.addr:x} 64',
+            f'busybox devmem 0x{self.addr:x} 64 0x9876543276543210',
             f'busybox devmem 0x{self.addr:x} 64'
         ]
 
 
-for h in ['gk']:
+for h in ['gk', 'simics']:
     e = exp.Experiment('basicmem-' + h)
     e.checkpoint = False
 
@@ -57,6 +59,13 @@ for h in ['gk']:
         host.variant = 'opt'
     elif h == 'qk':
         host = sim.QemuHost(node_config)
+    elif h == 'simics':
+        host = sim.SimicsHost(node_config)
+        host.sync = True
+        e.checkpoint = True
+    else:
+        raise NameError(h)
+
     host.name = 'host.0'
     e.add_host(host)
     host.wait = True

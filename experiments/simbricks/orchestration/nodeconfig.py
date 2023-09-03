@@ -71,7 +71,9 @@ class NodeConfig():
         self.prefix = 24
         """IP prefix."""
         self.cores = 1
-        """Number of cores to be simulated."""
+        """Number of CPU cores."""
+        self.threads = 1
+        """Number of threads per CPU core."""
         self.memory = 8 * 1024
         """Amount of system memory in MB."""
         self.disk_image = 'base'
@@ -86,15 +88,12 @@ class NodeConfig():
         """String to be appended to kernel command line."""
 
     def config_str(self) -> str:
-        if self.sim == 'qemu':
-            cp_es = []
-            exit_es = ['poweroff -f']
-        else:
-            if self.nockp:
-                cp_es = []
-            else:
-                cp_es = ['m5 checkpoint']
+        if self.sim == 'gem5':
+            cp_es = [] if self.nockp else ['m5 checkpoint']
             exit_es = ['m5 exit']
+        else:
+            cp_es = ['echo ready to checkpoint']
+            exit_es = ['poweroff -f']
 
         es = self.prepare_pre_cp() + self.app.prepare_pre_cp() + cp_es + \
             self.prepare_post_cp() + self.app.prepare_post_cp() + \

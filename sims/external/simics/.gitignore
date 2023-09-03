@@ -1,0 +1,7 @@
+installdir/
+intel-simics-package-manager*.tar.gz
+latest
+package-manager/
+project/
+ready
+simics-6-packages*.ispm

@@ -45,11 +45,6 @@ bool SymsFilter::ParseAddress(LineHandler &line_handler, uint64_t &address) {
     return false;
   }
 
-  if (line_handler.GetRawLine().compare("ffffffff81600000") == 0) {
-    std::cout << "found interesting line" << std::endl;
-    std::cout << "address: " << std::hex << address << std::endl;
-  }
-
   return true;
 }
 
@@ -97,6 +92,33 @@ const std::string *SymsFilter::Filter(uint64_t address) {
   auto symbol = symbol_table_.find(address);
   if (symbol != symbol_table_.end()) {
     return symbol->second;
+  }
+
+  return {};
+}
+
+const std::string *SymsFilter::FilterNearestAddressUpper(uint64_t address) {
+  auto symbol_iter = symbol_table_.upper_bound(address);
+  if (symbol_iter == symbol_table_.begin()) {
+    // the very first symbol is larger, hence we return null
+    return {};
+  }
+  symbol_iter--;
+  return symbol_iter->second;
+}
+
+const std::string *SymsFilter::FilterNearestAddressLower(uint64_t address) {
+  auto symbol_iter = symbol_table_.lower_bound(address);
+  if (symbol_iter->first == address) {
+    return symbol_iter->second;
+  }
+
+  if (symbol_iter->first > address) {
+    if (symbol_iter == symbol_table_.begin()) {
+      return {};
+    }
+    symbol_iter--;
+    return symbol_iter->second;
   }
 
   return {};

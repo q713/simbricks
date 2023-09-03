@@ -30,6 +30,7 @@
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <map>
 #include <utility>
 
 #include "util/log.h"
@@ -39,25 +40,30 @@
 enum FilterType { kSyms, kS, kElf };
 
 class SymsFilter {
+ public:
+  using SymTableT = std::map<uint64_t, const std::string *>;
+  //using SymTableT = std::unordered_map<uint64_t, const std::string *>;
+
  protected:
   uint64_t id_;
   const std::string component_;
   ReaderBuffer<1> reader_buffer_;
   //LineReader line_reader_;
   std::set<std::string> symbol_filter_;
-  std::unordered_map<uint64_t, const std::string *> symbol_table_;
+  //SymTableT symbol_table_;
+  SymTableT symbol_table_;
   StringInternalizer &i_;
 
   explicit SymsFilter(uint64_t id, const std::string component,
                       std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-                    //std::shared_ptr<concurrencpp::thread_executor> background_executor,
+      //std::shared_ptr<concurrencpp::thread_executor> background_executor,
                       std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                       std::set<std::string> symbol_filter,
                       StringInternalizer &i)
       : id_(id),
         component_(component),
         reader_buffer_("symtable", true),
-        //line_reader_("symtable", std::move(background_executor), std::move(foreground_executor), true),
+      //line_reader_("symtable", std::move(background_executor), std::move(foreground_executor), true),
         symbol_filter_(std::move(symbol_filter)),
         i_(i) {};
 
@@ -145,7 +151,7 @@ class SymsFilter {
     return component_;
   }
 
-  std::unordered_map<uint64_t, const std::string *> &GetSymTable() {
+  SymTableT &GetSymTable() {
     return symbol_table_;
   }
 
@@ -154,6 +160,10 @@ class SymsFilter {
    * Get in address and receive label for address.
    */
   const std::string *Filter(uint64_t address);
+
+  const std::string *FilterNearestAddressUpper(uint64_t address);
+
+  const std::string *FilterNearestAddressLower(uint64_t address);
 
   static std::shared_ptr<SymsFilter> Create(
       uint64_t id, const std::string component,

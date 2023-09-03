@@ -72,7 +72,7 @@ class TraceEnvironment {
     return internalizer_;
   }
 
-  inline static std::vector<std::shared_ptr<SymsFilter>> &get_symtables() {
+  inline static std::vector<std::shared_ptr<SymsFilter>> &GetSymtables() {
     return symbol_tables_;
   }
 

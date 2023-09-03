@@ -231,6 +231,7 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
 
   std::shared_ptr<Event> event_ptr;
   uint64_t timestamp, off, val, op, addr, vec, pending;
+  bool posted;
   int port;
   size_t len;
 
@@ -274,8 +275,12 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
       if (!ParseOffLenValComma(line_handler, off, len, val)) {
         co_return nullptr;
       }
+      if (not line_handler.ConsumeAndTrimTillString("posted=")
+           or not line_handler.ParseBoolFromUint(10, posted)) {
+        co_return nullptr;
+      }
       event_ptr = std::make_shared<NicMmioW>(timestamp, GetIdent(),
-                                             GetName(), off, len, val);
+                                             GetName(), off, len, val, posted);
       co_return event_ptr;
 
     } else if (line_handler.ConsumeAndTrimTillString("issuing dma")) {

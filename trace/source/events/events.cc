@@ -461,10 +461,18 @@ bool NicMmioR::Equal(const Event &other) {
 
 void NicMmioW::Display(std::ostream &out) {
   NicMmio::Display(out);
+  out << ", posted=" << BoolToString(posted_);
 }
 
 bool NicMmioW::Equal(const Event &other) {
-  return NicMmio::Equal(other);
+  if (not NicMmio::Equal(other)) {
+    return false;
+  }
+  const NicMmioW *mmio = dynamic_cast<const NicMmioW *>(&other);
+  if (not mmio) {
+    return false;
+  }
+  return mmio->posted_ == posted_;
 }
 
 void NicTrx::Display(std::ostream &out) {

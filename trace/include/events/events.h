@@ -1009,12 +1009,14 @@ class NicMmioR : public NicMmio {
 };
 
 class NicMmioW : public NicMmio {
+  bool posted_ = false;
+
  public:
   NicMmioW(uint64_t ts, const size_t parser_identifier,
            const std::string parser_name, uint64_t off, size_t len,
-           uint64_t val)
+           uint64_t val, bool posted)
       : NicMmio(ts, parser_identifier, parser_name,
-                EventType::kNicMmioWT, "NicMmioW", off, len, val) {
+                EventType::kNicMmioWT, "NicMmioW", off, len, val), posted_(posted) {
   }
 
   NicMmioW(const NicMmioW &other) = default;
@@ -1129,11 +1131,11 @@ bool IsType(std::shared_ptr<Event> &event_ptr, EventType type);
 
 bool IsType(const Event &event, EventType type);
 
-class EventPrinter : public consumer<std::shared_ptr<Event>>, 
+class EventPrinter : public consumer<std::shared_ptr<Event>>,
                      public cpipe<std::shared_ptr<Event>> {
   std::ostream &out_;
 
-  inline void print(const std::shared_ptr<Event>& event) {
+  inline void print(const std::shared_ptr<Event> &event) {
     throw_if_empty(event, event_is_null);
     out_ << *event << std::endl;
     out_.flush();
@@ -1177,7 +1179,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       std::shared_ptr<Event> event = msg.value();
       print(event);
       const bool was_pushed = co_await tar_chan->Push(resume_executor, event);
-      throw_on(not was_pushed, 
+      throw_on(not was_pushed,
                "EventPrinter::process: Could not push to target channel");
     }
 

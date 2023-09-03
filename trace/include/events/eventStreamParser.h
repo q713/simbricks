@@ -115,6 +115,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
           val = 0;
       int bar = 0, port = 0;
       size_t len = 0, size = 0, bytes = 0;
+      bool posted;
       std::string function, component;
       if (event_name == "SimSendSyncSimSendSync") {
         event = std::make_shared<SimSendSync>(ts, parser_ident, parser_name);
@@ -338,8 +339,10 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ParseUintTrim(16, offset) or
             not line_handler.ConsumeAndTrimString(", len=") or
             not line_handler.ParseUintTrim(16, len) or
-            not line_handler.ConsumeAndTrimString(", val=")
-            or not line_handler.ParseUintTrim(16, val)) {
+            not line_handler.ConsumeAndTrimString(", val=") or
+            not line_handler.ParseUintTrim(16, val) or
+            not line_handler.ConsumeAndTrimString(", posted=") or
+            not line_handler.ParseBoolFromStringRepr(posted)) {
           std::cout << "error parsing NicMmioR or NicMmioW: "
                     << line_handler.GetRawLine() << '\n';
           continue;
@@ -350,7 +353,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
                                              offset, len, val);
         } else {
           event = std::make_shared<NicMmioW>(ts, parser_ident, parser_name,
-                                             offset, len, val);
+                                             offset, len, val, posted);
         }
 
       } else if (event_name == "NicTx") {

@@ -38,11 +38,19 @@ class Simulator(object):
         self.name = ''
 
     def resreq_cores(self):
-        """Number of cores required for this simulator."""
+        """
+        Number of cores this simulator requires during execution.
+
+        This is used for scheduling multiple runs and experiments.
+        """
         return 1
 
     def resreq_mem(self):
-        """Memory required for this simulator (in MB)."""
+        """
+        Number of memory in MB this simulator requires during execution.
+
+        This is used for scheduling multiple runs and experiments.
+        """
         return 64
 
     def full_name(self):
@@ -51,16 +59,16 @@ class Simulator(object):
 
     # pylint: disable=unused-argument
     def prep_cmds(self, env: ExpEnv) -> tp.List[str]:
-        """Commands to run to prepare simulator."""
+        """Commands to prepare execution of this simulator."""
         return []
 
     # pylint: disable=unused-argument
     def run_cmd(self, env: ExpEnv) -> tp.Optional[str]:
-        """Command to run to execute simulator."""
+        """Command to execute this simulator."""
         return None
 
     def dependencies(self) -> tp.List[Simulator]:
-        """Other simulators this one depends on."""
+        """Other simulators to execute before this one."""
         return []
 
     # Sockets to be cleaned up
@@ -87,9 +95,20 @@ class PCIDevSim(Simulator):
         super().__init__()
 
         self.sync_mode = 0
+        """Synchronization mode. 0 is running unsynchronized, 1 synchronized.
+        Depending on the concrete simulator, there may be additional modes."""
         self.start_tick = 0
+        """The timestamp at which to start the simulation. This is useful when
+        the simulator is only attached at a later point in time and needs to
+        synchronize with connected simulators. For example, this could be used
+        when taking checkpoints to only attach certain simulators after the
+        checkpoint has been taken."""
         self.sync_period = 500
+        """Period in nanoseconds of sending synchronization messages from this
+        device to connected components."""
         self.pci_latency = 500
+        """Latency in nanoseconds for sending messages to components connected
+        via PCI."""
 
     def full_name(self):
         return 'dev.' + self.name
@@ -163,6 +182,8 @@ class NetSim(Simulator):
 
         self.opt = ''
         self.sync_mode = 0
+        """Synchronization mode. 0 is running unsynchronized, 1 synchronized.
+        Depending on the concrete simulator, there may be additional modes."""
         self.sync_period = 500
         """Synchronization period in nanoseconds from this network to connected
         components."""
@@ -215,10 +236,6 @@ class MemDevSim(NICSim):
     def __init__(self):
         super().__init__()
 
-        self.name = ''
-        self.sync_mode = 0
-        self.start_tick = 0
-        self.sync_period = 500
         self.mem_latency = 500
         self.addr = 0xe000000000000000
         self.size = 1024 * 1024 * 1024  # 1GB
@@ -240,11 +257,6 @@ class NetMemSim(NICSim):
     def __init__(self):
         super().__init__()
 
-        self.name = ''
-        self.sync_mode = 0
-        self.start_tick = 0
-        self.sync_period = 500
-        self.eth_latency = 500
         self.addr = 0xe000000000000000
         self.size = 1024 * 1024 * 1024  # 1GB
         self.as_id = 0
@@ -276,9 +288,17 @@ class HostSim(Simulator):
         self.cpu_freq = '4GHz'
 
         self.sync_mode = 0
+        """Synchronization mode. 0 is running unsynchronized, 1 synchronized.
+        Depending on the concrete simulator, there may be additional modes."""
         self.sync_period = 500
+        """Period in nanoseconds of sending synchronization messages from this
+        device to connected components."""
         self.pci_latency = 500
+        """Latency in nanoseconds for sending messages to components connected
+        via PCIe."""
         self.mem_latency = 500
+        """Latency in nanoseconds for sending messages to components connected
+        via Ethernet."""
 
         self.pcidevs: tp.List[PCIDevSim] = []
         self.net_directs: tp.List[NetSim] = []
@@ -330,6 +350,7 @@ class QemuHost(HostSim):
         super().__init__(node_config)
 
         self.sync = False
+        """"Whether to synchronize with attached simulators."""
 
     def resreq_cores(self):
         if self.sync:
@@ -765,6 +786,7 @@ class SwitchNet(NetSim):
     def __init__(self):
         super().__init__()
         self.sync = True
+        """Whether to synchronize with attached simulators."""
 
     def run_cmd(self, env):
         cmd = env.repodir + '/sims/net/switch/net_switch'

@@ -24,9 +24,28 @@
 
 #include <string>
 #include <chrono>
+#include <filesystem>
+#include <exception>
+#include <fstream>
 
 #ifndef SIMBRICKS_TRACE_UTILS_H_
 #define SIMBRICKS_TRACE_UTILS_H_
+
+inline void
+CreateOpenFile(std::ofstream &out, const std::string &filename, bool allow_override) {
+  if (not allow_override and std::filesystem::exists(filename)) {
+    std::stringstream error;
+    error << "the file " << filename << " already exists, we will not overwrite it";
+    throw std::runtime_error(error.str());
+  }
+
+  out.open(filename, std::ios::out);
+  if (not out.is_open()) {
+    std::stringstream error;
+    error << "could not open file " << filename;
+    throw std::runtime_error(error.str());
+  }
+}
 
 inline int64_t GetNowOffsetNanoseconds() {
   auto now = std::chrono::system_clock::now();

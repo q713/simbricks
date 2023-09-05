@@ -43,21 +43,6 @@
 #include "util/factory.h"
 #include "exporter/exporter.h"
 
-void create_open_file(std::ofstream &out, const std::string &filename, bool allow_override) {
-  if (not allow_override and std::filesystem::exists(filename)) {
-    std::stringstream error;
-    error << "the file " << filename << " already exists, we will not overwrite it";
-    throw std::runtime_error(error.str());
-  }
-
-  out.open(filename, std::ios::out);
-  if (not out.is_open()) {
-    std::stringstream error;
-    error << "could not open file " << filename;
-    throw std::runtime_error(error.str());
-  }
-}
-
 std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
                                             cxxopts::ParseResult &result,
                                             const std::string &option,
@@ -65,10 +50,10 @@ std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
   std::shared_ptr<EventPrinter> printer;
   if (result.count(option) != 0) {
     try {
-      create_open_file(out, result[option].as<std::string>(), allow_override);
+      CreateOpenFile(out, result[option].as<std::string>(), allow_override);
       printer = create_shared<EventPrinter>(printer_is_null, out);
     } catch (std::exception &exe) {
-      std::cerr << "could not create printer: " << exe.what() << std::endl;
+      std::cerr << "could not create printer: " << exe.what() << '\n';
       return nullptr;
     }
   } else {
@@ -114,7 +99,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (result.count("help")) {
-    std::cout << options.help() << std::endl;
+    std::cout << options.help() << '\n';
     exit(EXIT_SUCCESS);
   }
 
@@ -271,8 +256,8 @@ int main(int argc, char *argv[]) {
         !result.count("nicbm-log-server") ||
         !result.count("gem5-log-client") ||
         !result.count("nicbm-log-client")) {
-      std::cerr << "invalid arguments given" << std::endl
-                << options.help() << std::endl;
+      std::cerr << "invalid arguments given" << '\n'
+                << options.help() << '\n';
       exit(EXIT_FAILURE);
     }
 
@@ -283,9 +268,9 @@ int main(int argc, char *argv[]) {
             "Linuxvm-Symbols",
             background_executor, thread_pool_executor,
             result["linux-dump-server-client"].as<std::string>(), 0,
-            FilterType::kS)) {
+            FilterType::kSyms)) {
       std::cerr << "could not initialize symbol table linux-dump-server-client"
-                << std::endl;
+                << '\n';
       exit(EXIT_FAILURE);
     }
     if (result.count("nic-i40e-dump") &&
@@ -293,8 +278,8 @@ int main(int argc, char *argv[]) {
             "Nicdriver-Symbols",
             background_executor, thread_pool_executor,
             result["nic-i40e-dump"].as<std::string>(),
-            0xffffffffa0000000ULL, FilterType::kS)) {
-      std::cerr << "could not initialize symbol table nic-i40e-dump" << std::endl;
+            0xffffffffa0000000ULL, FilterType::kSyms)) {
+      std::cerr << "could not initialize symbol table nic-i40e-dump" << '\n';
       exit(EXIT_FAILURE);
     }
 

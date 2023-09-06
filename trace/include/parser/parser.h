@@ -149,14 +149,6 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
         continue;
       }
 
-      if (IsType(event_ptr, EventType::kHostCallT)) {
-        auto call = std::static_pointer_cast<HostCall>(event_ptr);
-        if (call->GetPc() == 0xffffffffa0025015 or *(call->GetFunc()) == "i40e_lan_xmit_frame") {
-          std::cout << "BufferedEventProvider: [" << std::hex << call->GetPc() << "] = " << *(call->GetFunc())
-                    << '\n';
-        }
-      }
-
       const bool could_push = event_buffer_channel_.Push(event_ptr);
       throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel");
     }

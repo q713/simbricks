@@ -42,7 +42,7 @@ services:
     command:
       - /bin/bash
       - -c
-      - for i in {1..2}; do build-docker/trace --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-new-S.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-new-S.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
+      - for i in {1..2}; do build-docker/trace --trace-env-config /usr/src/data-folder/trace-env-config.yaml --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-new-S.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-new-S.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
     volumes:
       - /home/jakob/uni/master/simbricks:/usr/src/data-folder
       - /home/jakob/uni/master/simbricks/trace/tests/linux-dumps:/usr/src/linux_dumbs

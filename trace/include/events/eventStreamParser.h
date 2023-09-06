@@ -38,6 +38,7 @@
 
 class EventStreamParser : public producer<std::shared_ptr<Event>> {
 
+  TraceEnvironment &trace_environment_;
   const std::string name_;
   const std::string log_file_path_;
   ReaderBuffer<10> reader_buffer_;
@@ -66,9 +67,11 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
 
  public:
   explicit EventStreamParser(
+      TraceEnvironment &trace_environment,
       const std::string name,
       const std::string log_file_path)
       : producer<std::shared_ptr<Event>>(),
+        trace_environment_(trace_environment),
         name_(name),
         log_file_path_(log_file_path),
         reader_buffer_(name_, true) {
@@ -144,9 +147,9 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
           continue;
         }
         const std::string *func_ptr =
-            TraceEnvironment::internalize_additional(function);
+            trace_environment_.InternalizeAdditional(function);
         const std::string *comp =
-            TraceEnvironment::internalize_additional(component);
+            trace_environment_.InternalizeAdditional(component);
 
         event = std::make_shared<HostCall>(ts, parser_ident, parser_name, pc,
                                            func_ptr, comp);

@@ -57,10 +57,17 @@ namespace simbricks::trace {
 class SpanExporter {
 
  protected:
+  // TODO: support reader writer lock, normally all threads should
+  //       only read values after exporter initialization, as such
+  //       we can also execute them concurrently as long as they only read values!
   std::recursive_mutex exporter_mutex_;
 
+  TraceEnvironment &trace_environment_;
+
  public:
-  SpanExporter() = default;
+  explicit SpanExporter(TraceEnvironment &trace_environment)
+      : trace_environment_(trace_environment) {
+  };
 
   virtual void StartSpan(std::shared_ptr<EventSpan> to_start) = 0;
 
@@ -72,7 +79,7 @@ class SpanExporter {
 // special span exporter that doies nothing, may be useful for debugging purposes
 class NoOpExporter : public SpanExporter {
  public:
-  NoOpExporter() = default;
+  explicit NoOpExporter(TraceEnvironment &trace_environment) : SpanExporter(trace_environment) {};
 
   void StartSpan(std::shared_ptr<EventSpan> to_start) override {
   }
@@ -218,13 +225,14 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"type", type});
   }
 
-  static void add_SimSendSync(std::map<std::string, std::string> &attributes, const std::shared_ptr<SimSendSync> &event) {
+  static void add_SimSendSync(std::map<std::string, std::string> &attributes,
+                              const std::shared_ptr<SimSendSync> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
   static void add_SimProcInEvent(std::map<std::string, std::string> &attributes,
-                          const std::shared_ptr<SimProcInEvent> &event) {
+                                 const std::shared_ptr<SimProcInEvent> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
@@ -243,7 +251,7 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   static void add_HostMmioImRespPoW(std::map<std::string, std::string> &attributes,
-                             const std::shared_ptr<HostMmioImRespPoW> &event) {
+                                    const std::shared_ptr<HostMmioImRespPoW> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
@@ -265,7 +273,7 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   static void add_HostAddrSizeOp(std::map<std::string, std::string> &attributes,
-                          const std::shared_ptr<HostAddrSizeOp> &event) {
+                                 const std::shared_ptr<HostAddrSizeOp> &event) {
     assert(event and "event is not null");
     add_HostIdOp(attributes, event);
     attributes.insert({"addr", std::to_string(event->GetAddr())});
@@ -321,12 +329,14 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"is_read", event->IsRead() ? "true" : "false"});
   }
 
-  static void add_HostClearInt(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostClearInt> &event) {
+  static void add_HostClearInt(std::map<std::string, std::string> &attributes,
+                               const std::shared_ptr<HostClearInt> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
 
-  static void add_HostPostInt(std::map<std::string, std::string> &attributes, const std::shared_ptr<HostPostInt> &event) {
+  static void add_HostPostInt(std::map<std::string, std::string> &attributes,
+                              const std::shared_ptr<HostPostInt> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
   }
@@ -393,28 +403,28 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"val", std::to_string(event->GetVal())});
   }
 
-  void add_NicMmioR(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioR> &event) {
+  static void add_NicMmioR(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioR> &event) {
     assert(event and "event is not null");
     add_NicMmio(attributes, event);
   }
 
-  void add_NicMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioW> &event) {
+  static void add_NicMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioW> &event) {
     assert(event and "event is not null");
     add_NicMmio(attributes, event);
   }
 
-  void add_NicTrx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTrx> &event) {
+  static void add_NicTrx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTrx> &event) {
     assert(event and "event is not null");
     add_Event(attributes, event);
     attributes.insert({"len", std::to_string(event->GetLen())});
   }
 
-  void add_NicTx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTx> &event) {
+  static void add_NicTx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTx> &event) {
     assert(event and "event is not null");
     add_NicTrx(attributes, event);
   }
 
-  void add_NicRx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicRx> &event) {
+  static void add_NicRx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicRx> &event) {
     assert(event and "event is not null");
     add_NicTrx(attributes, event);
     attributes.insert({"port", std::to_string(event->GetPort())});
@@ -481,13 +491,14 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
   }
 
-  static void set_HostMmioSpanAttr(span_t &new_span, std::shared_ptr<HostMmioSpan> &old_span) {
+  void set_HostMmioSpanAttr(span_t &new_span, std::shared_ptr<HostMmioSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
     //new_span->SetAttribute("after-pci/pci-before", BoolToString(old_span->IsAfterPci()));
     new_span->SetAttribute("BAR-number", std::to_string(old_span->GetBarNumber()));
     new_span->SetAttribute("is-going-to-device",
-                           BoolToString(TraceEnvironment::IsToDeviceBarNumber(old_span->GetBarNumber())));
+                           BoolToString(this->trace_environment_.IsToDeviceBarNumber(
+                               old_span->GetBarNumber())));
   }
 
   static void set_HostPciSpanAttr(span_t &new_span, std::shared_ptr<HostPciSpan> &old_span) {
@@ -510,7 +521,7 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("is-transmit", BoolToString(old_span->IsTransmit()));
   }
 
-  static void set_Attr(span_t &span, std::shared_ptr<EventSpan> &to_end) {
+  void set_Attr(span_t &span, std::shared_ptr<EventSpan> &to_end) {
     switch (to_end->GetType()) {
       case kHostCall: {
         auto call_span = std::static_pointer_cast<HostCallSpan>(to_end);
@@ -671,12 +682,26 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
  public:
-  explicit OtlpSpanExporter(const std::string &&url, bool batch_mode, std::string &&lib_name)
-      : time_offset_nanosec_(GetNowOffsetNanoseconds()), url_(url), batch_mode_(batch_mode), lib_name_(lib_name) {
+  explicit OtlpSpanExporter(TraceEnvironment &trace_environment,
+                            const std::string &&url,
+                            bool batch_mode,
+                            std::string &&lib_name)
+      : SpanExporter(trace_environment),
+        time_offset_nanosec_(GetNowOffsetNanoseconds()),
+        url_(url),
+        batch_mode_(batch_mode),
+        lib_name_(lib_name) {
   }
 
-  explicit OtlpSpanExporter(const std::string &url, bool batch_mode, std::string &&lib_name)
-      : time_offset_nanosec_(GetNowOffsetNanoseconds()), url_(url), batch_mode_(batch_mode), lib_name_(lib_name) {
+  explicit OtlpSpanExporter(TraceEnvironment &trace_environment,
+                            const std::string &url,
+                            bool batch_mode,
+                            std::string &&lib_name)
+      : SpanExporter(trace_environment),
+        time_offset_nanosec_(GetNowOffsetNanoseconds()),
+        url_(url),
+        batch_mode_(batch_mode),
+        lib_name_(lib_name) {
   }
 
   ~OtlpSpanExporter() {

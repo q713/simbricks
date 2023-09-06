@@ -55,15 +55,11 @@ class SymsFilter {
   StringInternalizer &i_;
 
   explicit SymsFilter(uint64_t id, const std::string component,
-                      std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-      //std::shared_ptr<concurrencpp::thread_executor> background_executor,
-                      std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
                       std::set<std::string> symbol_filter,
                       StringInternalizer &i)
       : id_(id),
         component_(component),
         reader_buffer_("symtable", true),
-      //line_reader_("symtable", std::move(background_executor), std::move(foreground_executor), true),
         symbol_filter_(std::move(symbol_filter)),
         i_(i) {};
 
@@ -165,26 +161,23 @@ class SymsFilter {
 
   const std::string *FilterNearestAddressLower(uint64_t address);
 
-  static std::shared_ptr<SymsFilter> Create(
-      uint64_t id, const std::string component,
-      std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-      //std::shared_ptr<concurrencpp::thread_executor> background_executor,
-      std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
-      const std::string &file_path,
-      uint64_t address_offset, FilterType type, StringInternalizer &i) {
-    return SymsFilter::Create(id, component, std::move(background_executor),
-                              std::move(foreground_executor), file_path,
+  static std::shared_ptr<SymsFilter> Create(uint64_t id,
+                                            const std::string component,
+                                            const std::string &file_path,
+                                            uint64_t address_offset,
+                                            FilterType type,
+                                            StringInternalizer &i) {
+    return SymsFilter::Create(id, component, file_path,
                               address_offset, type, {}, i);
   }
 
-  static std::shared_ptr<SymsFilter> Create(
-      uint64_t id, const std::string component,
-      std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-      //std::shared_ptr<concurrencpp::thread_executor> background_executor,
-      std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
-      const std::string &file_path,
-      uint64_t address_offset, FilterType type,
-      std::set<std::string> symbol_filter, StringInternalizer &i);
+  static std::shared_ptr<SymsFilter> Create(uint64_t id,
+                                            const std::string component,
+                                            const std::string &file_path,
+                                            uint64_t address_offset,
+                                            FilterType type,
+                                            std::set<std::string> symbol_filter,
+                                            StringInternalizer &i);
 
   friend std::ostream &operator<<(std::ostream &os, SymsFilter &filter) {
     os << std::endl << std::endl;

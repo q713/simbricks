@@ -31,6 +31,7 @@
 
 #include "sync/corobelt.h"
 #include "env/symtable.h"
+#include "config/config.h"
 #include "env/traceEnvironment.h"
 #include "events/event-filter.h"
 #include "events/eventStreamParser.h"
@@ -67,11 +68,14 @@ int main(int argc, char *argv[]) {
 
   cxxopts::Options options("trace", "Log File Analysis/Tracing Tool");
   options.add_options()("h,help", "Print usage")
+      ("trace-env-config",
+       "file path to a trace environment config yaml file",
+       cxxopts::value<std::string>())
       ("linux-dump-server-client",
-       "file path to a output file obtained by 'objdump -S linux_image'",
+       "file path to a symbol table of the linux kernel",
        cxxopts::value<std::string>())
       ("nic-i40e-dump",
-       "file path to a output file obtained by 'objdump -d i40e.ko' (driver)",
+       "file path to symbol table for the i40e nic",
        cxxopts::value<std::string>())
       ("gem5-log-server", "file path to a server log file written by gem5", cxxopts::value<std::string>())
       ("gem5-server-events", "file to which the server event stream is written to", cxxopts::value<std::string>())
@@ -105,9 +109,9 @@ int main(int argc, char *argv[]) {
 
   // --ts-lower-bound 1967446102500
   uint64_t lower_bound =
-      EventTimestampFilter::EventTimeBoundary::MIN_LOWER_BOUND;
+      EventTimestampFilter::EventTimeBoundary::kMinLowerBound;
   uint64_t upper_bound =
-      EventTimestampFilter::EventTimeBoundary::MAX_UPPER_BOUND;
+      EventTimestampFilter::EventTimeBoundary::kMaxUpperBound;
 
   if (result.count("ts-upper-bound")) {
     sim_string_utils::parse_uint_trim_copy(
@@ -120,37 +124,23 @@ int main(int argc, char *argv[]) {
   }
 
   // Init the trace environment --> IMPORTANT
-  TraceEnvironment::initialize();
-  // Init runtime and set threads to use --> IMPORTANT
-  auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.thread_terminated_callback = [](std::string_view thread_name) {
-    std::cout << "thread " << thread_name << "finished" << std::endl;
-  };
-  concurren_options.max_background_threads = 4;
-  concurren_options.max_cpu_threads = 10;
-  //concurren_options.max_background_executor_waiting_time =
-  //    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(600));
-  //concurren_options.max_thread_pool_executor_waiting_time =
-  //    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(600));
-  const concurrencpp::runtime runtime{concurren_options};
-  const auto thread_pool_executor = runtime.thread_pool_executor();
-  const auto background_executor = runtime.background_executor();
-  const auto thread_executor = runtime.thread_executor();
-  try {
-    throw_if_empty(thread_pool_executor, resume_executor_null);
-    throw_if_empty(background_executor, resume_executor_null);
-    throw_if_empty(thread_executor, resume_executor_null);
-  } catch (std::exception &err) {
-    std::cerr << err.what() << std::endl;
+  if (1 > result.count("trace-env-config")) {
+    std::cerr << "must provide a path to a yaml tarce environment configuration file" << '\n';
     exit(EXIT_FAILURE);
   }
+  const TraceEnvConfig trace_env_config
+      = TraceEnvConfig::CreateFromYaml(result["trace-env-config"].as<std::string>());
+  TraceEnvironment trace_environment{trace_env_config};
+
   //const std::string jaeger_url = "http://localhost:4318/v1/traces";
   const std::string jaeger_url = "http://jaeger:4318/v1/traces";
-  simbricks::trace::OtlpSpanExporter
-      exporter{jaeger_url, false, "trace"};
+  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
+                                              jaeger_url,
+                                              false,
+                                              "trace"};
   //simbricks::trace::NoOpExporter exporter;
 
-  Tracer tracer{exporter};
+  Tracer tracer{trace_environment, exporter};
 
   constexpr size_t kAmountSources = 4;
   constexpr size_t kLineBufferSize = 1;
@@ -179,6 +169,7 @@ int main(int argc, char *argv[]) {
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
     auto spanner_h_s = create_shared<HostSpanner>(spanner_is_null,
+                                                  trace_environment,
                                                   "Server-Host",
                                                   tracer,
                                                   timer,
@@ -187,6 +178,7 @@ int main(int argc, char *argv[]) {
                                                   server_n_h_receive);
 
     auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null,
+                                                  trace_environment,
                                                   "Client-Host",
                                                   tracer,
                                                   timer,
@@ -195,6 +187,7 @@ int main(int argc, char *argv[]) {
                                                   client_n_h_receive);
 
     auto spanner_n_s = create_shared<NicSpanner>(spanner_is_null,
+                                                 trace_environment,
                                                  "NIC-Server",
                                                  tracer,
                                                  timer,
@@ -205,6 +198,7 @@ int main(int argc, char *argv[]) {
                                                  server_n_h_receive);
 
     auto spanner_n_c = create_shared<NicSpanner>(spanner_is_null,
+                                                 trace_environment,
                                                  "Client-NIC",
                                                  tracer,
                                                  timer,
@@ -218,35 +212,47 @@ int main(int argc, char *argv[]) {
         and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
       auto parser_h_s = create_shared<EventStreamParser>("EventStreamParser null",
+                                                         trace_environment,
                                                          "gem5-server-reader",
                                                          result["gem5-server-event-stream"].as<std::string>());
-      auto filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+      auto filter_h_s = create_shared<EventTimestampFilter>(actor_is_null,
+                                                            trace_environment,
+                                                            timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
       const pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pipeline_h_s, spanner_h_s};
 
       auto parser_h_c = create_shared<EventStreamParser>("EventStreamParser",
+                                                         trace_environment,
                                                          "gem5-client-reader",
                                                          result["gem5-client-event-stream"].as<std::string>());
-      auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+      auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null,
+                                                            trace_environment,
+                                                            timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
       const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
 
       auto parser_n_s = create_shared<EventStreamParser>("EventStreamParser null",
+                                                         trace_environment,
                                                          "nicbm-server-reader",
                                                          result["nicbm-server-event-stream"].as<std::string>());
-      auto filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+      auto filter_n_s = create_shared<EventTimestampFilter>(actor_is_null,
+                                                            trace_environment,
+                                                            timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
       const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pipeline_n_s, spanner_n_s};
 
       auto parser_n_c = create_shared<EventStreamParser>("EventStreamParser null",
+                                                         trace_environment,
                                                          "nicbm-client-reader",
                                                          result["nicbm-client-event-stream"].as<std::string>());
-      auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+      auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null,
+                                                            trace_environment,
+                                                            timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
       const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
 
       std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s};
-      run_pipelines_parallel(thread_pool_executor, pipelines);
+      run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
 
       exit(EXIT_SUCCESS);
     }
@@ -264,9 +270,8 @@ int main(int argc, char *argv[]) {
     // add both symbol tables / symbol filterr to translate hex addresses to
     // function-name/label
     if (result.count("linux-dump-server-client") &&
-        !TraceEnvironment::add_symbol_table(
+        !trace_environment.AddSymbolTable(
             "Linuxvm-Symbols",
-            background_executor, thread_pool_executor,
             result["linux-dump-server-client"].as<std::string>(), 0,
             FilterType::kSyms)) {
       std::cerr << "could not initialize symbol table linux-dump-server-client"
@@ -274,9 +279,8 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
     }
     if (result.count("nic-i40e-dump") &&
-        !TraceEnvironment::add_symbol_table(
+        !trace_environment.AddSymbolTable(
             "Nicdriver-Symbols",
-            background_executor, thread_pool_executor,
             result["nic-i40e-dump"].as<std::string>(),
             0xffffffffa0000000ULL, FilterType::kSyms)) {
       std::cerr << "could not initialize symbol table nic-i40e-dump" << '\n';
@@ -285,17 +289,20 @@ int main(int argc, char *argv[]) {
 
     // SERVER HOST PIPELINE
     std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT, EventType::kSimSendSyncT};
-    auto event_filter_h_s = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-    auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+    auto event_filter_h_s = create_shared<EventTypeFilter>(actor_is_null,
+                                                           trace_environment,
+                                                           to_filter,
+                                                           true);
+    auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(actor_is_null,
+                                                                    trace_environment,
+                                                                    timestamp_bounds);
     ComponentFilter comp_filter_server("ComponentFilter-Server");
-    Gem5Parser gem5_server_par{thread_pool_executor,
+    Gem5Parser gem5_server_par{trace_environment,
                                "Gem5ServerParser",
                                comp_filter_server};
     auto gem5_ser_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
         "BufferedEventProvider null",
-        thread_pool_executor,
-        background_executor,
-        thread_executor,
+        trace_environment,
         "Gem5ServerEventProvider",
         result["gem5-log-server"].as<std::string>(),
         gem5_server_par,
@@ -306,7 +313,10 @@ int main(int argc, char *argv[]) {
     if (not printer_h_s) {
       exit(EXIT_FAILURE);
     }
-    auto func_filter_h_s = create_shared<HostCallFuncFilter>(actor_is_null, blacklist_functions, true);
+    auto func_filter_h_s = create_shared<HostCallFuncFilter>(actor_is_null,
+                                                             trace_environment,
+                                                             blacklist_functions,
+                                                             true);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
         server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s, printer_h_s};
     const pipeline<std::shared_ptr<Event>> server_host_pipeline{
@@ -317,17 +327,20 @@ int main(int argc, char *argv[]) {
     //    gem5_server_par, server_host_pipes, printer_h_s};
 
     // CLIENT HOST PIPELINE
-    auto event_filter_h_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-    auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
+    auto event_filter_h_c = create_shared<EventTypeFilter>(actor_is_null,
+                                                           trace_environment,
+                                                           to_filter,
+                                                           true);
+    auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(actor_is_null,
+                                                                    trace_environment,
+                                                                    timestamp_bounds);
     ComponentFilter comp_filter_client("ComponentFilter-Server");
-    Gem5Parser gem5_client_par{thread_pool_executor,
+    Gem5Parser gem5_client_par{trace_environment,
                                "Gem5ClientParser",
                                comp_filter_client};
     auto gem5_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
         "BufferedEventProvider null",
-        thread_pool_executor,
-        background_executor,
-        thread_executor,
+        trace_environment,
         "Gem5ClientEventProvider",
         result["gem5-log-client"].as<std::string>(),
         gem5_client_par,
@@ -338,7 +351,10 @@ int main(int argc, char *argv[]) {
     if (not printer_h_c) {
       exit(EXIT_FAILURE);
     }
-    auto func_filter_h_c = create_shared<HostCallFuncFilter>(actor_is_null, blacklist_functions, true);
+    auto func_filter_h_c = create_shared<HostCallFuncFilter>(actor_is_null,
+                                                             trace_environment,
+                                                             blacklist_functions,
+                                                             true);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
         client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c, printer_h_c};
     const pipeline<std::shared_ptr<Event>> client_host_pipeline{
@@ -349,15 +365,18 @@ int main(int argc, char *argv[]) {
     //    gem5_client_par, client_host_pipes, printer_h_c};
 
     // SERVER NIC PIPELINE
-    auto event_filter_n_s = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-    auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
-    NicBmParser nicbm_ser_par{thread_pool_executor,
+    auto event_filter_n_s = create_shared<EventTypeFilter>(actor_is_null,
+                                                           trace_environment,
+                                                           to_filter,
+                                                           true);
+    auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(actor_is_null,
+                                                                    trace_environment,
+                                                                    timestamp_bounds);
+    NicBmParser nicbm_ser_par{trace_environment,
                               "NicbmServerParser"};
     auto nicbm_ser_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
         "BufferedEventProvider null",
-        thread_pool_executor,
-        background_executor,
-        thread_executor,
+        trace_environment,
         "NicbmServerEventProvider",
         result["nicbm-log-server"].as<std::string>(),
         nicbm_ser_par,
@@ -378,15 +397,18 @@ int main(int argc, char *argv[]) {
     //    nic_ser_par, server_nic_pipes, printer_n_s};
 
     // CLIENT NIC PIPELINE
-    auto event_filter_n_c = create_shared<EventTypeFilter>(actor_is_null, to_filter, true);
-    auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null, timestamp_bounds);
-    NicBmParser nicbm_client_par{thread_pool_executor,
+    auto event_filter_n_c = create_shared<EventTypeFilter>(actor_is_null,
+                                                           trace_environment,
+                                                           to_filter,
+                                                           true);
+    auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null,
+                                                                    trace_environment,
+                                                                    timestamp_bounds);
+    NicBmParser nicbm_client_par{trace_environment,
                                  "NicbmClientParser"};
     auto nicbm_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
         "BufferedEventProvider null",
-        thread_pool_executor,
-        background_executor,
-        thread_executor,
+        trace_environment,
         "NicbmClientEventProvider",
         result["nicbm-log-client"].as<std::string>(),
         nicbm_client_par,
@@ -408,9 +430,9 @@ int main(int argc, char *argv[]) {
 
     std::vector<pipeline<std::shared_ptr<Event>>>
         pipelines{client_host_pipeline, client_nic_pipeline, server_host_pipeline, server_nic_pipeline};
-    run_pipelines_parallel(thread_pool_executor, pipelines);
+    run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
   } catch (std::runtime_error &err) {
-    std::cerr << err.what() << std::endl;
+    std::cerr << err.what() << '\n';
     exit(EXIT_FAILURE);
   }
   // std::cout << "runtime goes out of scope!!!!!" << std::endl;

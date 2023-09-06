@@ -41,7 +41,10 @@
 
 class LogParser {
 
-  std::shared_ptr<concurrencpp::thread_pool_executor> resume_executor_;
+ protected:
+  TraceEnvironment &trace_environment_;
+
+ private:
   const std::string name_;
   const uint64_t identifier_;
 
@@ -51,13 +54,11 @@ class LogParser {
   bool ParseAddress(LineHandler &line_handler, uint64_t &address);
 
  public:
-  explicit LogParser(std::shared_ptr<concurrencpp::thread_pool_executor> resume_executor,
+  explicit LogParser(TraceEnvironment &trace_environment,
                      const std::string name)
-      : resume_executor_(std::move(resume_executor)),
+      : trace_environment_(trace_environment),
         name_(name),
-        identifier_(TraceEnvironment::GetNextParserId()) {
-    throw_if_empty(resume_executor_,
-                   "LogParser::LogParser: resume executor is null");
+        identifier_(trace_environment_.GetNextParserId()) {
   };
 
   inline uint64_t GetIdent() const {
@@ -90,10 +91,10 @@ class Gem5Parser : public LogParser {
   std::shared_ptr<Event> ParseSimbricksEvent(LineHandler &line_handler, uint64_t timestamp);
 
  public:
-  explicit Gem5Parser(std::shared_ptr<concurrencpp::thread_pool_executor> resume_executor,
+  explicit Gem5Parser(TraceEnvironment &trace_environment,
                       const std::string name,
                       ComponentFilter &component_table)
-      : LogParser(std::move(resume_executor), name),
+      : LogParser(trace_environment, name),
         component_table_(component_table) {
   }
 
@@ -113,9 +114,9 @@ class NicBmParser : public LogParser {
   bool ParseSyncInfo(LineHandler &line_handler, bool &sync_pcie, bool &sync_eth);
 
  public:
-  explicit NicBmParser(std::shared_ptr<concurrencpp::thread_pool_executor> resume_executor,
+  explicit NicBmParser(TraceEnvironment &trace_environment,
                        const std::string name)
-      : LogParser(std::move(resume_executor), name) {}
+      : LogParser(trace_environment, name) {}
 
   concurrencpp::lazy_result<std::shared_ptr<Event>>
   ParseEvent(LineHandler &line_handler) override;
@@ -125,9 +126,7 @@ template<size_t LineBufferSize, size_t EventBufferSize> requires
 SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
 class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
-  std::shared_ptr<concurrencpp::thread_pool_executor> executor_;
-  std::shared_ptr<concurrencpp::thread_pool_executor> background_executor_;
-  std::shared_ptr<concurrencpp::thread_executor> thread_executor_;
+  TraceEnvironment &trace_environment_;
   const std::string name_;
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
@@ -150,6 +149,14 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
         continue;
       }
 
+      if (IsType(event_ptr, EventType::kHostCallT)) {
+        auto call = std::static_pointer_cast<HostCall>(event_ptr);
+        if (call->GetPc() == 0xffffffffa0025015 or *(call->GetFunc()) == "i40e_lan_xmit_frame") {
+          std::cout << "BufferedEventProvider: [" << std::hex << call->GetPc() << "] = " << *(call->GetFunc())
+                    << '\n';
+        }
+      }
+
       const bool could_push = event_buffer_channel_.Push(event_ptr);
       throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel");
     }
@@ -158,27 +165,17 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   }
 
  public:
-  explicit BufferedEventProvider(std::shared_ptr<concurrencpp::thread_pool_executor> executor,
-                                 std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-                                 std::shared_ptr<concurrencpp::thread_executor> thread_executor,
+  explicit BufferedEventProvider(TraceEnvironment &trace_environment,
                                  const std::string name,
                                  const std::string log_file_path,
                                  LogParser &log_parser,
                                  WeakTimer &timer_)
       : producer<std::shared_ptr<Event>>(),
-        executor_(std::move(executor)),
-        background_executor_(std::move(background_executor)),
-        thread_executor_(std::move(thread_executor)),
+        trace_environment_(trace_environment),
+        name_(name),
         log_file_path_(log_file_path),
         log_parser_(log_parser),
         timer_(timer_) {
-    //, line_handler_buffer_(ReaderBuffer<LineBufferSize>{name, true}) {
-    throw_if_empty(executor_,
-                   "BufferedEventProvider::BufferedEventProvider: executor is null");
-    throw_if_empty(background_executor_,
-                   "BufferedEventProvider::BufferedEventProvider: background executor is null");
-    throw_if_empty(thread_executor_,
-                   "BufferedEventProvider::BufferedEventProvider: thread executor is null");
   };
 
   ~BufferedEventProvider() = default;
@@ -189,7 +186,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     throw_if_empty(resume_executor, "BufferedEventProvider::process: resume executor is null");
     throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null");
 
-    concurrencpp::result<concurrencpp::result<void>> producer_task = thread_executor_->submit([&]() {
+    concurrencpp::result<concurrencpp::result<void>>
+        producer_task = trace_environment_.GetThreadExecutor()->submit([&]() {
       return FillBuffer();
     });
 
@@ -212,7 +210,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     co_await timer_.Done(resume_executor, timer_key);
     co_await co_await producer_task;
     co_await tar_chan->CloseChannel(resume_executor);
-    std::cout << "BufferedEventProvider exits" << std::endl;
+    std::cout << "BufferedEventProvider exits" << '\n';
     co_return;
   }
 };

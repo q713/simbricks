@@ -39,10 +39,8 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   const std::string test_file_path{"./tests/raw-logs/gem5-events-test.txt"};
   const std::string parser_name{"Gem5ClientParser"};
 
-  auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 1;
-  concurren_options.max_cpu_threads = 1;
-  const concurrencpp::runtime runtime{concurren_options};
+  const TraceEnvConfig trace_env_config = TraceEnvConfig::CreateFromYaml("tests/trace-env-config.yaml");
+  TraceEnvironment trace_environment{trace_env_config};
 
   ComponentFilter comp_filter_client("ComponentFilter-Server");
 
@@ -50,7 +48,7 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   REQUIRE_NOTHROW(reader_buffer.OpenFile(test_file_path));
 
   auto gem5 = create_shared<Gem5Parser>(parser_is_null,
-                                        runtime.thread_pool_executor(),
+                                        trace_environment,
                                         parser_name,
                                         comp_filter_client);
 
@@ -81,40 +79,3 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
   REQUIRE_FALSE(bh_p.first);
 }
-
-#if 0
-TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
-
-  const std::string test_file_path{"./tests/raw-logs/gem5-events-test.txt"};
-  const std::string parser_name{"Gem5ClientParser"};
-
-  auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 1;
-  concurren_options.max_cpu_threads = 1;
-  const concurrencpp::runtime runtime{concurren_options};
-
-  ComponentFilter comp_filter_client("ComponentFilter-Server");
-
-  LineReader client_lr{"test-reader",
-                       runtime.background_executor(),
-                       runtime.thread_pool_executor()};
-  auto gem5 = create_shared<Gem5Parser>(parser_is_null, parser_name,
-                                        test_file_path,
-                                        comp_filter_client, client_lr);
-  const std::vector<std::shared_ptr<Event>> to_match {
-      std::make_shared<HostMmioR>(1869691991749,
-                                  gem5->GetIdent(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
-      std::make_shared<HostMmioR>(1869693118999,
-                                  gem5->GetIdent(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
-      std::make_shared<HostMmioR>(1869699347625, gem5->GetIdent(), parser_name, 94469181901728, 0xc040000c, 4, 3, 0xc),
-      std::make_shared<HostMmioR>(1869699662249, gem5->GetIdent(), parser_name, 94469181901920, 0xc040001c, 4, 3, 0x1c)
-  };
-  auto checker = std::make_shared<EventChecker>(to_match);
-
-  const auto thread_pool_executor = runtime.thread_pool_executor();
-  run_pipeline<std::shared_ptr<Event>>(thread_pool_executor, gem5, checker);
-
-}
-#endif
-
-

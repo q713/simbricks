@@ -600,15 +600,11 @@ bool SymsFilter::LoadElf(const std::string &file_path,
 
 std::shared_ptr<SymsFilter> SymsFilter::Create(
     uint64_t id, const std::string component,
-    std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-    //std::shared_ptr<concurrencpp::thread_executor> background_executor,
-    std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
     const std::string &file_path,
     uint64_t address_offset, FilterType type,
     std::set<std::string> symbol_filter, StringInternalizer &i) {
   std::shared_ptr<SymsFilter> filter{
-      new SymsFilter{id, component, std::move(background_executor), std::move(foreground_executor),
-                     std::move(symbol_filter), i}};
+      new SymsFilter{id, component, std::move(symbol_filter), i}};
   if (not filter) {
     return nullptr;
   }

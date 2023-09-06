@@ -119,7 +119,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
 
   throw_if_empty(pending_host_call_span_, span_is_null);
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
-    pci_write_before_ = TraceEnvironment::is_pci_write(event_ptr);
+    pci_write_before_ = trace_environment_.is_pci_write(event_ptr);
 
     if (pending_host_call_span_->DoesDriverTransmit()) {
       std::cout << "Host Driver Transmit found!!!!!!" << '\n';
@@ -176,7 +176,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
             IsType(event_ptr, EventType::kHostMmioRT)) and
             "try to create mmio host span but event is neither read nor write");
 
-    if (not pci_write_before_ and TraceEnvironment::IsToDeviceBarNumber(
+    if (not pci_write_before_ and trace_environment_.IsToDeviceBarNumber(
         pending_mmio_span->GetBarNumber())) {
       //std::cout << name_ << " host try push mmio" << std::endl;
       auto context =
@@ -189,7 +189,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
       //std::cout << name_ << " host pushed mmio" << std::endl;
     }
 
-    if (TraceEnvironment::IsMsixNotToDeviceBarNumber(
+    if (trace_environment_.IsMsixNotToDeviceBarNumber(
         pending_mmio_span->GetBarNumber()) and
         pending_mmio_span->IsComplete()) {
       tracer_.MarkSpanAsDone(pending_mmio_span);
@@ -338,11 +338,14 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelInt(
 }
 
 HostSpanner::HostSpanner(
-    std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
+    TraceEnvironment &trace_environment,
+    std::string &&name,
+    Tracer &tra,
+    /*Timer &timer*/ WeakTimer &timer,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives)
-    : Spanner(std::move(name), tra, timer),
+    : Spanner(trace_environment, std::move(name), tra, timer),
       to_nic_queue_(std::move(to_nic)),
       from_nic_queue_(std::move(from_nic)),
       from_nic_receives_queue_(std::move(from_nic_receives)) {

@@ -36,7 +36,8 @@ std::shared_ptr<Event> Gem5Parser::ParseGlobalEvent(LineHandler &line_handler, u
     if (line_handler.ConsumeAndTrimString("processInEvent")) {
       return std::make_shared<SimProcInEvent>(timestamp, GetIdent(),
                                               GetName());
-    } else if (line_handler.ConsumeAndTrimString("sending sync message")) {
+    }
+    if (line_handler.ConsumeAndTrimString("sending sync message")) {
       return std::make_shared<SimSendSync>(timestamp, GetIdent(),
                                            GetName());
     }
@@ -75,23 +76,20 @@ Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp)
   if (line_handler.ConsumeAndTrimChar('.')) {
     return std::make_shared<HostInstr>(timestamp, GetIdent(), GetName(),
                                        addr);
-  } else {
-    // in case the given instruction is a call we expect to be able to
-    // translate the address to a symbol name
-    auto sym_comp = TraceEnvironment::symtable_filter(addr);
-    const std::string *sym_s = sym_comp.first;
-    const std::string *comp = sym_comp.second;
+  }
+  // in case the given instruction is a call we expect to be able to
+  // translate the address to a symbol name
+  auto sym_comp = trace_environment_.SymtableFilter(addr);
+  const std::string *sym_s = sym_comp.first;
+  const std::string *comp = sym_comp.second;
 
-    if (not comp or not sym_s) {
-      return nullptr;
-    }
-
-    return std::make_shared<HostCall>(timestamp, GetIdent(), GetName(),
-                                      addr,
-                                      sym_s, comp);
+  if (not comp or not sym_s) {
+    return nullptr;
   }
 
-  return nullptr;
+  return std::make_shared<HostCall>(timestamp, GetIdent(), GetName(),
+                                    addr,
+                                    sym_s, comp);
 }
 
 std::shared_ptr<Event>
@@ -101,7 +99,7 @@ Gem5Parser::ParseSystemPcPciHost(LineHandler &line_handler, uint64_t timestamp) 
 
   uint64_t offset;
   size_t size;
-  bool is_read = line_handler.ConsumeAndTrimTillString("read: offset=0x");
+  const bool is_read = line_handler.ConsumeAndTrimTillString("read: offset=0x");
   if (is_read ||
       line_handler.ConsumeAndTrimTillString("write: offset=0x")) {
     if (line_handler.ParseUintTrim(16, offset) &&
@@ -129,7 +127,8 @@ Gem5Parser::ParseSystemPcPciHostInterface(LineHandler &line_handler, uint64_t ti
   if (line_handler.ConsumeAndTrimString("clearInt")) {
     return std::make_shared<HostClearInt>(timestamp, GetIdent(),
                                           GetName());
-  } else if (line_handler.ConsumeAndTrimString("postInt")) {
+  }
+  if (line_handler.ConsumeAndTrimString("postInt")) {
     return std::make_shared<HostPostInt>(timestamp, GetIdent(),
                                          GetName());
   }
@@ -284,7 +283,8 @@ std::shared_ptr<Event> Gem5Parser::ParseSimbricksEvent(LineHandler &line_handler
     if (line_handler.ConsumeAndTrimString("processInEvent")) {
       return std::make_shared<SimProcInEvent>(timestamp, GetIdent(),
                                               GetName());
-    } else if (line_handler.ConsumeAndTrimString("sending sync message")) {
+    }
+    if (line_handler.ConsumeAndTrimString("sending sync message")) {
       return std::make_shared<SimSendSync>(timestamp, GetIdent(),
                                            GetName());
     }

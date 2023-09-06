@@ -39,6 +39,7 @@
 #define SIMBRICKS_TRACE_SPANNER_H_
 
 struct Spanner : public consumer<std::shared_ptr<Event>> {
+  TraceEnvironment &trace_environment_;
   uint64_t id_;
   std::string name_;
   Tracer &tracer_;
@@ -53,16 +54,29 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
   concurrencpp::result<void> consume(ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> src_chan) override;
 
-  explicit Spanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer)
-      : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer) {
+  explicit Spanner(TraceEnvironment &trace_environment,
+                   std::string &&name,
+                   Tracer &tra, /*Timer &timer*/
+                   WeakTimer &timer)
+      : trace_environment_(trace_environment),
+        id_(trace_environment_.GetNextSpannerId()),
+        name_(name),
+        tracer_(tra),
+        timer_(timer) {
   }
 
-  explicit Spanner(std::string &&name,
+  explicit Spanner(TraceEnvironment &trace_environment,
+                   std::string &&name,
                    Tracer &tra,
-                   //Timer &timer,
+      //Timer &timer,
                    WeakTimer &timer,
                    std::unordered_map<EventType, HandlerT> &&handler)
-      : id_(TraceEnvironment::GetNextSpannerId()), name_(name), tracer_(tra), timer_(timer), handler_(handler) {
+      : trace_environment_(trace_environment),
+        id_(trace_environment_.GetNextSpannerId()),
+        name_(name),
+        tracer_(tra),
+        timer_(timer),
+        handler_(handler) {
   }
 
   void RegisterHandler(EventType type, HandlerT &&handler) {
@@ -97,7 +111,10 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
 struct HostSpanner : public Spanner {
 
-  explicit HostSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
+  explicit HostSpanner(TraceEnvironment &trace_environment,
+                       std::string &&name,
+                       Tracer &tra, /*Timer &timer*/
+                       WeakTimer &timer,
                        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic,
                        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic,
                        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives);
@@ -143,7 +160,10 @@ struct HostSpanner : public Spanner {
 
 struct NicSpanner : public Spanner {
 
-  explicit NicSpanner(std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
+  explicit NicSpanner(TraceEnvironment &trace_environment,
+                      std::string &&name,
+                      Tracer &tra, /*Timer &timer*/
+                      WeakTimer &timer,
                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,

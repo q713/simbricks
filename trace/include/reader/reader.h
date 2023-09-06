@@ -186,6 +186,10 @@ class ReaderBuffer {
         break;
       }
 
+      if (buf.find("ffffffffa0025015") != std::string::npos) {
+        std::cout << "LineHandler: found xmit line = " << buf << std::endl;
+      }
+
       if (skip_empty_lines_ and buf.empty()) {
         continue;
       }

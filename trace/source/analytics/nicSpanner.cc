@@ -42,14 +42,14 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
   throw_if_empty(con, context_is_null);
   //std::cout << name_ << " nic polled mmio" << std::endl;
   if (not is_expectation(con, expectation::kMmio)) {
-    std::cerr << "nic_spanner: could not poll mmio context" << std::endl;
+    std::cerr << "nic_spanner: could not poll mmio context" << '\n';
     co_return false;
   }
 
   auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
       con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent(), name_);
   if (not mmio_span) {
-    std::cerr << "could not register mmio_span" << std::endl;
+    std::cerr << "could not register mmio_span" << '\n';
     co_return false;
   }
 
@@ -98,7 +98,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(
       last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_dma) {
-    std::cerr << "could not register new pending dma action" << std::endl;
+    std::cerr << "could not register new pending dma action" << '\n';
     co_return false;
   }
 
@@ -117,11 +117,11 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     parent = last_causing_;
 
     if (not IsType(parent, span_type::kNicMmio)) {
-      std::cerr << "error" << std::endl;
+      std::cerr << "error" << '\n';
     }
 
     if (std::static_pointer_cast<NicMmioSpan>(parent)->IsRead()) {
-      std::cerr << "error" << std::endl;
+      std::cerr << "error" << '\n';
     }
 
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
@@ -164,7 +164,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     //std::cout << name_ << " nic pushed receive update." << std::endl;
 
   } else {
-    std::cerr << "NicSpanner::HandelTxrx: unknown event type" << std::endl;
+    std::cerr << "NicSpanner::HandelTxrx: unknown event type" << '\n';
     co_return false;
   }
 
@@ -183,7 +183,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
   auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
       last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not msix_span) {
-    std::cerr << "could not register msix span" << std::endl;
+    std::cerr << "could not register msix span" << '\n';
     co_return false;
   }
 
@@ -201,13 +201,16 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
 }
 
 NicSpanner::NicSpanner(
-    std::string &&name, Tracer &tra, /*Timer &timer*/ WeakTimer &timer,
+    TraceEnvironment &trace_environment,
+    std::string &&name,
+    Tracer &tra,
+    /*Timer &timer*/ WeakTimer &timer,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_receives)
-    : Spanner(std::move(name), tra, timer),
+    : Spanner(trace_environment, std::move(name), tra, timer),
       to_network_queue_(std::move(to_network)),
       from_network_queue_(std::move(from_network)),
       to_host_queue_(std::move(to_host)),

@@ -32,7 +32,12 @@
 #include "util/exception.h"
 
 /* general operator to act on an event stream */
-struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
+class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
+
+ protected:
+  TraceEnvironment &trace_environment_;
+
+ public:
   /* this method acts on an event within the stream,
    * if true is returned, the event is after acting on
    * it pased on, in case false is returned, the event
@@ -65,12 +70,13 @@ struct EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     }
 
     co_await tar_chan->CloseChannel(resume_executor);
-    std::cout << "event actor exited" << std::endl;
+    std::cout << "event actor exited" << '\n';
 
     co_return;
   }
 
-  explicit EventStreamActor() : cpipe<std::shared_ptr<Event>>() {
+  explicit EventStreamActor(TraceEnvironment &trace_environment)
+      : trace_environment_(trace_environment) {
   }
 
   ~EventStreamActor() = default;
@@ -84,8 +90,9 @@ class GenericEventFilter : public EventStreamActor {
     return to_filter_(event);
   }
 
-  explicit GenericEventFilter(std::function<bool(std::shared_ptr<Event> event)> &to_filter)
-      : EventStreamActor(), to_filter_(to_filter) {
+  explicit GenericEventFilter(TraceEnvironment &trace_environment,
+                              std::function<bool(std::shared_ptr<Event> event)> &to_filter)
+      : EventStreamActor(trace_environment), to_filter_(to_filter) {
   }
 };
 
@@ -101,14 +108,17 @@ class EventTypeFilter : public EventStreamActor {
     return is_to_sink;
   }
 
-  explicit EventTypeFilter(std::set<EventType> &types_to_filter, bool invert_filter)
-      : EventStreamActor(),
+  explicit EventTypeFilter(TraceEnvironment &trace_environment,
+                           std::set<EventType> &types_to_filter,
+                           bool invert_filter)
+      : EventStreamActor(trace_environment),
         types_to_filter_(types_to_filter),
         inverted_(invert_filter) {
   }
 
-  explicit EventTypeFilter(std::set<EventType> &types_to_filter)
-      : EventStreamActor(),
+  explicit EventTypeFilter(TraceEnvironment &trace_environment,
+                           std::set<EventType> &types_to_filter)
+      : EventStreamActor(trace_environment),
         types_to_filter_(types_to_filter),
         inverted_(false) {
   }
@@ -120,8 +130,8 @@ class EventTimestampFilter : public EventStreamActor {
     uint64_t lower_bound_;
     uint64_t upper_bound_;
 
-    const static uint64_t MIN_LOWER_BOUND = 0;
-    const static uint64_t MAX_UPPER_BOUND = UINT64_MAX;
+    const static uint64_t kMinLowerBound = 0;
+    const static uint64_t kMaxUpperBound = UINT64_MAX;
 
     explicit EventTimeBoundary(uint64_t lower_bound, uint64_t upper_bound)
         : lower_bound_(lower_bound), upper_bound_(upper_bound) {
@@ -133,18 +143,19 @@ class EventTimestampFilter : public EventStreamActor {
 
  public:
   bool act_on(std::shared_ptr<Event> &event) override {
-    const uint64_t ts = event->GetTs();
+    const uint64_t timestamp = event->GetTs();
 
     for (auto &boundary : event_time_boundaries_) {
-      if (boundary.lower_bound_ <= ts && ts <= boundary.upper_bound_) {
+      if (boundary.lower_bound_ <= timestamp && timestamp <= boundary.upper_bound_) {
         return true;
       }
     }
     return false;
   }
 
-  explicit EventTimestampFilter(std::vector<EventTimeBoundary> &event_time_boundaries)
-      : EventStreamActor(),
+  explicit EventTimestampFilter(TraceEnvironment &trace_environment,
+                                std::vector<EventTimeBoundary> &event_time_boundaries)
+      : EventStreamActor(trace_environment),
         event_time_boundaries_(event_time_boundaries) {
   }
 };
@@ -163,17 +174,20 @@ class HostCallFuncFilter : public EventStreamActor {
     const std::shared_ptr<HostCall> &call = std::static_pointer_cast<HostCall>(event);
     if (blacklist_ and list_.contains(call->GetFunc())) {
       return false;
-    } else if (not blacklist_ and not list_.contains(call->GetFunc())) {
+    }
+    if (not blacklist_ and not list_.contains(call->GetFunc())) {
       return false;
     }
 
     return true;
   }
 
-  explicit HostCallFuncFilter(const std::set<std::string> &list, bool blacklist = true)
-      : EventStreamActor(), blacklist_(blacklist) {
+  explicit HostCallFuncFilter(TraceEnvironment &trace_environment,
+                              const std::set<std::string> &list,
+                              bool blacklist = true)
+      : EventStreamActor(trace_environment), blacklist_(blacklist) {
     for (const std::string &str : list) {
-      const std::string *sym = TraceEnvironment::internalize_additional(str);
+      const std::string *sym = this->trace_environment_.InternalizeAdditional(str);
       list_.insert(sym);
     }
   }

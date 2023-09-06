@@ -378,10 +378,10 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
       co_return nullptr;
 
     } else {
-#ifdef PARSER_DEBUG_NICBM_
+//#ifdef PARSER_DEBUG_NICBM_
       DFLOGERR("%s: line '%s' did not match any expected main line\n",
                GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+//#endif
       co_return nullptr;
     }
   } else {

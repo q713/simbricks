@@ -73,12 +73,15 @@ class TraceContext {
   std::mutex trace_context_mutex_;
 
  public:
-  explicit TraceContext(uint64_t trace_id)
-      : parent_(nullptr), trace_id_(trace_id), id_(TraceEnvironment::GetNextTraceContextId()) {
+  explicit TraceContext(uint64_t trace_id,
+                        uint64_t trace_context_id)
+      : parent_(nullptr), trace_id_(trace_id), id_(trace_context_id) {
   }
 
-  explicit TraceContext(std::shared_ptr<EventSpan> &parent, uint64_t trace_id)
-      : parent_(parent), trace_id_(trace_id), id_(TraceEnvironment::GetNextTraceContextId()) {
+  explicit TraceContext(std::shared_ptr<EventSpan> &parent,
+                        uint64_t trace_id,
+                        uint64_t trace_context_id)
+      : parent_(parent), trace_id_(trace_id), id_(trace_context_id) {
   }
 
   TraceContext(const TraceContext &other) {
@@ -151,8 +154,8 @@ class Context {
 
   void Display(std::ostream &out) {
     out << "Context: " << "expectation=" << expectation_;
-    out << ", parent_span={" << std::endl;
-    out << parent_span_ << std::endl;
+    out << ", parent_span={" << '\n';
+    out << parent_span_ << '\n';
     out << "}";
   }
 
@@ -165,10 +168,7 @@ inline std::shared_ptr<TraceContext> clone_shared(const std::shared_ptr<TraceCon
 }
 
 inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
-  if (not con or con->GetExpectation() != exp) {
-    return false;
-  }
-  return true;
+  return con && con->GetExpectation() == exp;
 }
 
 inline std::ostream &operator<<(std::ostream &out, Context &con) {
@@ -177,8 +177,8 @@ inline std::ostream &operator<<(std::ostream &out, Context &con) {
 }
 
 inline std::ostream &PrintContextPtr(std::ostream &out, std::shared_ptr<Context> &context) {
-    out << *context << std::endl;
-    return out;
+  out << *context << '\n';
+  return out;
 }
 
 #endif  // SIMBRICKS_TRACE_CONTEXT_QUEUE_H_

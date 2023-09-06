@@ -58,6 +58,13 @@ FetchContent_Declare(
     )
 FetchContent_MakeAvailable(Catch2)
 
+FetchContent_Declare(
+        yaml-cpp
+        GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
+        GIT_TAG yaml-cpp-0.7.0
+)
+set(YAML_CPP_BUILD_TESTS OFF)
+FetchContent_MakeAvailable(yaml-cpp)
 
 #######################################
 # Concurrencpp
@@ -99,6 +106,8 @@ set(TRACE_LIB_HEADER_FILES
         include/events/events.h
         include/events/event-filter.h
         include/events/eventStreamParser.h
+        # config
+        include/config/config.h
         # tracing environment
         include/env/stringInternalizer.h
         include/env/symtable.h
@@ -148,6 +157,7 @@ else()
 endif()
 # link coroutine library
 target_link_libraries(${PROJECT_NAME} PUBLIC
+        yaml-cpp
         concurrencpp::concurrencpp
         Catch2::Catch2WithMain
         opentelemetry_trace
@@ -155,6 +165,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
         opentelemetry_exporter_otlp_http
         opentelemetry_exporter_ostream_span
 )
+
 
 #######################################
 # Trace - Tests

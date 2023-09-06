@@ -21,6 +21,7 @@
  * TORT OR OTHERWISE, ARISING FROM, os OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
+
 #ifndef SIM_TRACE_CONFIG_VARS_H_
 #define SIM_TRACE_CONFIG_VARS_H_
 
@@ -28,141 +29,166 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <shared_mutex>
 
+#include "config/config.h"
 #include "events/events.h"
 #include "env/stringInternalizer.h"
 #include "env/symtable.h"
 
-// TODO: dont make this a singleton, pass it around as a reference/pointer!!!
-// TODO: add proper configuration (JSON?) support for the tracing environment!!!!
 class TraceEnvironment {
-  static std::mutex trace_env_mutex_;
+  std::shared_mutex trace_env_reader_writer_mutex_;
 
-  static StringInternalizer internalizer_;
+  const TraceEnvConfig &trace_env_config_;
 
-  static std::set<const std::string *> linux_net_func_indicator_;
+  StringInternalizer internalizer_;
 
-  static std::set<const std::string *> driver_func_indicator_;
+  std::set<const std::string *> linux_net_func_indicator_;
 
-  static std::set<const std::string *> kernel_tx_indicator_;
+  std::set<const std::string *> driver_func_indicator_;
 
-  static std::set<const std::string *> kernel_rx_indicator_;
+  std::set<const std::string *> kernel_tx_indicator_;
 
-  static std::set<const std::string *> pci_write_indicators_;
+  std::set<const std::string *> kernel_rx_indicator_;
 
-  static std::set<const std::string *> driver_tx_indicator_;
+  std::set<const std::string *> pci_write_indicators_;
 
-  static std::set<const std::string *> driver_rx_indicator_;
+  std::set<const std::string *> driver_tx_indicator_;
 
-  static std::set<const std::string *> sys_entry_;
+  std::set<const std::string *> driver_rx_indicator_;
 
-  static std::set<EventType> mmio_related_event_t_;
+  std::set<const std::string *> sys_entry_;
 
-  static std::set<EventType> dma_related_event_t_;
+  std::vector<std::shared_ptr<SymsFilter>> symbol_tables_;
 
-  static std::vector<std::shared_ptr<SymsFilter>> symbol_tables_;
+  concurrencpp::runtime runtime_;
+
+  void InternalizeStrings(TraceEnvConfig::IndicatorContainer::const_iterator begin,
+                          TraceEnvConfig::IndicatorContainer::const_iterator end,
+                          std::set<const std::string *> &into) {
+    for (; begin != end; begin++) {
+      const std::string *symbol_ptr = internalizer_.Internalize(*begin);
+      auto suc = into.insert(symbol_ptr);
+      assert(suc.second);
+    }
+  }
 
  protected:
-  static const std::string *get_call_func(std::shared_ptr<Event> event_ptr);
+  using PoolExecutor = concurrencpp::thread_pool_executor;
+  using ThreadExecutor = concurrencpp::thread_executor;
+  using PoolExecutorPtr = std::shared_ptr<PoolExecutor>;
+  using ThreadExecutorPtr = std::shared_ptr<ThreadExecutor>;
+
+  const std::string *GetCallFunc(std::shared_ptr<Event> &event_ptr);
 
  public:
-  static void initialize();
+  explicit TraceEnvironment(const TraceEnvConfig &trace_env_config);
 
-  inline static StringInternalizer &get_internalizer() {
+  ~TraceEnvironment() {
+    runtime_.thread_executor()->shutdown();
+    runtime_.thread_pool_executor()->shutdown();
+    runtime_.inline_executor()->shutdown();
+    runtime_.background_executor()->shutdown();
+  }
+
+  PoolExecutorPtr GetPoolExecutor() {
+    const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+    auto executor = runtime_.thread_pool_executor();
+    throw_if_empty(executor, resume_executor_null);
+    return executor;
+  }
+
+  PoolExecutorPtr GetBackgroundPoolExecutor() {
+    const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+    auto executor = runtime_.background_executor();
+    throw_if_empty(executor, resume_executor_null);
+    return executor;
+  }
+
+  ThreadExecutorPtr GetThreadExecutor() {
+    const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+    auto executor = runtime_.thread_executor();
+    throw_if_empty(executor, resume_executor_null);
+    return executor;
+  }
+
+  inline StringInternalizer &GetInternalizer() {
     return internalizer_;
   }
 
-  inline static std::vector<std::shared_ptr<SymsFilter>> &GetSymtables() {
+  inline std::vector<std::shared_ptr<SymsFilter>> &GetSymtables() {
     return symbol_tables_;
   }
 
-  inline static uint64_t GetNextParserId() {
-    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline uint64_t GetNextParserId() {
+    const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t GetNextSpanId() {
-    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline uint64_t GetNextSpanId() {
+    const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t GetNextSpannerId() {
-    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline uint64_t GetNextSpannerId() {
+    const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t GetNextTraceId() {
-    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline uint64_t GetNextTraceId() {
+    const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static uint64_t GetNextTraceContextId() {
-    const std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline uint64_t GetNextTraceContextId() {
+    const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
     static uint64_t next_id = 0;
     return next_id++;
   }
 
-  inline static const std::string *internalize_additional(
-      const std::string &symbol) {
-    //std::lock_guard<std::mutex> lock(trace_env_mutex_);
+  inline const std::string *InternalizeAdditional(const std::string &symbol) {
+    const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
     return internalizer_.Internalize(symbol);
   }
 
-  static bool add_symbol_table(const std::string identifier,
-                               std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-                               //std::shared_ptr<concurrencpp::thread_executor> background_executor,
-                               std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
-                               const std::string &file_path,
-                               uint64_t address_offset, FilterType type,
-                               std::set<std::string> symbol_filter);
+  bool AddSymbolTable(const std::string identifier,
+                      const std::string &file_path,
+                      uint64_t address_offset, FilterType type,
+                      std::set<std::string> symbol_filter);
 
-  static bool add_symbol_table(const std::string identifier,
-                               std::shared_ptr<concurrencpp::thread_pool_executor> background_executor,
-                               //std::shared_ptr<concurrencpp::thread_executor> background_executor,
-                               std::shared_ptr<concurrencpp::thread_pool_executor> foreground_executor,
-                               const std::string &file_path,
-                               uint64_t address_offset, FilterType type);
+  bool AddSymbolTable(const std::string identifier,
+                      const std::string &file_path,
+                      uint64_t address_offset, FilterType type);
 
-  static std::pair<const std::string *, const std::string *> symtable_filter(
-      uint64_t address);
+  std::pair<const std::string *, const std::string *> SymtableFilter(uint64_t address);
 
-  static bool is_call_pack_related(std::shared_ptr<Event> event_ptr);
+  bool IsDriverTx(std::shared_ptr<Event> event_ptr);
 
-  static bool IsDriverTx(std::shared_ptr<Event> event_ptr);
+  bool IsDriverRx(std::shared_ptr<Event> event_ptr);
 
-  static bool IsDriverRx(std::shared_ptr<Event> event_ptr);
+  bool IsPciMsixDescAddr(std::shared_ptr<Event> event_ptr);
 
-  static bool is_pci_msix_desc_addr(std::shared_ptr<Event> event_ptr);
+  bool is_pci_write(std::shared_ptr<Event> event_ptr);
 
-  static bool is_pci_write(std::shared_ptr<Event> event_ptr);
+  bool IsKernelTx(std::shared_ptr<Event> event_ptr);
 
-  static bool is_mmio_pack_related(std::shared_ptr<Event> event_ptr);
+  bool IsKernelRx(std::shared_ptr<Event> event_ptr);
 
-  static bool is_dma_pack_related(std::shared_ptr<Event> event_ptr);
+  bool IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr);
 
-  static bool is_eth_pack_related(std::shared_ptr<Event> event_ptr);
+  bool IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr);
 
-  static bool is_msix_related(std::shared_ptr<Event> event_ptr);
+  bool IsSocketConnect(std::shared_ptr<Event> event_ptr);
 
-  static bool IsKernelTx(std::shared_ptr<Event> event_ptr);
+  bool IsSysEntry(std::shared_ptr<Event> event_ptr);
 
-  static bool IsKernelRx(std::shared_ptr<Event> event_ptr);
+  bool IsMsixNotToDeviceBarNumber(int bar);
 
-  static bool IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr);
-
-  static bool IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr);
-
-  static bool is_socket_connect(std::shared_ptr<Event> event_ptr);
-
-  static bool IsSysEntry(std::shared_ptr<Event> event_ptr);
-
-  static bool IsMsixNotToDeviceBarNumber(int bar);
-
-  static bool IsToDeviceBarNumber(int bar);
+  bool IsToDeviceBarNumber(int bar);
 };
 
 #endif  // SIM_TRACE_CONFIG_VARS_H_

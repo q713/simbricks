@@ -1012,6 +1012,9 @@ class NicMmioW : public NicMmio {
   bool posted_ = false;
 
  public:
+
+  bool IsPosted() const;
+
   NicMmioW(uint64_t ts, const size_t parser_identifier,
            const std::string parser_name, uint64_t off, size_t len,
            uint64_t val, bool posted)

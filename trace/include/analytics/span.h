@@ -120,31 +120,36 @@ class EventSpan {
     //}
   }
 
-  std::string &GetServiceName() {
+  inline std::string &GetServiceName() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return service_name_;
   }
 
-  void SetOriginal(const std::shared_ptr<EventSpan> &original) {
+  inline void SetOriginal(const std::shared_ptr<EventSpan> &original) {
     throw_if_empty(original, "EventSpan::SetOriginal: original is empty");
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     original_ = original;
   }
 
-  bool IsCopy() {
+  inline bool IsCopy() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return original_ != nullptr;
   }
 
-  uint64_t GetOriginalId() {
+  inline uint64_t GetOriginalId() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     throw_if_empty(original_, "EventSpan::GetOriginalId: span is not a copy");
     return original_->GetId();
   }
 
-  size_t GetAmountEvents() {
+  inline size_t GetAmountEvents() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return events_.size();
+  }
+
+  inline bool HasEvents() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return GetAmountEvents() > 0;
   }
 
   std::shared_ptr<Event> GetAt(size_t index) {
@@ -180,12 +185,12 @@ class EventSpan {
     is_pending_ = false;
   }
 
-  bool IsPending() {
+  inline bool IsPending() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_pending_;
   }
 
-  bool IsComplete() {
+  inline bool IsComplete() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return not IsPending();
   }

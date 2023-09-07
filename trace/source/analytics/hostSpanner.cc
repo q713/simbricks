@@ -219,6 +219,9 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
   assert(IsType(event_ptr, EventType::kHostPciRWT) and
       "HostSpanner::HandelPci: event is no pci starting event");
   if (pending_pci_span_) {
+    throw_on(not pending_pci_span_->HasEvents(),
+             "HostSpanner::HandelPci: finsih pci without conf has no events!");
+    pending_pci_span_->MarkAsDone();
     tracer_.MarkSpanAsDone(pending_pci_span_);
   }
 

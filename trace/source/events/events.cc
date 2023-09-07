@@ -459,6 +459,10 @@ bool NicMmioR::Equal(const Event &other) {
   return NicMmio::Equal(other);
 }
 
+bool NicMmioW::IsPosted() const {
+  return posted_;
+}
+
 void NicMmioW::Display(std::ostream &out) {
   NicMmio::Display(out);
   out << ", posted=" << BoolToString(posted_);

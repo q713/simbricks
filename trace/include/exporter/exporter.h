@@ -411,6 +411,7 @@ class OtlpSpanExporter : public SpanExporter {
   static void add_NicMmioW(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicMmioW> &event) {
     assert(event and "event is not null");
     add_NicMmio(attributes, event);
+    attributes.insert({"posted", BoolToString(event->IsPosted())});
   }
 
   static void add_NicTrx(std::map<std::string, std::string> &attributes, const std::shared_ptr<NicTrx> &event) {

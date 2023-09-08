@@ -120,11 +120,6 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
   throw_if_empty(pending_host_call_span_, span_is_null);
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
     pci_write_before_ = trace_environment_.is_pci_write(event_ptr);
-
-    if (pending_host_call_span_->DoesDriverTransmit()) {
-      std::cout << "Host Driver Transmit found!!!!!!" << '\n';
-    }
-
     co_return true;
 
   } else if (pending_host_call_span_->IsComplete()) {

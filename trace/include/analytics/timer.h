@@ -202,6 +202,7 @@ class WeakTimer {
       });
       --waiters_that_reached_min_;
     }
+    timer_cv_.notify_all();
     co_return;
   }
 

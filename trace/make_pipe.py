@@ -27,25 +27,15 @@ import os
 import fcntl
 
 
-def create_named_pipe(names: list[str], size: int = 16, path: str = ""):
+def create_named_pipe(names: list[str], path: str = ""):
     print("Start creation of named pipes")
-    page_size = os.sysconf("SC_PAGESIZE")
+    # page_size = os.sysconf("SC_PAGESIZE")
     for name in names:
         if path != "":
             name = os.path.join(path, name)
         print(f"Start Creation of named pipe with name {name} and size {size}")
         try:
             os.mkfifo(name)
-            if size < 1:
-                print("A size < 1 was given, hence the script will fallback to the default size of named pipes")
-            else:
-                fd = os.open(name, os.O_RDWR)
-                if fd < 0:
-                    raise Exception("could not open named pipe file to changed the underlying size")
-                print(size * page_size)
-                fcntl.fcntl(fd, fcntl.F_SETPIPE_SZ, size * page_size)
-                print_named_pipe_buffer_size(name)
-                os.close(fd)
         except OSError as err:
             print(f"An error occurred while creating the named pipe: {err}")
             return
@@ -71,7 +61,6 @@ if __name__ == "__main__":
 
     create_parser = subparsers.add_parser("create", help="create named pipes")
     create_parser.add_argument("pipe_names", nargs="+", type=str, help="The names of the named pipes to create")
-    create_parser.add_argument("-s", "--size", type=int, help="The size IN PAGES of the underlying pipe")
     create_parser.add_argument("-p", "--path", type=str, help="Path to a folder in which the named pipe shall be "
                                                               "created")
 
@@ -83,7 +72,7 @@ if __name__ == "__main__":
     if args.commands == "create":
         size = int(args.size) if args.size is not None else 16
         path = str(args.path) if args.path is not None else ""
-        create_named_pipe(args.pipe_names, size, path)
+        create_named_pipe(args.pipe_names, path)
     elif args.commands == "check":
         print_named_pipe_buffer_size(args.pipe_to_check)
     else:

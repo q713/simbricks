@@ -41,7 +41,7 @@ nicbm_client_pipe = f"{named_pipe_folder}/nicbm-client-log-pipe.pipe"
 e = Experiment(name='simple_netperf')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 
-gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecFaulting,ExecUser,ExecKernel,EthernetAll,PciDevice,PciHost'
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,PciHost,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecUser,ExecKernel,ExecOpClass,ExecRegDelta,ExecFaulting,ExecAsid,ExecFlags,ExecCPSeq,ExecFaulting,ExecFetchSeq'
 
 # create client
 client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver

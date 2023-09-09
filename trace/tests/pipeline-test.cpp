@@ -40,11 +40,11 @@ struct int_prod : public producer<int> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull);
+    throw_if_empty<CoroChannel<int>>(tar_chan, TraceException::kChannelIsNull);
 
     for (int i = start; i < 3 + start; i++) {
-      bool could_write = co_await tar_chan->Push(resume_executor, std::move(i));
+      bool could_write = co_await tar_chan->Push(resume_executor, i);
       if (not could_write) {
         break;
       }
@@ -65,8 +65,8 @@ struct int_cons : public consumer<int> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<int>> src_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull);
+    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull);
 
     auto int_opt = co_await src_chan->Pop(resume_executor);
 
@@ -86,9 +86,9 @@ struct int_adder : public cpipe<int> {
       std::shared_ptr<CoroChannel<int>> src_chan,
       std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
-    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull);
+    throw_if_empty<CoroChannel<int>>(tar_chan, TraceException::kChannelIsNull);
+    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull);
 
     auto int_opt = co_await src_chan->Pop(resume_executor);
 

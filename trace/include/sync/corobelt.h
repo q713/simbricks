@@ -86,14 +86,14 @@ template<typename ValueType>
 inline concurrencpp::result<void> run_pipeline_impl(
     std::shared_ptr<concurrencpp::executor> executor,
     pipeline<ValueType> &pipeline) {
-  throw_if_empty(executor, resume_executor_null);
+  throw_if_empty(executor, TraceException::kResumeExecutorNull);
 
   const size_t amount_channels = pipeline.pipes_.size() + 1;
   std::vector<std::shared_ptr<CoroChannel<ValueType>>> channels{amount_channels};
   std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
   //std::vector<concurrencpp::result<concurrencpp::result<void>>> tasks{amount_channels + 1};
-  channels[0] = create_shared<CoroBoundedChannel<ValueType>>(channel_is_null);
-  throw_if_empty(pipeline.prod_, producer_is_null);
+  channels[0] = create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
+  throw_if_empty(pipeline.prod_, TraceException::kProducerIsNull);
   //tasks[0] = executor->submit([&](std::shared_ptr<Channel<ValueType>> tar) {
   //  return pipeline.prod_->produce(executor, tar);
   //}, channels[0]);
@@ -101,10 +101,10 @@ inline concurrencpp::result<void> run_pipeline_impl(
 
   for (size_t index = 0; index < pipeline.pipes_.size(); index++) {
     auto &pipe = pipeline.pipes_[index];
-    throw_if_empty(pipe, pipe_is_null);
+    throw_if_empty(pipe, TraceException::kPipeIsNull);
 
     channels[index + 1] =
-        create_shared<CoroBoundedChannel<ValueType>>(channel_is_null);
+        create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
 
     //tasks[index + 1] = executor->submit([&](std::shared_ptr<Channel<ValueType>> src,
     //                                        std::shared_ptr<Channel<ValueType>> tar) {
@@ -113,7 +113,7 @@ inline concurrencpp::result<void> run_pipeline_impl(
     tasks[index + 1] =
         pipe->process(executor, channels[index], channels[index + 1]);
   }
-  throw_if_empty(pipeline.cons_, consumer_is_null);
+  throw_if_empty(pipeline.cons_, TraceException::kConsumerIsNull);
   //tasks[amount_channels] = executor->submit([&](std::shared_ptr<Channel<ValueType>> src) {
   //  return pipeline.cons_->consume(executor, src);
   //}, channels[amount_channels - 1]);
@@ -143,8 +143,9 @@ inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
                          pipeline<ValueType> &pipeline) {
   try {
     run_pipeline_impl(executor, pipeline).get();
-  } catch (std::exception &exe) {
-    std::cerr << exe.what() << std::endl;
+  } catch (TraceException &exe) {
+    std::cerr << exe.what() << '\n';
+    executor->shutdown();
   }
 }
 
@@ -157,8 +158,9 @@ inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
 
   try {
     run_pipeline_impl(executor, pipeline).get();
-  } catch (std::exception &exe) {
-    std::cerr << exe.what() << std::endl;
+  } catch (TraceException &exe) {
+    std::cerr << exe.what() << '\n';
+    executor->shutdown();
   }
 }
 
@@ -187,8 +189,9 @@ inline void run_pipelines(std::shared_ptr<concurrencpp::executor> executor,
     for (size_t index = 0; index < amount_tasks; index++) {
       pipelns[index].get();
     }
-  } catch (std::exception &exe) {
-    std::cerr << exe.what() << std::endl;
+  } catch (TraceException &exe) {
+    std::cerr << exe.what() << '\n';
+    executor->shutdown();
   }
 }
 
@@ -196,7 +199,7 @@ template<typename ValueType>
 inline void run_pipelines_parallel(
     std::shared_ptr<concurrencpp::executor> executor,
     std::vector<pipeline<ValueType>> &pipelines) {
-  throw_if_empty(executor, resume_executor_null);
+  throw_if_empty(executor, TraceException::kResumeExecutorNull);
   size_t amount_tasks = pipelines.size();
   //std::vector<concurrencpp::result<concurrencpp::result<void>>> pipelns{
   //    amount_tasks};
@@ -214,8 +217,9 @@ inline void run_pipelines_parallel(
       pipelns[index].get();
       std::cout << "one pipeline finished" << '\n';
     }
-  } catch (std::exception &exe) {
+  } catch (TraceException &exe) {
     std::cerr << exe.what() << '\n';
+    executor->shutdown();
   }
 
   std::cout << "all pipelines finished" << '\n';

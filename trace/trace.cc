@@ -52,13 +52,13 @@ std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
   if (result.count(option) != 0) {
     try {
       CreateOpenFile(out, result[option].as<std::string>(), allow_override);
-      printer = create_shared<EventPrinter>(printer_is_null, out);
-    } catch (std::exception &exe) {
+      printer = create_shared<EventPrinter>(TraceException::kPrinterIsNull, out);
+    } catch (TraceException &exe) {
       std::cerr << "could not create printer: " << exe.what() << '\n';
       return nullptr;
     }
   } else {
-    printer = create_shared<EventPrinter>(printer_is_null, std::cout);
+    printer = create_shared<EventPrinter>(TraceException::kPrinterIsNull, std::cout);
   }
 
   return printer;
@@ -156,19 +156,19 @@ int main(int argc, char *argv[]) {
 
   try {
     using QueueT = CoroUnBoundedChannel<std::shared_ptr<Context>>;
-    auto server_hn = create_shared<QueueT>(channel_is_null);
-    auto server_nh = create_shared<QueueT>(channel_is_null);
-    auto client_hn = create_shared<QueueT>(channel_is_null);
-    auto client_nh = create_shared<QueueT>(channel_is_null);
-    auto nic_cn = create_shared<QueueT>(channel_is_null);
-    auto nic_sn = create_shared<QueueT>(channel_is_null);
-    auto server_n_h_receive = create_shared<QueueT>(channel_is_null);
-    auto client_n_h_receive = create_shared<QueueT>(channel_is_null);
+    auto server_hn = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto server_nh = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto client_hn = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto client_nh = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nic_cn = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nic_sn = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto server_n_h_receive = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto client_n_h_receive = create_shared<QueueT>(TraceException::kChannelIsNull);
 
     std::vector<EventTimestampFilter::EventTimeBoundary> timestamp_bounds{
         EventTimestampFilter::EventTimeBoundary{lower_bound, upper_bound}};
 
-    auto spanner_h_s = create_shared<HostSpanner>(spanner_is_null,
+    auto spanner_h_s = create_shared<HostSpanner>(TraceException::kSpannerIsNull,
                                                   trace_environment,
                                                   "Server-Host",
                                                   tracer,
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
                                                   server_nh,
                                                   server_n_h_receive);
 
-    auto spanner_h_c = create_shared<HostSpanner>(spanner_is_null,
+    auto spanner_h_c = create_shared<HostSpanner>(TraceException::kSpannerIsNull,
                                                   trace_environment,
                                                   "Client-Host",
                                                   tracer,
@@ -186,7 +186,7 @@ int main(int argc, char *argv[]) {
                                                   client_nh,
                                                   client_n_h_receive);
 
-    auto spanner_n_s = create_shared<NicSpanner>(spanner_is_null,
+    auto spanner_n_s = create_shared<NicSpanner>(TraceException::kSpannerIsNull,
                                                  trace_environment,
                                                  "NIC-Server",
                                                  tracer,
@@ -197,7 +197,7 @@ int main(int argc, char *argv[]) {
                                                  server_hn,
                                                  server_n_h_receive);
 
-    auto spanner_n_c = create_shared<NicSpanner>(spanner_is_null,
+    auto spanner_n_c = create_shared<NicSpanner>(TraceException::kSpannerIsNull,
                                                  trace_environment,
                                                  "Client-NIC",
                                                  tracer,
@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
                                                          trace_environment,
                                                          "gem5-server-reader",
                                                          result["gem5-server-event-stream"].as<std::string>());
-      auto filter_h_s = create_shared<EventTimestampFilter>(actor_is_null,
+      auto filter_h_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
@@ -225,7 +225,7 @@ int main(int argc, char *argv[]) {
                                                          trace_environment,
                                                          "gem5-client-reader",
                                                          result["gem5-client-event-stream"].as<std::string>());
-      auto filter_h_c = create_shared<EventTimestampFilter>(actor_is_null,
+      auto filter_h_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
@@ -235,7 +235,7 @@ int main(int argc, char *argv[]) {
                                                          trace_environment,
                                                          "nicbm-server-reader",
                                                          result["nicbm-server-event-stream"].as<std::string>());
-      auto filter_n_s = create_shared<EventTimestampFilter>(actor_is_null,
+      auto filter_n_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
                                                          trace_environment,
                                                          "nicbm-client-reader",
                                                          result["nicbm-client-event-stream"].as<std::string>());
-      auto filter_n_c = create_shared<EventTimestampFilter>(actor_is_null,
+      auto filter_n_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
@@ -289,11 +289,11 @@ int main(int argc, char *argv[]) {
 
     // SERVER HOST PIPELINE
     std::set<EventType> to_filter{EventType::kHostInstrT, EventType::kSimProcInEventT, EventType::kSimSendSyncT};
-    auto event_filter_h_s = create_shared<EventTypeFilter>(actor_is_null,
+    auto event_filter_h_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-    auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(actor_is_null,
+    auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
     ComponentFilter comp_filter_server("ComponentFilter-Server");
@@ -313,7 +313,7 @@ int main(int argc, char *argv[]) {
     if (not printer_h_s) {
       exit(EXIT_FAILURE);
     }
-    auto func_filter_h_s = create_shared<HostCallFuncFilter>(actor_is_null,
+    auto func_filter_h_s = create_shared<HostCallFuncFilter>(TraceException::kActorIsNull,
                                                              trace_environment,
                                                              blacklist_functions,
                                                              true);
@@ -327,11 +327,11 @@ int main(int argc, char *argv[]) {
     //    gem5_server_par, server_host_pipes, printer_h_s};
 
     // CLIENT HOST PIPELINE
-    auto event_filter_h_c = create_shared<EventTypeFilter>(actor_is_null,
+    auto event_filter_h_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-    auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(actor_is_null,
+    auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
     ComponentFilter comp_filter_client("ComponentFilter-Server");
@@ -351,7 +351,7 @@ int main(int argc, char *argv[]) {
     if (not printer_h_c) {
       exit(EXIT_FAILURE);
     }
-    auto func_filter_h_c = create_shared<HostCallFuncFilter>(actor_is_null,
+    auto func_filter_h_c = create_shared<HostCallFuncFilter>(TraceException::kActorIsNull,
                                                              trace_environment,
                                                              blacklist_functions,
                                                              true);
@@ -365,11 +365,11 @@ int main(int argc, char *argv[]) {
     //    gem5_client_par, client_host_pipes, printer_h_c};
 
     // SERVER NIC PIPELINE
-    auto event_filter_n_s = create_shared<EventTypeFilter>(actor_is_null,
+    auto event_filter_n_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-    auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(actor_is_null,
+    auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
     NicBmParser nicbm_ser_par{trace_environment,
@@ -397,11 +397,11 @@ int main(int argc, char *argv[]) {
     //    nic_ser_par, server_nic_pipes, printer_n_s};
 
     // CLIENT NIC PIPELINE
-    auto event_filter_n_c = create_shared<EventTypeFilter>(actor_is_null,
+    auto event_filter_n_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-    auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(actor_is_null,
+    auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
     NicBmParser nicbm_client_par{trace_environment,
@@ -431,7 +431,7 @@ int main(int argc, char *argv[]) {
     std::vector<pipeline<std::shared_ptr<Event>>>
         pipelines{client_host_pipeline, client_nic_pipeline, server_host_pipeline, server_nic_pipeline};
     run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
-  } catch (std::runtime_error &err) {
+  } catch (TraceException &err) {
     std::cerr << err.what() << '\n';
     exit(EXIT_FAILURE);
   }

@@ -72,7 +72,7 @@ class Trace {
   }
 
   bool AddSpan(std::shared_ptr<EventSpan> span) {
-    throw_if_empty(span, span_is_null);
+    throw_if_empty(span, TraceException::kSpanIsNull);
 
     const std::lock_guard<std::mutex> lock(mutex_);
     auto iter = spans_.insert({span->GetId(), span});
@@ -86,7 +86,7 @@ class Trace {
     out << "trace: id=" << ident_ << '\n';
     out << "\t parent_span:" << parent_span_ << '\n';
     for (auto &span : spans_) {
-      throw_if_empty(span.second, span_is_null);
+      throw_if_empty(span.second, TraceException::kSpanIsNull);
       if (span.second.get() == parent_span_.get()) {
         continue;
       }
@@ -97,7 +97,7 @@ class Trace {
 
   Trace(uint64_t ident, std::shared_ptr<EventSpan> parent_span)
       : ident_(ident), parent_span_(std::move(parent_span)) {
-    throw_if_empty(parent_span_, span_is_null);
+    throw_if_empty(parent_span_, TraceException::kSpanIsNull);
     this->AddSpan(parent_span_);
   }
 };

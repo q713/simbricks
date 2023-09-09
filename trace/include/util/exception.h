@@ -32,117 +32,147 @@
 #include <sstream>
 #include <optional>
 #include <iostream>
+#include <source_location>
 
-// TODO: create proper exceptions!!!
-inline const char *resume_executor_null =
-        "std::shared_ptr<concurrencpp::executor> is null";
-inline const char *channel_is_null = "std::shared_ptr<channel<ValueType>> is null";
-inline const char *pipe_is_null = "std::shared_ptr<pipe<ValueType>> is null";
-inline const char *consumer_is_null = "std::shared_ptr<consumer<ValueType>> is null";
-inline const char *producer_is_null = "std::shared_ptr<producer<ValueType>> is null";
-inline const char *event_is_null = "std::shared_ptr<Event> is null";
-inline const char *trace_is_null = "std::shared_ptr<Trace> is null";
-inline const char *span_is_null = "std::shared_ptr<Span> is null";
-inline const char *parser_is_null = "std::shared_ptr<LogParser> is null";
-inline const char *actor_is_null = "std::shared_ptr<EventStreamActor> is null";
-inline const char *printer_is_null = "a printer is null";
-inline const char *context_is_null = "std::shared_ptr<context> is null";
-inline const char* event_stream_parser_null = "std::shared_ptr<EventStreamParser> is null";
-inline const char* spanner_is_null = "sstd::shared_ptr<Spanner> is null";
-inline const char* could_not_push_to_context_queue = "could not push value into context queue";
-inline const char* queue_is_null = "std::shared_ptr<ContextQueue<...>> is null";
-inline const char* span_exporter_null = "SpanExporter is null";
-inline const char* span_processor_null = "SpanProcessor is null";
-inline const char* trace_provider_null = "TracerProvider is null";
+class TraceException : public std::exception {
+  const std::string error_message_;
+
+  static std::string build_error_msg(const std::string_view location,
+                                     const std::string_view message) noexcept {
+    std::stringstream err_msg{"TraceException"};
+    err_msg << "occured in " << location << ": " << message;
+    return err_msg.str();
+  }
+
+ public:
+  static constexpr const char *kResumeExecutorNull = "concurrencpp::executor is null";
+  static constexpr const char *kChannelIsNull = "channel<ValueType> is null";
+  static constexpr const char *kPipeIsNull = "pipe<ValueType> is null";
+  static constexpr const char *kConsumerIsNull = "consumer<ValueType> is null";
+  static constexpr const char *kProducerIsNull = "producer<ValueType> is null";
+  static constexpr const char *kEventIsNull = "Event is null";
+  static constexpr const char *kTraceIsNull = "Trace is null";
+  static constexpr const char *kSpanIsNull = "Span is null";
+  static constexpr const char *kParserIsNull = "LogParser is null";
+  static constexpr const char *kActorIsNull = "EventStreamActor is null";
+  static constexpr const char *kPrinterIsNull = "printer is null";
+  static constexpr const char *kContextIsNull = "context is null";
+  static constexpr const char *kEventStreamParserNull = "EventStreamParser is null";
+  static constexpr const char *kSpannerIsNull = "Spanner is null";
+  static constexpr const char *kCouldNotPushToContextQueue = "could not push value into context queue";
+  static constexpr const char *kQueueIsNull = "ContextQueue<...> is null";
+  static constexpr const char *kSpanExporterNull = "SpanExporter is null";
+  static constexpr const char *kSpanProcessorNull = "SpanProcessor is null";
+  static constexpr const char *kTraceProviderNull = "TracerProvider is null";
+
+  explicit TraceException(const char *location, const char *message)
+      : error_message_(build_error_msg(location, message)) {}
+
+  explicit TraceException(const std::string &location, const std::string &message) : error_message_(
+      build_error_msg(location, message)) {}
+
+  explicit TraceException(const std::string &&location, const std::string &&message) : error_message_(
+      build_error_msg(location, message)) {}
+
+  const char *what() const noexcept override {
+    return error_message_.c_str();
+  }
+};
+
+inline std::string LocationToString(const std::source_location &location) {
+  std::stringstream msg{location.file_name()};
+  msg << ":" << location.function_name();
+  return msg.str();
+}
 
 template<typename Value>
-inline void throw_if_empty (const std::shared_ptr<Value> &to_check, const char *message)
-{
-  if (not to_check)
-  {
-    std::cout << "exception thrown" << std::endl;
-    std::cout << message << std::endl;
+inline void throw_if_empty(const std::shared_ptr<Value> &to_check,
+                           const char *message,
+                           const std::source_location &location = std::source_location::current()) {
+  if (not to_check) {
+    std::cout << "exception thrown" << '\n';
+    std::cout << message << '\n';
     //std::terminate();
-    throw std::runtime_error (message);
+    throw TraceException(LocationToString(location), message);
   }
 }
 
 template<typename Value>
-inline void throw_if_empty(const std::shared_ptr<Value> &to_check, std::string&& message) {
+inline void throw_if_empty(const std::shared_ptr<Value> &to_check, std::string &&message) {
   throw_if_empty(to_check, message.c_str());
 }
 
 template<typename Value>
-inline void throw_if_empty (const std::unique_ptr<Value> &to_check, const char *message)
-{
-  if (not to_check)
-  {
-    std::cout << "exception thrown" << std::endl;
-    std::cout << message << std::endl;
+inline void throw_if_empty(const std::unique_ptr<Value> &to_check,
+                           const char *message,
+                           const std::source_location &location = std::source_location::current()) {
+  if (not to_check) {
+    std::cout << "exception thrown" << '\n';
+    std::cout << message << '\n';
     //std::terminate();
-    throw std::runtime_error (message);
+    throw TraceException(LocationToString(location), message);
   }
 }
 
 template<typename Value>
-inline void throw_if_empty (const Value *to_check, const char *message)
-{
-  if (not to_check)
-  {
-    std::cout << "exception thrown" << std::endl;
-    std::cout << message << std::endl;
+inline void throw_if_empty(const Value *to_check,
+                           const char *message,
+                           const std::source_location &location = std::source_location::current()) {
+  if (not to_check) {
+    std::cout << "exception thrown" << '\n';
+    std::cout << message << '\n';
     //std::terminate();
-    throw std::runtime_error (message);
+    throw TraceException(LocationToString(location), message);
   }
 }
 
 template<typename Value>
-inline void throw_if_empty (const Value *to_check, std::string&& message)
-{
+inline void throw_if_empty(const Value *to_check, std::string &&message) {
   throw_if_empty(to_check, message.c_str());
 }
 
-inline void throw_on(bool should_throw, const char* message) {
+inline void throw_on(bool should_throw,
+                     const char *message,
+                     const std::source_location &location = std::source_location::current()) {
   if (should_throw) {
-    std::cout << "exception thrown" << std::endl;
-    std::cout << message << std::endl;
+    std::cout << "exception thrown" << '\n';
+    std::cout << message << '\n';
     //std::terminate();
-    throw std::runtime_error (message);
+    throw TraceException(LocationToString(location), message);
   }
 }
 
-inline void throw_on(bool should_throw, std::string&& message) {
+inline void throw_on(bool should_throw, std::string &&message) {
   throw_on(should_throw, message.c_str());
 }
 
 template<typename ValueType>
-ValueType OrElseThrow(std::optional<ValueType> &val_opt, const char* message) {
+ValueType OrElseThrow(std::optional<ValueType> &val_opt, const char *message) {
   throw_on(not val_opt.has_value(), message);
   return val_opt.value();
 }
 
 template<typename ValueType>
-ValueType OrElseThrow(std::optional<ValueType>& val_opt, std::string&& message) {
+ValueType OrElseThrow(std::optional<ValueType> &val_opt, std::string &&message) {
   return OrElseThrow(val_opt, message.c_str());
 }
 
 template<typename ValueType>
-ValueType OrElseThrow(std::optional<ValueType>&& val_opt, std::string&& message) {
+ValueType OrElseThrow(std::optional<ValueType> &&val_opt, std::string &&message) {
   return OrElseThrow(val_opt, message.c_str());
 }
 
 template<typename ...Args>
-inline void throw_just(Args&&... args) {
+inline void throw_just(const std::source_location &location, Args &&... args) {
   std::stringstream message_builder;
   ([&] {
     message_builder << args;
-  } (), ...);
-  std::cout << "exception thrown" << std::endl;
-  std::string message{message_builder.str()};
-  std::cout << message << std::endl;
+  }(), ...);
+  std::cout << "exception thrown" << '\n';
+  const std::string message{message_builder.str()};
+  std::cout << message << '\n';
 //std::terminate();
-  throw std::runtime_error(message);
+  throw TraceException(LocationToString(location), message);
 }
-
 
 #endif //SIMBRICKS_TRACE_EXCEPTION_H_

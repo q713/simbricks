@@ -1082,7 +1082,7 @@ inline bool IsType(std::shared_ptr<EventSpan> &span, span_type type) {
 }
 
 inline std::shared_ptr<EventSpan> CloneShared(const std::shared_ptr<EventSpan> &other) {
-  throw_if_empty(other, span_is_null);
+  throw_if_empty(other, TraceException::kSpanIsNull);
   auto raw_ptr = other->clone();
   throw_if_empty(raw_ptr, "EventSpan CloneShared: raw pointer is null");
   return std::shared_ptr<EventSpan>(raw_ptr);
@@ -1115,15 +1115,15 @@ struct SpanPrinter
     : public consumer<std::shared_ptr<EventSpan>> {
   concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
                                      std::shared_ptr<CoroChannel<std::shared_ptr<EventSpan>>> src_chan) override {
-    throw_if_empty(resume_executor, resume_executor_null);
-    throw_if_empty(src_chan, channel_is_null);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(src_chan, TraceException::kChannelIsNull);
 
     std::optional<std::shared_ptr<EventSpan>> next_span_opt;
     std::shared_ptr<EventSpan> next_span = nullptr;
     for (next_span_opt = co_await src_chan->Pop(resume_executor); next_span_opt.has_value();
          next_span_opt = co_await src_chan->Pop(resume_executor)) {
       next_span = next_span_opt.value();
-      throw_if_empty(next_span, span_is_null);
+      throw_if_empty(next_span, TraceException::kSpanIsNull);
       std::cout << next_span << '\n';
     }
 

@@ -23,11 +23,12 @@
  */
 
 #include "analytics/spanner.h"
+#include "util/exception.h"
 
 concurrencpp::result<void> Spanner::consume(
     ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> src_chan) {
-  throw_if_empty(resume_executor, resume_executor_null);
-  throw_if_empty(src_chan, channel_is_null);
+  throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+  throw_if_empty(src_chan, TraceException::kChannelIsNull);
 
   std::shared_ptr<Event> event_ptr = nullptr;
   bool added = false;
@@ -39,7 +40,7 @@ concurrencpp::result<void> Spanner::consume(
        event_ptr_opt = co_await src_chan->Pop(resume_executor)) {
 
     event_ptr = event_ptr_opt.value();
-    throw_if_empty(event_ptr, event_is_null);
+    throw_if_empty(event_ptr, TraceException::kEventIsNull);
 
     //std::cout << name_ << " try handel: " << *event_ptr << std::endl;
     //co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
@@ -68,7 +69,7 @@ concurrencpp::result<void> Spanner::consume(
   //co_await timer_.Done(resume_executor);
   //co_await timer_.Done(resume_executor, timer_key);
 
-  std::cout << "event spanner exited" << std::endl;
+  std::cout << "event spanner exited" << '\n';
 
   co_return;
 }

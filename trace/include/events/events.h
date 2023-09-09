@@ -149,7 +149,9 @@ inline std::ostream &operator<<(std::stringstream &into, EventType type) {
       break;
     case EventType::kNicRxT:into << "kNicRxT";
       break;
-    default:throw_just("encountered unknown event type");
+    default:
+      throw_just(std::source_location::current(),
+                 "encountered unknown event type");
   }
   return into;
 }
@@ -1139,8 +1141,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
   std::ostream &out_;
 
   inline void print(const std::shared_ptr<Event> &event) {
-    throw_if_empty(event, event_is_null);
-    out_ << *event << std::endl;
+    throw_if_empty(event, TraceException::kEventIsNull);
+    out_ << *event << '\n';
     out_.flush();
   }
 
@@ -1153,8 +1155,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan
   ) override {
-    throw_if_empty(resume_executor, resume_executor_null);
-    throw_if_empty(src_chan, channel_is_null);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(src_chan, TraceException::kChannelIsNull);
 
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
@@ -1163,7 +1165,6 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       print(event);
     }
 
-    std::cout << "event printer exited" << std::endl;
     co_return;
   }
 
@@ -1172,9 +1173,9 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan
   ) override {
-    throw_if_empty(resume_executor, resume_executor_null);
-    throw_if_empty(src_chan, channel_is_null);
-    throw_if_empty(tar_chan, channel_is_null);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(src_chan, TraceException::kChannelIsNull);
+    throw_if_empty(tar_chan, TraceException::kChannelIsNull);
 
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
@@ -1187,7 +1188,6 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
     }
 
     co_await tar_chan->CloseChannel(resume_executor);
-    std::cout << "event printer exited" << std::endl;
     co_return;
   }
 };
@@ -1199,7 +1199,7 @@ struct EventComperator {
   }
 };
 
-inline std::string GetTypeStr(std::shared_ptr<Event> event) {
+inline std::string GetTypeStr(const std::shared_ptr<Event> &event) {
   if (not event) {
     return "";
   }

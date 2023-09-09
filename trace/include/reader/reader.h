@@ -142,7 +142,7 @@ class ReaderBuffer {
 
   LineHandler *GetHandler() {
     assert(cur_size_ > 0 and cur_line_index_ < cur_size_);
-    LineHandler* handler = &buffer_[cur_line_index_];
+    LineHandler *handler = &buffer_[cur_line_index_];
     assert(handler);
     ++cur_line_index_;
     return handler;
@@ -237,13 +237,13 @@ class ReaderBuffer {
 
   void OpenFile(const std::string &file_path, bool is_named_pipe = false) {
     if (!std::filesystem::exists(file_path)) {
-      throw_just("ReaderBuffer: the file path'", file_path, "' does not exist");
+      throw_just(std::source_location::current(),
+                 "ReaderBuffer: the file path'", file_path, "' does not exist");
     }
     throw_on(input_stream_.is_open(), "ReaderBuffer:OpenFile: already opened file to read");
     throw_on(file_, "ReaderBuffer:OpenFile: already opened file to read");
 
     if (is_named_pipe) {
-      std::cout << "ReaderBuffer: try changing '" << file_path << "' size to " << kBufSize << '\n';
       file_ = fopen(file_path.c_str(), "r");
       throw_if_empty(file_, "ReaderBuffer: could not open file path");
       const int fd = fileno(file_);
@@ -252,23 +252,23 @@ class ReaderBuffer {
       if (suc != kBufSize) {
         std::cout << "ReaderBuffer: could not change '" << file_path << "' size to " << kBufSize << '\n';
       } else {
-        std::cout << "ReaderBuffer: changed size sucessfull" << '\n';
+        std::cout << "ReaderBuffer: changed size successfully" << '\n';
       }
     }
 
     input_stream_ = std::ifstream(file_path);
     if (not input_stream_.is_open()) {
-      throw_just("ReaderBuffer: could not open file path'", file_path, "'");
+      throw_just(std::source_location::current(),
+                 "ReaderBuffer: could not open file path'", file_path, "'");
     }
     if (not input_stream_.good()) {
-      throw_just(
-          "ReaderBuffer: the input stream of the file regarding file path'",
-          file_path, "' is not good");
+      throw_just(std::source_location::current(),
+                 "ReaderBuffer: the input stream of the file regarding file path'",
+                 file_path, "' is not good");
     }
     istream_buffer_ = new char[kBufSize];
     throw_on(not istream_buffer_, "ReaderBuffer: could not create istream buffer");
     input_stream_.rdbuf()->pubsetbuf(istream_buffer_, kBufSize);
-    std::cout << "ReaderBuffer::Open: opened file '" << file_path << "'" << '\n';
   }
 
   ~ReaderBuffer() {

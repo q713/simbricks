@@ -47,7 +47,7 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
   ReaderBuffer<10> reader_buffer{"test-reader", true};
   REQUIRE_NOTHROW(reader_buffer.OpenFile(test_file_path));
 
-  auto gem5 = create_shared<Gem5Parser>(parser_is_null,
+  auto gem5 = create_shared<Gem5Parser>(TraceException::kParserIsNull,
                                         trace_environment,
                                         parser_name,
                                         comp_filter_client);

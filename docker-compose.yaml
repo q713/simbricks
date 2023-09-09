@@ -44,8 +44,8 @@ services:
       - -c
       - for i in {1..2}; do build-docker/trace --trace-env-config /usr/src/data-folder/trace/trace-env-config.yaml --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-image-syms.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-image-syms.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
     volumes:
-      - <path to the log files directory>:/usr/src/data-folder
-      - <path to the images symbol tables>:/usr/src/linux_dumbs
+      - /home/jakob/uni/master/simbricks:/usr/src/data-folder
+      - /home/jakob/uni/master/simbricks/trace/linux_dumps:/usr/src/linux_dumbs
     depends_on:
       - jaeger
     links:
@@ -61,7 +61,7 @@ services:
         make convert-images-raw 
         python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/simple_ping.py
     volumes:
-      - <path to workdirectory>:/usr/src/data-folder
+      - /home/jakob/uni/master/simbricks:/usr/src/data-folder
       - /dev/kvm:/dev/kvm
     privileged: true
     depends_on:

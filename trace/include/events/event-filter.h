@@ -51,9 +51,9 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan)
   override {
-    throw_if_empty(resume_executor, resume_executor_null);
-    throw_if_empty(tar_chan, channel_is_null);
-    throw_if_empty(src_chan, channel_is_null);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(tar_chan, TraceException::kChannelIsNull);
+    throw_if_empty(src_chan, TraceException::kChannelIsNull);
 
     bool pass_on;
     std::shared_ptr<Event> event;
@@ -61,7 +61,7 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
          msg = co_await src_chan->Pop(resume_executor)) {
       event = msg.value();
-      throw_if_empty(event, event_is_null);
+      throw_if_empty(event, TraceException::kEventIsNull);
 
       pass_on = act_on(event);
       if (pass_on) {

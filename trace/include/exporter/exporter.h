@@ -154,7 +154,7 @@ class OtlpSpanExporter : public SpanExporter {
     auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
         opts);
     //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
-    throw_if_empty(exporter, span_exporter_null);
+    throw_if_empty(exporter, TraceException::kSpanExporterNull);
 
     // create span processor
     std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> processor = nullptr;
@@ -165,7 +165,7 @@ class OtlpSpanExporter : public SpanExporter {
     } else {
       processor = opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
     }
-    throw_if_empty(processor, span_processor_null);
+    throw_if_empty(processor, TraceException::kSpanProcessorNull);
 
     // create trace provider
     auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
@@ -174,7 +174,7 @@ class OtlpSpanExporter : public SpanExporter {
     auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
     const provider_t
         provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
-    throw_if_empty(provider, trace_provider_null);
+    throw_if_empty(provider, TraceException::kTraceProviderNull);
 
     // Set the global trace provider
     provider_.push_back(provider);
@@ -674,7 +674,8 @@ class OtlpSpanExporter : public SpanExporter {
           break;
         }
         default: {
-          throw_just("transform_HostCallSpan unexpected event: ", *action);
+          throw_just(std::source_location::current(),
+                     "transform_HostCallSpan unexpected event: ", *action);
         }
       }
 

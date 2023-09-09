@@ -79,8 +79,8 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
   
   concurrencpp::result<void> produce(std::shared_ptr<concurrencpp::executor> resume_executor,
                                      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
-    throw_if_empty(resume_executor, resume_executor_null);
-    throw_if_empty(tar_chan, channel_is_null);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(tar_chan, TraceException::kChannelIsNull);
 
     reader_buffer_.OpenFile(log_file_path_);
 
@@ -384,7 +384,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
         continue;
       }
 
-      throw_if_empty(event, event_is_null);
+      throw_if_empty(event, TraceException::kEventIsNull);
       co_await tar_chan->Push(resume_executor, event);
     }
 

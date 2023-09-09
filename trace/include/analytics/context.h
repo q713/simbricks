@@ -162,8 +162,8 @@ class Context {
 };
 
 inline std::shared_ptr<TraceContext> clone_shared(const std::shared_ptr<TraceContext> &other) {
-  throw_if_empty(other, context_is_null);
-  auto new_con = create_shared<TraceContext>(context_is_null, *other);
+  throw_if_empty(other, TraceException::kContextIsNull);
+  auto new_con = create_shared<TraceContext>(TraceException::kContextIsNull, *other);
   return new_con;
 }
 

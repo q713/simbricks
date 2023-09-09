@@ -117,7 +117,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
   //   }
   // }
 
-  throw_if_empty(pending_host_call_span_, span_is_null);
+  throw_if_empty(pending_host_call_span_, TraceException::kSpanIsNull);
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
     pci_write_before_ = trace_environment_.is_pci_write(event_ptr);
     co_return true;
@@ -257,7 +257,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
   // hence poll this context blocking!!
   //std::cout << name_ << " host try poll dma: " << *event_ptr << std::endl;
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
-  throw_on(not con_opt.has_value(), context_is_null);
+  throw_on(not con_opt.has_value(), TraceException::kContextIsNull);
   auto con = con_opt.value();
   //std::cout << name_ << " host polled dma" << std::endl;
   if (not is_expectation(con_opt.value(), expectation::kDma)) {
@@ -289,7 +289,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
 
   //std::cout << name_ << " host try poll msix" << std::endl;
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
-  throw_on(not con_opt.has_value(), context_is_null);
+  throw_on(not con_opt.has_value(), TraceException::kContextIsNull);
   auto con = con_opt.value();
   //std::cout << name_ << " host polled msix" << std::endl;
   if (not is_expectation(con, expectation::kMsix)) {
@@ -347,9 +347,9 @@ HostSpanner::HostSpanner(
       to_nic_queue_(std::move(to_nic)),
       from_nic_queue_(std::move(from_nic)),
       from_nic_receives_queue_(std::move(from_nic_receives)) {
-  throw_if_empty(to_nic_queue_, queue_is_null);
-  throw_if_empty(from_nic_queue_, queue_is_null);
-  throw_if_empty(from_nic_receives_queue_, queue_is_null);
+  throw_if_empty(to_nic_queue_, TraceException::kQueueIsNull);
+  throw_if_empty(from_nic_queue_, TraceException::kQueueIsNull);
+  throw_if_empty(from_nic_receives_queue_, TraceException::kQueueIsNull);
 
   auto handel_call = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelCall(std::move(resume_executor), event_ptr);

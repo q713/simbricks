@@ -29,8 +29,10 @@
 #include <memory>
 #include <unordered_map>
 #include <set>
+#include <utility>
 
 #include "sync/corobelt.h"
+#include "sync/channel.h"
 #include "events/events.h"
 #include "analytics/span.h"
 #include "analytics/trace.h"
@@ -38,7 +40,9 @@
 #include "exporter/exporter.h"
 #include "util/factory.h"
 #include "analytics/context.h"
+#include "util/exception.h"
 
+//template<size_t ExportBufferSize> requires SizeLagerZero<ExportBufferSize>
 class Tracer {
   std::recursive_mutex tracer_mutex_;
 
@@ -104,7 +108,7 @@ class Tracer {
     // NOTE: lock must be held when calling this method
 
     auto target_trace = GetTrace(trace_id);
-    throw_if_empty(target_trace, trace_is_null);
+    throw_if_empty(target_trace, TraceException::kTraceIsNull);
 
     target_trace->AddSpan(span_ptr);
   }
@@ -121,7 +125,7 @@ class Tracer {
 
   bool WasParentExported(std::shared_ptr<EventSpan> &child) {
     // NOTE: lock must be held when calling this method
-    assert(child and span_is_null);
+    assert(child and "span is null");
     auto parent = child->GetParent();
     if (not parent) { // no parent measn trace starting span
       return true;
@@ -132,7 +136,7 @@ class Tracer {
 
   void MarkSpanAsExported(std::shared_ptr<EventSpan> &span) {
     // NOTE: lock must be held when calling this method
-    assert(span and span_is_null);
+    assert(span and "span is null");
     const uint64_t ident = span->GetId();
     auto res_p = already_exported_spans_.insert(ident);
     throw_on(not res_p.second, "MarkSpanAsExported: could not insert value");
@@ -140,9 +144,9 @@ class Tracer {
 
   void MarkSpanAsWaitingForParent(std::shared_ptr<EventSpan> &span) {
     // NOTE: lock must be held when calling this method
-    assert(span and span_is_null);
+    assert(span and TraceException::kSpanIsNull);
     auto parent = span->GetParent();
-    assert(parent and span_is_null);
+    assert(parent and TraceException::kSpanIsNull);
     const uint64_t parent_id = parent->GetId();
     auto iter = waiting_list_.find(parent_id);
     if (iter != waiting_list_.end()) {
@@ -154,9 +158,28 @@ class Tracer {
     }
   }
 
+  // NOTE: shall only be used via 'RunExportJobInBackground'
+  // NOTE: This is an eager fire and forget task, as such,
+  //       the calling thread should and must not wait for
+  //       consuming any result;
+  concurrencpp::null_result ExportTask(std::shared_ptr<EventSpan> span_to_export) {
+    try {
+      exporter_.ExportSpan(std::move(span_to_export));
+    } catch (std::runtime_error &err) {
+      std::cerr << "error while trying to export a trace: " << err.what() << '\n';
+    }
+    co_return;
+  }
+
+  void RunExportJobInBackground(std::shared_ptr<EventSpan> span_to_export) {
+    // NOTE: lock must be held when calling this method
+    auto executor = trace_environment_.GetBackgroundPoolExecutor();
+    executor->submit(std::bind(&Tracer::ExportTask, this, std::move(span_to_export)));
+  }
+
   void ExportWaitingForParentVec(std::shared_ptr<EventSpan> &parent) {
     // NOTE: lock must be held when calling this method
-    assert(parent and span_is_null);
+    assert(parent and "span is null");
     const uint64_t parent_id = parent->GetId();
     auto iter = waiting_list_.find(parent_id);
     if (iter == waiting_list_.end()) {
@@ -164,7 +187,8 @@ class Tracer {
     }
     auto waiters = iter->second;
     for (auto &waiter : waiters) {
-      exporter_.ExportSpan(waiter);
+      //exporter_.ExportSpan(waiter); // TODO: use export queue vs. push job on normal thread pool / background executor
+      RunExportJobInBackground(waiter);
       ExportWaitingForParentVec(waiter);
       MarkSpanAsExported(waiter);
     }
@@ -233,7 +257,8 @@ class Tracer {
 
     if (WasParentExported(span)) {
       // TODO: make this run concurrently, either within exporter or within tracer
-      exporter_.ExportSpan(span);
+      //exporter_.ExportSpan(span); // TODO: use export queue vs. push job on normal thread pool / background executor
+      RunExportJobInBackground(span);
       ExportWaitingForParentVec(span);
       MarkSpanAsExported(span);
       return;
@@ -243,18 +268,18 @@ class Tracer {
   }
 
   void AddParentLazily(const std::shared_ptr<EventSpan> &span, std::shared_ptr<EventSpan> &parent_span) {
-    throw_if_empty(span, span_is_null);
-    throw_if_empty(parent_span, spanner_is_null);
+    throw_if_empty(span, TraceException::kSpanIsNull);
+    throw_if_empty(parent_span, TraceException::kSpanIsNull);
 
     auto parent_context = parent_span->GetContext();
-    throw_if_empty(parent_context, context_is_null);
+    throw_if_empty(parent_context, TraceException::kContextIsNull);
     auto parent_trace = GetTrace(parent_context->GetTraceId());
     auto new_trace_id = parent_context->GetTraceId();
 
     auto old_context = span->GetContext();
-    throw_if_empty(old_context, context_is_null);
+    throw_if_empty(old_context, TraceException::kContextIsNull);
     auto old_trace = GetTrace(old_context->GetTraceId());
-    throw_if_empty(old_trace, trace_is_null);
+    throw_if_empty(old_trace, TraceException::kTraceIsNull);
 
     old_context->SetTraceId(new_trace_id);
     old_context->SetParentSpan(parent_span);

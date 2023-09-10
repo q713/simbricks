@@ -499,13 +499,17 @@ class HostMmioR : public HostMmioOp {
 };
 
 class HostMmioW : public HostMmioOp {
+  bool posted_ = false;
+
  public:
+  bool IsPosted() const;
+
   explicit HostMmioW(uint64_t ts, const size_t parser_identifier,
                      const std::string parser_name, uint64_t id, uint64_t addr,
-                     size_t size, int bar, uint64_t offset)
+                     size_t size, int bar, uint64_t offset, bool posted)
       : HostMmioOp(ts, parser_identifier, parser_name,
                    EventType::kHostMmioWT, "HostMmioW", id, addr, size, bar,
-                   offset) {
+                   offset), posted_(posted) {
   }
 
   HostMmioW(const HostMmioW &other) = default;

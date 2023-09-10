@@ -44,7 +44,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
   ReaderBuffer<10> reader_buffer_;
 
   static bool ParseIdentNameTs(LineHandler &line_handler, size_t &parser_ident,
-                        std::string &parser_name, uint64_t &ts) {
+                               std::string &parser_name, uint64_t &ts) {
     if (not line_handler.ConsumeAndTrimString(": source_id=") or
         not line_handler.ParseUintTrim(10, parser_ident)) {
       return false;
@@ -76,7 +76,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
         log_file_path_(log_file_path),
         reader_buffer_(name_, true) {
   }
-  
+
   concurrencpp::result<void> produce(std::shared_ptr<concurrencpp::executor> resume_executor,
                                      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
     throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
@@ -207,8 +207,13 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
           }
 
           if (event_name == "HostMmioW") {
+            if (not line_handler.ConsumeAndTrimString(", posted=") or
+                not line_handler.ParseBoolFromStringRepr(posted)) {
+              std::cout << "error parsing HostMmioW posted" << '\n';
+              continue;
+            }
             event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name,
-                                                id, addr, size, bar, offset);
+                                                id, addr, size, bar, offset, posted);
           } else {
             event = std::make_shared<HostMmioR>(ts, parser_ident, parser_name,
                                                 id, addr, size, bar, offset);
@@ -343,9 +348,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
             not line_handler.ConsumeAndTrimString(", len=") or
             not line_handler.ParseUintTrim(16, len) or
             not line_handler.ConsumeAndTrimString(", val=") or
-            not line_handler.ParseUintTrim(16, val) or
-            not line_handler.ConsumeAndTrimString(", posted=") or
-            not line_handler.ParseBoolFromStringRepr(posted)) {
+            not line_handler.ParseUintTrim(16, val)) {
           std::cout << "error parsing NicMmioR or NicMmioW: "
                     << line_handler.GetRawLine() << '\n';
           continue;
@@ -355,6 +358,12 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
           event = std::make_shared<NicMmioR>(ts, parser_ident, parser_name,
                                              offset, len, val);
         } else {
+          if (not line_handler.ConsumeAndTrimString(", posted=") or
+              not line_handler.ParseBoolFromStringRepr(posted)) {
+            std::cout << "error parsing NicMmioW: "
+                      << line_handler.GetRawLine() << '\n';
+            continue;
+          }
           event = std::make_shared<NicMmioW>(ts, parser_ident, parser_name,
                                              offset, len, val, posted);
         }

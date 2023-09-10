@@ -166,6 +166,7 @@ Gem5Parser::ParseSystemPcSimbricks(LineHandler &line_handler, uint64_t timestamp
 
   uint64_t dev, func, reg, bytes, data, offset;
   int bar;
+  bool posted;
   const bool is_read_conf = line_handler.ConsumeAndTrimString("readConfig:");
   if (is_read_conf || line_handler.ConsumeAndTrimString("writeConfig:")) {
     line_handler.TrimL();
@@ -261,9 +262,12 @@ Gem5Parser::ParseSystemPcSimbricks(LineHandler &line_handler, uint64_t timestamp
                                              GetName(),
                                              id, addr, size, bar, offset);
         } else {
-          return std::make_shared<HostMmioW>(timestamp, GetIdent(),
-                                             GetName(),
-                                             id, addr, size, bar, offset);
+          if (line_handler.ConsumeAndTrimString(" posted ") &&
+              line_handler.ParseBoolFromInt(posted)) {
+            return std::make_shared<HostMmioW>(timestamp, GetIdent(),
+                                               GetName(),
+                                               id, addr, size, bar, offset, posted);
+          }
         }
       }
     } else if (line_handler.ConsumeAndTrimString("completed DMA id ") &&

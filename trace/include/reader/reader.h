@@ -124,6 +124,8 @@ class LineHandler {
   bool ParseBoolFromUint(int base, bool &target);
 
   bool ParseBoolFromStringRepr(bool &target);
+
+  bool ParseBoolFromInt(bool &target);
 };
 
 template<size_t BufferSize> requires SizeLagerZero<BufferSize>

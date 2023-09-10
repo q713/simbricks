@@ -234,3 +234,12 @@ bool LineHandler::ParseBoolFromStringRepr(bool &target) {
   }
   return false;
 }
+
+bool LineHandler::ParseBoolFromInt(bool &target) {
+  int value;
+  if (not ParseInt(value)) {
+    return false;
+  }
+  target = value != 0;
+  return true;
+}

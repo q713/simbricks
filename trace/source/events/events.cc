@@ -180,12 +180,21 @@ bool HostMmioR::Equal(const Event &other) {
   return HostMmioOp::Equal(other);
 }
 
+bool HostMmioW::IsPosted() const {
+  return posted_;
+}
+
 void HostMmioW::Display(std::ostream &out) {
   HostMmioOp::Display(out);
+  out << ", posted=" << BoolToString(posted_);
 }
 
 bool HostMmioW::Equal(const Event &other) {
-  return HostMmioOp::Equal(other);
+  const HostMmioW *mmiow = dynamic_cast<const HostMmioW *>(&other);
+  if (not mmiow) {
+    return false;
+  }
+  return posted_ == mmiow->IsPosted() and HostMmioOp::Equal(other);
 }
 
 void HostDmaC::Display(std::ostream &out) {

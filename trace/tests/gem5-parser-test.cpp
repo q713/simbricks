@@ -61,7 +61,25 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
       std::make_shared<HostMmioR>(1869693118999,
                                   gem5->GetIdent(), parser_name, 94469181196688, 0xc0080300, 4, 0, 0x80300),
       std::make_shared<HostMmioR>(1869699347625, gem5->GetIdent(), parser_name, 94469181901728, 0xc040000c, 4, 3, 0xc),
-      std::make_shared<HostMmioR>(1869699662249, gem5->GetIdent(), parser_name, 94469181901920, 0xc040001c, 4, 3, 0x1c)
+      std::make_shared<HostMmioR>(1869699662249, gem5->GetIdent(), parser_name, 94469181901920, 0xc040001c, 4, 3, 0x1c),
+      std::make_shared<HostMmioW>(1967474400999,
+                                  gem5->GetIdent(),
+                                  parser_name,
+                                  94469376954304,
+                                  0xc0400010,
+                                  4,
+                                  0,
+                                  0,
+                                  true),
+      std::make_shared<HostMmioW>(1967474526999,
+                                  gem5->GetIdent(),
+                                  parser_name,
+                                  94469376954304,
+                                  0xc0400014,
+                                  4,
+                                  0,
+                                  0,
+                                  false),
   };
 
   std::pair<bool, LineHandler *> bh_p;

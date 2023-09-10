@@ -63,7 +63,7 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
     */
   SECTION("normal mmio write") {
     auto mmio_w = std::make_shared<HostMmioW>(1967468841374, parser_ident,
-                                              parser_name, 94469376773312, 108000, 4, 0, 0);
+                                              parser_name, 94469376773312, 108000, 4, 0, 0, true);
     auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967468841374, parser_ident, parser_name);
     auto mmio_cw = std::make_shared<HostMmioCW>(1967469841374, parser_ident, parser_name, 94469376773312);
 
@@ -87,7 +87,7 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
      */
   SECTION("mmio write cannot add additional read") {
     auto mmio_w = std::make_shared<HostMmioW>(1967473406749, parser_ident,
-                                              parser_name, 94469376953344, 40001, 4, 0, 0);
+                                              parser_name, 94469376953344, 40001, 4, 0, 0, true);
     auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967473406749, parser_ident, parser_name);
     auto mmio_r = std::make_shared<HostMmioR>(1967473531624, parser_ident,
                                               parser_name, 94469376953344, 40000, 4, 0, 0);
@@ -104,7 +104,7 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
 
   SECTION("mmio write non device BAR number") {
     auto mmio_w = std::make_shared<HostMmioW>(1967473406749, parser_ident,
-                                              parser_name, 94469376953344, 40001, 4, 3, 0);
+                                              parser_name, 94469376953344, 40001, 4, 3, 0, true);
     auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967473406749, parser_ident, parser_name);
 
     HostMmioSpan span{trace_environment, trace_context, source_id, service_name, 3};

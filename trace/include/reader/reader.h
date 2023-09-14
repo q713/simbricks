@@ -239,17 +239,19 @@ class ReaderBuffer {
 
   void OpenFile(const std::string &file_path, bool is_named_pipe = false) {
     if (!std::filesystem::exists(file_path)) {
-      throw_just(std::source_location::current(),
+      throw_just(source_loc::current(),
                  "ReaderBuffer: the file path'", file_path, "' does not exist");
     }
-    throw_on(input_stream_.is_open(), "ReaderBuffer:OpenFile: already opened file to read");
-    throw_on(file_, "ReaderBuffer:OpenFile: already opened file to read");
+    throw_on(input_stream_.is_open(), "ReaderBuffer:OpenFile: already opened file to read",
+             source_loc::current());
+    throw_on(file_, "ReaderBuffer:OpenFile: already opened file to read",
+             source_loc::current());
 
     if (is_named_pipe) {
       file_ = fopen(file_path.c_str(), "r");
-      throw_if_empty(file_, "ReaderBuffer: could not open file path");
+      throw_if_empty(file_, "ReaderBuffer: could not open file path", source_loc::current());
       const int fd = fileno(file_);
-      throw_on(fd == -1, "ReaderBuffer: could not obtain fd");
+      throw_on(fd == -1, "ReaderBuffer: could not obtain fd", source_loc::current());
       const int suc = fcntl(fd, F_SETPIPE_SZ, kBufSize);
       if (suc != kBufSize) {
         std::cout << "ReaderBuffer: could not change '" << file_path << "' size to " << kBufSize << '\n';
@@ -260,16 +262,17 @@ class ReaderBuffer {
 
     input_stream_ = std::ifstream(file_path);
     if (not input_stream_.is_open()) {
-      throw_just(std::source_location::current(),
+      throw_just(source_loc::current(),
                  "ReaderBuffer: could not open file path'", file_path, "'");
     }
     if (not input_stream_.good()) {
-      throw_just(std::source_location::current(),
+      throw_just(source_loc::current(),
                  "ReaderBuffer: the input stream of the file regarding file path'",
                  file_path, "' is not good");
     }
     istream_buffer_ = new char[kBufSize];
-    throw_on(not istream_buffer_, "ReaderBuffer: could not create istream buffer");
+    throw_on(not istream_buffer_, "ReaderBuffer: could not create istream buffer",
+             source_loc::current());
     input_stream_.rdbuf()->pubsetbuf(istream_buffer_, kBufSize);
   }
 

@@ -38,8 +38,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
 
   //std::cout << name_ << " nic try poll mmio" << std::endl;
   auto con_opt = co_await from_host_queue_->Pop(resume_executor);
-  auto con = OrElseThrow(con_opt, TraceException::kContextIsNull);
-  throw_if_empty(con, TraceException::kContextIsNull);
+  auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
+  throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
   //std::cout << name_ << " nic polled mmio" << std::endl;
   if (not is_expectation(con, expectation::kMmio)) {
     std::cerr << "nic_spanner: could not poll mmio context" << '\n';
@@ -77,7 +77,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
       auto context = create_shared<Context>(
           "HandelDma could not create context", expectation::kDma, pending_dma);
       throw_on(not co_await to_host_queue_->Push(resume_executor, context),
-               TraceException::kCouldNotPushToContextQueue);
+               TraceException::kCouldNotPushToContextQueue,
+               source_loc::current());
       //std::cout << name_ << " nic pushed dma" << std::endl;
     }
 
@@ -134,7 +135,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     auto context = create_shared<Context>(
         "HandelTxrx: could not create context", expectation::kRx, eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
-             "HandelTxrx: could not write network context ");
+             "HandelTxrx: could not write network context ",
+             source_loc::current());
     //std::cout << name_
     //          << " NicSpanner::HandelTxrx: pushed tx context to other side"
     //          << std::endl;
@@ -145,9 +147,9 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     auto con_opt = co_await from_network_queue_->Pop(resume_executor);
     // std::cout << name_ << " NicSpanner::HandelTxrx: pulled tx context from
     // other side" << std::endl;
-    auto con = OrElseThrow(con_opt, TraceException::kContextIsNull);
+    auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(con, expectation::kRx),
-             "nic_spanner: received non kRx context");
+             "nic_spanner: received non kRx context", source_loc::current());
 
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent(),
@@ -160,7 +162,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
         eth_span);
     throw_on(
         not co_await to_host_receives_->Push(resume_executor, receive_context),
-        "NicSpanner::HandelTxrx: could not write host receive context ");
+        "NicSpanner::HandelTxrx: could not write host receive context ",
+        source_loc::current());
     //std::cout << name_ << " nic pushed receive update." << std::endl;
 
   } else {
@@ -194,7 +197,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
   auto context = create_shared<Context>("HandelMsix could not create context",
                                         expectation::kMsix, msix_span);
   throw_on(not co_await to_host_queue_->Push(resume_executor, context),
-           TraceException::kCouldNotPushToContextQueue);
+           TraceException::kCouldNotPushToContextQueue,
+           source_loc::current());
   //std::cout << name_ << " nic pushed msix" << std::endl;
 
   co_return true;
@@ -216,11 +220,11 @@ NicSpanner::NicSpanner(
       to_host_queue_(std::move(to_host)),
       from_host_queue_(std::move(from_host)),
       to_host_receives_(std::move(to_host_receives)) {
-  throw_if_empty(to_network_queue_, TraceException::kQueueIsNull);
-  throw_if_empty(from_network_queue_, TraceException::kQueueIsNull);
-  throw_if_empty(to_host_queue_, TraceException::kQueueIsNull);
-  throw_if_empty(from_host_queue_, TraceException::kQueueIsNull);
-  throw_if_empty(to_host_receives_, TraceException::kQueueIsNull);
+  throw_if_empty(to_network_queue_, TraceException::kQueueIsNull, source_loc::current());
+  throw_if_empty(from_network_queue_, TraceException::kQueueIsNull, source_loc::current());
+  throw_if_empty(to_host_queue_, TraceException::kQueueIsNull, source_loc::current());
+  throw_if_empty(from_host_queue_, TraceException::kQueueIsNull, source_loc::current());
+  throw_if_empty(to_host_receives_, TraceException::kQueueIsNull, source_loc::current());
 
   auto handel_mmio = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelMmio(std::move(resume_executor), event_ptr);

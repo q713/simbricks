@@ -63,7 +63,8 @@ class Tracer {
   void InsertTrace(std::shared_ptr<Trace> &new_trace) {
     // NOTE: the lock must be held when calling this method
     auto iter = traces_.insert({new_trace->GetId(), new_trace});
-    throw_on(not iter.second, "could not insert trace into traces map");
+    throw_on(not iter.second, "could not insert trace into traces map",
+             source_loc::current());
   }
 
   std::shared_ptr<Trace> GetTrace(uint64_t trace_id) {
@@ -79,19 +80,22 @@ class Tracer {
   void InsertContext(std::shared_ptr<TraceContext> &trace_context) {
     // NOTE: the lock must be held when calling this method
     auto iter = contexts_.insert({trace_context->GetId(), trace_context});
-    throw_on(not iter.second, "could not insert context into contexts map");
+    throw_on(not iter.second, "could not insert context into contexts map",
+             source_loc::current());
   }
 
   void RemoveContext(uint64_t context_id) {
     // NOTE: lock must be held when calling this method
     const size_t amount_removed = contexts_.erase(context_id);
-    throw_on(amount_removed == 0, "RemoveContext: nothing was removed");
+    throw_on(amount_removed == 0, "RemoveContext: nothing was removed",
+             source_loc::current());
   }
 
   void RemoveTrace(uint64_t trace_id) {
     // NOTE: lock must be held when calling this method
     const size_t amount_removed = traces_.erase(trace_id);
-    throw_on(amount_removed == 0, "RemoveTrace: nothing was removed");
+    throw_on(amount_removed == 0, "RemoveTrace: nothing was removed",
+             source_loc::current());
   }
 
   std::shared_ptr<TraceContext> GetContext(uint64_t trace_context_id) {
@@ -108,7 +112,7 @@ class Tracer {
     // NOTE: lock must be held when calling this method
 
     auto target_trace = GetTrace(trace_id);
-    throw_if_empty(target_trace, TraceException::kTraceIsNull);
+    throw_if_empty(target_trace, TraceException::kTraceIsNull, source_loc::current());
 
     target_trace->AddSpan(span_ptr);
   }
@@ -139,14 +143,15 @@ class Tracer {
     assert(span and "span is null");
     const uint64_t ident = span->GetId();
     auto res_p = already_exported_spans_.insert(ident);
-    throw_on(not res_p.second, "MarkSpanAsExported: could not insert value");
+    throw_on(not res_p.second, "MarkSpanAsExported: could not insert value",
+             source_loc::current());
   }
 
   void MarkSpanAsWaitingForParent(std::shared_ptr<EventSpan> &span) {
     // NOTE: lock must be held when calling this method
-    assert(span and TraceException::kSpanIsNull);
+    assert(span);
     auto parent = span->GetParent();
-    assert(parent and TraceException::kSpanIsNull);
+    assert(parent);
     const uint64_t parent_id = parent->GetId();
     auto iter = waiting_list_.find(parent_id);
     if (iter != waiting_list_.end()) {
@@ -154,7 +159,8 @@ class Tracer {
       wait_vec.push_back(span);
     } else {
       auto res_p = waiting_list_.insert({parent_id, {span}});
-      throw_on(not res_p.second, "MarkSpanAsWaitingForParent: could not insert value");
+      throw_on(not res_p.second, "MarkSpanAsWaitingForParent: could not insert value",
+               source_loc::current());
     }
   }
 
@@ -211,7 +217,8 @@ class Tracer {
         "StartSpanByParentInternal(...) could not create a new span",
         trace_environment_, trace_context, args...);
     const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
-    throw_on(not was_added, "StartSpanByParentInternal(...) could not add first event");
+    throw_on(not was_added, "StartSpanByParentInternal(...) could not add first event",
+             source_loc::current());
 
     // must add span to trace manually
     AddSpanToTrace(trace_id, new_span);
@@ -232,7 +239,8 @@ class Tracer {
         "StartSpanInternal(...) could not create a new span",
         trace_environment_, trace_context, args...);
     const bool was_added = std::static_pointer_cast<EventSpan>(new_span)->AddToSpan(starting_event);
-    throw_on(not was_added, "StartSpanInternal(...) could not add first event");
+    throw_on(not was_added, "StartSpanInternal(...) could not add first event",
+             source_loc::current());
 
     // TODO: not needed
     auto new_trace = create_shared<Trace>(
@@ -247,13 +255,13 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    throw_if_empty(span, "MarkSpanAsDone, span is null");
+    throw_if_empty(span, "MarkSpanAsDone, span is null", source_loc::current());
     auto context = span->GetContext();
-    throw_if_empty(context, "MarkSpanAsDone context is null");
+    throw_if_empty(context, "MarkSpanAsDone context is null", source_loc::current());
     const uint64_t trace_id = context->GetTraceId();
 
     auto trace = GetTrace(trace_id);
-    throw_if_empty(trace, "MarkSpanAsDone trace is null");
+    throw_if_empty(trace, "MarkSpanAsDone trace is null", source_loc::current());
 
     if (WasParentExported(span)) {
       // TODO: make this run concurrently, either within exporter or within tracer
@@ -268,18 +276,18 @@ class Tracer {
   }
 
   void AddParentLazily(const std::shared_ptr<EventSpan> &span, std::shared_ptr<EventSpan> &parent_span) {
-    throw_if_empty(span, TraceException::kSpanIsNull);
-    throw_if_empty(parent_span, TraceException::kSpanIsNull);
+    throw_if_empty(span, TraceException::kSpanIsNull, source_loc::current());
+    throw_if_empty(parent_span, TraceException::kSpanIsNull, source_loc::current());
 
     auto parent_context = parent_span->GetContext();
-    throw_if_empty(parent_context, TraceException::kContextIsNull);
+    throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
     auto parent_trace = GetTrace(parent_context->GetTraceId());
     auto new_trace_id = parent_context->GetTraceId();
 
     auto old_context = span->GetContext();
-    throw_if_empty(old_context, TraceException::kContextIsNull);
+    throw_if_empty(old_context, TraceException::kContextIsNull, source_loc::current());
     auto old_trace = GetTrace(old_context->GetTraceId());
-    throw_if_empty(old_trace, TraceException::kTraceIsNull);
+    throw_if_empty(old_trace, TraceException::kTraceIsNull, source_loc::current());
 
     old_context->SetTraceId(new_trace_id);
     old_context->SetParentSpan(parent_span);
@@ -305,12 +313,14 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    throw_if_empty(starting_event, "StartSpanByParent(...) starting_event is null");
+    throw_if_empty(starting_event, "StartSpanByParent(...) starting_event is null",
+                   source_loc::current());
     std::shared_ptr<SpanType> new_span;
 
     if (parent_span) {
       throw_if_empty(parent_span->GetContext(),
-                     "StartSpanByParent(...) parent context is null");
+                     "StartSpanByParent(...) parent context is null",
+                     source_loc::current());
       new_span = StartSpanByParentInternal<SpanType, Args...>(
           parent_span, starting_event, std::forward<Args>(args)...);
     } else {
@@ -332,7 +342,8 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    throw_if_empty(starting_event, "StartSpan(...) starting_event is null");
+    throw_if_empty(starting_event, "StartSpan(...) starting_event is null",
+                   source_loc::current());
     std::shared_ptr<SpanType> new_span = nullptr;
     new_span = StartSpanInternal<SpanType, Args...>(starting_event, std::forward<Args>(args)...);
     assert(new_span);
@@ -344,9 +355,10 @@ class Tracer {
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    throw_if_empty(parent_span, "StartSpan(...) parent span is null");
+    throw_if_empty(parent_span, "StartSpan(...) parent span is null", source_loc::current());
     auto parent_context = parent_span->GetContext();
-    throw_if_empty(parent_context, "StartSpan(...) parent context is null");
+    throw_if_empty(parent_context, "StartSpan(...) parent context is null",
+                   source_loc::current());
     const uint64_t trace_id = parent_context->GetTraceId();
 
     auto trace_context = RegisterCreateContext(trace_id, parent_span);

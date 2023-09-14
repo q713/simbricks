@@ -86,42 +86,30 @@ template<typename ValueType>
 inline concurrencpp::result<void> run_pipeline_impl(
     std::shared_ptr<concurrencpp::executor> executor,
     pipeline<ValueType> &pipeline) {
-  throw_if_empty(executor, TraceException::kResumeExecutorNull);
+  throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
 
   const size_t amount_channels = pipeline.pipes_.size() + 1;
   std::vector<std::shared_ptr<CoroChannel<ValueType>>> channels{amount_channels};
   std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
-  //std::vector<concurrencpp::result<concurrencpp::result<void>>> tasks{amount_channels + 1};
   channels[0] = create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
-  throw_if_empty(pipeline.prod_, TraceException::kProducerIsNull);
-  //tasks[0] = executor->submit([&](std::shared_ptr<Channel<ValueType>> tar) {
-  //  return pipeline.prod_->produce(executor, tar);
-  //}, channels[0]);
+  throw_if_empty(pipeline.prod_, TraceException::kProducerIsNull, source_loc::current());
   tasks[0] = pipeline.prod_->produce(executor, channels[0]);
 
   for (size_t index = 0; index < pipeline.pipes_.size(); index++) {
     auto &pipe = pipeline.pipes_[index];
-    throw_if_empty(pipe, TraceException::kPipeIsNull);
+    throw_if_empty(pipe, TraceException::kPipeIsNull, source_loc::current());
 
     channels[index + 1] =
         create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
-
-    //tasks[index + 1] = executor->submit([&](std::shared_ptr<Channel<ValueType>> src,
-    //                                        std::shared_ptr<Channel<ValueType>> tar) {
-    //  return pipe->process(executor, src, tar);
-    //}, channels[index], channels[index + 1]);
     tasks[index + 1] =
         pipe->process(executor, channels[index], channels[index + 1]);
   }
-  throw_if_empty(pipeline.cons_, TraceException::kConsumerIsNull);
-  //tasks[amount_channels] = executor->submit([&](std::shared_ptr<Channel<ValueType>> src) {
-  //  return pipeline.cons_->consume(executor, src);
-  //}, channels[amount_channels - 1]);
+
+  throw_if_empty(pipeline.cons_, TraceException::kConsumerIsNull, source_loc::current());
   tasks[amount_channels] =
       pipeline.cons_->consume(executor, channels[amount_channels - 1]);
 
   for (size_t index = 0; index < amount_channels; index++) {
-    //co_await co_await tasks[index];
     co_await tasks[index];
     co_await channels[index]->CloseChannel(executor);
   }
@@ -161,6 +149,7 @@ inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
   } catch (TraceException &exe) {
     std::cerr << exe.what() << '\n';
     executor->shutdown();
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -192,6 +181,7 @@ inline void run_pipelines(std::shared_ptr<concurrencpp::executor> executor,
   } catch (TraceException &exe) {
     std::cerr << exe.what() << '\n';
     executor->shutdown();
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -199,7 +189,7 @@ template<typename ValueType>
 inline void run_pipelines_parallel(
     std::shared_ptr<concurrencpp::executor> executor,
     std::vector<pipeline<ValueType>> &pipelines) {
-  throw_if_empty(executor, TraceException::kResumeExecutorNull);
+  throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
   size_t amount_tasks = pipelines.size();
   //std::vector<concurrencpp::result<concurrencpp::result<void>>> pipelns{
   //    amount_tasks};
@@ -220,6 +210,7 @@ inline void run_pipelines_parallel(
   } catch (TraceException &exe) {
     std::cerr << exe.what() << '\n';
     executor->shutdown();
+    exit(EXIT_FAILURE);
   }
 
   std::cout << "all pipelines finished" << '\n';

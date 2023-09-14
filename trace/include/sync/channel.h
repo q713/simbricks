@@ -288,7 +288,8 @@ class CoroChannel {
   concurrencpp::result<void> CloseChannel(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
     {
       concurrencpp::scoped_async_lock guard =
           co_await channel_lock_.lock(resume_executor);
@@ -301,7 +302,8 @@ class CoroChannel {
   concurrencpp::result<void> PoisenChannel(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
     {
       concurrencpp::scoped_async_lock guard =
           co_await channel_lock_.lock(resume_executor);
@@ -412,7 +414,8 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
     {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
@@ -439,7 +442,8 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
     {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
@@ -461,7 +465,8 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
 
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
@@ -492,7 +497,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
 
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
@@ -520,7 +525,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::function<bool(ValueType &)> &predicate) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
 
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
@@ -588,7 +593,8 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
     {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
@@ -612,7 +618,8 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
     this->channel_cv_.notify_all();
     co_return co_await Push(resume_executor, std::move(value));
   }
@@ -621,7 +628,8 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
   concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
 
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
@@ -654,7 +662,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
 
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);
@@ -678,7 +686,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
   concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::function<bool(ValueType &)> &predicate) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
 
     concurrencpp::scoped_async_lock guard =
         co_await this->channel_lock_.lock(resume_executor);

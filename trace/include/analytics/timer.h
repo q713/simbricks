@@ -120,7 +120,8 @@ class WeakTimer {
   explicit WeakTimer(size_t amount_waiters) : amount_waiters_(amount_waiters),
                                               still_needed_waiters_(amount_waiters) {
     throw_on(amount_waiters < 2,
-             "WeakTimer: must use more than one waiter, otherwise the timer is useless");
+             "WeakTimer: must use more than one waiter, otherwise the timer is useless",
+             source_loc::current());
     waiters_.resize(amount_waiters);
   };
 
@@ -129,7 +130,9 @@ class WeakTimer {
     bool last_to_register;
     {
       concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
-      throw_on(registered_ >= amount_waiters_, "Timer::Register: already AmountWaiters many waiters registered");
+      throw_on(registered_ >= amount_waiters_,
+               "Timer::Register: already AmountWaiters many waiters registered",
+               source_loc::current());
       ++registered_;
       key = next_key_++;
       waiters_[key] = UINT64_MAX;
@@ -159,7 +162,9 @@ class WeakTimer {
   VoidResT MoveForward(ExecutorT resume_executor, size_t key, uint64_t timestamp) {
     {
       concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
-      throw_on(key >= amount_waiters_, "Timer::Register: try moving forward with illegal key");
+      throw_on(key >= amount_waiters_,
+               "Timer::Register: try moving forward with illegal key",
+               source_loc::current());
 
       // wait for all waiters to at least register
       //co_await timer_cv_.await(resume_executor, guard, [this]() {
@@ -167,7 +172,9 @@ class WeakTimer {
       //});
       if (not active_waiters_.contains(key)) {
         const auto marked_active = active_waiters_.insert(key);
-        throw_on(not marked_active.second, "WeakTimer::MoveForward: could not mark waiter as active");
+        throw_on(not marked_active.second,
+                 "WeakTimer::MoveForward: could not mark waiter as active",
+                 source_loc::current());
       }
       waiters_[key] = timestamp;
       // move forward if smaller than the current minimum/when being in the past

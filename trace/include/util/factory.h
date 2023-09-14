@@ -29,44 +29,65 @@
 #define SIMBRICKS_TRACE_INCLUDE_UTIL_FACTORY_H_
 
 template<class T, typename ...Args>
-std::shared_ptr<T> create_shared(const char* error_msg, Args&&... args) {
+std::shared_ptr<T> create_shared(const char *error_msg, Args &&... args) {
   auto result = std::make_shared<T>(std::forward<Args>(args)...);
-  throw_if_empty(result, error_msg);
+  throw_if_empty(result, error_msg, source_loc::current());
+  return result;
+}
+
+template<class T, typename ...Args>
+std::shared_ptr<T> create_shared(const std::string &error_msg, Args &&... args) {
+  auto result = std::make_shared<T>(std::forward<Args>(args)...);
+  throw_if_empty(result, error_msg, source_loc::current());
   return result;
 }
 
 template<typename T>
-std::shared_ptr<T> copy_shared(const char* error_msg, std::shared_ptr<T> &other) {
+std::shared_ptr<T> copy_shared(const char *error_msg, std::shared_ptr<T> &other) {
   auto result = std::make_shared<T>(*other);
-  throw_if_empty(result, error_msg);
+  throw_if_empty(result, error_msg, source_loc::current());
   return result;
 }
 
 template<class T, typename ...Args>
-std::shared_ptr<T> create_unique(const char* error_msg, Args&&... args) {
+std::shared_ptr<T> create_unique(const char *error_msg, Args &&... args) {
   auto result = std::make_unique<T>(std::forward<Args>(args)...);
-  throw_if_empty(result, error_msg);
-  return result;
-}
-
-template<typename T>
-std::unique_ptr<T> copy_unique(const char* error_msg, std::unique_ptr<T> &other) {
-  auto result = std::make_unique<T>(*other);
-  throw_if_empty(result, error_msg);
+  throw_if_empty(result, error_msg, source_loc::current());
   return result;
 }
 
 template<class T, typename ...Args>
-T* create_raw(const char* error_msg, Args&&... args) {
-  auto result = new T(std::forward<Args>(args)...);
-  throw_if_empty(result, error_msg);
+std::shared_ptr<T> create_unique(const std::string &error_msg, Args &&... args) {
+  auto result = std::make_unique<T>(std::forward<Args>(args)...);
+  throw_if_empty(result, error_msg, source_loc::current());
   return result;
 }
 
 template<typename T>
-T* copy_raw(const char* error_msg, T* other) {
+std::unique_ptr<T> copy_unique(const char *error_msg, std::unique_ptr<T> &other) {
+  auto result = std::make_unique<T>(*other);
+  throw_if_empty(result, error_msg, source_loc::current());
+  return result;
+}
+
+template<class T, typename ...Args>
+T *create_raw(const char *error_msg, Args &&... args) {
+  auto result = new T(std::forward<Args>(args)...);
+  throw_if_empty(result, error_msg, source_loc::current());
+  return result;
+}
+
+template<class T, typename ...Args>
+T *create_raw(const std::string &error_msg, Args &&... args) {
+  auto result = new T(std::forward<Args>(args)...);
+  throw_if_empty(result, error_msg, source_loc::current());
+  return result;
+}
+
+template<typename T>
+T *copy_raw(const char *error_msg, T *other) {
   auto result = new T(*other);
-  throw_if_empty(result, error_msg);
+  throw_if_empty(result, error_msg, source_loc::current());
   return result;
 }
 

@@ -150,7 +150,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
       }
 
       const bool could_push = event_buffer_channel_.Push(event_ptr);
-      throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel");
+      throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel",
+               source_loc::current());
     }
 
     event_buffer_channel_.CloseChannel();
@@ -175,8 +176,10 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   concurrencpp::result<void>
   produce(std::shared_ptr<concurrencpp::executor> resume_executor,
           std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
-    throw_if_empty(resume_executor, "BufferedEventProvider::process: resume executor is null");
-    throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null");
+    throw_if_empty(resume_executor, "BufferedEventProvider::process: resume executor is null",
+                   source_loc::current());
+    throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null",
+                   source_loc::current());
 
     concurrencpp::result<concurrencpp::result<void>>
         producer_task = trace_environment_.GetThreadExecutor()->submit([&]() {
@@ -196,7 +199,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
       const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);
       throw_on(not could_push,
-               "BufferedEventProvider::process: unable to push next event to target channel");
+               "BufferedEventProvider::process: unable to push next event to target channel",
+               source_loc::current());
     }
 
     co_await timer_.Done(resume_executor, timer_key);

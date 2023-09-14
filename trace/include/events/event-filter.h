@@ -51,9 +51,9 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan)
   override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
-    throw_if_empty(tar_chan, TraceException::kChannelIsNull);
-    throw_if_empty(src_chan, TraceException::kChannelIsNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
+    throw_if_empty(tar_chan, TraceException::kChannelIsNull, source_loc::current());
+    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     bool pass_on;
     std::shared_ptr<Event> event;
@@ -61,7 +61,7 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
          msg = co_await src_chan->Pop(resume_executor)) {
       event = msg.value();
-      throw_if_empty(event, TraceException::kEventIsNull);
+      throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
 
       pass_on = act_on(event);
       if (pass_on) {
@@ -70,7 +70,6 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
     }
 
     co_await tar_chan->CloseChannel(resume_executor);
-    std::cout << "event actor exited" << '\n';
 
     co_return;
   }
@@ -97,30 +96,25 @@ class GenericEventFilter : public EventStreamActor {
 };
 
 class EventTypeFilter : public EventStreamActor {
-  std::set<EventType> &types_to_filter_;
+  const std::set<EventType> &types_to_filter_;
   bool inverted_;
 
  public:
-  bool act_on(std::shared_ptr<Event> &event) override {
-    auto search = types_to_filter_.find(event->GetType());
-    const bool is_to_sink = inverted_ ? search == types_to_filter_.end()
-                                      : search != types_to_filter_.end();
-    return is_to_sink;
+  virtual bool act_on(std::shared_ptr<Event> &event) override {
+    const EventType type = event->GetType();
+    if (inverted_) {
+      return not types_to_filter_.contains(type);
+    }
+
+    return types_to_filter_.contains(type);
   }
 
   explicit EventTypeFilter(TraceEnvironment &trace_environment,
-                           std::set<EventType> &types_to_filter,
-                           bool invert_filter)
+                           const std::set<EventType> &types_to_filter,
+                           bool invert_filter = false)
       : EventStreamActor(trace_environment),
         types_to_filter_(types_to_filter),
         inverted_(invert_filter) {
-  }
-
-  explicit EventTypeFilter(TraceEnvironment &trace_environment,
-                           std::set<EventType> &types_to_filter)
-      : EventStreamActor(trace_environment),
-        types_to_filter_(types_to_filter),
-        inverted_(false) {
   }
 };
 

@@ -51,7 +51,29 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
 
     REQUIRE(span.IsPending());
     REQUIRE(span.AddToSpan(mmio_r));
+    REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
     REQUIRE(span.AddToSpan(mmio_cr));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
+  }
+
+    /*
+      HostMmioW: source_id=0, source_name=Gem5ClientParser, timestamp=1967468841374, id=94469376773312, addr=c0108000, size=4, bar=0, offset=0
+      HostMmioCW: source_id=0, source_name=Gem5ClientParser, timestamp=1967469841374, id=94469376773312
+      */
+  SECTION("normal mmio write") {
+    auto mmio_w = std::make_shared<HostMmioW>(1967468841374, parser_ident,
+                                              parser_name, 94469376773312, 108000, 4, 0, 0, true);
+    auto mmio_cw = std::make_shared<HostMmioCW>(1967469841374, parser_ident, parser_name, 94469376773312);
+
+    HostMmioSpan span{trace_environment, trace_context, source_id, service_name, 0};
+
+    REQUIRE(span.IsPending());
+    REQUIRE(span.AddToSpan(mmio_w));
+    REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.AddToSpan(mmio_cw));
     REQUIRE(span.IsComplete());
     REQUIRE_FALSE(span.IsPending());
   }
@@ -61,20 +83,19 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
     HostMmioImRespPoW: source_id=0, source_name=Gem5ClientParser, timestamp=1967468841374
     HostMmioCW: source_id=0, source_name=Gem5ClientParser, timestamp=1967469841374, id=94469376773312
     */
-  SECTION("normal mmio write") {
+  SECTION("posted mmio write") {
     auto mmio_w = std::make_shared<HostMmioW>(1967468841374, parser_ident,
                                               parser_name, 94469376773312, 108000, 4, 0, 0, true);
     auto mmio_imr = std::make_shared<HostMmioImRespPoW>(1967468841374, parser_ident, parser_name);
-    auto mmio_cw = std::make_shared<HostMmioCW>(1967469841374, parser_ident, parser_name, 94469376773312);
 
     HostMmioSpan span{trace_environment, trace_context, source_id, service_name, 0};
 
     REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
     REQUIRE(span.AddToSpan(mmio_w));
-    REQUIRE(span.AddToSpan(mmio_imr));
     REQUIRE(span.IsPending());
     REQUIRE_FALSE(span.IsComplete());
-    REQUIRE(span.AddToSpan(mmio_cw));
+    REQUIRE(span.AddToSpan(mmio_imr));
     REQUIRE(span.IsComplete());
     REQUIRE_FALSE(span.IsPending());
   }
@@ -96,10 +117,13 @@ TEST_CASE("Test HostMmioSpan", "[HostMmioSpan]") {
 
     REQUIRE(span.IsPending());
     REQUIRE(span.AddToSpan(mmio_w));
-    REQUIRE(span.AddToSpan(mmio_imr));
-    REQUIRE_FALSE(span.AddToSpan(mmio_r));
-    REQUIRE_FALSE(span.IsComplete());
     REQUIRE(span.IsPending());
+    REQUIRE_FALSE(span.IsComplete());
+    REQUIRE(span.AddToSpan(mmio_imr));
+    REQUIRE(span.IsComplete());
+    REQUIRE_FALSE(span.IsPending());
+    REQUIRE_FALSE(span.AddToSpan(mmio_r));
+    REQUIRE(span.IsComplete());
   }
 
   SECTION("mmio write non device BAR number") {

@@ -79,7 +79,7 @@ enum EventType {
   kNicRxT
 };
 
-inline std::ostream &operator<<(std::stringstream &into, EventType type) {
+inline std::ostream &operator<<(std::ostream &into, EventType type) {
   switch (type) {
     case EventType::kEventT:into << "kEventT";
       break;
@@ -149,9 +149,7 @@ inline std::ostream &operator<<(std::stringstream &into, EventType type) {
       break;
     case EventType::kNicRxT:into << "kNicRxT";
       break;
-    default:
-      throw_just(std::source_location::current(),
-                 "encountered unknown event type");
+    default:throw_just(source_loc::current(), "encountered unknown event type");
   }
   return into;
 }
@@ -1132,7 +1130,7 @@ inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
     return {};
   }
   auto raw_ptr = other->clone();
-  throw_if_empty(raw_ptr, "CloneShared: cloned raw pointer is null");
+  throw_if_empty(raw_ptr, "CloneShared: cloned raw pointer is null", source_loc::current());
   return std::shared_ptr<Event>(raw_ptr);
 }
 
@@ -1145,7 +1143,7 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
   std::ostream &out_;
 
   inline void print(const std::shared_ptr<Event> &event) {
-    throw_if_empty(event, TraceException::kEventIsNull);
+    throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
     out_ << *event << '\n';
     out_.flush();
   }
@@ -1159,8 +1157,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan
   ) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
-    throw_if_empty(src_chan, TraceException::kChannelIsNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
+    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
@@ -1177,9 +1175,9 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
       std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan
   ) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
-    throw_if_empty(src_chan, TraceException::kChannelIsNull);
-    throw_if_empty(tar_chan, TraceException::kChannelIsNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
+    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
+    throw_if_empty(tar_chan, TraceException::kChannelIsNull, source_loc::current());
 
     std::optional<std::shared_ptr<Event>> msg;
     for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
@@ -1188,7 +1186,8 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
       print(event);
       const bool was_pushed = co_await tar_chan->Push(resume_executor, event);
       throw_on(not was_pushed,
-               "EventPrinter::process: Could not push to target channel");
+               "EventPrinter::process: Could not push to target channel",
+               source_loc::current());
     }
 
     co_await tar_chan->CloseChannel(resume_executor);

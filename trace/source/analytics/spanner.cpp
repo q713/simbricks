@@ -27,8 +27,8 @@
 
 concurrencpp::result<void> Spanner::consume(
     ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> src_chan) {
-  throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
-  throw_if_empty(src_chan, TraceException::kChannelIsNull);
+  throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
+  throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
   std::shared_ptr<Event> event_ptr = nullptr;
   bool added = false;
@@ -40,7 +40,7 @@ concurrencpp::result<void> Spanner::consume(
        event_ptr_opt = co_await src_chan->Pop(resume_executor)) {
 
     event_ptr = event_ptr_opt.value();
-    throw_if_empty(event_ptr, TraceException::kEventIsNull);
+    throw_if_empty(event_ptr, TraceException::kEventIsNull, source_loc::current());
 
     //std::cout << name_ << " try handel: " << *event_ptr << std::endl;
     //co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());

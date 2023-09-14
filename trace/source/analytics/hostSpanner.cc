@@ -46,7 +46,8 @@ concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
   //std::cout << name_ << " host polled nic receive" << std::endl;
   auto context = OrElseThrow(
       context_opt,
-      "HostSpanner::CreateTraceStartingSpan could not receive rx context");
+      "HostSpanner::CreateTraceStartingSpan could not receive rx context",
+      source_loc::current());
   tracer_.AddParentLazily(pending_host_call_span_,
                           context->GetNonEmptyParent());
 
@@ -85,7 +86,8 @@ concurrencpp::lazy_result<bool> HostSpanner::CreateTraceStartingSpan(
   pending_host_call_span_ = tracer_.StartSpan<HostCallSpan>(
       starting_event, starting_event->GetParserIdent(), name_, fragmented);
   throw_if_empty(pending_host_call_span_,
-                 "could not register new pending_host_call_span_");
+                 "could not register new pending_host_call_span_",
+                 source_loc::current());
   last_trace_starting_span_ = pending_host_call_span_;
 
   pci_write_before_ = false;
@@ -117,7 +119,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
   //   }
   // }
 
-  throw_if_empty(pending_host_call_span_, TraceException::kSpanIsNull);
+  throw_if_empty(pending_host_call_span_, TraceException::kSpanIsNull, source_loc::current());
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
     pci_write_before_ = trace_environment_.is_pci_write(event_ptr);
     co_return true;
@@ -203,7 +205,8 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
   if (pending_pci_span_ and IsType(event_ptr, EventType::kHostConfT)) {
     bool could_be_added = pending_pci_span_->AddToSpan(event_ptr);
     throw_on(not could_be_added,
-             "HostSpanner::HandelPci: could not add event to pending pci span");
+             "HostSpanner::HandelPci: could not add event to pending pci span",
+             source_loc::current());
     assert(pending_pci_span_->IsComplete() and
         "HostSpanner::HandelPci: span is not complete but should be");
     tracer_.MarkSpanAsDone(pending_pci_span_);
@@ -215,7 +218,8 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
       "HostSpanner::HandelPci: event is no pci starting event");
   if (pending_pci_span_) {
     throw_on(not pending_pci_span_->HasEvents(),
-             "HostSpanner::HandelPci: finsih pci without conf has no events!");
+             "HostSpanner::HandelPci: finsih pci without conf has no events!",
+             source_loc::current());
     pending_pci_span_->MarkAsDone();
     tracer_.MarkSpanAsDone(pending_pci_span_);
   }
@@ -257,7 +261,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
   // hence poll this context blocking!!
   //std::cout << name_ << " host try poll dma: " << *event_ptr << std::endl;
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
-  throw_on(not con_opt.has_value(), TraceException::kContextIsNull);
+  throw_on(not con_opt.has_value(), TraceException::kContextIsNull, source_loc::current());
   auto con = con_opt.value();
   //std::cout << name_ << " host polled dma" << std::endl;
   if (not is_expectation(con_opt.value(), expectation::kDma)) {
@@ -289,7 +293,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
 
   //std::cout << name_ << " host try poll msix" << std::endl;
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
-  throw_on(not con_opt.has_value(), TraceException::kContextIsNull);
+  throw_on(not con_opt.has_value(), TraceException::kContextIsNull, source_loc::current());
   auto con = con_opt.value();
   //std::cout << name_ << " host polled msix" << std::endl;
   if (not is_expectation(con, expectation::kMsix)) {
@@ -347,9 +351,9 @@ HostSpanner::HostSpanner(
       to_nic_queue_(std::move(to_nic)),
       from_nic_queue_(std::move(from_nic)),
       from_nic_receives_queue_(std::move(from_nic_receives)) {
-  throw_if_empty(to_nic_queue_, TraceException::kQueueIsNull);
-  throw_if_empty(from_nic_queue_, TraceException::kQueueIsNull);
-  throw_if_empty(from_nic_receives_queue_, TraceException::kQueueIsNull);
+  throw_if_empty(to_nic_queue_, TraceException::kQueueIsNull, source_loc::current());
+  throw_if_empty(from_nic_queue_, TraceException::kQueueIsNull, source_loc::current());
+  throw_if_empty(from_nic_receives_queue_, TraceException::kQueueIsNull, source_loc::current());
 
   auto handel_call = [this](ExecutorT resume_executor, EventT &event_ptr) {
     return HandelCall(std::move(resume_executor), event_ptr);

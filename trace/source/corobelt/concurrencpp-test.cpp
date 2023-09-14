@@ -44,7 +44,7 @@ concurrencpp::result<void> producer_loop(
 
 concurrencpp::result<void> adder_loop(
     std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
-    std::shared_ptr<CoroChannel<int>> &chan_src, std::shared_ptr<CoroChannel<int>> &chan_tar) {
+    std::shared_ptr<CoroChannel<int>> chan_src, std::shared_ptr<CoroChannel<int>> chan_tar) {
   while (true) {
     auto res_opt = co_await chan_src->Pop(tpe);
     if (not res_opt) {
@@ -61,7 +61,7 @@ concurrencpp::result<void> adder_loop(
 
 concurrencpp::result<void> consumer_loop(
     std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
-    std::shared_ptr<CoroChannel<int>> &chan) {
+    std::shared_ptr<CoroChannel<int>> chan) {
   while (true) {
     auto res_opt = co_await chan->Pop(tpe);
     if (not res_opt) {
@@ -85,8 +85,11 @@ struct int_prod : public producer<int> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
+    throw_if_empty<CoroChannel<int>>(tar_chan,
+                                     TraceException::kChannelIsNull,
+                                     source_loc::current());
 
     for (int i = start; i < end + start; i++) {
       bool could_write = co_await tar_chan->Push(resume_executor, i);
@@ -105,8 +108,9 @@ struct int_cons : public consumer<int> {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<int>> src_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
+    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     auto int_opt = co_await src_chan->Pop(resume_executor);
 
@@ -126,15 +130,16 @@ struct int_chan_cons : public consumer<int> {
 
   explicit int_chan_cons(std::shared_ptr<CoroChannel<int>> to_collector)
       : consumer<int>(), to_collector_(to_collector) {
-    throw_if_empty(to_collector, "to_collector is empty");
+    throw_if_empty(to_collector, "to_collector is empty", source_loc::current());
   }
 
   concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<int>> src_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
+    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     std::optional<int> int_opt;
     for (int_opt = co_await src_chan->Pop(resume_executor); int_opt.has_value();
@@ -161,9 +166,10 @@ struct int_adder : public cpipe<int> {
       std::shared_ptr<CoroChannel<int>> src_chan,
       std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
-    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
+    throw_if_empty<CoroChannel<int>>(tar_chan, TraceException::kChannelIsNull, source_loc::current());
+    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     auto int_opt = co_await src_chan->Pop(resume_executor);
 
@@ -193,9 +199,10 @@ struct int_transformer : public cpipe<int> {
       std::shared_ptr<CoroChannel<int>> src_chan,
       std::shared_ptr<CoroChannel<int>> tar_chan) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           resume_executor_null);
-    throw_if_empty<CoroChannel<int>>(tar_chan, channel_is_null);
-    throw_if_empty<CoroChannel<int>>(src_chan, channel_is_null);
+                                           TraceException::kResumeExecutorNull,
+                                           source_loc::current());
+    throw_if_empty<CoroChannel<int>>(tar_chan, TraceException::kChannelIsNull, source_loc::current());
+    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     std::optional<int> int_opt;
     for (int_opt = co_await src_chan->Pop(resume_executor); int_opt.has_value();
@@ -328,7 +335,6 @@ int main() {
     await_results(consumers);
   }
 
-  /*
   std::cout << "###############################" << std::endl;
   std::cout << "############ BREAK ############" << std::endl;
   std::cout << "###############################" << std::endl;
@@ -344,25 +350,22 @@ int main() {
     }
     auto c = std::make_shared<int_cons>();
     assert(c);
-    run_pipeline<int>(thread_pool_executor, p, c);
+    run_pipeline<int>(thread_pool_executor, p, pipes, c);
   }
 
-    std::cout << "###############################" << std::endl;
+  std::cout << "###############################" << std::endl;
   std::cout << "############ BREAK ############" << std::endl;
   std::cout << "###############################" << std::endl;
 
   {
     auto p = std::make_shared<int_prod>(0);
     const size_t amount_adder = 1;
-    std::vector<std::shared_ptr<cpipe<int>>> pipes{amount_adder};
-    for (size_t i = 0; i < amount_adder; i++) {
-      pipes[i] = std::make_shared<int_adder>();
-    }
     auto c = std::make_shared<int_cons>();
 
-    run_pipeline<int>(thread_pool_executor, p, pipes, c);
+    run_pipeline<int>(thread_pool_executor, p, c);
   }
 
+  /*
   std::cout << "###############################" << std::endl;
   std::cout << "############ BREAK ############" << std::endl;
   std::cout << "###############################" << std::endl;
@@ -462,7 +465,6 @@ int main() {
     task_b_test.get().get();
     task_c_test.get().get();
   }
-
 
   return 0;
 }

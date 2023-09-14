@@ -46,9 +46,11 @@ class TraceEnvConfig {
   template<YAML::NodeType::value Type>
   inline static void CheckKeyAndType(const char *key, const YAML::Node &node) {
     throw_on(not node[key],
-             "TraceEnvConfig::CheckKeyAndType node doesnt contain specified key");
+             "TraceEnvConfig::CheckKeyAndType node doesnt contain specified key",
+             source_loc::current());
     throw_on(node[key].Type() != Type,
-             "TraceEnvConfig::CheckKeyAndType node at key doesnt have specified type");
+             "TraceEnvConfig::CheckKeyAndType node at key doesnt have specified type",
+             source_loc::current());
   }
 
   inline static void IterateAddValue(const YAML::Node &node, IndicatorContainer &container_to_fill) {
@@ -59,7 +61,8 @@ class TraceEnvConfig {
 
   inline static void CheckEmptiness(IndicatorContainer &container_to_check) {
     throw_on(container_to_check.empty(),
-             "TraceEnvConfig::CheckEmptiness: the container to check is empty");
+             "TraceEnvConfig::CheckEmptiness: the container to check is empty",
+             source_loc::current());
   }
 
   inline static TraceEnvConfig CreateFromYaml(const std::string &config_path) {
@@ -108,12 +111,14 @@ class TraceEnvConfig {
     CheckKeyAndType<YAML::NodeType::Scalar>(kMaxBackgroundThreadsKey, config_root);
     trace_config.max_background_threads_ = config_root[kMaxBackgroundThreadsKey].as<size_t>();
     throw_on(trace_config.max_background_threads_ == 0,
-             "TraceEnvConfig::Create: max_background_threads_ is 0");
+             "TraceEnvConfig::Create: max_background_threads_ is 0",
+             source_loc::current());
 
     CheckKeyAndType<YAML::NodeType::Scalar>(kMaxCpuThreadsKey, config_root);
     trace_config.max_cpu_threads_ = config_root[kMaxCpuThreadsKey].as<size_t>();
     throw_on(trace_config.max_cpu_threads_ == 0,
-             "TraceEnvConfig::Create: max_cpu_threads_ is 0");
+             "TraceEnvConfig::Create: max_cpu_threads_ is 0",
+             source_loc::current());
 
     return trace_config;
   }

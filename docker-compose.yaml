@@ -24,32 +24,32 @@
 
 version: '3'
 services:
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    ports:
-      - "16686:16686" # Jaeger UI
-      - "4318:4318" # HTTP
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    command: []
+  #jaeger:
+  #  image: jaegertracing/all-in-one:latest
+  #  container_name: jaeger
+  #  ports:
+  #    - "16686:16686" # Jaeger UI
+  #    - "4318:4318" # HTTP
+  #  environment:
+  #    - COLLECTOR_OTLP_ENABLED=true
+  #  command: []
 
-  trace:
-    build:
-      context: trace
-      dockerfile: Dockerfile.trace
-    container_name: trace
-    command:
-      - /bin/bash
-      - -c
-      - for i in {1..2}; do build-docker/trace --trace-env-config /usr/src/data-folder/trace/trace-env-config.yaml --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-image-syms.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-image-syms.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
-    volumes:
-      - /home/jakob/uni/master/simbricks:/usr/src/data-folder
-      - /home/jakob/uni/master/simbricks/trace/linux_dumps:/usr/src/linux_dumbs
-    depends_on:
-      - jaeger
-    links:
-      - jaeger:jaeger
+  #trace:
+  #  build:
+  #    context: trace
+  #    dockerfile: Dockerfile.trace
+  #  container_name: trace
+  #  command:
+  #    - /bin/bash
+  #    - -c
+  #    - for i in {1..2}; do build-docker/trace --trace-env-config /usr/src/data-folder/trace/trace-env-config.yaml --linux-dump-server-client /usr/src/linux_dumbs/vmlinux-image-syms.dump --nic-i40e-dump /usr/src/linux_dumbs/i40e-image-syms.dump --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt; done
+  #  volumes:
+  #    - /home/jakob/uni/master/simbricks:/usr/src/data-folder
+  #    - /home/jakob/uni/master/simbricks/trace/linux_dumps:/usr/src/linux_dumbs
+  #  depends_on:
+  #    - jaeger
+  #  links:
+  #    - jaeger:jaeger
 
   simbricks:
     image: simbricks/simbricks-gem5opt:jakob
@@ -64,6 +64,6 @@ services:
       - /home/jakob/uni/master/simbricks:/usr/src/data-folder
       - /dev/kvm:/dev/kvm
     privileged: true
-    depends_on:
-      - trace
+    #depends_on:
+    #  - trace
 

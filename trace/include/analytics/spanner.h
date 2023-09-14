@@ -82,7 +82,8 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
   void RegisterHandler(EventType type, HandlerT &&handler) {
     auto it_suc = handler_.insert({type, handler});
     throw_on(not it_suc.second,
-             "Spanner::RegisterHandler Could not insert new handler");
+             "Spanner::RegisterHandler Could not insert new handler",
+             source_loc::current());
   }
 
   inline uint64_t GetId() const {

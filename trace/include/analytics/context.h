@@ -132,7 +132,8 @@ class Context {
  public:
   Context(expectation expectation, std::shared_ptr<EventSpan> parent_span)
       : expectation_(expectation), parent_span_(parent_span) {
-    throw_if_empty(parent_span, "trying to create Context, parent span is null");
+    throw_if_empty(parent_span, "trying to create Context, parent span is null",
+                   source_loc::current());
   }
 
   inline bool HasParent() {
@@ -144,7 +145,7 @@ class Context {
   };
 
   inline std::shared_ptr<EventSpan> &GetNonEmptyParent() {
-    throw_if_empty(parent_span_, "GetNonEmptyParent parent is null");
+    throw_if_empty(parent_span_, "GetNonEmptyParent parent is null", source_loc::current());
     return parent_span_;
   };
 
@@ -162,7 +163,7 @@ class Context {
 };
 
 inline std::shared_ptr<TraceContext> clone_shared(const std::shared_ptr<TraceContext> &other) {
-  throw_if_empty(other, TraceException::kContextIsNull);
+  throw_if_empty(other, TraceException::kContextIsNull, source_loc::current());
   auto new_con = create_shared<TraceContext>(TraceException::kContextIsNull, *other);
   return new_con;
 }

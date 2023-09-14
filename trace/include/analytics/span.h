@@ -126,7 +126,7 @@ class EventSpan {
   }
 
   inline void SetOriginal(const std::shared_ptr<EventSpan> &original) {
-    throw_if_empty(original, "EventSpan::SetOriginal: original is empty");
+    throw_if_empty(original, "EventSpan::SetOriginal: original is empty", source_loc::current());
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     original_ = original;
   }
@@ -138,7 +138,8 @@ class EventSpan {
 
   inline uint64_t GetOriginalId() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    throw_if_empty(original_, "EventSpan::GetOriginalId: span is not a copy");
+    throw_if_empty(original_, "EventSpan::GetOriginalId: span is not a copy",
+                   source_loc::current());
     return original_->GetId();
   }
 
@@ -233,13 +234,13 @@ class EventSpan {
     return 0xFFFFFFFFFFFFFFFF;
   }
 
-  bool SetContext(std::shared_ptr<TraceContext> traceContext, bool override_existing) {
+  bool SetContext(const std::shared_ptr<TraceContext> &traceContext, bool override_existing) {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
     if (not override_existing and trace_context_) {
       return false;
     }
-    throw_if_empty(traceContext, tc_null_);
+    throw_if_empty(traceContext, tc_null_, source_loc::current());
 
     auto parent = traceContext->GetParent();
     if (not parent or parent->GetStartingTs() >= GetStartingTs()) {
@@ -279,7 +280,7 @@ class EventSpan {
         type_(type),
         trace_context_(trace_context),
         service_name_(service_name) {
-    throw_if_empty(trace_context, tc_null_);
+    throw_if_empty(trace_context, tc_null_, source_loc::current());
   }
 
   EventSpan(const EventSpan &other)
@@ -563,6 +564,7 @@ class HostMmioSpan : public EventSpan {
   // issue, either host_mmio_w_ or host_mmio_r_
   std::shared_ptr<Event> host_mmio_issue_ = nullptr;
   bool is_read_ = false;
+  bool is_posted_ = false;
   int bar_number_ = 0;
   std::shared_ptr<Event> im_mmio_resp_ = nullptr;
   // completion, either host_mmio_cw_ or host_mmio_cr_
@@ -597,6 +599,11 @@ class HostMmioSpan : public EventSpan {
     return bar_number_;
   }
 
+  inline bool IsPosted() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_posted_;
+  }
+
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
@@ -611,8 +618,16 @@ class HostMmioSpan : public EventSpan {
           return false;
         }
 
-        is_read_ = IsType(event_ptr, EventType::kHostMmioRT);
-        auto mmio = std::static_pointer_cast<HostMmioOp>(event_ptr);
+        std::shared_ptr<HostMmioOp> mmio;
+        if (IsType(event_ptr, EventType::kHostMmioRT)) {
+          is_read_ = true;
+          mmio = std::static_pointer_cast<HostMmioOp>(event_ptr);
+        } else {
+          is_read_ = false;
+          auto mmiow = std::static_pointer_cast<HostMmioW>(event_ptr);
+          is_posted_ = mmiow->IsPosted();
+          mmio = mmiow;
+        }
         bar_number_ = mmio->GetBar();
         host_mmio_issue_ = event_ptr;
 
@@ -624,7 +639,7 @@ class HostMmioSpan : public EventSpan {
       }
 
       case EventType::kHostMmioImRespPoWT: {
-        if (not host_mmio_issue_ or is_read_ or im_mmio_resp_) {
+        if (not host_mmio_issue_ or is_read_ or im_mmio_resp_ or not is_posted_) {
           return false;
         }
         if (host_mmio_issue_->GetTs() != event_ptr->GetTs()) {
@@ -632,7 +647,8 @@ class HostMmioSpan : public EventSpan {
         }
         im_mmio_resp_ = event_ptr;
 
-        if (trace_environment_.IsMsixNotToDeviceBarNumber(bar_number_)) {
+        if (is_posted_ or
+            trace_environment_.IsMsixNotToDeviceBarNumber(bar_number_)) {
           is_pending_ = false;
         }
 
@@ -650,7 +666,7 @@ class HostMmioSpan : public EventSpan {
         }
 
         if (IsType(event_ptr, EventType::kHostMmioCWT)) {
-          if (is_read_ or not im_mmio_resp_) {
+          if (is_read_ or im_mmio_resp_) {
             return false;
           }
         } else {
@@ -1082,9 +1098,9 @@ inline bool IsType(std::shared_ptr<EventSpan> &span, span_type type) {
 }
 
 inline std::shared_ptr<EventSpan> CloneShared(const std::shared_ptr<EventSpan> &other) {
-  throw_if_empty(other, TraceException::kSpanIsNull);
+  throw_if_empty(other, TraceException::kSpanIsNull, source_loc::current());
   auto raw_ptr = other->clone();
-  throw_if_empty(raw_ptr, "EventSpan CloneShared: raw pointer is null");
+  throw_if_empty(raw_ptr, "EventSpan CloneShared: raw pointer is null", source_loc::current());
   return std::shared_ptr<EventSpan>(raw_ptr);
 }
 
@@ -1115,15 +1131,15 @@ struct SpanPrinter
     : public consumer<std::shared_ptr<EventSpan>> {
   concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
                                      std::shared_ptr<CoroChannel<std::shared_ptr<EventSpan>>> src_chan) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull);
-    throw_if_empty(src_chan, TraceException::kChannelIsNull);
+    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
+    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
 
     std::optional<std::shared_ptr<EventSpan>> next_span_opt;
     std::shared_ptr<EventSpan> next_span = nullptr;
     for (next_span_opt = co_await src_chan->Pop(resume_executor); next_span_opt.has_value();
          next_span_opt = co_await src_chan->Pop(resume_executor)) {
       next_span = next_span_opt.value();
-      throw_if_empty(next_span, TraceException::kSpanIsNull);
+      throw_if_empty(next_span, TraceException::kSpanIsNull, source_loc::current());
       std::cout << next_span << '\n';
     }
 

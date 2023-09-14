@@ -118,33 +118,36 @@ class OtlpSpanExporter : public SpanExporter {
 
   void InsertNewContext(std::shared_ptr<TraceContext> &custom,
                         context_t &context) {
-    throw_if_empty(custom, "InsertNewContext custom is null");
+    throw_if_empty(custom, "InsertNewContext custom is null", source_loc::current());
     auto context_id = custom->GetId();
     auto iter = context_map_.insert({context_id, context});
-    throw_on(not iter.second, "InsertNewContext could not insert context into map");
+    throw_on(not iter.second, "InsertNewContext could not insert context into map",
+             source_loc::current());
   }
 
   opentelemetry::trace::SpanContext
   GetContext(std::shared_ptr<TraceContext> &context_to_get) {
-    throw_if_empty(context_to_get, "GetContext context_to_get is null");
+    throw_if_empty(context_to_get, "GetContext context_to_get is null", source_loc::current());
     auto iter = context_map_.find(context_to_get->GetId());
-    throw_on(iter == context_map_.end(), "GetContext context was not found");
+    throw_on(iter == context_map_.end(), "GetContext context was not found",
+             source_loc::current());
     return iter->second;
   }
 
   void InsertNewSpan(std::shared_ptr<EventSpan> &old_span,
                      span_t &new_span) {
-    throw_if_empty(old_span, "InsertNewSpan old span is null");
-    throw_on(not new_span, "InsertNewSpan new_span is null");
+    throw_if_empty(old_span, "InsertNewSpan old span is null", source_loc::current());
+    throw_on(not new_span, "InsertNewSpan new_span is null", source_loc::current());
 
     const uint64_t span_id = old_span->GetId();
     auto iter = span_map_.insert({span_id, new_span});
-    throw_on(not iter.second, "InsertNewSpan could not insert into span map");
+    throw_on(not iter.second, "InsertNewSpan could not insert into span map",
+             source_loc::current());
   }
 
   void RemoveSpan(const std::shared_ptr<EventSpan> &old_span) {
     const size_t erased = span_map_.erase(old_span->GetId());
-    throw_on(erased != 1, "RemoveSpan did not remove a single span");
+    throw_on(erased != 1, "RemoveSpan did not remove a single span", source_loc::current());
   }
 
   tracer_t CreateTracer(std::string &service_name) {
@@ -154,7 +157,7 @@ class OtlpSpanExporter : public SpanExporter {
     auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
         opts);
     //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
-    throw_if_empty(exporter, TraceException::kSpanExporterNull);
+    throw_if_empty(exporter, TraceException::kSpanExporterNull, source_loc::current());
 
     // create span processor
     std::unique_ptr<opentelemetry::sdk::trace::SpanProcessor> processor = nullptr;
@@ -165,7 +168,7 @@ class OtlpSpanExporter : public SpanExporter {
     } else {
       processor = opentelemetry::sdk::trace::SimpleSpanProcessorFactory::Create(std::move(exporter));
     }
-    throw_if_empty(processor, TraceException::kSpanProcessorNull);
+    throw_if_empty(processor, TraceException::kSpanProcessorNull, source_loc::current());
 
     // create trace provider
     auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
@@ -174,7 +177,7 @@ class OtlpSpanExporter : public SpanExporter {
     auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
     const provider_t
         provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
-    throw_if_empty(provider, TraceException::kTraceProviderNull);
+    throw_if_empty(provider, TraceException::kTraceProviderNull, source_loc::current());
 
     // Set the global trace provider
     provider_.push_back(provider);
@@ -197,10 +200,10 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   span_t GetSpan(std::shared_ptr<EventSpan> &span_to_get) {
-    throw_if_empty(span_to_get, "GetSpan span_to_get is null");
+    throw_if_empty(span_to_get, "GetSpan span_to_get is null", source_loc::current());
     const uint64_t span_id = span_to_get->GetId();
     auto span = span_map_.find(span_id)->second;
-    throw_on(not span, "InsertNewSpan span is null");
+    throw_on(not span, "InsertNewSpan span is null", source_loc::current());
     return span;
   }
 
@@ -437,7 +440,8 @@ class OtlpSpanExporter : public SpanExporter {
       auto custom_context = span->GetContext();
       auto parent = custom_context->GetParent();
       auto parent_context = parent->GetContext();
-      throw_if_empty(parent_context, "GetSpanStartOpts, parent context is null");
+      throw_if_empty(parent_context, "GetSpanStartOpts, parent context is null",
+                     source_loc::current());
       auto open_context = GetContext(parent_context);
       span_options.parent = open_context;
     }
@@ -463,7 +467,7 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("type", span_name);
     new_span->SetAttribute("pending", BoolToString(old_span->IsPending()));
     auto context = old_span->GetContext();
-    throw_if_empty(context, "add_EventSpanAttr context is null");
+    throw_if_empty(context, "add_EventSpanAttr context is null", source_loc::current());
     new_span->SetAttribute("trace id", std::to_string(context->GetTraceId()));
     if (context->HasParent()) {
       auto parent = context->GetParent();
@@ -574,7 +578,7 @@ class OtlpSpanExporter : public SpanExporter {
     for (size_t index = 0; index < amount_events; index++) {
 
       auto action = to_end->GetAt(index);
-      throw_if_empty(action, "EndSpan action is null");
+      throw_if_empty(action, "EndSpan action is null", source_loc::current());
 
       auto type = GetTypeStr(action);
       std::map<std::string, std::string> attributes;
@@ -674,7 +678,7 @@ class OtlpSpanExporter : public SpanExporter {
           break;
         }
         default: {
-          throw_just(std::source_location::current(),
+          throw_just(source_loc::current(),
                      "transform_HostCallSpan unexpected event: ", *action);
         }
       }

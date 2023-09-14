@@ -95,21 +95,22 @@ class TraceEnvironment {
     const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
     auto executor = runtime_.thread_pool_executor();
     throw_if_empty(executor,
-                   TraceException::kResumeExecutorNull);
+                   TraceException::kResumeExecutorNull,
+                   source_loc::current());
     return executor;
   }
 
   PoolExecutorPtr GetBackgroundPoolExecutor() {
     const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
     auto executor = runtime_.background_executor();
-    throw_if_empty(executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     return executor;
   }
 
   ThreadExecutorPtr GetThreadExecutor() {
     const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
     auto executor = runtime_.thread_executor();
-    throw_if_empty(executor, TraceException::kResumeExecutorNull);
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     return executor;
   }
 

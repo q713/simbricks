@@ -22,7 +22,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-MaxBackgroundThreads: 1
+MaxBackgroundThreads: 5
 MaxCpuThreads: 10
 LinuxFuncIndicator:
   - "__sys_socket"

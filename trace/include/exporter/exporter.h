@@ -48,6 +48,7 @@
 #include "analytics/span.h"
 #include "analytics/trace.h"
 #include "util/utils.h"
+#include "util/ttlMap.h"
 
 #ifndef SIMBRICKS_TRACE_EXPORTER_H_
 #define SIMBRICKS_TRACE_EXPORTER_H_
@@ -100,7 +101,9 @@ class OtlpSpanExporter : public SpanExporter {
 
   // mapping: own_context_id -> opentelemetry_span_context
   using context_t = opentelemetry::trace::SpanContext;
-  std::unordered_map<uint64_t, context_t> context_map_;
+  // mapping old_span_id -> opentelemetry_span_context
+  //std::unordered_map<uint64_t, context_t> context_map_;
+  LazyTtLMap<uint64_t, context_t, 900> context_map_;
 
   // mapping: own_span_id -> opentelemetry_span
   using span_t = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
@@ -116,22 +119,29 @@ class OtlpSpanExporter : public SpanExporter {
   using ts_steady = std::chrono::time_point<std::chrono::steady_clock, std::chrono::nanoseconds>;
   using ts_system = std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>;
 
-  void InsertNewContext(std::shared_ptr<TraceContext> &custom,
+  void InsertNewContext(uint64_t span_id,
                         context_t &context) {
-    throw_if_empty(custom, "InsertNewContext custom is null", source_loc::current());
-    auto context_id = custom->GetId();
-    auto iter = context_map_.insert({context_id, context});
-    throw_on(not iter.second, "InsertNewContext could not insert context into map",
-             source_loc::current());
+    throw_on_false(TraceEnvironment::IsValidId(span_id),
+                   "invalid id", source_loc::current());
+    //auto iter = context_map_.insert({span_id, context});
+    //throw_on_false(iter.second, "InsertNewContext could not insert context into map",
+    //               source_loc::current());
+    const bool suc = context_map_.Insert(span_id, context);
+    throw_on_false(suc, "InsertNewContext could not insert context into map",
+                   source_loc::current());
   }
 
   opentelemetry::trace::SpanContext
-  GetContext(std::shared_ptr<TraceContext> &context_to_get) {
-    throw_if_empty(context_to_get, "GetContext context_to_get is null", source_loc::current());
-    auto iter = context_map_.find(context_to_get->GetId());
-    throw_on(iter == context_map_.end(), "GetContext context was not found",
-             source_loc::current());
-    return iter->second;
+  GetContext(uint64_t span_id) {
+    throw_on_false(TraceEnvironment::IsValidId(span_id),
+                   "GetContext context_to_get is null", source_loc::current());
+    //auto iter = context_map_.find(span_id);
+    //throw_on(iter == context_map_.end(), "GetContext context was not found",
+    //         source_loc::current());
+    auto con_opt = context_map_.Find(span_id);
+    auto con = OrElseThrow(con_opt, "could not find context for key",
+                           source_loc::current());
+    return con;
   }
 
   void InsertNewSpan(std::shared_ptr<EventSpan> &old_span,
@@ -141,8 +151,8 @@ class OtlpSpanExporter : public SpanExporter {
 
     const uint64_t span_id = old_span->GetId();
     auto iter = span_map_.insert({span_id, new_span});
-    throw_on(not iter.second, "InsertNewSpan could not insert into span map",
-             source_loc::current());
+    throw_on_false(iter.second, "InsertNewSpan could not insert into span map",
+                   source_loc::current());
   }
 
   void RemoveSpan(const std::shared_ptr<EventSpan> &old_span) {
@@ -437,12 +447,13 @@ class OtlpSpanExporter : public SpanExporter {
   opentelemetry::trace::StartSpanOptions GetSpanStartOpts(const std::shared_ptr<EventSpan> &span) {
     opentelemetry::trace::StartSpanOptions span_options;
     if (span->HasParent()) {
-      auto custom_context = span->GetContext();
-      auto parent = custom_context->GetParent();
-      auto parent_context = parent->GetContext();
-      throw_if_empty(parent_context, "GetSpanStartOpts, parent context is null",
-                     source_loc::current());
-      auto open_context = GetContext(parent_context);
+      //auto custom_context = span->GetContext();
+      const uint64_t parent_id = span->GetValidParentId();
+      //auto parent_context = parent->GetContext();
+      //throw_if_empty(parent_context, "GetSpanStartOpts, parent context is null",
+      //               source_loc::current());
+      //auto open_context = GetContext(parent_context);
+      auto open_context = GetContext(parent_id);
       span_options.parent = open_context;
     }
     span_options.start_system_time = ToSystemNanoseconds(span->GetStartingTs());
@@ -470,8 +481,8 @@ class OtlpSpanExporter : public SpanExporter {
     throw_if_empty(context, "add_EventSpanAttr context is null", source_loc::current());
     new_span->SetAttribute("trace id", std::to_string(context->GetTraceId()));
     if (context->HasParent()) {
-      auto parent = context->GetParent();
-      new_span->SetAttribute("parent_id", parent->GetId());
+      const uint64_t parent_id = context->GetParentId();
+      new_span->SetAttribute("parent_id", parent_id);
     }
   }
 
@@ -727,9 +738,11 @@ class OtlpSpanExporter : public SpanExporter {
     auto span = tracer->StartSpan(span_name, span_opts);
     InsertNewSpan(to_start, span);
 
-    auto old_context = to_start->GetContext();
+    const uint64_t span_id = to_start->GetId();
+    throw_on_false(TraceEnvironment::IsValidId(span_id),
+                   "invalid id", source_loc::current());
     auto new_context = span->GetContext();
-    InsertNewContext(old_context, new_context);
+    InsertNewContext(span_id, new_context);
   }
 
   void EndSpan(std::shared_ptr<EventSpan> to_end) override {

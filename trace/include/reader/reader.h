@@ -40,9 +40,11 @@
 #include "util/log.h"
 #include "util/string_util.h"
 #include "util/utils.h"
+#include "util/concepts.h"
 
 class LineHandler {
   size_t cur_reading_pos_ = 0;
+  // TODO: consider using string views instead of the iterator
   std::string::iterator cur_line_it_;
   std::string::iterator cur_line_end_it_;
   std::string cur_line_;
@@ -128,16 +130,16 @@ class LineHandler {
   bool ParseBoolFromInt(bool &target);
 };
 
-template<size_t BufferSize> requires SizeLagerZero<BufferSize>
+template<size_t BufferSize, size_t Tries = 0> requires SizeLagerZero<BufferSize>
 class ReaderBuffer {
   const std::string name_;
   const bool skip_empty_lines_;
   std::ifstream input_stream_;
-  constexpr static size_t kPageSize = 4096;
-  constexpr static size_t kBufSize = kPageSize * 64;//* 256;
+  constexpr static size_t kPageSize = 4096;                  // TODO: make template parameter
+  constexpr static size_t kBufSize = kPageSize * 64;//* 256; // TODO: make template parameter
   char *istream_buffer_ = nullptr;
+  std::string cur_file_path_;
   FILE *file_ = nullptr;
-  // TODO: introduce maximum size for strings a.k.a lines --> then use arena allocation to allocate these strings
   std::vector<LineHandler> buffer_{BufferSize};
   size_t cur_size_ = 0;
   size_t cur_line_index_ = 0;
@@ -151,7 +153,10 @@ class ReaderBuffer {
   }
 
   bool IsStreamStillGood() const {
-    return not input_stream_.eof() and input_stream_.good();
+    int file_descriptor = open(cur_file_path_.c_str(), O_RDONLY | O_NONBLOCK);
+    close(file_descriptor);
+    return file_descriptor != -1 and not input_stream_.eof() and input_stream_.good() and not input_stream_.fail()
+        and not input_stream_.bad();
   }
 
   bool StillBuffered() const {
@@ -161,7 +166,7 @@ class ReaderBuffer {
   void FillBuffer() {
     assert(cur_line_index_ == 0 or cur_line_index_ == cur_size_);
 
-    size_t tries = 1;
+    size_t tries = Tries;
     cur_size_ = 0;
     size_t index = 0;
     while (index < BufferSize) {
@@ -218,14 +223,14 @@ class ReaderBuffer {
 
   std::pair<bool, LineHandler *> NextHandler() {
     if (not HasStillLine()) {
-      return std::make_pair(false, buffer_.data());
+      return std::make_pair(false, nullptr);
     }
 
     if (not StillBuffered()) {
       FillBuffer();
       // maybe we have nothing buffered but the stream still appears to be good
       if (not StillBuffered()) {
-        return std::make_pair(false, buffer_.data());
+        return std::make_pair(false, nullptr);
       }
     }
 
@@ -238,6 +243,7 @@ class ReaderBuffer {
   }
 
   void OpenFile(const std::string &file_path, bool is_named_pipe = false) {
+    cur_file_path_ = file_path;
     if (!std::filesystem::exists(file_path)) {
       throw_just(source_loc::current(),
                  "ReaderBuffer: the file path'", file_path, "' does not exist");
@@ -250,9 +256,9 @@ class ReaderBuffer {
     if (is_named_pipe) {
       file_ = fopen(file_path.c_str(), "r");
       throw_if_empty(file_, "ReaderBuffer: could not open file path", source_loc::current());
-      const int fd = fileno(file_);
-      throw_on(fd == -1, "ReaderBuffer: could not obtain fd", source_loc::current());
-      const int suc = fcntl(fd, F_SETPIPE_SZ, kBufSize);
+      const int file_descriptor = fileno(file_);
+      throw_on(file_descriptor == -1, "ReaderBuffer: could not obtain fd", source_loc::current());
+      const int suc = fcntl(file_descriptor, F_SETPIPE_SZ, kBufSize);
       if (suc != kBufSize) {
         std::cout << "ReaderBuffer: could not change '" << file_path << "' size to " << kBufSize << '\n';
       } else {

@@ -43,8 +43,6 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
   uint64_t id_;
   std::string name_;
   Tracer &tracer_;
-  //Timer &timer_;
-  WeakTimer &timer_;
 
   using ExecutorT = std::shared_ptr<concurrencpp::executor>;
   using EventT = std::shared_ptr<Event>;
@@ -56,26 +54,21 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
   explicit Spanner(TraceEnvironment &trace_environment,
                    std::string &&name,
-                   Tracer &tra, /*Timer &timer*/
-                   WeakTimer &timer)
+                   Tracer &tra)
       : trace_environment_(trace_environment),
         id_(trace_environment_.GetNextSpannerId()),
         name_(name),
-        tracer_(tra),
-        timer_(timer) {
+        tracer_(tra) {
   }
 
   explicit Spanner(TraceEnvironment &trace_environment,
                    std::string &&name,
                    Tracer &tra,
-      //Timer &timer,
-                   WeakTimer &timer,
                    std::unordered_map<EventType, HandlerT> &&handler)
       : trace_environment_(trace_environment),
         id_(trace_environment_.GetNextSpannerId()),
         name_(name),
         tracer_(tra),
-        timer_(timer),
         handler_(handler) {
   }
 
@@ -114,8 +107,7 @@ struct HostSpanner : public Spanner {
 
   explicit HostSpanner(TraceEnvironment &trace_environment,
                        std::string &&name,
-                       Tracer &tra, /*Timer &timer*/
-                       WeakTimer &timer,
+                       Tracer &tra,
                        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_nic,
                        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic,
                        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_nic_receives);
@@ -163,8 +155,7 @@ struct NicSpanner : public Spanner {
 
   explicit NicSpanner(TraceEnvironment &trace_environment,
                       std::string &&name,
-                      Tracer &tra, /*Timer &timer*/
-                      WeakTimer &timer,
+                      Tracer &tra,
                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
                       std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,

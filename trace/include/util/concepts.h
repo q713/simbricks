@@ -22,41 +22,19 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SIMBRICKS_TRACE_COMP_H_
-#define SIMBRICKS_TRACE_COMP_H_
+#ifndef SIMBRICKS_TRACE_CONCEPTS_H_
+#define SIMBRICKS_TRACE_CONCEPTS_H_
 
-#include <set>
-#include <string>
+template<size_t Size>
+concept SizeLagerZero =  Size > 0;
 
-class ComponentFilter {
- private:
-  const std::string &identifier_;
-  std::set<std::string> component_table_;
-
- public:
-  explicit ComponentFilter(const std::string &identifier)
-      : identifier_(identifier){};
-
-  inline ComponentFilter &operator()(const std::string &symbol) {
-    component_table_.insert(symbol);
-    return *this;
-  }
-
-  inline const std::set<std::string> &get_component_table() {
-    return component_table_;
-  }
-
-  bool filter(const std::string &comp) const {
-    if (component_table_.empty())
-        return true;
-        
-    auto found = component_table_.find(comp);
-    return found != component_table_.end();
-  }
- 
-  inline const std::string &get_ident() {
-    return identifier_;
-  }
+template<typename Type>
+concept ContextInterface = requires(Type con)
+{
+  { con.HasParent() } -> std::convertible_to<bool>;
+  { con.GetTraceId() } -> std::convertible_to<uint64_t>;
+  { con.GetParentId() } -> std::convertible_to<uint64_t>;
+  { con.GetParentStartingTs() } -> std::convertible_to<uint64_t>;
 };
 
-#endif  // SIMBRICKS_TRACE_COMP_H_
+#endif //SIMBRICKS_TRACE_CONCEPTS_H_

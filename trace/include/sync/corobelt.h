@@ -52,9 +52,16 @@ struct consumer {
   virtual concurrencpp::result<void> consume(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::shared_ptr<CoroChannel<ValueType>> src_chan) {
+    std::optional<ValueType> val_opt;
+    for (val_opt = co_await src_chan->Pop(resume_executor);
+         val_opt;
+         val_opt = co_await src_chan->Pop(resume_executor));
     co_return;
   };
 };
+
+template<typename ValueType>
+using NoOpConsumer = consumer<ValueType>;
 
 template<typename ValueType>
 struct cpipe {

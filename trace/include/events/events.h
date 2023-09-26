@@ -36,123 +36,13 @@
 
 #include "util/exception.h"
 #include "sync/corobelt.h"
+#include "sync/channel.h"
 #include "util/log.h"
+#include "events/eventType.h"
 
 #define DEBUG_EVENT_ ;
 
 class LogParser;
-
-enum EventType {
-  kEventT,
-  kSimSendSyncT,
-  kSimProcInEventT,
-  kHostInstrT,
-  kHostCallT,
-  kHostMmioImRespPoWT,
-  kHostIdOpT,
-  kHostMmioCRT,
-  kHostMmioCWT,
-  kHostAddrSizeOpT,
-  kHostMmioRT,
-  kHostMmioWT,
-  kHostDmaCT,
-  kHostDmaRT,
-  kHostDmaWT,
-  kHostMsiXT,
-  kHostConfT,
-  kHostClearIntT,
-  kHostPostIntT,
-  kHostPciRWT,
-  kNicMsixT,
-  kNicDmaT,
-  kSetIXT,
-  kNicDmaIT,
-  kNicDmaExT,
-  kNicDmaEnT,
-  kNicDmaCRT,
-  kNicDmaCWT,
-  kNicMmioT,
-  kNicMmioRT,
-  kNicMmioWT,
-  kNicTrxT,
-  kNicTxT,
-  kNicRxT
-};
-
-inline std::ostream &operator<<(std::ostream &into, EventType type) {
-  switch (type) {
-    case EventType::kEventT:into << "kEventT";
-      break;
-    case EventType::kSimSendSyncT:into << "kSimSendSyncT";
-      break;
-    case EventType::kSimProcInEventT:into << "kSimProcInEventT";
-      break;
-    case EventType::kHostInstrT:into << "kHostInstrT";
-      break;
-    case EventType::kHostCallT:into << "kHostCallT";
-      break;
-    case EventType::kHostMmioImRespPoWT:into << "kHostMmioImRespPoWT";
-      break;
-    case EventType::kHostIdOpT:into << "kHostIdOpT";
-      break;
-    case EventType::kHostMmioCRT:into << "kHostMmioCRT";
-      break;
-    case EventType::kHostMmioCWT:into << "kHostMmioCWT";
-      break;
-    case EventType::kHostAddrSizeOpT:into << "kHostAddrSizeOpT";
-      break;
-    case EventType::kHostMmioRT:into << "kHostMmioRT";
-      break;
-    case EventType::kHostMmioWT:into << "kHostMmioWT";
-      break;
-    case EventType::kHostDmaCT:into << "kHostDmaCT";
-      break;
-    case EventType::kHostDmaRT:into << "kHostDmaRT";
-      break;
-    case EventType::kHostDmaWT:into << "kHostDmaWT";
-      break;
-    case EventType::kHostMsiXT:into << "kHostMsiXT";
-      break;
-    case EventType::kHostConfT:into << "kHostConfT";
-      break;
-    case EventType::kHostClearIntT:into << "kHostClearIntT";
-      break;
-    case EventType::kHostPostIntT:into << "kHostPostIntT";
-      break;
-    case EventType::kHostPciRWT:into << "kHostPciRWT";
-      break;
-    case EventType::kNicMsixT:into << "kNicMsixT";
-      break;
-    case EventType::kNicDmaT:into << "kNicDmaT";
-      break;
-    case EventType::kSetIXT:into << "kSetIXT";
-      break;
-    case EventType::kNicDmaIT:into << "kNicDmaIT";
-      break;
-    case EventType::kNicDmaExT:into << "kNicDmaExT";
-      break;
-    case EventType::kNicDmaEnT:into << "kNicDmaEnT";
-      break;
-    case EventType::kNicDmaCRT:into << "kNicDmaCRT";
-      break;
-    case EventType::kNicDmaCWT:into << "kNicDmaCWT";
-      break;
-    case EventType::kNicMmioT:into << "kNicMmioT";
-      break;
-    case EventType::kNicMmioRT:into << "kNicMmioRT";
-      break;
-    case EventType::kNicMmioWT:into << "kNicMmioWT";
-      break;
-    case EventType::kNicTrxT:into << "kNicTrxT";
-      break;
-    case EventType::kNicTxT:into << "kNicTxT";
-      break;
-    case EventType::kNicRxT:into << "kNicRxT";
-      break;
-    default:throw_just(source_loc::current(), "encountered unknown event type");
-  }
-  return into;
-}
 
 /* Parent class for all events of interest */
 class Event {
@@ -1134,7 +1024,7 @@ inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
   return std::shared_ptr<Event>(raw_ptr);
 }
 
-bool IsType(std::shared_ptr<Event> &event_ptr, EventType type);
+bool IsType(const std::shared_ptr<Event> &event_ptr, EventType type);
 
 bool IsType(const Event &event, EventType type);
 

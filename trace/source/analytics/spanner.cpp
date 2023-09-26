@@ -34,18 +34,13 @@ concurrencpp::result<void> Spanner::consume(
   bool added = false;
   std::optional<std::shared_ptr<Event>> event_ptr_opt;
 
-  //size_t timer_key = co_await timer_.Register(resume_executor);
-
   for (event_ptr_opt = co_await src_chan->Pop(resume_executor); event_ptr_opt.has_value();
        event_ptr_opt = co_await src_chan->Pop(resume_executor)) {
 
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, TraceException::kEventIsNull, source_loc::current());
 
-    //std::cout << name_ << " try handel: " << *event_ptr << std::endl;
-    //co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
-    //co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
-
+    //std::cout << name_ << " try handel: " << *event_ptr << '\n';
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {
       std::cerr << "Spanner: could not find handler for the following event: ";
@@ -65,11 +60,6 @@ concurrencpp::result<void> Spanner::consume(
                 << *event_ptr << '\n';
     }
   }
-
-  //co_await timer_.Done(resume_executor);
-  //co_await timer_.Done(resume_executor, timer_key);
-
-  std::cout << "event spanner exited" << '\n';
 
   co_return;
 }

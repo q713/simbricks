@@ -28,7 +28,7 @@
 
 const std::string *TraceEnvironment::GetCallFunc(
     // NOTE: when calling this function the lock must be already held
-    std::shared_ptr<Event> &event_ptr) {
+    const std::shared_ptr<Event> &event_ptr) {
   if (not event_ptr or not IsType(event_ptr, EventType::kHostCallT)) {
     return nullptr;
   }
@@ -40,9 +40,28 @@ const std::string *TraceEnvironment::GetCallFunc(
   return func;
 }
 
+bool TraceEnvironment::AddSymbolTableInternal(const std::string identifier,
+                                              const std::string &file_path,
+                                              uint64_t address_offset, FilterType type,
+                                              std::set<std::string> symbol_filter) {
+  // Note the writer lock must be held when calling this method
+  static uint64_t next_id = 0;
+  auto filter_ptr =
+      SymsFilter::Create(++next_id, identifier,
+                         file_path, address_offset, type,
+                         std::move(symbol_filter), internalizer_);
+
+  if (not filter_ptr) {
+    return false;
+  }
+  symbol_tables_.push_back(filter_ptr);
+  return true;
+}
+
 TraceEnvironment::TraceEnvironment(const TraceEnvConfig &trace_env_config)
     : trace_env_config_(trace_env_config),
-      runtime_(trace_env_config_.GetRuntimeOptions()) {
+      runtime_(trace_env_config_.GetRuntimeOptions()),
+      types_to_filter_(trace_env_config.BeginTypesToFilter(), trace_env_config.EndTypesToFilter()) {
   InternalizeStrings(trace_env_config_.BeginFuncIndicator(),
                      trace_env_config_.EndFuncIndicator(),
                      linux_net_func_indicator_);
@@ -74,6 +93,20 @@ TraceEnvironment::TraceEnvironment(const TraceEnvConfig &trace_env_config)
   InternalizeStrings(trace_env_config_.BeginSysEntry(),
                      trace_env_config_.EndSysEntry(),
                      sys_entry_);
+
+  InternalizeStrings(trace_env_config_.BeginBlacklistFuncIndicator(),
+                     trace_env_config_.EndBlacklistFuncIndicator(),
+                     blacklist_func_indicator_);
+
+  for (auto sym_b = trace_env_config_.BeginSymbolTables();
+       sym_b != trace_env_config_.EndSymbolTables(); sym_b++) {
+    const TraceEnvConfig::SymTableConf &sym_conf = *sym_b;
+    AddSymbolTableInternal(sym_conf.GetIdentifier(),
+                           sym_conf.GetFilePath(),
+                           sym_conf.GetAddressOffset(),
+                           sym_conf.GetFilterType(),
+                           {});
+  }
 }
 
 bool TraceEnvironment::AddSymbolTable(const std::string identifier,
@@ -82,17 +115,7 @@ bool TraceEnvironment::AddSymbolTable(const std::string identifier,
                                       FilterType type,
                                       std::set<std::string> symbol_filter) {
   const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
-  static uint64_t next_id = 0;
-  auto filter_ptr =
-      SymsFilter::Create(++next_id, identifier,
-                         file_path, address_offset, type,
-                         std::move(symbol_filter), internalizer_);
-
-  if (not filter_ptr) {
-    return false;
-  }
-  symbol_tables_.push_back(filter_ptr);
-  return true;
+  return AddSymbolTableInternal(identifier, file_path, address_offset, type, symbol_filter);
 }
 
 bool TraceEnvironment::AddSymbolTable(const std::string identifier,
@@ -123,7 +146,33 @@ TraceEnvironment::SymtableFilter(uint64_t address) {
   return std::make_pair(nullptr, nullptr);
 }
 
-bool TraceEnvironment::IsDriverTx(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsTypeToFilter(const std::shared_ptr<Event> &event_ptr) {
+  if (not event_ptr) {
+    return true;
+  }
+  const EventType type = event_ptr->GetType();
+  const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+  return types_to_filter_.contains(type);
+}
+
+bool TraceEnvironment::IsBlacklistedFunctionCall(const std::shared_ptr<Event> &event_ptr) {
+  const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+  const std::string *func_name = GetCallFunc(event_ptr);
+  if (nullptr == func_name) {
+    return false;
+  }
+  return blacklist_func_indicator_.contains(func_name);
+}
+
+bool TraceEnvironment::IsBlacklistedFunctionCall(const std::string *func_name) {
+  if (func_name == nullptr) {
+    return false;
+  }
+  const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+  return blacklist_func_indicator_.contains(func_name);
+}
+
+bool TraceEnvironment::IsDriverTx(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -132,7 +181,7 @@ bool TraceEnvironment::IsDriverTx(std::shared_ptr<Event> event_ptr) {
   return driver_tx_indicator_.contains(func);
 }
 
-bool TraceEnvironment::IsDriverRx(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsDriverRx(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -141,8 +190,7 @@ bool TraceEnvironment::IsDriverRx(std::shared_ptr<Event> event_ptr) {
   return driver_rx_indicator_.contains(func);
 }
 
-bool TraceEnvironment::IsPciMsixDescAddr(
-    std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsPciMsixDescAddr(const std::shared_ptr<Event> &event_ptr) {
   const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -151,7 +199,7 @@ bool TraceEnvironment::IsPciMsixDescAddr(
   return func == internalizer_.Internalize("pci_msix_desc_addr");
 }
 
-bool TraceEnvironment::is_pci_write(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::is_pci_write(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -160,7 +208,7 @@ bool TraceEnvironment::is_pci_write(std::shared_ptr<Event> event_ptr) {
   return pci_write_indicators_.contains(func);
 }
 
-bool TraceEnvironment::IsKernelTx(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsKernelTx(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -169,8 +217,7 @@ bool TraceEnvironment::IsKernelTx(std::shared_ptr<Event> event_ptr) {
   return kernel_tx_indicator_.contains(func);
 }
 
-bool TraceEnvironment::IsKernelRx(
-    std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsKernelRx(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -179,7 +226,7 @@ bool TraceEnvironment::IsKernelRx(
   return kernel_rx_indicator_.contains(func);
 }
 
-bool TraceEnvironment::IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsKernelOrDriverTx(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -188,7 +235,7 @@ bool TraceEnvironment::IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr) {
   return kernel_tx_indicator_.contains(func) or driver_tx_indicator_.contains(func);
 }
 
-bool TraceEnvironment::IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsKernelOrDriverRx(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -197,7 +244,7 @@ bool TraceEnvironment::IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr) {
   return kernel_rx_indicator_.contains(func) or driver_rx_indicator_.contains(func);
 }
 
-bool TraceEnvironment::IsSocketConnect(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsSocketConnect(const std::shared_ptr<Event> &event_ptr) {
   const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -206,7 +253,7 @@ bool TraceEnvironment::IsSocketConnect(std::shared_ptr<Event> event_ptr) {
   return func == internalizer_.Internalize("__sys_connect");
 }
 
-bool TraceEnvironment::IsSysEntry(std::shared_ptr<Event> event_ptr) {
+bool TraceEnvironment::IsSysEntry(const std::shared_ptr<Event> &event_ptr) {
   const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
   const std::string *func = GetCallFunc(event_ptr);
   if (not func) {
@@ -216,11 +263,13 @@ bool TraceEnvironment::IsSysEntry(std::shared_ptr<Event> event_ptr) {
 }
 
 bool TraceEnvironment::IsMsixNotToDeviceBarNumber(int bar) {
+  // TODO: push this into the trace environment configuration!!
   // 1, 2, 3, 4, 5 are currently expected to not end up within the device
   return bar != 0;
 }
 
 bool TraceEnvironment::IsToDeviceBarNumber(int bar) {
+  // TODO: push this into the trace environment configuration!!
   // only 0 is currently expected to end up in the device
   return bar == 0;
 }

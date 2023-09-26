@@ -26,7 +26,6 @@
 #include <vector>
 #include <memory>
 
-#include "sync/corobelt.h"
 #include "util/componenttable.h"
 #include "reader/reader.h"
 #include "parser/parser.h"

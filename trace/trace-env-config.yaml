@@ -24,6 +24,10 @@
 
 MaxBackgroundThreads: 5
 MaxCpuThreads: 10
+JaegerUrl: "http://jaeger:4318/v1/traces"
+#JaegerUrl: "http://localhost:4318/v1/traces"
+LineBufferSize: 1
+EventBufferSize: 60000000
 LinuxFuncIndicator:
   - "__sys_socket"
   - "__x64_sys_socket"
@@ -78,8 +82,9 @@ KernelRxIndicator:
   #- "__sys_recvmsg"
   #- "___sys_recvmsg"
   #- "__x64_sys_recvmsg"
+  - "netif_receive_skb_list_internal"
   #- "ip_recv"
-  - "ip_list_rcv"
+  #- "ip_list_rcv"
   #- "netif_receive_skb"
   #- "netif_rx"
   #- "net_rx_action"
@@ -95,3 +100,38 @@ SysEntryIndicator:
   - "entry_SYSCALL_64"
   - "error_entry"
   - "entry_SYSCALL_64_safe_stack"
+BlacklistFunctions:
+  - "match_strlcpy"
+  - "__const_udelay"
+  - "static_key_disable"
+  - "__put_page"
+  - "relock_page_lruvec_irqsave"
+  - "xas_move_index"
+  - "xas_set_offset"
+  - "blk_account_io_merge_bio"
+  - "biovec_phys_mergeable.isra.0"
+  - "vmalloc_node"
+  - "__kfifo_poke_n"
+  - "__count_numa_events.isra.0"
+TypesToFilter:
+  - "kHostInstrT"
+  - "kSimProcInEventT"
+  - "kSimSendSyncT"
+  #- "kHostMmioCRT"
+  #- "kHostMmioCWT"
+  #- "kHostMmioImRespPoWT"
+  #- "kHostMmioRT"
+  #- "kHostMmioWT"
+  #- "kNicMmioRT"
+  #- "kNicMmioWT"
+SymbolTables:
+  - Identifier: "Linuxvm-Symbols"
+    Path: "/usr/src/data-folder/trace/linux_dumps/vmlinux-image-syms.dump"
+    #Path: "linux_dumps/vmlinux-image-syms.dump"
+    AddressOffset: 0
+    Type: kSyms
+  - Identifier: "Nicdriver-Symbols"
+    Path: "/usr/src/data-folder/trace/linux_dumps/i40e-image-syms.dump"
+    #Path: "linux_dumps/i40e-image-syms.dump"
+    AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
+    Type: kSyms

@@ -39,6 +39,20 @@
 
 enum FilterType { kSyms, kS, kElf };
 
+inline FilterType FilterTypeFromString(const std::string &type_str) {
+  static const std::unordered_map<std::string, FilterType> kLookup{
+      {"kSyms", kSyms},
+      {"kS", kS},
+      {"kElf", kElf}
+  };
+  auto iter = kLookup.find(type_str);
+  if (iter != kLookup.end()) {
+    return iter->second;
+  }
+  std::cerr << "could not resolve filter type string '" << type_str << "'. Fallback to kSyms" << '\n';
+  return FilterType::kSyms;
+}
+
 class SymsFilter {
  public:
   using SymTableT = std::map<uint64_t, const std::string *>;

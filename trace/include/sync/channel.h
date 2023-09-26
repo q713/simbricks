@@ -34,6 +34,7 @@
 
 #include "util/exception.h"
 #include "util/utils.h"
+#include "util/concepts.h"
 
 #ifndef SIMBRICKS_TRACE_INCLUDE_SYNC_CHANNEL_H_
 #define SIMBRICKS_TRACE_INCLUDE_SYNC_CHANNEL_H_

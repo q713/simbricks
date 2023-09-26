@@ -24,6 +24,16 @@
 
 version: '3'
 services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686" # Jaeger UI
+      - "4318:4318" # HTTP
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    command: []
+
   trace:
     build:
       context: .
@@ -32,26 +42,10 @@ services:
     command:
       - /bin/bash
       - -c
-      - build-docker/trace --gem5-server-event-stream ./data-folder/gem5-server-events.txt --gem5-client-event-stream ./data-folder/gem5-client-events.txt --nicbm-server-event-stream ./data-folder/nicbm-server-events.txt --nicbm-client-event-stream ./data-folder/nicbm-client-events.txt
+      - build-docker/trace --trace-env-config /usr/src/data-folder/trace/trace-env-config.yaml --gem5-server-event-stream ./data-folder/gem5-server-events.txt --gem5-client-event-stream ./data-folder/gem5-client-events.txt --nicbm-server-event-stream ./data-folder/nicbm-server-events.txt --nicbm-client-event-stream ./data-folder/nicbm-client-events.txt
     volumes:
-      - /home/jakob/uni/master/simbricks/trace/event-streams:/usr/src/data-folder
+      - /home/jakob/uni/master/simbricks:/usr/src/data-folder
     depends_on:
       - jaeger
     links:
       - jaeger:jaeger
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: jaeger
-    ports:
-      - "16686:16686"     # Jaeger UI
-      - "4318:4318"       # HTTP
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    command: []
-
-# You CAN "execute" the file as follows
-# docker compose up --build
-# teardown via
-# docker compose down --volume
-

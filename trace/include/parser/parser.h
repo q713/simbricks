@@ -74,7 +74,7 @@ class LogParser {
 };
 
 class Gem5Parser : public LogParser {
-  ComponentFilter &component_table_;
+  const ComponentFilter &component_table_;
 
  protected:
   std::shared_ptr<Event> ParseGlobalEvent(LineHandler &line_handler, uint64_t timestamp);
@@ -93,7 +93,7 @@ class Gem5Parser : public LogParser {
  public:
   explicit Gem5Parser(TraceEnvironment &trace_environment,
                       const std::string name,
-                      ComponentFilter &component_table)
+                      const ComponentFilter &component_table)
       : LogParser(trace_environment, name),
         component_table_(component_table) {
   }

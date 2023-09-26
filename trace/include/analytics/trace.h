@@ -49,6 +49,16 @@ class Trace {
     return ident_;
   }
 
+  auto GetSpanIds() {
+    const std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<uint64_t> span_ids;
+    span_ids.reserve(spans_.size());
+    for (const auto& span_id_span : spans_) {
+      span_ids.push_back(span_id_span.first);
+    }
+    return span_ids;
+  }
+
   auto GetSpansAndRemoveSpans() {
     const std::lock_guard<std::mutex> lock(mutex_);
     std::vector<std::shared_ptr<EventSpan>> spans;

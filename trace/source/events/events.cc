@@ -535,6 +535,6 @@ bool IsType(const Event &event, EventType type) {
   return event.GetType() == type;
 }
 
-bool IsType(std::shared_ptr<Event> &event_ptr, EventType type) {
+bool IsType(const std::shared_ptr<Event> &event_ptr, EventType type) {
   return event_ptr && event_ptr->GetType() == type;
 }

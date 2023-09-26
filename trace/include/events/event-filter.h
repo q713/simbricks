@@ -30,6 +30,7 @@
 #include "sync/corobelt.h"
 #include "events/events.h"
 #include "util/exception.h"
+#include "events/eventTimeBoundary.h"
 
 /* general operator to act on an event stream */
 class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
@@ -100,7 +101,7 @@ class EventTypeFilter : public EventStreamActor {
   bool inverted_;
 
  public:
-  virtual bool act_on(std::shared_ptr<Event> &event) override {
+  bool act_on(std::shared_ptr<Event> &event) override {
     const EventType type = event->GetType();
     if (inverted_) {
       return not types_to_filter_.contains(type);
@@ -119,20 +120,6 @@ class EventTypeFilter : public EventStreamActor {
 };
 
 class EventTimestampFilter : public EventStreamActor {
- public:
-  struct EventTimeBoundary {
-    uint64_t lower_bound_;
-    uint64_t upper_bound_;
-
-    const static uint64_t kMinLowerBound = 0;
-    const static uint64_t kMaxUpperBound = UINT64_MAX;
-
-    explicit EventTimeBoundary(uint64_t lower_bound, uint64_t upper_bound)
-        : lower_bound_(lower_bound), upper_bound_(upper_bound) {
-    }
-  };
-
- private:
   std::vector<EventTimeBoundary> &event_time_boundaries_;
 
  public:

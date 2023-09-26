@@ -94,6 +94,8 @@ set(TRACE_LIB_HEADER_FILES
         include/util/log.h
         include/util/factory.h
         include/util/utils.h
+        include/util/concepts.h
+        include/util/ttlMap.h
         # channel abstractions
         include/sync/channel.h
         # coroutine wrappers
@@ -103,6 +105,8 @@ set(TRACE_LIB_HEADER_FILES
         # parser
         include/parser/parser.h
         # events
+        include/events/eventType.h
+        include/events/eventTimeBoundary.h
         include/events/events.h
         include/events/event-filter.h
         include/events/eventStreamParser.h
@@ -117,6 +121,7 @@ set(TRACE_LIB_HEADER_FILES
         include/analytics/trace.h
         include/analytics/tracer.h
         include/analytics/context.h
+        include/analytics/traceContext.h
         include/analytics/spanner.h
         include/analytics/timer.h
         # exporter
@@ -177,6 +182,7 @@ set (TRACE_UNIT_TESTS_SRC_FILES
         tests/span-test.cpp
         tests/gem5-parser-test.cpp
         tests/reader-test.cpp
+        tests/config-test.cpp
         )
 add_executable(${UNIT_TESTS_TARGET} ${TRACE_UNIT_TESTS_SRC_FILES})
 target_include_directories(${UNIT_TESTS_TARGET} PUBLIC
@@ -213,3 +219,14 @@ set(TRACE_SRC_FILES
 add_executable(trace ${TRACE_SRC_FILES})
 target_link_libraries(trace ${PROJECT_NAME})
 
+#######################################
+# Trace utility binary to clear named
+# pipes for usage during checkpointing
+# phase when performing online tracing
+# with gem5
+#######################################
+set(TRACE_EXHAUST_UTIL_FILES
+    namedpipe-exhauster.cpp
+)
+add_executable(exhauster ${TRACE_EXHAUST_UTIL_FILES})
+target_link_libraries(exhauster ${PROJECT_NAME})

@@ -94,7 +94,6 @@ Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp)
 
 std::shared_ptr<Event>
 Gem5Parser::ParseSystemPcPciHost(LineHandler &line_handler, uint64_t timestamp) {
-  // TODO: parse  system.pc.pci_host
   // 1369143199499: system.pc.pci_host: 00:00.0: read: offset=0x4, size=0x2
 
   uint64_t offset;
@@ -115,7 +114,6 @@ Gem5Parser::ParseSystemPcPciHost(LineHandler &line_handler, uint64_t timestamp) 
 
 std::shared_ptr<Event>
 Gem5Parser::ParseSystemPcPciHostInterface(LineHandler &line_handler, uint64_t timestamp) {
-  // TODO: parse system.pc.pci_host.interface
   // 1473338125374: system.pc.pci_host.interface[00:04.0]: clearInt
   // 1473659826000: system.pc.pci_host.interface[00:04.0]: postInt
   // 1473661882374: system.pc.pci_host.interface[00:04.0]: clearInt
@@ -143,7 +141,6 @@ Gem5Parser::ParseSystemPcSimbricks(LineHandler &line_handler, uint64_t timestamp
   }
   line_handler.TrimL();
 
-  // TODO: parse simbricks
   // 1369143037374: system.pc.simbricks _0: readConfig:  dev 0 func 0 reg 0x3d 1
   // 1693978886124: system.pc.simbricks _0.pio: simbricks-pci: sending immediate
   // response for posted write 1693980306000: system.pc.simbricks_0:
@@ -151,18 +148,14 @@ Gem5Parser::ParseSystemPcSimbricks(LineHandler &line_handler, uint64_t timestamp
   // system.pc.simbricks_0: readConfig:  dev 0 func 0 reg 0x3d 1 bytes: data =
   // 0x1 1369146219499: system.pc.simbricks_0: writeConfig: dev 0 func 0 reg 0x4
   // 2 bytes: data = 0x6
-
-  // TODO:!!!!!!!!!!!!!!!!!!!!!!!!!
-/*
- 980510899250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x30 4 bytes: data = 0xfffff800
- 980528061250: system.pc.south_bridge.ide: writeConfig: dev 0x4 func 0 reg 0x30 4 bytes: data = 0
- 982032152250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x2c 2 bytes: data = 0
- 982049790250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x2e 2 bytes: data = 0
- 982067678250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x9 1 bytes: data = 0x80
- 988036794250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x6 2 bytes: data = 0x280
- 988054157250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x6 2 bytes: data = 0x280
- 988071611250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x6 2 bytes: data = 0x280
- */
+  // 980510899250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x30 4 bytes: data = 0xfffff800
+  // 980528061250: system.pc.south_bridge.ide: writeConfig: dev 0x4 func 0 reg 0x30 4 bytes: data = 0
+  // 982032152250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x2c 2 bytes: data = 0
+  // 982049790250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x2e 2 bytes: data = 0
+  // 982067678250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x9 1 bytes: data = 0x80
+  // 988036794250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x6 2 bytes: data = 0x280
+  // 988054157250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x6 2 bytes: data = 0x280
+  // 988071611250: system.pc.south_bridge.ide: readConfig:  dev 0x4 func 0 reg 0x6 2 bytes: data = 0x280
 
   uint64_t dev, func, reg, bytes, data, offset;
   int bar;

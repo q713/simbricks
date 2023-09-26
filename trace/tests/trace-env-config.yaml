@@ -24,7 +24,10 @@
 
 # NOTE : This config is ONLY for test purposes
 MaxBackgroundThreads: 1
-MaxCpuThreads: 1
+MaxCpuThreads: 2
+JaegerUrl: "http://jaeger:4318/v1/traces"#"http://localhost:4318/v1/traces"
+LineBufferSize: 1
+EventBufferSize: 60000000
 LinuxFuncIndicator:
   - "netdev_start_xmit"
 DriverFuncIndicator:
@@ -41,3 +44,17 @@ DriverRxIndicator:
   - "i40e_napi_poll"
 SysEntryIndicator:
   - "entry_SYSCALL_64"
+BlacklistFunctions:
+  - "sjkdgfkdsjgfjk"
+TypesToFilter:
+  - "kHostMmioCRT"
+  - "kHostMmioCWT"
+SymbolTables:
+  - Identifier: "Linuxvm-Symbols"
+    Path: "linux_dumps/vmlinux-image-syms.dump"
+    AddressOffset: 0
+    Type: kSyms
+  - Identifier: "Nicdriver-Symbols"
+    Path: "linux_dumps/i40e-image-syms.dump"
+    AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
+    Type: kSyms

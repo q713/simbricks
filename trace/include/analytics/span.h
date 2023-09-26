@@ -36,7 +36,7 @@
 #include "sync/corobelt.h"
 #include "events/events.h"
 #include "env/traceEnvironment.h"
-#include "analytics/context.h"
+#include "analytics/traceContext.h"
 #include "util/utils.h"
 
 enum span_type {
@@ -102,6 +102,7 @@ class EventSpan {
 
  public:
   virtual void Display(std::ostream &out) {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     out << "id: " << std::to_string(id_);
     out << ", source_id: " << std::to_string(source_id_);
     out << ", kind: " << type_;
@@ -109,15 +110,8 @@ class EventSpan {
       out << ", starting_event={" << events_.front() << "}";
       out << ", ending_event={" << events_.back() << "}";
     }
-    // TODO: fix
-    //WriteIdent(out, ident);
-    //out << "has parent? " << (parent_ != nullptr) << std::endl;
-    //WriteIdent(out, ident);
-    //out << std::endl;
-    //for (const std::shared_ptr<Event> &event : events_) {
-    //  WriteIdent(out, ident);
-    //  out << *event << std::endl;
-    //}
+    out << ", has parent? " << BoolToString(HasParent());
+    out << ", parent_id=" << GetParentId();
   }
 
   inline std::string &GetServiceName() {
@@ -166,6 +160,13 @@ class EventSpan {
     return id_;
   }
 
+  inline uint64_t GetValidId() {
+    const uint64_t ident = GetId();
+    throw_on_false(TraceEnvironment::IsValidId(ident), "invalid span id",
+                   source_loc::current());
+    return ident;
+  }
+
   inline span_type GetType() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return type_;
@@ -176,7 +177,7 @@ class EventSpan {
     return source_id_;
   }
 
-  inline const std::shared_ptr<TraceContext> &GetContext() {
+  inline std::shared_ptr<TraceContext> GetContext() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return trace_context_;
   }
@@ -242,8 +243,11 @@ class EventSpan {
     }
     throw_if_empty(traceContext, tc_null_, source_loc::current());
 
-    auto parent = traceContext->GetParent();
-    if (not parent or parent->GetStartingTs() >= GetStartingTs()) {
+    if (not traceContext->HasParent()) {
+      return false;
+    }
+    assert(traceContext->GetParentId() != 0);
+    if (traceContext->GetParentStartingTs() >= GetStartingTs()) {
       return false;
     }
 
@@ -253,18 +257,40 @@ class EventSpan {
 
   bool HasParent() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    return trace_context_ != nullptr and trace_context_->GetParent() != nullptr;
+    return trace_context_ != nullptr and trace_context_->HasParent();
   }
 
-  std::shared_ptr<EventSpan> GetParent() {
+  uint64_t GetParentId() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not trace_context_) {
-      return nullptr;
+    if (trace_context_ == nullptr) {
+      return 0; // invalid id
     }
+    if (not trace_context_->HasParent()) {
+      return 0; // invalid id
+    }
+    return trace_context_->GetParentId();
+  }
 
-    return trace_context_->GetParent();
+  uint64_t GetValidParentId() {
+    const uint64_t parent_id = GetParentId();
+    throw_on_false(TraceEnvironment::IsValidId(parent_id),
+                   "invalid parent id", source_loc::current());
+    return parent_id;
+  }
+
+  uint64_t GetTraceId() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    if (trace_context_ == nullptr) {
+      return 0; // invalid id
+    }
+    return trace_context_->GetTraceId();
+  }
+
+  uint64_t GetValidTraceId() {
+    const uint64_t trace_id = GetTraceId();
+    throw_on_false(TraceEnvironment::IsValidId(trace_id),
+                   TraceException::kInvalidId, source_loc::current());
+    return trace_id;
   }
 
   virtual ~EventSpan() = default;

@@ -36,6 +36,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
+  //std::cout << "Nic try handel: " << *event_ptr << std::endl;
   //std::cout << name_ << " nic try poll mmio" << std::endl;
   auto con_opt = co_await from_host_queue_->Pop(resume_executor);
   auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
@@ -46,8 +47,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
     co_return false;
   }
 
-  auto mmio_span = tracer_.StartSpanByParent<NicMmioSpan>(
-      con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent(), name_);
+  auto mmio_span = tracer_.StartSpanByParentPassOnContext<NicMmioSpan>(
+      con, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not mmio_span) {
     std::cerr << "could not register mmio_span" << '\n';
     co_return false;
@@ -66,6 +67,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
+  //std::cout << "Nic try handel: " << *event_ptr << std::endl;
   auto pending_dma =
       iterate_add_erase<NicDmaSpan>(pending_nic_dma_spans_, event_ptr);
   if (pending_dma) {
@@ -73,9 +75,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
       tracer_.MarkSpanAsDone(pending_dma);
     } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
-      //std::cout << name_ << " nic try push dma" << std::endl;
-      auto context = create_shared<Context>(
-          "HandelDma could not create context", expectation::kDma, pending_dma);
+      //std::cout << name_ << " nic try push dma: " << *event_ptr << std::endl;
+      auto context = Context::CreatePassOnContext<expectation::kDma>(pending_dma);
       throw_on(not co_await to_host_queue_->Push(resume_executor, context),
                TraceException::kCouldNotPushToContextQueue,
                source_loc::current());
@@ -88,7 +89,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
   if (not IsType(event_ptr, EventType::kNicDmaIT)) {
     std::cout << "NicSpanner::HandelDma: Found non start Dma event, but neeed "
                  "to start"
-              << std::endl;
+              << '\n';
     co_return false;
   }
 
@@ -96,6 +97,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
       "try starting a new dma span with NON issue");
 
   // TODO: maybe we need to write at this point into the queue
+  throw_if_empty(last_causing_, TraceException::kSpanIsNull, source_loc::current());
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(
       last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_dma) {
@@ -125,6 +127,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
       std::cerr << "error" << '\n';
     }
 
+    throw_if_empty(parent, TraceException::kSpanIsNull, source_loc::current());
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
@@ -132,8 +135,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     //    << name_
     //    << " NicSpanner::HandelTxrx: trying to push tx context to other side"
     //    << std::endl;
-    auto context = create_shared<Context>(
-        "HandelTxrx: could not create context", expectation::kRx, eth_span);
+    auto context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
              "HandelTxrx: could not write network context ",
              source_loc::current());
@@ -150,20 +152,16 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(con, expectation::kRx),
              "nic_spanner: received non kRx context", source_loc::current());
-
-    eth_span = tracer_.StartSpanByParent<NicEthSpan>(
-        con->GetNonEmptyParent(), event_ptr, event_ptr->GetParserIdent(),
-        name_);
+    eth_span = tracer_.StartSpanByParentPassOnContext<NicEthSpan>(
+        con, event_ptr, event_ptr->GetParserIdent(), name_);
     last_causing_ = eth_span;
 
     //std::cout << name_ << " nic tryna push receive update." << std::endl;
-    auto receive_context = create_shared<Context>(
-        "could not create receive context to pass on to host", expectation::kRx,
-        eth_span);
-    throw_on(
-        not co_await to_host_receives_->Push(resume_executor, receive_context),
-        "NicSpanner::HandelTxrx: could not write host receive context ",
-        source_loc::current());
+    auto receive_context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
+    const bool could_push = co_await to_host_receives_->Push(resume_executor, receive_context);
+    throw_on_false(could_push,
+                   "NicSpanner::HandelTxrx: could not write host receive context ",
+                   source_loc::current());
     //std::cout << name_ << " nic pushed receive update." << std::endl;
 
   } else {
@@ -183,6 +181,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
+  throw_if_empty(last_causing_, TraceException::kSpanIsNull, source_loc::current());
   auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
       last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not msix_span) {
@@ -194,8 +193,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
   tracer_.MarkSpanAsDone(msix_span);
 
   //std::cout << name_ << " nic try push msix" << std::endl;
-  auto context = create_shared<Context>("HandelMsix could not create context",
-                                        expectation::kMsix, msix_span);
+  auto context = Context::CreatePassOnContext<expectation::kMsix>(msix_span);
   throw_on(not co_await to_host_queue_->Push(resume_executor, context),
            TraceException::kCouldNotPushToContextQueue,
            source_loc::current());
@@ -208,13 +206,12 @@ NicSpanner::NicSpanner(
     TraceEnvironment &trace_environment,
     std::string &&name,
     Tracer &tra,
-    /*Timer &timer*/ WeakTimer &timer,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host,
     std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_receives)
-    : Spanner(trace_environment, std::move(name), tra, timer),
+    : Spanner(trace_environment, std::move(name), tra),
       to_network_queue_(std::move(to_network)),
       from_network_queue_(std::move(from_network)),
       to_host_queue_(std::move(to_host)),

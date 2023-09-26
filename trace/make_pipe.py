@@ -33,7 +33,7 @@ def create_named_pipe(names: list[str], path: str = ""):
     for name in names:
         if path != "":
             name = os.path.join(path, name)
-        print(f"Start Creation of named pipe with name {name} and size {size}")
+        print(f"Start Creation of named pipe with name {name}")
         try:
             os.mkfifo(name)
         except OSError as err:
@@ -70,7 +70,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.commands == "create":
-        size = int(args.size) if args.size is not None else 16
         path = str(args.path) if args.path is not None else ""
         create_named_pipe(args.pipe_names, path)
     elif args.commands == "check":

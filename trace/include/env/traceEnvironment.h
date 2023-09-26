@@ -59,6 +59,10 @@ class TraceEnvironment {
 
   std::set<const std::string *> sys_entry_;
 
+  std::set<const std::string *> blacklist_func_indicator_;
+
+  std::set<EventType> types_to_filter_;
+
   std::vector<std::shared_ptr<SymsFilter>> symbol_tables_;
 
   concurrencpp::runtime runtime_;
@@ -73,13 +77,18 @@ class TraceEnvironment {
     }
   }
 
+  bool AddSymbolTableInternal(const std::string identifier,
+                              const std::string &file_path,
+                              uint64_t address_offset, FilterType type,
+                              std::set<std::string> symbol_filter);
+
  protected:
   using PoolExecutor = concurrencpp::thread_pool_executor;
   using ThreadExecutor = concurrencpp::thread_executor;
   using PoolExecutorPtr = std::shared_ptr<PoolExecutor>;
   using ThreadExecutorPtr = std::shared_ptr<ThreadExecutor>;
 
-  const std::string *GetCallFunc(std::shared_ptr<Event> &event_ptr);
+  const std::string *GetCallFunc(const std::shared_ptr<Event> &event_ptr);
 
  public:
   explicit TraceEnvironment(const TraceEnvConfig &trace_env_config);
@@ -114,6 +123,11 @@ class TraceEnvironment {
     return executor;
   }
 
+  TraceEnvConfig GetConfig() {
+    const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+    return trace_env_config_;
+  }
+
   inline StringInternalizer &GetInternalizer() {
     return internalizer_;
   }
@@ -122,33 +136,41 @@ class TraceEnvironment {
     return symbol_tables_;
   }
 
+  static inline constexpr uint64_t GetDefaultId() {
+    return 0;
+  }
+
+  static inline bool IsValidId(uint64_t ident) {
+    return ident != 0;
+  }
+
   inline uint64_t GetNextParserId() {
     const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
-    static uint64_t next_id = 0;
+    static uint64_t next_id = 1;
     return next_id++;
   }
 
   inline uint64_t GetNextSpanId() {
     const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
-    static uint64_t next_id = 0;
+    static uint64_t next_id = 1;
     return next_id++;
   }
 
   inline uint64_t GetNextSpannerId() {
     const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
-    static uint64_t next_id = 0;
+    static uint64_t next_id = 1;
     return next_id++;
   }
 
   inline uint64_t GetNextTraceId() {
     const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
-    static uint64_t next_id = 0;
+    static uint64_t next_id = 1;
     return next_id++;
   }
 
   inline uint64_t GetNextTraceContextId() {
     const std::unique_lock writer_lock(trace_env_reader_writer_mutex_);
-    static uint64_t next_id = 0;
+    static uint64_t next_id = 1;
     return next_id++;
   }
 
@@ -168,25 +190,31 @@ class TraceEnvironment {
 
   std::pair<const std::string *, const std::string *> SymtableFilter(uint64_t address);
 
-  bool IsDriverTx(std::shared_ptr<Event> event_ptr);
+  bool IsTypeToFilter(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsDriverRx(std::shared_ptr<Event> event_ptr);
+  bool IsBlacklistedFunctionCall(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsPciMsixDescAddr(std::shared_ptr<Event> event_ptr);
+  bool IsBlacklistedFunctionCall(const std::string *func_name);
 
-  bool is_pci_write(std::shared_ptr<Event> event_ptr);
+  bool IsDriverTx(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsKernelTx(std::shared_ptr<Event> event_ptr);
+  bool IsDriverRx(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsKernelRx(std::shared_ptr<Event> event_ptr);
+  bool IsPciMsixDescAddr(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsKernelOrDriverTx(std::shared_ptr<Event> event_ptr);
+  bool is_pci_write(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsKernelOrDriverRx(std::shared_ptr<Event> event_ptr);
+  bool IsKernelTx(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsSocketConnect(std::shared_ptr<Event> event_ptr);
+  bool IsKernelRx(const std::shared_ptr<Event> &event_ptr);
 
-  bool IsSysEntry(std::shared_ptr<Event> event_ptr);
+  bool IsKernelOrDriverTx(const std::shared_ptr<Event> &event_ptr);
+
+  bool IsKernelOrDriverRx(const std::shared_ptr<Event> &event_ptr);
+
+  bool IsSocketConnect(const std::shared_ptr<Event> &event_ptr);
+
+  bool IsSysEntry(const std::shared_ptr<Event> &event_ptr);
 
   bool IsMsixNotToDeviceBarNumber(int bar);
 

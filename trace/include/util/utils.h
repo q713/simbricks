@@ -77,7 +77,4 @@ inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<ObjT> &to_wri
   return out;
 }
 
-template<size_t Size>
-concept SizeLagerZero =  Size > 0;
-
 #endif //SIMBRICKS_TRACE_UTILS_H_

@@ -66,6 +66,7 @@ class TraceException : public std::exception {
   inline static const std::string kSpanExporterNull{"SpanExporter is null"};
   inline static const std::string kSpanProcessorNull{"SpanProcessor is null"};
   inline static const std::string kTraceProviderNull{"TracerProvider is null"};
+  inline static const std::string kInvalidId{"Invalid Identifier"};
 
   explicit TraceException(const char *location, const char *message)
       : error_message_(build_error_msg(location, message)) {}
@@ -83,7 +84,7 @@ class TraceException : public std::exception {
 
 inline std::string LocationToString(const source_loc &location) {
   std::stringstream msg{location.file_name()};
-  msg << ":" << location.function_name();
+  msg << "-" << location.function_name() << "(" << location.line() << "," << location.column() << ")";
   return msg.str();
 }
 
@@ -92,10 +93,10 @@ inline void throw_if_empty(const std::shared_ptr<Value> to_check,
                            const char *message,
                            const source_loc &location) {
   if (not to_check) {
-    std::cout << "exception thrown" << '\n';
-    std::cout << message << '\n';
-    //std::terminate();
-    throw TraceException(LocationToString(location), message);
+    const TraceException trace_exception{LocationToString(location), message};
+    std::cerr << trace_exception.what() << std::endl;
+    std::terminate();
+    // throw TraceException(LocationToString(location), message);
   }
 }
 
@@ -118,10 +119,10 @@ inline void throw_if_empty(const std::unique_ptr<Value> &to_check,
                            const char *message,
                            const source_loc &location) {
   if (not to_check) {
-    std::cout << "exception thrown" << '\n';
-    std::cout << message << '\n';
-    //std::terminate();
-    throw TraceException(LocationToString(location), message);
+    const TraceException trace_exception{LocationToString(location), message};
+    std::cerr << trace_exception.what() << std::endl;
+    std::terminate();
+    //throw TraceException(LocationToString(location), message);
   }
 }
 
@@ -144,10 +145,10 @@ inline void throw_if_empty(const Value *to_check,
                            const char *message,
                            const source_loc &location) {
   if (not to_check) {
-    std::cout << "exception thrown" << '\n';
-    std::cout << message << '\n';
-    //std::terminate();
-    throw TraceException(LocationToString(location), message);
+    const TraceException trace_exception{LocationToString(location), message};
+    std::cerr << trace_exception.what() << std::endl;
+    std::terminate();
+    // throw TraceException(LocationToString(location), message);
   }
 }
 
@@ -161,14 +162,12 @@ inline void throw_if_empty(const Value *to_check, const std::string &&message, c
   throw_if_empty(to_check, message.c_str(), location);
 }
 
-inline void throw_on(bool should_throw,
-                     const char *message,
-                     const source_loc &location) {
+inline void throw_on(bool should_throw, const char *message, const source_loc &location) {
   if (should_throw) {
-    std::cout << "exception thrown" << '\n';
-    std::cout << message << '\n';
-    //std::terminate();
-    throw TraceException(LocationToString(location), message);
+    const TraceException trace_exception{LocationToString(location), message};
+    std::cerr << trace_exception.what() << std::endl;
+    std::terminate();
+    //throw trace_exception;
   }
 }
 
@@ -178,6 +177,18 @@ inline void throw_on(bool should_throw, const std::string &message, const source
 
 inline void throw_on(bool should_throw, const std::string &&message, const source_loc &location) {
   throw_on(should_throw, message.c_str(), location);
+}
+
+inline void throw_on_false(bool should_throw, const char *message, const source_loc &location) {
+  throw_on(not should_throw, message, location);
+}
+
+inline void throw_on_false(bool should_throw, const std::string &message, const source_loc &location) {
+  throw_on(not should_throw, message.c_str(), location);
+}
+
+inline void throw_on_false(bool should_throw, const std::string &&message, const source_loc &location) {
+  throw_on(not should_throw, message.c_str(), location);
 }
 
 template<typename ValueType>
@@ -207,11 +218,12 @@ inline void throw_just(const source_loc &location, Args &&... args) {
   ([&] {
     message_builder << args;
   }(), ...);
-  std::cout << "exception thrown" << '\n';
+  std::cout << "exception thrown" << std::endl;
   const std::string message{message_builder.str()};
-  std::cout << message << '\n';
-//std::terminate();
-  throw TraceException(LocationToString(location), message);
+  const TraceException trace_exception{LocationToString(location), message};
+  std::cerr << trace_exception.what() << std::endl;
+  std::terminate();
+  // throw TraceException(LocationToString(location), message);
 }
 
 #endif //SIMBRICKS_TRACE_EXCEPTION_H_

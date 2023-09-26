@@ -22,41 +22,21 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SIMBRICKS_TRACE_COMP_H_
-#define SIMBRICKS_TRACE_COMP_H_
+#include <cstdint>
 
-#include <set>
-#include <string>
+#ifndef SIMBRICKS_TRACE_EVENTS_EVENTTIMEBOUNDARY_H_
+#define SIMBRICKS_TRACE_EVENTS_EVENTTIMEBOUNDARY_H_
 
-class ComponentFilter {
- private:
-  const std::string &identifier_;
-  std::set<std::string> component_table_;
+struct EventTimeBoundary {
+  uint64_t lower_bound_;
+  uint64_t upper_bound_;
 
- public:
-  explicit ComponentFilter(const std::string &identifier)
-      : identifier_(identifier){};
+  const static uint64_t kMinLowerBound = 0;
+  const static uint64_t kMaxUpperBound = UINT64_MAX;
 
-  inline ComponentFilter &operator()(const std::string &symbol) {
-    component_table_.insert(symbol);
-    return *this;
-  }
-
-  inline const std::set<std::string> &get_component_table() {
-    return component_table_;
-  }
-
-  bool filter(const std::string &comp) const {
-    if (component_table_.empty())
-        return true;
-        
-    auto found = component_table_.find(comp);
-    return found != component_table_.end();
-  }
- 
-  inline const std::string &get_ident() {
-    return identifier_;
+  explicit EventTimeBoundary(uint64_t lower_bound, uint64_t upper_bound)
+      : lower_bound_(lower_bound), upper_bound_(upper_bound) {
   }
 };
 
-#endif  // SIMBRICKS_TRACE_COMP_H_
+#endif //SIMBRICKS_TRACE_EVENTS_EVENTTIMEBOUNDARY_H_

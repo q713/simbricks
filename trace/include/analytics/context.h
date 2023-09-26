@@ -22,23 +22,16 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
-#define SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
-
-#include <concurrencpp/executors/executor.h>
-#include <concurrencpp/results/result.h>
-#include <condition_variable>
 #include <iostream>
-#include <list>
 #include <memory>
-#include <optional>
-#include <unordered_map>
-#include <utility>
-#include <mutex>
 
 #include "util/exception.h"
-#include "sync/corobelt.h"
+#include "util/factory.h"
 #include "env/traceEnvironment.h"
+#include "analytics/span.h"
+
+#ifndef SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
+#define SIMBRICKS_TRACE_CONTEXT_QUEUE_H_
 
 enum expectation { kTx, kRx, kDma, kMsix, kMmio };
 
@@ -60,115 +53,66 @@ inline std::ostream &operator<<(std::ostream &out, expectation exp) {
   return out;
 }
 
-class EventSpan;
-std::shared_ptr<EventSpan> CloneShared(const std::shared_ptr<EventSpan> &other);
-std::ostream &operator<<(std::ostream &out, std::shared_ptr<EventSpan> &span);
-
-class TraceContext {
-  // if parent is null it is a trace starting span
-  std::shared_ptr<EventSpan> parent_ = nullptr;
-  uint64_t trace_id_;
-  uint64_t id_;
-
-  std::mutex trace_context_mutex_;
-
- public:
-  explicit TraceContext(uint64_t trace_id,
-                        uint64_t trace_context_id)
-      : parent_(nullptr), trace_id_(trace_id), id_(trace_context_id) {
-  }
-
-  explicit TraceContext(std::shared_ptr<EventSpan> &parent,
-                        uint64_t trace_id,
-                        uint64_t trace_context_id)
-      : parent_(parent), trace_id_(trace_id), id_(trace_context_id) {
-  }
-
-  TraceContext(const TraceContext &other) {
-    trace_id_ = other.trace_id_;
-    id_ = other.id_;
-    parent_ = CloneShared(other.parent_);
-  }
-
-  bool HasParent() {
-    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
-    return parent_ != nullptr;
-  }
-
-  const std::shared_ptr<EventSpan> &GetParent() {
-    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
-    return parent_;
-  }
-
-  uint64_t GetTraceId() {
-    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
-    return trace_id_;
-  }
-
-  uint64_t GetId() {
-    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
-    return id_;
-  }
-
-  void SetTraceId(uint64_t new_id) {
-    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
-    trace_id_ = new_id;
-  }
-
-  void SetParentSpan(std::shared_ptr<EventSpan> new_parent_span) {
-    const std::lock_guard<std::mutex> guard(trace_context_mutex_);
-    parent_ = std::move(new_parent_span);
-  }
-
-};
-
 class Context {
-
-  // TODO: technically the expectation is not needed, for now, it stays
-  //       as it might come in handy for debugging or there like
-  expectation expectation_;
-  std::shared_ptr<EventSpan> parent_span_;
+  const uint64_t trace_id_;
+  const expectation expectation_;
+  const uint64_t parent_id_;
+  const bool has_parent_ = true;
+  const uint64_t parent_start_ts_;
 
  public:
-  Context(expectation expectation, std::shared_ptr<EventSpan> parent_span)
-      : expectation_(expectation), parent_span_(parent_span) {
-    throw_if_empty(parent_span, "trying to create Context, parent span is null",
-                   source_loc::current());
+  explicit Context(uint64_t trace_id, expectation expectation, uint64_t parent_id, uint64_t parent_start_ts)
+      : trace_id_(trace_id), expectation_(expectation), parent_id_(parent_id), parent_start_ts_(parent_start_ts) {
+    throw_on_false(TraceEnvironment::IsValidId(trace_id),
+                   TraceException::kInvalidId, source_loc::current());
+    throw_on_false(TraceEnvironment::IsValidId(parent_id),
+                   TraceException::kInvalidId, source_loc::current());
   }
 
-  inline bool HasParent() {
-    return parent_span_ != nullptr;
+  inline bool HasParent() const {
+    return has_parent_;
   }
-
-  inline std::shared_ptr<EventSpan> &GetParent() {
-    return parent_span_;
-  };
-
-  inline std::shared_ptr<EventSpan> &GetNonEmptyParent() {
-    throw_if_empty(parent_span_, "GetNonEmptyParent parent is null", source_loc::current());
-    return parent_span_;
-  };
 
   inline expectation GetExpectation() const {
     return expectation_;
   }
 
+  inline uint64_t GetParentStartingTs() const {
+    return parent_start_ts_;
+  }
+
+  inline uint64_t GetTraceId() const {
+    return trace_id_;
+  }
+
+  inline uint64_t GetParentId() const {
+    return parent_id_;
+  }
+
   void Display(std::ostream &out) {
     out << "Context: " << "expectation=" << expectation_;
+    out << ", has_parent=" << BoolToString(has_parent_);
+    out << ", parent_starting_ts=" << parent_start_ts_;
     out << ", parent_span={" << '\n';
-    out << parent_span_ << '\n';
+    out << "parent_id=" << parent_id_ << '\n';
     out << "}";
+  }
+
+  template<expectation Exp>
+  static std::shared_ptr<Context> CreatePassOnContext(const std::shared_ptr<EventSpan> &parent_span) {
+    throw_if_empty(parent_span, TraceException::kSpanIsNull, source_loc::current());
+    auto context = create_shared<Context>(TraceException::kContextIsNull,
+                                          parent_span->GetValidTraceId(),
+                                          Exp,
+                                          parent_span->GetValidId(),
+                                          parent_span->GetStartingTs());
+    assert(context);
+    return context;
   }
 
 };
 
-inline std::shared_ptr<TraceContext> clone_shared(const std::shared_ptr<TraceContext> &other) {
-  throw_if_empty(other, TraceException::kContextIsNull, source_loc::current());
-  auto new_con = create_shared<TraceContext>(TraceException::kContextIsNull, *other);
-  return new_con;
-}
-
-inline bool is_expectation(std::shared_ptr<Context> &con, expectation exp) {
+inline bool is_expectation(const std::shared_ptr<Context> &con, expectation exp) {
   return con && con->GetExpectation() == exp;
 }
 

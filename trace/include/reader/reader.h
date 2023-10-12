@@ -223,6 +223,7 @@ class ReaderBuffer {
 
   std::pair<bool, LineHandler *> NextHandler() {
     if (not HasStillLine()) {
+      std::cout << "ReaderBuffer has no line left, impossible to read more" << '\n';
       return std::make_pair(false, nullptr);
     }
 
@@ -230,6 +231,7 @@ class ReaderBuffer {
       FillBuffer();
       // maybe we have nothing buffered but the stream still appears to be good
       if (not StillBuffered()) {
+        std::cout << "ReaderBuffer has no line buffered left" << '\n';
         return std::make_pair(false, nullptr);
       }
     }

@@ -398,6 +398,7 @@ class EventStreamParser : public producer<std::shared_ptr<Event>> {
       co_await tar_chan->Push(resume_executor, event);
     }
 
+    co_await tar_chan->CloseChannel(resume_executor);
     co_return;
   };
 };

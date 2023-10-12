@@ -99,10 +99,8 @@ class OtlpSpanExporter : public SpanExporter {
   bool batch_mode_ = false;
   std::string lib_name_;
 
-  // mapping: own_context_id -> opentelemetry_span_context
   using context_t = opentelemetry::trace::SpanContext;
   // mapping old_span_id -> opentelemetry_span_context
-  //std::unordered_map<uint64_t, context_t> context_map_;
   LazyTtLMap<uint64_t, context_t, 900> context_map_;
 
   // mapping: own_span_id -> opentelemetry_span
@@ -123,9 +121,6 @@ class OtlpSpanExporter : public SpanExporter {
                         context_t &context) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "invalid id", source_loc::current());
-    //auto iter = context_map_.insert({span_id, context});
-    //throw_on_false(iter.second, "InsertNewContext could not insert context into map",
-    //               source_loc::current());
     const bool suc = context_map_.Insert(span_id, context);
     throw_on_false(suc, "InsertNewContext could not insert context into map",
                    source_loc::current());
@@ -135,9 +130,6 @@ class OtlpSpanExporter : public SpanExporter {
   GetContext(uint64_t span_id) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "GetContext context_to_get is null", source_loc::current());
-    //auto iter = context_map_.find(span_id);
-    //throw_on(iter == context_map_.end(), "GetContext context was not found",
-    //         source_loc::current());
     auto con_opt = context_map_.Find(span_id);
     auto con = OrElseThrow(con_opt, "could not find context for key",
                            source_loc::current());
@@ -447,12 +439,7 @@ class OtlpSpanExporter : public SpanExporter {
   opentelemetry::trace::StartSpanOptions GetSpanStartOpts(const std::shared_ptr<EventSpan> &span) {
     opentelemetry::trace::StartSpanOptions span_options;
     if (span->HasParent()) {
-      //auto custom_context = span->GetContext();
       const uint64_t parent_id = span->GetValidParentId();
-      //auto parent_context = parent->GetContext();
-      //throw_if_empty(parent_context, "GetSpanStartOpts, parent context is null",
-      //               source_loc::current());
-      //auto open_context = GetContext(parent_context);
       auto open_context = GetContext(parent_id);
       span_options.parent = open_context;
     }
@@ -510,7 +497,6 @@ class OtlpSpanExporter : public SpanExporter {
   void set_HostMmioSpanAttr(span_t &new_span, std::shared_ptr<HostMmioSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-read", BoolToString(old_span->IsRead()));
-    //new_span->SetAttribute("after-pci/pci-before", BoolToString(old_span->IsAfterPci()));
     new_span->SetAttribute("BAR-number", std::to_string(old_span->GetBarNumber()));
     new_span->SetAttribute("is-going-to-device",
                            BoolToString(this->trace_environment_.IsToDeviceBarNumber(

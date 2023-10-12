@@ -159,6 +159,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
         return this->closed_ or this->poisened_ or this->size_ < BufferSize;
       });
       if (this->closed_ or this->poisened_) {
+        lock.unlock();
         this->chan_cond_var_.notify_all();
         return false;
       }
@@ -175,7 +176,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
   // returns false if channel is closed or poisened
   bool TryPush(ValueType value) {
     {
-      std::unique_lock<std::mutex> lock{this->chan_numtex_};
+      std::unique_lock lock{this->chan_numtex_};
       if (this->closed_ or this->poisened_ or this->size_ >= BufferSize) {
         return false;
       }
@@ -194,6 +195,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
       return this->poisened_ || this->closed_ || this->size_ > 0;
     });
     if (this->poisened_) {
+      lock.unlock();
       this->chan_cond_var_.notify_all();
       return std::nullopt;
     }
@@ -449,6 +451,8 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
       if (this->closed_ or this->poisened_ or this->size_ >= Capacity) {
+        guard.unlock();
+        this->channel_cv_.notify_all();
         co_return false;
       }
 
@@ -476,6 +480,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       return this->poisened_ || this->closed_ || this->size_ > 0;
     });
     if (this->poisened_) {
+      guard.unlock();
       this->channel_cv_.notify_all();
       co_return std::nullopt;
     }
@@ -600,6 +605,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
       if (this->closed_ or this->poisened_) {
+        guard.unlock();
         this->channel_cv_.notify_all();
         co_return false;
       }
@@ -639,6 +645,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
       return this->poisened_ || this->closed_ || this->size_ > 0;
     });
     if (this->poisened_) {
+      guard.unlock();
       this->channel_cv_.notify_all();
       co_return std::nullopt;
     }

@@ -101,7 +101,8 @@ class OtlpSpanExporter : public SpanExporter {
 
   using context_t = opentelemetry::trace::SpanContext;
   // mapping old_span_id -> opentelemetry_span_context
-  LazyTtLMap<uint64_t, context_t, 900> context_map_;
+  //LazyTtLMap<uint64_t, context_t, 900> context_map_;
+  std::unordered_map<uint64_t, context_t> context_map_;
 
   // mapping: own_span_id -> opentelemetry_span
   using span_t = opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>;
@@ -121,7 +122,8 @@ class OtlpSpanExporter : public SpanExporter {
                         context_t &context) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "invalid id", source_loc::current());
-    const bool suc = context_map_.Insert(span_id, context);
+    //const bool suc = context_map_.Insert(span_id, context);
+    const bool suc = context_map_.insert({span_id, context}).second;
     throw_on_false(suc, "InsertNewContext could not insert context into map",
                    source_loc::current());
   }
@@ -130,10 +132,14 @@ class OtlpSpanExporter : public SpanExporter {
   GetContext(uint64_t span_id) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "GetContext context_to_get is null", source_loc::current());
-    auto con_opt = context_map_.Find(span_id);
-    auto con = OrElseThrow(con_opt, "could not find context for key",
+    //auto con_opt = context_map_.Find(span_id);
+    auto con_opt = context_map_.find(span_id);
+    throw_on(con_opt == context_map_.end(), "could not find context for key",
                            source_loc::current());
-    return con;
+    //auto con = OrElseThrow(con_opt, "could not find context for key",
+    //                       source_loc::current());
+    //return con;
+    return con_opt->second;
   }
 
   void InsertNewSpan(std::shared_ptr<EventSpan> &old_span,

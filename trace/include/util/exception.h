@@ -67,6 +67,7 @@ class TraceException : public std::exception {
   inline static const std::string kSpanProcessorNull{"SpanProcessor is null"};
   inline static const std::string kTraceProviderNull{"TracerProvider is null"};
   inline static const std::string kInvalidId{"Invalid Identifier"};
+  inline static const std::string kBufferedEventProviderIsNull{"BufferedEventProvider is null"};
 
   explicit TraceException(const char *location, const char *message)
       : error_message_(build_error_msg(location, message)) {}

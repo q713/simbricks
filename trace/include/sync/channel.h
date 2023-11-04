@@ -206,10 +206,10 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
       return std::nullopt;
     }
     assert(this->size_ > 0 and "trying to read from empty channel");
-    auto result = perform_read();
+    auto result = std::move(perform_read());
     lock.unlock();
     this->chan_cond_var_.notify_all();
-    return result;
+    return std::move(result);
   }
 
   std::optional<ValueType> TryPop() {
@@ -219,7 +219,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
       this->chan_cond_var_.notify_all();
       return std::nullopt;
     }
-    auto result = perform_read();
+    auto result = std::move(perform_read());
     lock.unlock();
     this->chan_cond_var_.notify_all();
     return std::move(result);
@@ -238,9 +238,129 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
     if (not predicate(value)) {
       return std::nullopt;
     }
-    auto result = perform_read();
+    auto result = std::move(perform_read());
     lock.unlock();
     this->chan_cond_var_.notify_all();
+    return std::move(result);
+  }
+};
+
+template<typename ValueType>
+class NonCoroUnBufferedChannel : public NonCoroChannel<ValueType> {
+
+  std::list<ValueType> buffer_;
+
+ public:
+
+  NonCoroUnBufferedChannel() = default;
+
+  NonCoroUnBufferedChannel(const NonCoroUnBufferedChannel<ValueType> &) = delete;
+
+  NonCoroUnBufferedChannel(NonCoroUnBufferedChannel<ValueType> &&) = delete;
+
+  NonCoroUnBufferedChannel<ValueType> &operator=(
+      const NonCoroUnBufferedChannel<ValueType> &) noexcept = delete;
+
+  NonCoroUnBufferedChannel<ValueType> &operator=(
+      NonCoroUnBufferedChannel<ValueType> &&) noexcept = delete;
+
+  // returns false if channel is closed or poisened
+  bool Push(ValueType value) {
+    {
+      std::unique_lock lock{this->chan_numtex_};
+      if (this->closed_ or this->poisened_) {
+        lock.unlock();
+        this->chan_cond_var_.notify_all();
+        return false;
+      }
+      assert(not this->closed_ and "channel should not be closed here");
+      assert(not this->poisened_ and "channel should not be poisened here");
+
+      buffer_.push_back(std::move(value));
+      ++(this->size_);
+    }
+
+    this->chan_cond_var_.notify_all();
+    return true;
+  }
+
+  // returns false if channel is closed or poisened
+  bool TryPush(ValueType value) {
+    return Push(std::move(value));
+  }
+
+  // returns empty optional in case channel is poisened or empty
+  std::optional<ValueType> Pop() {
+    std::unique_lock lock{this->chan_numtex_};
+
+    this->chan_cond_var_.wait(lock, [this] {
+      return this->poisened_ || this->closed_ || this->size_ > 0;
+    });
+
+    if (this->poisened_) {
+      lock.unlock();
+      this->chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+
+    assert(not this->poisened_ and "channel should not be poisened here");
+    if (this->size_ == 0) {
+      lock.unlock();
+      this->chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+
+    assert(this->size_ > 0 and "trying to read from empty channel");
+    auto result = std::move(buffer_.front());
+    buffer_.pop_front();
+    --(this->size_);
+
+    lock.unlock();
+    this->chan_cond_var_.notify_all();
+
+    return std::move(result);
+  }
+
+  std::optional<ValueType> TryPop() {
+    std::unique_lock lock{this->chan_numtex_};
+
+    if (this->poisened_ or this->size_ == 0) {
+      lock.unlock();
+      this->chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+
+    auto result = std::move(buffer_.front());
+    buffer_.pop_front();
+    --(this->size_);
+
+    lock.unlock();
+    this->chan_cond_var_.notify_all();
+
+    return std::move(result);
+  }
+
+  std::optional<ValueType> TryPopOnTrue(std::function<bool(ValueType &)> &predicate) {
+    std::unique_lock lock{this->chan_numtex_};
+
+    if (this->poisened_ or this->size_ == 0) {
+      lock.unlock();
+      this->chan_cond_var_.notify_all();
+      return std::nullopt;
+    }
+
+    ValueType &value = buffer_.front();
+    if (not predicate(value)) {
+      return std::nullopt;
+    }
+
+    auto result = std::move(buffer_.front());
+    buffer_.pop_front();
+    --(this->size_);
+
+    lock.unlock();
+    this->chan_cond_var_.notify_all();
+
     return std::move(result);
   }
 };
@@ -345,7 +465,7 @@ class CoroChannel {
   }
 };
 
-template<typename ValueType, size_t Capacity = 30> requires SizeLagerZero<Capacity>
+template<typename ValueType, size_t Capacity = 150> requires SizeLagerZero<Capacity>
 class CoroBoundedChannel : public CoroChannel<ValueType> {
 
  private:
@@ -412,7 +532,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     out << "}" << '\n';
   }
 
-  // returns false if channel is closed or poisened
+  // returns false if channel is closed or poisoned
   concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
@@ -493,12 +613,12 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     }
     assert(this->size_ > 0 and "trying to read from empty channel");
 
-    auto result = perform_read();
+    auto result = std::move(perform_read());
 
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return result;
+    co_return std::move(result);
   }
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
@@ -520,7 +640,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       co_return std::nullopt;
     }
 
-    auto result = perform_read();
+    auto result = std::move(perform_read());
 
     guard.unlock();
     this->channel_cv_.notify_all();
@@ -549,7 +669,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       co_return std::nullopt;
     }
 
-    auto result = perform_read();
+    auto result = std::move(perform_read());
 
     guard.unlock();
     this->channel_cv_.notify_all();
@@ -658,14 +778,14 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
     }
     assert(this->size_ > 0 and "trying to read from empty channel");
 
-    auto result = buffer_.front();
+    auto result = std::move(buffer_.front());
     buffer_.pop_front();
     --(this->size_);
 
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return result;
+    co_return std::move(result);
   }
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
@@ -681,7 +801,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
       co_return std::nullopt;
     }
 
-    auto result = buffer_.front();
+    auto result = std::move(buffer_.front());
     buffer_.pop_front();
     --(this->size_);
 
@@ -705,6 +825,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
       co_return std::nullopt;
     }
 
+    // no move here, we may want to keep the value!
     auto result = buffer_.front();
     if (not predicate(result)) {
       co_return std::nullopt;

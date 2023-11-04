@@ -33,7 +33,7 @@
 #include "config/config.h"
 #include "env/traceEnvironment.h"
 #include "events/event-filter.h"
-#include "events/eventStreamParser.h"
+#include "parser/eventStreamParser.h"
 #include "events/events.h"
 #include "parser/parser.h"
 #include "reader/reader.h"
@@ -193,45 +193,65 @@ int main(int argc, char *argv[]) {
     if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
         and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")) {
 
-      auto parser_h_s = create_shared<EventStreamParser>("EventStreamParser null",
-                                                         trace_environment,
-                                                         "gem5-server-reader",
-                                                         result["gem5-server-event-stream"].as<std::string>());
+      EventStreamParser parser_h_s {trace_environment,"gem5-server-reader"};
+      auto event_pro_h_s = create_shared<BufferedEventProvider<1, 1>>(
+          TraceException::kBufferedEventProviderIsNull,
+          trace_environment,
+          "BufferedEventProviderHostServer",
+          result["gem5-server-event-stream"].as<std::string>(),
+          parser_h_s,
+          timer
+      );
       auto filter_h_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
-      const pipeline<std::shared_ptr<Event>> pl_h_s{parser_h_s, pipeline_h_s, spanner_h_s};
+      const pipeline<std::shared_ptr<Event>> pl_h_s{event_pro_h_s, pipeline_h_s, spanner_h_s};
 
-      auto parser_h_c = create_shared<EventStreamParser>("EventStreamParser",
-                                                         trace_environment,
-                                                         "gem5-client-reader",
-                                                         result["gem5-client-event-stream"].as<std::string>());
+      EventStreamParser parser_h_c{trace_environment, "gem5-client-reader"};
+      auto event_pro_h_c = create_shared<BufferedEventProvider<1, 1>>(
+          TraceException::kBufferedEventProviderIsNull,
+          trace_environment,
+          "BufferedEventProviderHostClient",
+          result["gem5-client-event-stream"].as<std::string>(),
+          parser_h_c,
+          timer
+      );
       auto filter_h_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
-      const pipeline<std::shared_ptr<Event>> pl_h_c{parser_h_c, pipeline_h_c, spanner_h_c};
+      const pipeline<std::shared_ptr<Event>> pl_h_c{event_pro_h_c, pipeline_h_c, spanner_h_c};
 
-      auto parser_n_s = create_shared<EventStreamParser>("EventStreamParser null",
-                                                         trace_environment,
-                                                         "nicbm-server-reader",
-                                                         result["nicbm-server-event-stream"].as<std::string>());
+      EventStreamParser parser_n_s{trace_environment, "nicbm-server-reader"};
+      auto event_pro_n_s = create_shared<BufferedEventProvider<1, 1>>(
+          TraceException::kBufferedEventProviderIsNull,
+          trace_environment,
+          "BufferedEventProviderNicServer",
+          result["nicbm-server-event-stream"].as<std::string>(),
+          parser_n_s,
+          timer
+      );
       auto filter_n_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
-      const pipeline<std::shared_ptr<Event>> pl_n_s{parser_n_s, pipeline_n_s, spanner_n_s};
+      const pipeline<std::shared_ptr<Event>> pl_n_s{event_pro_n_s, pipeline_n_s, spanner_n_s};
 
-      auto parser_n_c = create_shared<EventStreamParser>("EventStreamParser null",
-                                                         trace_environment,
-                                                         "nicbm-client-reader",
-                                                         result["nicbm-client-event-stream"].as<std::string>());
+      EventStreamParser parser_n_c {trace_environment, "nicbm-client-reader"};
+      auto event_pro_n_c = create_shared<BufferedEventProvider<1, 1>>(
+        TraceException::kBufferedEventProviderIsNull,
+        trace_environment,
+        "BufferedEventProviderNicClient",
+        result["nicbm-client-event-stream"].as<std::string>(),
+        parser_n_c,
+        timer
+      );
       auto filter_n_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                             trace_environment,
                                                             timestamp_bounds);
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
-      const pipeline<std::shared_ptr<Event>> pl_n_c{parser_n_c, pipeline_n_c, spanner_n_c};
+      const pipeline<std::shared_ptr<Event>> pl_n_c{event_pro_n_c, pipeline_n_c, spanner_n_c};
 
       std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s};
       run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
@@ -255,7 +275,7 @@ int main(int argc, char *argv[]) {
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-                                                           //false);
+    //false);
     auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
@@ -264,7 +284,7 @@ int main(int argc, char *argv[]) {
                                "Gem5ServerParser",
                                comp_filter_server};
     auto gem5_ser_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
-        "BufferedEventProvider null",
+        TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "Gem5ServerEventProvider",
         result["gem5-log-server"].as<std::string>(),
@@ -294,7 +314,7 @@ int main(int argc, char *argv[]) {
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-                                                           //false);
+    //false);
     auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
@@ -303,7 +323,7 @@ int main(int argc, char *argv[]) {
                                "Gem5ClientParser",
                                comp_filter_client};
     auto gem5_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
-        "BufferedEventProvider null",
+        TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "Gem5ClientEventProvider",
         result["gem5-log-client"].as<std::string>(),
@@ -333,14 +353,14 @@ int main(int argc, char *argv[]) {
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-                                                           //false);
+    //false);
     auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
     NicBmParser nicbm_ser_par{trace_environment,
                               "NicbmServerParser"};
     auto nicbm_ser_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
-        "BufferedEventProvider null",
+        TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "NicbmServerEventProvider",
         result["nicbm-log-server"].as<std::string>(),
@@ -366,14 +386,14 @@ int main(int argc, char *argv[]) {
                                                            trace_environment,
                                                            to_filter,
                                                            true);
-                                                           //false);
+    //false);
     auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
     NicBmParser nicbm_client_par{trace_environment,
                                  "NicbmClientParser"};
     auto nicbm_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
-        "BufferedEventProvider null",
+        TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "NicbmClientEventProvider",
         result["nicbm-log-client"].as<std::string>(),

@@ -1010,6 +1010,206 @@ class NicRx : public NicTrx {
   int GetPort() const;
 };
 
+class NetworkEvent : public Event {
+
+ public:
+  struct EthernetHeader {
+    size_t length_type_ = 0;
+    static constexpr size_t kMacSize = 6;
+    std::array<unsigned char, kMacSize> src_mac_ = {0, 0, 0, 0, 0, 0};
+    std::array<unsigned char, kMacSize> dst_mac_ = {0, 0, 0, 0, 0, 0};
+
+    void Display(std::ostream &out) const;
+
+    bool operator==(const EthernetHeader &other) const {
+      for (int index = 0; index < kMacSize; index++) {
+        if (src_mac_[index] != other.src_mac_[index] or dst_mac_[index] != other.dst_mac_[index]) {
+          return false;
+        }
+      }
+      return length_type_ == other.length_type_;
+    }
+  };
+
+  struct Ipv4Header {
+    // NOTE: currently only Ipv4 is supported!!
+    size_t length_;
+    uint32_t src_ip_;
+    uint32_t dst_ip_;
+
+    void Display(std::ostream &out) const;
+
+    bool operator==(const Ipv4Header &other) const {
+      return length_ == other.length_ and src_ip_ == other.src_ip_ and dst_ip_ == other.dst_ip_;
+    }
+  };
+
+ private:
+  const int node_;
+  const int device_;
+  const std::string *device_name_;
+  const size_t payload_size_ = 0;
+  const std::optional<EthernetHeader> ethernet_header_;
+  const std::optional<Ipv4Header> ip_header_;
+
+ public:
+
+  void Display(std::ostream &out) override;
+
+  Event *clone() override {
+    return new NetworkEvent(*this);
+  }
+
+  int GetNode() const;
+
+  int GetDevice() const;
+
+  size_t GetPayloadSize() const;
+
+  bool HasEthernetHeader() const;
+
+  const EthernetHeader &GetEthernetHeader() const;
+
+  bool HasIpHeader() const;
+
+  const Ipv4Header &GetIpHeader() const;
+
+  virtual bool Equal(const Event &other) override;
+
+ protected:
+  explicit NetworkEvent(uint64_t ts,
+                        const size_t parser_identifier,
+                        const std::string parser_name,
+                        EventType type,
+                        std::string name,
+                        int node,
+                        int device,
+                        const std::string *device_name,
+                        size_t payload_size,
+                        const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                        const std::optional<Ipv4Header> &ip_header = std::nullopt)
+      : Event(ts, parser_identifier, parser_name, type, name),
+        node_(node),
+        device_(device),
+        device_name_(device_name),
+        payload_size_(payload_size),
+        ethernet_header_(ethernet_header),
+        ip_header_(ip_header) {
+  }
+
+  NetworkEvent(const NetworkEvent &other) = default;
+
+  ~NetworkEvent() override = default;
+};
+
+class NetworkEnqueue : public NetworkEvent {
+ public:
+  explicit NetworkEnqueue(uint64_t ts,
+                          const size_t parser_identifier,
+                          const std::string parser_name,
+                          int node,
+                          int device,
+                          const std::string *device_name,
+                          size_t payload_size,
+                          const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                          const std::optional<Ipv4Header> &ip_header = std::nullopt)
+      : NetworkEvent(ts,
+                     parser_identifier,
+                     parser_name,
+                     EventType::kNetworkEnqueueT,
+                     "NetworkEnqueue",
+                     node,
+                     device,
+                     device_name,
+                     payload_size,
+                     ethernet_header,
+                     ip_header) {}
+
+  NetworkEnqueue(const NetworkEnqueue &other) = default;
+
+  Event *clone() override {
+    return new NetworkEnqueue(*this);
+  }
+
+  ~NetworkEnqueue() override = default;
+
+  void Display(std::ostream &out) override;
+
+  bool Equal(const Event &other) override;
+};
+
+class NetworkDequeue : public NetworkEvent {
+ public:
+  explicit NetworkDequeue(uint64_t ts,
+                          const size_t parser_identifier,
+                          const std::string parser_name,
+                          int node,
+                          int device,
+                          const std::string *device_name,
+                          size_t payload_size,
+                          const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                          const std::optional<Ipv4Header> &ip_header = std::nullopt)
+      : NetworkEvent(ts,
+                     parser_identifier,
+                     parser_name,
+                     EventType::kNetworkDequeueT,
+                     "NetworkDequeue",
+                     node,
+                     device,
+                     device_name,
+                     payload_size,
+                     ethernet_header,
+                     ip_header) {}
+
+  NetworkDequeue(const NetworkDequeue &other) = default;
+
+  Event *clone() override {
+    return new NetworkDequeue(*this);
+  }
+
+  ~NetworkDequeue() override = default;
+
+  void Display(std::ostream &out) override;
+
+  bool Equal(const Event &other) override;
+};
+
+class NetworkDrop : public NetworkEvent {
+ public:
+  explicit NetworkDrop(uint64_t ts,
+                       const size_t parser_identifier,
+                       const std::string parser_name,
+                       int node,
+                       int device,
+                       const std::string *device_name,
+                       size_t payload_size,
+                       const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                       const std::optional<Ipv4Header> &ip_header = std::nullopt)
+      : NetworkEvent(ts,
+                     parser_identifier,
+                     parser_name,
+                     EventType::kNetworkDropT,
+                     "NetworkDrop",
+                     node,
+                     device,
+                     device_name,
+                     payload_size,
+                     ethernet_header,
+                     ip_header) {}
+
+  NetworkDrop(const NetworkDrop &other) = default;
+
+  Event *clone() override {
+    return new NetworkDrop(*this);
+  }
+
+  ~NetworkDrop() override = default;
+
+  void Display(std::ostream &out) override;
+
+  bool Equal(const Event &other) override;
+};
+
 inline std::ostream &operator<<(std::ostream &out, Event &event) {
   event.Display(out);
   return out;

@@ -42,7 +42,6 @@
 #include "analytics/context.h"
 #include "util/exception.h"
 
-//template<size_t ExportBufferSize> requires SizeLagerZero<ExportBufferSize>
 class Tracer {
   std::recursive_mutex tracer_mutex_;
 
@@ -50,17 +49,16 @@ class Tracer {
 
   // trace_id -> trace
   std::unordered_map<uint64_t, std::shared_ptr<Trace>> traces_;
-  // context_id -> context
-  // std::unordered_map<uint64_t, std::shared_ptr<TraceContext>> contexts_;
 
   // span ids that were already exported
-  //std::set<uint64_t> already_exported_spans_;
   std::set<uint64_t> exported_spans_;
   // parent_span_id -> list/vector of spans that wait for the parent to be exported
   std::unordered_map<uint64_t, std::vector<std::shared_ptr<EventSpan>>> waiting_list_;
 
   simbricks::trace::SpanExporter &exporter_;
   using ExportTastT = const std::function<concurrencpp::null_result()>;
+  NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>> to_export_queue_;
+  concurrencpp::result<concurrencpp::result<void>> exporter_thread_;
 
   void InsertExportedSpan(uint64_t span_id) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
@@ -113,58 +111,11 @@ class Tracer {
       return false;
     }
     auto span_ids = trace->GetSpanIds();
-    //const std::function<bool(uint64_t)> is_non_exported = [this](uint64_t span_id) {
-    //  return non_exported_spans_.contains(span_id);
-    //};
-    //return has_non_exported;
-    //const bool has_non_exported = std::ranges::none_of(span_ids, is_non_exported);
-    for (auto span_id : span_ids) {
-      if (not exported_spans_.contains(span_id)) {
-        return false;
-      }
-    }
-    return true;
+    const bool all_exported = std::ranges::all_of(span_ids, [&](uint64_t span_id) -> bool {
+      return exported_spans_.contains(span_id);
+    });
+    return all_exported;
   }
-
-  // send
-// -> bla bla bla
-// --> mmiow
-// ---> bla bla bla
-// ---> nic tx
-// ----> nic rx
-// -----> bla bla bla
-// -----> msix
-// ------> syscall rx <-------------------------------------------
-//          |                                                    |
-//          -----> in actual event log we have a case that:      |
-//                    |                                          |
-//                    ---> return to user space                  |
-//                    ---> mmio operation --> who is the parent? |--> need to set the correct TRACE id / context ---> don't know when these events will occur
-//                    ---> entry new syscall
-
-  // void InsertContext(std::shared_ptr<TraceContext> &trace_context) {
-  //   // NOTE: the lock must be held when calling this method
-  //   auto iter = contexts_.insert({trace_context->GetId(), trace_context});
-  //   throw_on(not iter.second, "could not insert context into contexts map",
-  //            source_loc::current());
-  // }
-
-  // void RemoveContext(uint64_t context_id) {
-  //   // NOTE: lock must be held when calling this method
-  //   const size_t amount_removed = contexts_.erase(context_id);
-  //   throw_on(amount_removed == 0, "RemoveContext: nothing was removed",
-  //            source_loc::current());
-  // }
-
-  // std::shared_ptr<TraceContext> GetContext(uint64_t trace_context_id) {
-  //   // NOTE: lock must be held when calling this method
-  //   auto iter = contexts_.find(trace_context_id);
-  //   if (iter == contexts_.end()) {
-  //     return {};
-  //   }
-  //
-  //   return iter->second;
-  // }
 
   std::shared_ptr<TraceContext>
   RegisterCreateContextParent(uint64_t trace_id, uint64_t parent_id, uint64_t parent_starting_ts) {
@@ -176,7 +127,6 @@ class Tracer {
     auto trace_context = create_shared<TraceContext>(
         "RegisterCreateContext couldnt create context",
         trace_id, trace_environment_.GetNextTraceContextId(), parent_id, parent_starting_ts);
-    // InsertContext(trace_context);
     return trace_context;
   }
 
@@ -186,7 +136,6 @@ class Tracer {
     auto trace_context = create_shared<TraceContext>(
         "RegisterCreateContext couldnt create context",
         trace_id, trace_environment_.GetNextTraceContextId());
-    // InsertContext(trace_context);
     return trace_context;
   }
 
@@ -215,8 +164,6 @@ class Tracer {
       // we cannot wait for a non-existing parent...
       return;
     }
-    //auto parent = span->GetParent();
-    //assert(parent);
     const uint64_t parent_id = span->GetValidParentId();
     auto iter = waiting_list_.find(parent_id);
     if (iter != waiting_list_.end()) {
@@ -228,19 +175,6 @@ class Tracer {
                source_loc::current());
     }
   }
-
-  // NOTE: shall only be used via 'RunExportJobInBackground'
-  // NOTE: This is an eager fire and forget task, as such,
-  //       the calling thread should and must not wait for
-  //       consuming any result;
-  //concurrencpp::null_result ExportTask(std::shared_ptr<EventSpan> span_to_export) {
-  //  try {
-  //    exporter_.ExportSpan(std::move(span_to_export));
-  //  } catch (std::runtime_error &err) {
-  //    std::cerr << "error while trying to export a trace: " << err.what() << '\n';
-  //  }
-  //  co_return;
-  //}
 
   void RunExportJobInBackground(const std::shared_ptr<EventSpan> &span_to_export) {
     // NOTE: lock must be held when calling this method
@@ -256,7 +190,7 @@ class Tracer {
     };
 
     auto executor = trace_environment_.GetBackgroundPoolExecutor();
-    executor->submit(export_task);
+    executor->post(export_task);
   }
 
   void ExportWaitingForParentVec(std::shared_ptr<EventSpan> &parent) {
@@ -273,7 +207,9 @@ class Tracer {
                      "try to export span whos parent was not exported yet",
                      source_loc::current());
       MarkSpanAsExported(waiter);
-      exporter_.ExportSpan(waiter);
+      // TODO: fix background!!
+      to_export_queue_.Push(waiter);
+      //exporter_.ExportSpan(waiter);
       //RunExportJobInBackground(waiter);
       ExportWaitingForParentVec(waiter);
     }
@@ -284,8 +220,6 @@ class Tracer {
   std::shared_ptr<SpanType> StartSpanByParentInternal(uint64_t trace_id,
                                                       uint64_t parent_id,
                                                       uint64_t parent_starting_ts,
-      //const std::shared_ptr<ContextType> &parent_context,
-      //const std::shared_ptr<EventSpan> &parent_span,
                                                       std::shared_ptr<Event> starting_event,
                                                       Args &&... args) {
     // NOTE: lock must be held when calling this method
@@ -346,7 +280,9 @@ class Tracer {
 
     if (WasParentExported(span)) {
       MarkSpanAsExported(span);
-      exporter_.ExportSpan(span);
+      // TODO: fix background!!
+      to_export_queue_.Push(span);
+      //exporter_.ExportSpan(span);
       //RunExportJobInBackground(span);
       ExportWaitingForParentVec(span);
 
@@ -363,17 +299,13 @@ class Tracer {
   }
 
   void AddParentLazily(const std::shared_ptr<EventSpan> &span,
-                       const std::shared_ptr<Context> &parent_context) {// std::shared_ptr<EventSpan> &parent_span) {
+                       const std::shared_ptr<Context> &parent_context) {
     throw_if_empty(span, TraceException::kSpanIsNull, source_loc::current());
-    //throw_if_empty(parent_span, TraceException::kSpanIsNull, source_loc::current());
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
 
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    //auto parent_context = parent_span->GetContext();
-    //throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
-    //auto parent_trace = GetTrace(parent_context->GetTraceId());
     auto new_trace_id = parent_context->GetTraceId();
     auto old_context = span->GetContext();
     throw_if_empty(old_context, TraceException::kContextIsNull, source_loc::current());
@@ -384,7 +316,6 @@ class Tracer {
     throw_if_empty(old_trace, TraceException::kTraceIsNull, source_loc::current());
 
     old_context->SetTraceId(new_trace_id);
-    // old_context->SetParentSpan(parent_span);
     const uint64_t parent_id = parent_context->GetParentId();
     const uint64_t parent_start_ts = parent_context->GetParentStartingTs();
     old_context->SetParentIdAndTs(parent_id, parent_start_ts);
@@ -404,9 +335,7 @@ class Tracer {
 
   // will create and add a new span to a trace using the context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParent(//uint64_t trace_id,
-      //uint64_t parent_id,
-      //uint64_t parent_starting_ts,
+  std::shared_ptr<SpanType> StartSpanByParent(
       std::shared_ptr<EventSpan> parent_span,
       std::shared_ptr<Event> starting_event,
       Args &&... args) {
@@ -431,7 +360,6 @@ class Tracer {
   // will create and add a new span to a trace using the context
   template<class SpanType, class... Args>
   std::shared_ptr<SpanType> StartSpanByParentPassOnContext(const std::shared_ptr<Context> &parent_context,
-      //std::shared_ptr<EventSpan> parent_span,
                                                            std::shared_ptr<Event> starting_event,
                                                            Args &&... args) {
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
@@ -472,15 +400,10 @@ class Tracer {
   requires ContextInterface<ContextType>
   void StartSpanSetParentContext(std::shared_ptr<EventSpan> &span_to_register,
                                  const std::shared_ptr<ContextType> &parent_context) {
-    //std::shared_ptr<EventSpan> &parent_span) {
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
     // guard potential access using a lock guard
     const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
 
-    //throw_if_empty(parent_span, "StartSpan(...) parent span is null", source_loc::current());
-    //auto parent_context = parent_span->GetContext();
-    //throw_if_empty(parent_context, "StartSpan(...) parent context is null",
-    //               source_loc::current());
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();
     const uint64_t parent_starting_ts = parent_context->GetParentStartingTs();
@@ -493,9 +416,26 @@ class Tracer {
 
   explicit Tracer(TraceEnvironment &trace_environment,
                   simbricks::trace::SpanExporter &exporter)
-      : trace_environment_(trace_environment), exporter_(exporter) {};
+      : trace_environment_(trace_environment), exporter_(exporter) {
+    exporter_thread_ = trace_environment_.GetThreadExecutor()->submit([&]() -> concurrencpp::result<void> {
+      std::optional<std::shared_ptr<EventSpan>> opt;
+      std::shared_ptr<EventSpan> span_to_export;
+      for (opt = to_export_queue_.Pop(); opt.has_value(); opt = to_export_queue_.Pop()) {
+        span_to_export = std::move(opt.value());
+        assert(span_to_export);
+        exporter_.ExportSpan(span_to_export);
+      }
+      co_return;
+    });
+  };
 
-  ~Tracer() = default;
+  ~Tracer() {
+    try {
+      exporter_thread_.get().get();
+    } catch (std::exception &err) {
+      std::cerr << "error within exporter thread: " << err.what() << '\n';
+    }
+  };
 };
 
 #endif  // SIMBRICKS_TRACE_TRACER_H_

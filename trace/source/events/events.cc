@@ -24,6 +24,8 @@
 
 #include "events/events.h"
 
+#include "util/utils.h"
+
 void Event::Display(std::ostream &out) {
   out << GetName();
   out << ": source_id=" << parser_identifier_;
@@ -529,6 +531,145 @@ bool NicRx::Equal(const Event &other) {
 
 int NicRx::GetPort() const {
   return port_;
+}
+
+void NetworkEvent::EthernetHeader::Display(std::ostream &out) const {
+  out << "EthernetHeader(";
+  out << "length/type=0x" << std::hex << length_type_;
+  out << ", source=";
+  out << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(src_mac_[0]);
+  for (int index = 1; index < kMacSize; index++) {
+    out << ":" << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(src_mac_[index]);
+  }
+  out << ", destination=" << "";
+  out << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(dst_mac_[0]);
+  for (int index = 1; index < kMacSize; index++) {
+    out << ":" << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(dst_mac_[index]);
+  }
+  out << ")";
+  out << std::setfill(' ');
+  out << std::dec;
+}
+
+void NetworkEvent::Ipv4Header::Display(std::ostream &out) const {
+  out << "Ipv4Header(";
+  out << "length: " << length_;
+  out << " " << std::to_string(((0xff000000 & src_ip_) >> 24));
+  out << "." << std::to_string(((0x00ff0000 & src_ip_) >> 16));
+  out << "." << std::to_string(((0x0000ff00 & src_ip_) >> 8));
+  out << "." << std::to_string((0x000000ff & src_ip_));
+  out << " > " << std::to_string(((0xff000000 & dst_ip_) >> 24));
+  out << "." << std::to_string(((0x00ff0000 & dst_ip_) >> 16));
+  out << "." << std::to_string(((0x0000ff00 & dst_ip_) >> 8));
+  out << "." << std::to_string((0x000000ff & dst_ip_));
+  out << ")";
+}
+
+void NetworkEvent::Display(std::ostream &out) {
+  Event::Display(out);
+  out << ", node=" << std::to_string(node_);
+  out << ", device=" << std::to_string(device_);
+  out << ", device_name=" << (device_name_ ? *device_name_ : "null");
+  out << ", payload_size=" << std::to_string(payload_size_);
+  if (HasEthernetHeader()) {
+    out << ", ";
+    const EthernetHeader &header = ethernet_header_.value();
+    header.Display(out);
+  }
+  if (HasIpHeader()) {
+    out << ", ";
+    const Ipv4Header &header = ip_header_.value();
+    header.Display(out);
+  }
+}
+
+int NetworkEvent::GetNode() const {
+  return node_;
+}
+
+int NetworkEvent::GetDevice() const {
+  return device_;
+}
+
+size_t NetworkEvent::GetPayloadSize() const {
+  return payload_size_;
+}
+
+bool NetworkEvent::HasEthernetHeader() const {
+  return ethernet_header_.has_value();
+}
+
+const NetworkEvent::EthernetHeader &NetworkEvent::GetEthernetHeader() const {
+  throw_on_false(ethernet_header_.has_value(), "network event has no ethernet header", source_loc::current());
+  return ethernet_header_.value();
+}
+
+bool NetworkEvent::HasIpHeader() const {
+  return ip_header_.has_value();
+}
+
+const NetworkEvent::Ipv4Header &NetworkEvent::GetIpHeader() const {
+  throw_on_false(ip_header_.has_value(), "network event has no ip header", source_loc::current());
+  return ip_header_.value();
+}
+
+bool NetworkEvent::Equal(const Event &other) {
+  const NetworkEvent *net = dynamic_cast<const NetworkEvent *>(&other);
+  if (not net) {
+    return false;
+  }
+
+  if ((HasEthernetHeader() and not net->HasEthernetHeader()) or (not HasEthernetHeader() and net->HasEthernetHeader())) {
+    return false;
+  }
+  // either both or non has an ethernet header
+  if (HasEthernetHeader() and GetEthernetHeader() != net->GetEthernetHeader()) {
+    return false;
+  }
+
+  if ((HasIpHeader() and not net->HasIpHeader()) or (not HasIpHeader() and net->HasIpHeader())) {
+    return false;
+  }
+  // either both have an ip header or none
+  if (HasIpHeader() and GetIpHeader() != net->GetIpHeader()) {
+    return false;
+  }
+
+  return node_ == net->node_ and device_ == net->device_ and payload_size_ == net->payload_size_
+      and Event::Equal(other);
+}
+
+void NetworkEnqueue::Display(std::ostream &out) {
+  NetworkEvent::Display(out);
+}
+
+bool NetworkEnqueue::Equal(const Event &other) {
+  if (not IsType(other, EventType::kNetworkEnqueueT)) {
+    return false;
+  }
+  return NetworkEvent::Equal(other);
+}
+
+void NetworkDequeue::Display(std::ostream &out) {
+  NetworkEvent::Display(out);
+}
+
+bool NetworkDequeue::Equal(const Event &other) {
+  if (not IsType(other, EventType::kNetworkDequeueT)) {
+    return false;
+  }
+  return NetworkEvent::Equal(other);
+}
+
+void NetworkDrop::Display(std::ostream &out) {
+  NetworkEvent::Display(out);
+}
+
+bool NetworkDrop::Equal(const Event &other) {
+  if (not IsType(other, EventType::kNetworkDropT)) {
+    return false;
+  }
+  return NetworkEvent::Equal(other);
 }
 
 bool IsType(const Event &event, EventType type) {

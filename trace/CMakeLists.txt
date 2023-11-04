@@ -109,7 +109,7 @@ set(TRACE_LIB_HEADER_FILES
         include/events/eventTimeBoundary.h
         include/events/events.h
         include/events/event-filter.h
-        include/events/eventStreamParser.h
+        include/parser/eventStreamParser.h
         # config
         include/config/config.h
         # tracing environment
@@ -134,6 +134,8 @@ set(TRACE_LIB_SOURCE_FILES
         source/parser/parser.cc
         source/parser/nicbm.cc
         source/parser/gem5.cc
+        source/parser/ns3.cpp
+        source/parser/event-stream.cpp
         # events
         source/events/events.cc
         # tracing environment
@@ -181,6 +183,8 @@ set (TRACE_UNIT_TESTS_SRC_FILES
         tests/pipeline-test.cpp
         tests/span-test.cpp
         tests/gem5-parser-test.cpp
+        tests/ns3-parser-test.cpp
+        tests/event-stream-parser-test.cpp
         tests/reader-test.cpp
         tests/config-test.cpp
         )

@@ -39,6 +39,15 @@
 #include "env/traceEnvironment.h"
 #include "analytics/timer.h"
 
+bool ParseMacAddress(LineHandler &line_handler,
+                     std::array<unsigned char, NetworkEvent::EthernetHeader::kMacSize> &addr);
+
+bool ParseIpAddress(LineHandler &line_handler, uint32_t &addr);
+
+std::optional<NetworkEvent::EthernetHeader> TryParseEthernetHeader(LineHandler &line_handler);
+
+std::optional<NetworkEvent::Ipv4Header> TryParseIpHeader(LineHandler &line_handler);
+
 class LogParser {
 
  protected:
@@ -122,6 +131,24 @@ class NicBmParser : public LogParser {
   ParseEvent(LineHandler &line_handler) override;
 };
 
+class NS3Parser : public LogParser {
+
+  std::shared_ptr<Event> ParseNetDevice(LineHandler &line_handler,
+                                        uint64_t timestamp,
+                                        EventType type,
+                                        int node,
+                                        int device,
+                                        const std::string *device_name);
+
+ public:
+  explicit NS3Parser(TraceEnvironment &trace_environment,
+                     const std::string name)
+      : LogParser(trace_environment, name) {}
+
+  concurrencpp::lazy_result<std::shared_ptr<Event>>
+  ParseEvent(LineHandler &line_handler) override;
+};
+
 template<size_t LineBufferSize, size_t EventBufferSize = 1>
 requires SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
 concurrencpp::result<void> FillBuffer(concurrencpp::executor_tag,
@@ -162,9 +189,32 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   const std::string name_;
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
-  using EventBufferChannelT = CoroBoundedChannel<std::shared_ptr<Event>, EventBufferSize>;
-  EventBufferChannelT event_buffer_channel_;
+  NonCoroBufferedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
   WeakTimer &timer_;
+
+  concurrencpp::result<void>
+  FillBuffer() {
+    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
+    line_handler_buffer.OpenFile(log_file_path_, true);
+
+    std::pair<bool, LineHandler *> bh_p;
+    std::shared_ptr<Event> event_ptr;
+    for (bh_p = line_handler_buffer.NextHandler(); bh_p.first; bh_p = line_handler_buffer.NextHandler()) {
+      assert(bh_p.first);
+      LineHandler &line_handler = *bh_p.second;
+
+      event_ptr = co_await log_parser_.ParseEvent(line_handler);
+      if (not event_ptr) {
+        continue;
+      }
+
+      const bool could_push = event_buffer_channel_.Push(event_ptr);
+      throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel",
+               source_loc::current());
+    }
+
+    event_buffer_channel_.CloseChannel();
+  }
 
  public:
   explicit BufferedEventProvider(TraceEnvironment &trace_environment,
@@ -190,33 +240,32 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null",
                    source_loc::current());
 
-    concurrencpp::result<void> fill_buffer =
-        FillBuffer<LineBufferSize, EventBufferSize>({},
-                                                    trace_environment_.GetPoolExecutor(),
-                                                    name_,
-                                                    log_file_path_,
-                                                    log_parser_,
-                                                    event_buffer_channel_);
+    concurrencpp::result<concurrencpp::result<void>>
+        producer_task = trace_environment_.GetThreadExecutor()->submit([&]() {
+      return FillBuffer();
+    });
+
+    size_t timer_key = co_await timer_.Register(resume_executor);
 
     std::optional<std::shared_ptr<Event>> event_opt;
     std::shared_ptr<Event> event_ptr = nullptr;
-    for (event_opt = co_await event_buffer_channel_.Pop(resume_executor); event_opt.has_value();
-         event_opt = co_await event_buffer_channel_.Pop(resume_executor)) {
+    for (event_opt = event_buffer_channel_.Pop(); event_opt.has_value();
+         event_opt = event_buffer_channel_.Pop()) {
       assert(event_opt.has_value());
       event_ptr = event_opt.value();
 
-      //co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
+      co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
 
-      //std::cout << "buffered event provider: " << *event_ptr << std::endl;
       const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);
       throw_on(not could_push,
                "BufferedEventProvider::process: unable to push next event to target channel",
                source_loc::current());
     }
 
-    //co_await timer_.Done(resume_executor, timer_key);
+    co_await co_await producer_task;
     co_await tar_chan->CloseChannel(resume_executor);
-    co_await fill_buffer;
+
+    co_await timer_.Done(resume_executor, timer_key);
     std::cout << "BufferedEventProvider exits" << '\n';
     co_return;
   }

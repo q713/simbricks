@@ -64,7 +64,10 @@ enum EventType {
   kNicMmioWT,
   kNicTrxT,
   kNicTxT,
-  kNicRxT
+  kNicRxT,
+  kNetworkEnqueueT,
+  kNetworkDequeueT,
+  kNetworkDropT,
 };
 
 inline std::ostream &operator<<(std::ostream &into, EventType type) {
@@ -137,6 +140,12 @@ inline std::ostream &operator<<(std::ostream &into, EventType type) {
       break;
     case EventType::kNicRxT:into << "kNicRxT";
       break;
+    case EventType::kNetworkEnqueueT:into << "kNetworkEnqueueT";
+      break;
+    case EventType::kNetworkDequeueT:into << "kNetworkDequeueT";
+      break;
+    case EventType::kNetworkDropT:into << "kNetworkDropT";
+      break;
     default:throw_just(source_loc::current(), "encountered unknown event type");
   }
   return into;
@@ -177,7 +186,10 @@ inline EventType EventTypeFromString(const std::string &event_type_str) {
       {"kNicMmioWT", kNicMmioWT},
       {"kNicTrxT", kNicTrxT},
       {"kNicTxT", kNicTxT},
-      {"kNicRxT", kNicRxT}
+      {"kNicRxT", kNicRxT},
+      {"kNetworkEnqueueT", kNetworkEnqueueT},
+      {"kNetworkDequeueT", kNetworkDequeueT},
+      {"kNetworkDropT", kNetworkDropT}
   };
 
   auto iter = kTypeLookup.find(event_type_str);

@@ -31,6 +31,7 @@
 #ifndef SIMBRICKS_TRACE_TTLMAP_H_
 #define SIMBRICKS_TRACE_TTLMAP_H_
 
+// TODO: make this an lru cache with ttl --> when something is accessed, its ttl will be re-calculated!!
 template<typename KeyType, typename ValueType, uint64_t TTLSeconds> requires SizeLagerZero<TTLSeconds>
 class LazyTtLMap {
 

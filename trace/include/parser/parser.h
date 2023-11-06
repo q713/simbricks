@@ -138,7 +138,7 @@ class NS3Parser : public LogParser {
                                         EventType type,
                                         int node,
                                         int device,
-                                        const std::string *device_name);
+                                        NetworkEvent::NetworkDeviceType device_type);
 
  public:
   explicit NS3Parser(TraceEnvironment &trace_environment,

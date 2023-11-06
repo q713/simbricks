@@ -569,7 +569,7 @@ void NetworkEvent::Display(std::ostream &out) {
   Event::Display(out);
   out << ", node=" << std::to_string(node_);
   out << ", device=" << std::to_string(device_);
-  out << ", device_name=" << (device_name_ ? *device_name_ : "null");
+  out << ", device_name=" << device_type_;
   out << ", payload_size=" << std::to_string(payload_size_);
   if (HasEthernetHeader()) {
     out << ", ";
@@ -590,6 +590,11 @@ int NetworkEvent::GetNode() const {
 int NetworkEvent::GetDevice() const {
   return device_;
 }
+
+NetworkEvent::NetworkDeviceType NetworkEvent::GetDeviceType() const {
+  return device_type_;
+}
+
 
 size_t NetworkEvent::GetPayloadSize() const {
   return payload_size_;
@@ -619,7 +624,8 @@ bool NetworkEvent::Equal(const Event &other) {
     return false;
   }
 
-  if ((HasEthernetHeader() and not net->HasEthernetHeader()) or (not HasEthernetHeader() and net->HasEthernetHeader())) {
+  if ((HasEthernetHeader() and not net->HasEthernetHeader())
+      or (not HasEthernetHeader() and net->HasEthernetHeader())) {
     return false;
   }
   // either both or non has an ethernet header
@@ -636,7 +642,7 @@ bool NetworkEvent::Equal(const Event &other) {
   }
 
   return node_ == net->node_ and device_ == net->device_ and payload_size_ == net->payload_size_
-      and Event::Equal(other);
+      and device_type_ == net->device_type_ and Event::Equal(other);
 }
 
 void NetworkEnqueue::Display(std::ostream &out) {

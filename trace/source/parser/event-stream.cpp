@@ -27,13 +27,14 @@
 bool EventStreamParser::ParseNetworkEvent(LineHandler &line_handler,
                                           int &node,
                                           int &device,
-                                          std::string &device_name,
+                                          NetworkEvent::NetworkDeviceType &device_type,
                                           uint64_t &payload_size,
                                           std::optional<NetworkEvent::EthernetHeader> &eth_h,
                                           std::optional<NetworkEvent::Ipv4Header> &ip_h) {
   static std::function<bool(unsigned char)> device_name_pre = [](unsigned char chara) {
     return sim_string_utils::is_alnum(chara) or chara == ':';
   };
+  std::string device_name;
   if (not line_handler.ConsumeAndTrimTillString("node=") or
       not line_handler.ParseInt(node) or
       not line_handler.ConsumeAndTrimTillString("device=") or
@@ -42,6 +43,14 @@ bool EventStreamParser::ParseNetworkEvent(LineHandler &line_handler,
       not line_handler.ExtractAndSubstrUntilInto(device_name, device_name_pre) or
       not line_handler.ConsumeAndTrimTillString("payload_size=") or
       not line_handler.ParseUintTrim(10, payload_size)) {
+    return false;
+  }
+
+  if (device_name == "ns3::CosimNetDevice") {
+    device_type = NetworkEvent::kCosimNetDevice;
+  } else if (device_name == "ns3::SimpleNetDevice") {
+    device_type = NetworkEvent::kSimpleNetDevice;
+  } else {
     return false;
   }
 
@@ -83,7 +92,8 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   int bar = 0, port = 0, node, device;
   size_t len = 0, size = 0, bytes = 0;
   bool posted;
-  std::string function, component, device_name;
+  std::string function, component;
+  NetworkEvent::NetworkDeviceType device_type;
   std::optional<NetworkEvent::EthernetHeader> eth_h;
   std::optional<NetworkEvent::Ipv4Header> ip_h;
 
@@ -355,26 +365,47 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
     event = std::make_shared<NicRx>(ts, parser_ident,
                                     parser_name, len, addr);
   } else if (event_name == "NetworkEnqueue") {
-    if (not ParseNetworkEvent(line_handler, node, device, device_name, payload_size, eth_h, ip_h)) {
+    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, eth_h, ip_h)) {
       co_return nullptr;
     }
-    const std::string *dev_n = trace_environment_.InternalizeAdditional(device_name);
     co_return create_shared<NetworkEnqueue>("netowrk event null",
-                                            ts, parser_ident, parser_name, node, device, dev_n, payload_size, eth_h, ip_h);
+                                            ts,
+                                            parser_ident,
+                                            parser_name,
+                                            node,
+                                            device,
+                                            device_type,
+                                            payload_size,
+                                            eth_h,
+                                            ip_h);
   } else if (event_name == "NetworkDequeue") {
-    if (not ParseNetworkEvent(line_handler, node, device, device_name, payload_size, eth_h, ip_h)) {
+    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, eth_h, ip_h)) {
       co_return nullptr;
     }
-    const std::string *dev_n = trace_environment_.InternalizeAdditional(device_name);
     co_return create_shared<NetworkDequeue>("netowrk event null",
-                                            ts, parser_ident, parser_name, node, device, dev_n, payload_size, eth_h, ip_h);
+                                            ts,
+                                            parser_ident,
+                                            parser_name,
+                                            node,
+                                            device,
+                                            device_type,
+                                            payload_size,
+                                            eth_h,
+                                            ip_h);
   } else if (event_name == "NetworkDrop") {
-    if (not ParseNetworkEvent(line_handler, node, device, device_name, payload_size, eth_h, ip_h)) {
+    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, eth_h, ip_h)) {
       co_return nullptr;
     }
-    const std::string *dev_n = trace_environment_.InternalizeAdditional(device_name);
     co_return create_shared<NetworkDrop>("netowrk event null",
-                                         ts, parser_ident, parser_name, node, device, dev_n, payload_size, eth_h, ip_h);
+                                         ts,
+                                         parser_ident,
+                                         parser_name,
+                                         node,
+                                         device,
+                                         device_type,
+                                         payload_size,
+                                         eth_h,
+                                         ip_h);
   } else {
     std::cout << "unknown event found, it will be skipped" << '\n';
     co_return nullptr;

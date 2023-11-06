@@ -67,7 +67,7 @@ class EventStreamParser : public LogParser {
   bool ParseNetworkEvent(LineHandler &line_handler,
                          int &node,
                          int &device,
-                         std::string &device_name,
+                         NetworkEvent::NetworkDeviceType &device_type,
                          uint64_t &payload_size,
                          std::optional<NetworkEvent::EthernetHeader> &eth_h,
                          std::optional<NetworkEvent::Ipv4Header> &ip_h);

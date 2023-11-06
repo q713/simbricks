@@ -142,6 +142,7 @@ set(TRACE_LIB_SOURCE_FILES
         source/env/symtable.cc
         source/env/traceEnvironment.cc
         # analytics
+        source/analytics/span.cpp
         source/analytics/spanner.cpp
         source/analytics/nicSpanner.cc
         source/analytics/hostSpanner.cc
@@ -178,6 +179,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 # Trace - Tests
 #######################################
 set(UNIT_TESTS_TARGET unittests)
+set (TRACE_UNIT_TESTS_HEADER_FILES
+    tests/test-util.h
+    )
 set (TRACE_UNIT_TESTS_SRC_FILES
         tests/channel-test.cpp
         tests/pipeline-test.cpp
@@ -188,7 +192,7 @@ set (TRACE_UNIT_TESTS_SRC_FILES
         tests/reader-test.cpp
         tests/config-test.cpp
         )
-add_executable(${UNIT_TESTS_TARGET} ${TRACE_UNIT_TESTS_SRC_FILES})
+add_executable(${UNIT_TESTS_TARGET} ${TRACE_UNIT_TESTS_HEADER_FILES} ${TRACE_UNIT_TESTS_SRC_FILES})
 target_include_directories(${UNIT_TESTS_TARGET} PUBLIC
         tests
         )

@@ -24,6 +24,8 @@
 
 #include <catch2/catch_all.hpp>
 #include <memory>
+
+#include "test-util.h"
 #include "analytics/span.h"
 #include "events/events.h"
 
@@ -212,23 +214,133 @@ TEST_CASE("Test HostMsixSpan", "[HostMsixSpan]") {
   }
 }
 
-/*
- HostCall: source_id=0, source_name=Gem5ClientParser, timestamp=1967474305000, pc=ffffffff812c9dcc, func=pci_msi_domain_write_msg, comp=Linuxvm-Symbols
-HostCall: source_id=0, source_name=Gem5ClientParser, timestamp=1967474318750, pc=ffffffff812c9b00, func=__pci_write_msi_msg, comp=Linuxvm-Symbols <-----
-HostMmioW: source_id=0, source_name=Gem5ClientParser, timestamp=1967474400999, id=94469376954304, addr=c0400010, size=4, bar=0, offset=0
-HostMmioImRespPoW: source_id=0, source_name=Gem5ClientParser, timestamp=1967474400999
-HostMmioW: source_id=0, source_name=Gem5ClientParser, timestamp=1967474526999, id=94469376954304, addr=c0400014, size=4, bar=0, offset=0
-HostMmioImRespPoW: source_id=0, source_name=Gem5ClientParser, timestamp=1967474526999
-HostMmioW: source_id=0, source_name=Gem5ClientParser, timestamp=1967474652874, id=94469376954304, addr=c0400018, size=4, bar=0, offset=0
-HostMmioImRespPoW: source_id=0, source_name=Gem5ClientParser, timestamp=1967474652874
-HostMmioR: source_id=0, source_name=Gem5ClientParser, timestamp=1967474783625, id=94469376954304, addr=c0400018, size=4, bar=0, offset=0
- */
+TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
 
-/*
-HostCall: source_id=0, source_name=Gem5ClientParser, timestamp=1967474994250, pc=ffffffff812c8b7d, func=pci_msi_unmask_irq, comp=Linuxvm-Symbols <-------------
-HostCall: source_id=0, source_name=Gem5ClientParser, timestamp=1967474996250, pc=ffffffff812c8a7c, func=pci_msix_write_vector_ctrl, comp=Linuxvm-Symbols <-----
-HostMmioW: source_id=0, source_name=Gem5ClientParser, timestamp=1967475060874, id=94469376954448, addr=c040001c, size=4, bar=0, offset=0
-HostMmioImRespPoW: source_id=0, source_name=Gem5ClientParser, timestamp=1967475060874
- */
+  const uint64_t ident = 1;
+  const uint64_t source_id = 1;
+  const std::string parser_name{"NetworkSpan-test-parser"};
+  const NetworkEvent::NetworkDeviceType cosim_net_dev = NetworkEvent::NetworkDeviceType::kCosimNetDevice;
+  const NetworkEvent::NetworkDeviceType simple_net_dev = NetworkEvent::NetworkDeviceType::kSimpleNetDevice;
+  std::string service_name = "test-service";
+  const TraceEnvConfig trace_env_config = TraceEnvConfig::CreateFromYaml("tests/trace-env-config.yaml");
+  TraceEnvironment trace_environment{trace_env_config};
+  auto trace_context = std::make_shared<TraceContext>(0, 0);
+
+  /*
+   * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+   * NetworkDequeue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0x800, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+   */
+  SECTION("valid enqueue dequeue CosimNetDeviceSpan") {
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE_FALSE(net_device_span.AddToSpan(deq));
+    REQUIRE(net_device_span.AddToSpan(enq));
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE(net_device_span.AddToSpan(deq));
+    REQUIRE_FALSE(net_device_span.IsPending());
+    REQUIRE(net_device_span.IsComplete());
+  }
+
+  /*
+  * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+  * NetworkDrop: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0x800, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+  */
+  SECTION("valid enqueue drop CosimNetDeviceSpan") {
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt);
+    auto dro = std::make_shared<NetworkDrop>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt);
+    NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE_FALSE(net_device_span.AddToSpan(dro));
+    REQUIRE(net_device_span.AddToSpan(enq));
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE(net_device_span.AddToSpan(dro));
+    REQUIRE_FALSE(net_device_span.IsPending());
+    REQUIRE(net_device_span.IsComplete());
+  }
+
+  /*
+   * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+   * NetworkDequeue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+   */
+  SECTION("valid enqueue dequeue SimpleNetDeviceSpan") {
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98,  std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98,  std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE_FALSE(net_device_span.AddToSpan(deq));
+    REQUIRE(net_device_span.AddToSpan(enq));
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE(net_device_span.AddToSpan(deq));
+    REQUIRE_FALSE(net_device_span.IsPending());
+    REQUIRE(net_device_span.IsComplete());
+  }
+
+  /*
+   * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+   * NetworkDrop: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
+   */
+  SECTION("valid enqueue drop SimpleNetDeviceSpan") {
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto dro = std::make_shared<NetworkDrop>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE_FALSE(net_device_span.AddToSpan(dro));
+    REQUIRE(net_device_span.AddToSpan(enq));
+    REQUIRE(net_device_span.IsPending());
+    REQUIRE_FALSE(net_device_span.IsComplete());
+    REQUIRE(net_device_span.AddToSpan(dro));
+    REQUIRE_FALSE(net_device_span.IsPending());
+    REQUIRE(net_device_span.IsComplete());
+  }
+
+  SECTION("cannot add CosimNetDevice to SimpleNetDevice") {
+    auto enq_a = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_a = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    NetDeviceSpan net_device_span_a{trace_environment, trace_context, source_id, service_name};
+    REQUIRE(net_device_span_a.IsPending());
+    REQUIRE_FALSE(net_device_span_a.IsComplete());
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_a));
+    REQUIRE(net_device_span_a.AddToSpan(enq_a));
+    REQUIRE(net_device_span_a.IsPending());
+    REQUIRE_FALSE(net_device_span_a.IsComplete());
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_a));
+    REQUIRE(net_device_span_a.IsPending());
+    REQUIRE_FALSE(net_device_span_a.IsComplete());
+  }
+
+  SECTION("cannot add non matching events") {
+    auto enq_a = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_a = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 1,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_b = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0b8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_c = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 254, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_d = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt);
+    auto deq_e = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98,  std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_f = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98,  CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    NetDeviceSpan net_device_span_a{trace_environment, trace_context, source_id, service_name};
+    REQUIRE(net_device_span_a.IsPending());
+    REQUIRE_FALSE(net_device_span_a.IsComplete());
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_a));
+    REQUIRE(net_device_span_a.AddToSpan(enq_a));
+    REQUIRE(net_device_span_a.IsPending());
+    REQUIRE_FALSE(net_device_span_a.IsComplete());
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_a));
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_b));
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_c));
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_d));
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_e));
+    REQUIRE_FALSE(net_device_span_a.AddToSpan(deq_f));
+    REQUIRE(net_device_span_a.IsPending());
+    REQUIRE_FALSE(net_device_span_a.IsComplete());
+  }
+}
 
 

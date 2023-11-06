@@ -29,7 +29,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                                  EventType type,
                                                  int node,
                                                  int device,
-                                                 const std::string *device_name) {
+                                                 const NetworkEvent::NetworkDeviceType device_type) {
   line_handler.TrimL();
 
   std::optional<NetworkEvent::EthernetHeader> eth_header;
@@ -51,7 +51,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            GetName(),
                                            node,
                                            device,
-                                           device_name,
+                                           device_type,
                                            payload_size,
                                            eth_header,
                                            ip_header);
@@ -63,7 +63,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            GetName(),
                                            node,
                                            device,
-                                           device_name,
+                                           device_type,
                                            payload_size,
                                            eth_header,
                                            ip_header);
@@ -75,7 +75,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                         GetName(),
                                         node,
                                         device,
-                                        device_name,
+                                        device_type,
                                         payload_size,
                                         eth_header,
                                         ip_header);
@@ -120,14 +120,16 @@ NS3Parser::ParseEvent(LineHandler &line_handler) {
     co_return nullptr;
   }
 
-  const std::string *device_name;
+  NetworkEvent::NetworkDeviceType device_type;
   if (line_handler.ConsumeAndTrimTillString("ns3::SimpleNetDevice")) {
-    device_name = trace_environment_.InternalizeAdditional("ns3::SimpleNetDevice");
+    device_type = NetworkEvent::NetworkDeviceType::kSimpleNetDevice;
   } else if (line_handler.ConsumeAndTrimTillString("ns3::CosimNetDevice")) {
-    device_name = trace_environment_.InternalizeAdditional("ns3::CosimNetDevice");
+    device_type = NetworkEvent::NetworkDeviceType::kCosimNetDevice;
+  } else {
+    co_return nullptr;
   }
 
   line_handler.SkipTillWhitespace();
-  event_ptr = ParseNetDevice(line_handler, timestamp, type, node, device, device_name);
+  event_ptr = ParseNetDevice(line_handler, timestamp, type, node, device, device_type);
   co_return event_ptr;
 }

@@ -50,6 +50,8 @@ enum span_type {
   kNicMmio,
   kNicEth,
   kNicMsix,
+  kCosimNetDeviceSpan,
+  kSimpleNetDeviceSpan,
   kGenericSingle
 };
 
@@ -77,6 +79,10 @@ inline std::ostream &operator<<(std::ostream &out, span_type type) {
       break;
     case span_type::kGenericSingle:out << "kGenericSingle";
       break;
+    case span_type::kCosimNetDeviceSpan:out << "kCosimNetDeviceSpan";
+      break;
+    case span_type::kSimpleNetDeviceSpan:out << "kSimpleNetDeviceSpan";
+      break;
     default:out << "could not represent given span type";
       break;
   }
@@ -101,18 +107,7 @@ class EventSpan {
   inline static const char *tc_null_ = "try setting std::shared_ptr<TraceContext> which is null";
 
  public:
-  virtual void Display(std::ostream &out) {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    out << "id: " << std::to_string(id_);
-    out << ", source_id: " << std::to_string(source_id_);
-    out << ", kind: " << type_;
-    if (not events_.empty()) {
-      out << ", starting_event={" << events_.front() << "}";
-      out << ", ending_event={" << events_.back() << "}";
-    }
-    out << ", has parent? " << BoolToString(HasParent());
-    out << ", parent_id=" << GetParentId();
-  }
+  virtual void Display(std::ostream &out);
 
   inline std::string &GetServiceName() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
@@ -207,69 +202,18 @@ class EventSpan {
     is_relevant_ = false;
   }
 
-  uint64_t GetStartingTs() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+  uint64_t GetStartingTs();
 
-    if (events_.empty()) {
-      return 0xFFFFFFFFFFFFFFFF;
-    }
+  uint64_t GetCompletionTs();
 
-    const std::shared_ptr<Event> event_ptr = events_.front();
-    if (event_ptr) {
-      return event_ptr->GetTs();
-    }
-    return 0xFFFFFFFFFFFFFFFF;
-  }
-
-  uint64_t GetCompletionTs() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (events_.empty() or IsPending()) {
-      return 0xFFFFFFFFFFFFFFFF;
-    }
-
-    const std::shared_ptr<Event> event_ptr = events_.back();
-    if (event_ptr) {
-      return event_ptr->GetTs();
-    }
-    return 0xFFFFFFFFFFFFFFFF;
-  }
-
-  bool SetContext(const std::shared_ptr<TraceContext> &traceContext, bool override_existing) {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not override_existing and trace_context_) {
-      return false;
-    }
-    throw_if_empty(traceContext, tc_null_, source_loc::current());
-
-    if (not traceContext->HasParent()) {
-      return false;
-    }
-    assert(traceContext->GetParentId() != 0);
-    if (traceContext->GetParentStartingTs() >= GetStartingTs()) {
-      return false;
-    }
-
-    trace_context_ = traceContext;
-    return true;
-  }
+  bool SetContext(const std::shared_ptr<TraceContext> &traceContext, bool override_existing);
 
   bool HasParent() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return trace_context_ != nullptr and trace_context_->HasParent();
   }
 
-  uint64_t GetParentId() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    if (trace_context_ == nullptr) {
-      return 0; // invalid id
-    }
-    if (not trace_context_->HasParent()) {
-      return 0; // invalid id
-    }
-    return trace_context_->GetParentId();
-  }
+  uint64_t GetParentId();
 
   uint64_t GetValidParentId() {
     const uint64_t parent_id = GetParentId();
@@ -329,28 +273,7 @@ class EventSpan {
 
  protected:
   // When calling this method the lock must be held
-  bool IsPotentialAdd(std::shared_ptr<Event> &event_ptr) {
-    if (not event_ptr) {
-      return false;
-    }
-
-    if (IsComplete()) {
-      return false;
-    }
-
-    if (not events_.empty()) {
-      auto first = events_.front();
-      if (first->GetParserIdent() != event_ptr->GetParserIdent()) {
-        return false;
-      }
-      // TODO: investigate this further in original log files
-      // if (first->get_ts() > event_ptr->GetTs()) {
-      //   return false;
-      // }
-    }
-
-    return true;
-  }
+  bool IsPotentialAdd(std::shared_ptr<Event> &event_ptr);
 };
 
 class HostCallSpan : public EventSpan {
@@ -422,45 +345,7 @@ class HostCallSpan : public EventSpan {
     is_pending_ = false;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      std::cout << "is not a potential add" << '\n';
-      return false;
-    }
-
-    if (not IsType(event_ptr, EventType::kHostCallT)) {
-      return false;
-    }
-
-    if (trace_environment_.IsSysEntry(event_ptr)) {
-      if (is_fragmented_ or call_span_entry_) {
-        is_pending_ = false;
-        syscall_return_ = events_.back();
-        is_fragmented_ = false;
-        return false;
-      }
-
-      is_pending_ = true;
-      call_span_entry_ = event_ptr;
-      events_.push_back(event_ptr);
-      return true;
-    }
-
-    if (trace_environment_.IsKernelTx(event_ptr)) {
-      kernel_transmit_ = true;
-    } else if (trace_environment_.IsDriverTx(event_ptr)) {
-      driver_transmit_ = true;
-    } else if (trace_environment_.IsKernelRx(event_ptr)) {
-      kernel_receive_ = true;
-    } else if (trace_environment_.IsDriverRx(event_ptr)) {
-      driver_receive_ = true;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class HostIntSpan : public EventSpan {
@@ -484,33 +369,7 @@ class HostIntSpan : public EventSpan {
 
   ~HostIntSpan() override = default;
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    if (IsType(event_ptr, EventType::kHostPostIntT)) {
-      if (host_post_int_) {
-        return false;
-      }
-      host_post_int_ = event_ptr;
-
-    } else if (IsType(event_ptr, EventType::kHostClearIntT)) {
-      if (not host_post_int_ or host_clear_int_) {
-        return false;
-      }
-      host_clear_int_ = event_ptr;
-      is_pending_ = false;
-
-    } else {
-      return false;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class HostDmaSpan : public EventSpan {
@@ -542,48 +401,7 @@ class HostDmaSpan : public EventSpan {
     return is_read_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    switch (event_ptr->GetType()) {
-      case EventType::kHostDmaWT:
-      case EventType::kHostDmaRT: {
-        if (host_dma_execution_) {
-          return false;
-        }
-
-        is_read_ = IsType(event_ptr, EventType::kHostDmaRT);
-        host_dma_execution_ = event_ptr;
-        break;
-      }
-
-      case EventType::kHostDmaCT: {
-        if (not host_dma_execution_ or host_dma_completion_) {
-          return false;
-        }
-
-        auto exec =
-            std::static_pointer_cast<HostAddrSizeOp>(host_dma_execution_);
-        auto comp = std::static_pointer_cast<HostDmaC>(event_ptr);
-        if (exec->GetId() != comp->GetId()) {
-          return false;
-        }
-
-        host_dma_completion_ = event_ptr;
-        is_pending_ = false;
-        break;
-      }
-
-      default:return false;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class HostMmioSpan : public EventSpan {
@@ -630,93 +448,7 @@ class HostMmioSpan : public EventSpan {
     return is_posted_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    switch (event_ptr->GetType()) {
-      case EventType::kHostMmioWT:
-      case EventType::kHostMmioRT: {
-        if (host_mmio_issue_) {
-          return false;
-        }
-
-        std::shared_ptr<HostMmioOp> mmio;
-        if (IsType(event_ptr, EventType::kHostMmioRT)) {
-          is_read_ = true;
-          mmio = std::static_pointer_cast<HostMmioOp>(event_ptr);
-        } else {
-          is_read_ = false;
-          auto mmiow = std::static_pointer_cast<HostMmioW>(event_ptr);
-          is_posted_ = mmiow->IsPosted();
-          mmio = mmiow;
-        }
-        bar_number_ = mmio->GetBar();
-        host_mmio_issue_ = event_ptr;
-
-        if (is_read_ and trace_environment_.IsMsixNotToDeviceBarNumber(bar_number_)) {
-          is_pending_ = false;
-        }
-
-        break;
-      }
-
-      case EventType::kHostMmioImRespPoWT: {
-        if (not host_mmio_issue_ or is_read_ or im_mmio_resp_ or not is_posted_) {
-          return false;
-        }
-        if (host_mmio_issue_->GetTs() != event_ptr->GetTs()) {
-          return false;
-        }
-        im_mmio_resp_ = event_ptr;
-
-        if (is_posted_ or
-            trace_environment_.IsMsixNotToDeviceBarNumber(bar_number_)) {
-          is_pending_ = false;
-        }
-
-        break;
-      }
-
-      case EventType::kHostMmioCWT:
-      case EventType::kHostMmioCRT: {
-        if (trace_environment_.IsMsixNotToDeviceBarNumber(bar_number_)) {
-          return false;
-        }
-
-        if (not host_mmio_issue_) {
-          return false;
-        }
-
-        if (IsType(event_ptr, EventType::kHostMmioCWT)) {
-          if (is_read_ or im_mmio_resp_) {
-            return false;
-          }
-        } else {
-          if (not is_read_) {
-            return false;
-          }
-        }
-
-        auto issue = std::static_pointer_cast<HostAddrSizeOp>(host_mmio_issue_);
-        auto comp = std::static_pointer_cast<HostIdOp>(event_ptr);
-        if (issue->GetId() != comp->GetId()) {
-          return false;
-        }
-        completion_ = event_ptr;
-        is_pending_ = false;
-        break;
-      }
-
-      default:return false;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class HostMsixSpan : public EventSpan {
@@ -740,39 +472,7 @@ class HostMsixSpan : public EventSpan {
 
   ~HostMsixSpan() override = default;
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    if (IsType(event_ptr, EventType::kHostMsiXT)) {
-      if (host_msix_) {
-        return false;
-      }
-      host_msix_ = event_ptr;
-      is_pending_ = true;
-
-    } else if (IsType(event_ptr, EventType::kHostDmaCT)) {
-      if (not host_msix_ or host_dma_c_) {
-        return false;
-      }
-
-      auto dma = std::static_pointer_cast<HostDmaC>(event_ptr);
-      if (dma->GetId() != 0) {
-        return false;
-      }
-      host_dma_c_ = event_ptr;
-      is_pending_ = false;
-
-    } else {
-      return false;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class HostPciSpan : public EventSpan {
@@ -807,39 +507,7 @@ class HostPciSpan : public EventSpan {
     return not IsRead();
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    if (IsType(event_ptr, EventType::kHostPciRWT)) {
-      if (host_pci_rw_) {
-        return false;
-      }
-      host_pci_rw_ = event_ptr;
-      is_pending_ = true;
-      is_read_ = std::static_pointer_cast<HostPciRW>(event_ptr)->IsRead();
-
-    } else if (IsType(event_ptr, EventType::kHostConfT)) {
-      if (not host_pci_rw_ or host_conf_rw_) {
-        return false;
-      }
-      auto conf_rw = std::static_pointer_cast<HostConf>(event_ptr);
-      if (conf_rw->IsRead() != is_read_) {
-        return false;
-      }
-      host_conf_rw_ = event_ptr;
-      is_pending_ = false;
-
-    } else {
-      return false;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class NicMsixSpan : public EventSpan {
@@ -862,27 +530,7 @@ class NicMsixSpan : public EventSpan {
 
   ~NicMsixSpan() override = default;
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    if (IsType(event_ptr, EventType::kNicMsixT)) {
-      if (nic_msix_) {
-        return false;
-      }
-      nic_msix_ = event_ptr;
-
-    } else {
-      return false;
-    }
-
-    events_.push_back(event_ptr);
-    is_pending_ = false;
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class NicMmioSpan : public EventSpan {
@@ -917,26 +565,7 @@ class NicMmioSpan : public EventSpan {
     return not IsRead();
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr) or action_) {
-      return false;
-    }
-
-    if (IsType(event_ptr, EventType::kNicMmioRT)) {
-      is_read_ = true;
-    } else if (IsType(event_ptr, EventType::kNicMmioWT)) {
-      is_read_ = false;
-    } else {
-      return false;
-    }
-
-    is_pending_ = false;
-    action_ = event_ptr;
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class NicDmaSpan : public EventSpan {
@@ -970,60 +599,7 @@ class NicDmaSpan : public EventSpan {
     return is_read_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-
-    if (not IsPotentialAdd(event_ptr)) {
-      return false;
-    }
-
-    switch (event_ptr->GetType()) {
-      case EventType::kNicDmaIT: {
-        if (dma_issue_) {
-          return false;
-        }
-        dma_issue_ = event_ptr;
-        break;
-      }
-
-      case EventType::kNicDmaExT: {
-        if (not dma_issue_ or nic_dma_execution_) {
-          return false;
-        }
-        auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
-        auto exec = std::static_pointer_cast<NicDmaEx>(event_ptr);
-        if (issue->GetId() != exec->GetId() or issue->GetAddr() != exec->GetAddr()) {
-          return false;
-        }
-        nic_dma_execution_ = event_ptr;
-        break;
-      }
-
-      case EventType::kNicDmaCWT:
-      case EventType::kNicDmaCRT: {
-        if (not dma_issue_ or not nic_dma_execution_ or nic_dma_completion_) {
-          return false;
-        }
-
-        is_read_ = IsType(event_ptr, EventType::kNicDmaCRT);
-
-        auto issue = std::static_pointer_cast<NicDmaI>(dma_issue_);
-        auto comp = std::static_pointer_cast<NicDma>(event_ptr);
-        if (issue->GetId() != comp->GetId() or issue->GetAddr() != comp->GetAddr()) {
-          return false;
-        }
-
-        nic_dma_completion_ = event_ptr;
-        is_pending_ = false;
-        break;
-      }
-
-      default:return false;
-    }
-
-    events_.push_back(event_ptr);
-    return true;
-  }
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class NicEthSpan : public EventSpan {
@@ -1058,26 +634,35 @@ class NicEthSpan : public EventSpan {
     return not IsTransmit();
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+};
 
-    if (not IsPotentialAdd(event_ptr) or tx_rx_) {
-      return false;
-    }
+class NetDeviceSpan : public EventSpan {
 
-    if (IsType(event_ptr, EventType::kNicTxT)) {
-      is_send_ = true;
-    } else if (IsType(event_ptr, EventType::kNicRxT)) {
-      is_send_ = false;
-    } else {
-      return false;
-    }
+  std::shared_ptr<Event> enqueue_;
+  std::shared_ptr<Event> dequeue_;
+  std::shared_ptr<Event> drop_;
+  NetworkEvent::NetworkDeviceType device_type_;
 
-    is_pending_ = false;
-    tx_rx_ = event_ptr;
-    events_.push_back(event_ptr);
-    return true;
+  static bool IsConsistent(const std::shared_ptr<NetworkEvent> &event_a, const std::shared_ptr<NetworkEvent> &event_b);
+
+ public:
+  explicit NetDeviceSpan(TraceEnvironment &trace_environment,
+                         std::shared_ptr<TraceContext> &trace_context,
+                         uint64_t source_id,
+                         std::string &service_name)
+      : EventSpan(trace_environment, trace_context, source_id, span_type::kCosimNetDeviceSpan, service_name) {
   }
+
+  NetDeviceSpan(const NetDeviceSpan &other) = default;
+
+  EventSpan *clone() override {
+    return new NetDeviceSpan(*this);
+  }
+
+  ~NetDeviceSpan() override = default;
+
+  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };
 
 class GenericSingleSpan : public EventSpan {

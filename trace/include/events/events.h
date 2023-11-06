@@ -1044,10 +1044,15 @@ class NetworkEvent : public Event {
     }
   };
 
+  enum NetworkDeviceType {
+    kCosimNetDevice,
+    kSimpleNetDevice
+  };
+
  private:
   const int node_;
   const int device_;
-  const std::string *device_name_;
+  const NetworkDeviceType device_type_;
   const size_t payload_size_ = 0;
   const std::optional<EthernetHeader> ethernet_header_;
   const std::optional<Ipv4Header> ip_header_;
@@ -1063,6 +1068,8 @@ class NetworkEvent : public Event {
   int GetNode() const;
 
   int GetDevice() const;
+
+  NetworkDeviceType GetDeviceType() const;
 
   size_t GetPayloadSize() const;
 
@@ -1084,14 +1091,14 @@ class NetworkEvent : public Event {
                         std::string name,
                         int node,
                         int device,
-                        const std::string *device_name,
+                        const NetworkDeviceType device_type,
                         size_t payload_size,
                         const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                         const std::optional<Ipv4Header> &ip_header = std::nullopt)
       : Event(ts, parser_identifier, parser_name, type, name),
         node_(node),
         device_(device),
-        device_name_(device_name),
+        device_type_(device_type),
         payload_size_(payload_size),
         ethernet_header_(ethernet_header),
         ip_header_(ip_header) {
@@ -1102,6 +1109,22 @@ class NetworkEvent : public Event {
   ~NetworkEvent() override = default;
 };
 
+inline std::ostream &operator<<(std::ostream &out, NetworkEvent::NetworkDeviceType device) {
+  switch (device) {
+    case NetworkEvent::NetworkDeviceType::kCosimNetDevice: {
+      out << "ns3::CosimNetDevice";
+      break;
+    }
+    case NetworkEvent::NetworkDeviceType::kSimpleNetDevice: {
+      out << "ns3::SimpleNetDevice";
+      break;
+    }
+    default:out << "unknown";
+      break;
+  }
+  return out;
+}
+
 class NetworkEnqueue : public NetworkEvent {
  public:
   explicit NetworkEnqueue(uint64_t ts,
@@ -1109,7 +1132,7 @@ class NetworkEnqueue : public NetworkEvent {
                           const std::string parser_name,
                           int node,
                           int device,
-                          const std::string *device_name,
+                          const NetworkDeviceType device_type,
                           size_t payload_size,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                           const std::optional<Ipv4Header> &ip_header = std::nullopt)
@@ -1120,7 +1143,7 @@ class NetworkEnqueue : public NetworkEvent {
                      "NetworkEnqueue",
                      node,
                      device,
-                     device_name,
+                     device_type,
                      payload_size,
                      ethernet_header,
                      ip_header) {}
@@ -1145,7 +1168,7 @@ class NetworkDequeue : public NetworkEvent {
                           const std::string parser_name,
                           int node,
                           int device,
-                          const std::string *device_name,
+                          const NetworkDeviceType device_type,
                           size_t payload_size,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                           const std::optional<Ipv4Header> &ip_header = std::nullopt)
@@ -1156,7 +1179,7 @@ class NetworkDequeue : public NetworkEvent {
                      "NetworkDequeue",
                      node,
                      device,
-                     device_name,
+                     device_type,
                      payload_size,
                      ethernet_header,
                      ip_header) {}
@@ -1181,7 +1204,7 @@ class NetworkDrop : public NetworkEvent {
                        const std::string parser_name,
                        int node,
                        int device,
-                       const std::string *device_name,
+                       const NetworkDeviceType device_type,
                        size_t payload_size,
                        const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                        const std::optional<Ipv4Header> &ip_header = std::nullopt)
@@ -1192,7 +1215,7 @@ class NetworkDrop : public NetworkEvent {
                      "NetworkDrop",
                      node,
                      device,
-                     device_name,
+                     device_type,
                      payload_size,
                      ethernet_header,
                      ip_header) {}

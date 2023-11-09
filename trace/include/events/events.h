@@ -1049,11 +1049,18 @@ class NetworkEvent : public Event {
     kSimpleNetDevice
   };
 
+  enum EventBoundaryType {
+    kWithinSimulator,
+    kFromAdapter,
+    kToAdapter
+  };
+
  private:
   const int node_;
   const int device_;
   const NetworkDeviceType device_type_;
   const size_t payload_size_ = 0;
+  const EventBoundaryType boundary_type_;
   const std::optional<EthernetHeader> ethernet_header_;
   const std::optional<Ipv4Header> ip_header_;
 
@@ -1072,6 +1079,10 @@ class NetworkEvent : public Event {
   NetworkDeviceType GetDeviceType() const;
 
   size_t GetPayloadSize() const;
+
+  EventBoundaryType GetBoundaryType() const;
+
+  bool IsBoundaryType(EventBoundaryType boundary_type) const;
 
   bool HasEthernetHeader() const;
 
@@ -1093,6 +1104,7 @@ class NetworkEvent : public Event {
                         int device,
                         const NetworkDeviceType device_type,
                         size_t payload_size,
+                        const EventBoundaryType boundary_type,
                         const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                         const std::optional<Ipv4Header> &ip_header = std::nullopt)
       : Event(ts, parser_identifier, parser_name, type, name),
@@ -1100,6 +1112,7 @@ class NetworkEvent : public Event {
         device_(device),
         device_type_(device_type),
         payload_size_(payload_size),
+        boundary_type_(boundary_type),
         ethernet_header_(ethernet_header),
         ip_header_(ip_header) {
   }
@@ -1125,6 +1138,26 @@ inline std::ostream &operator<<(std::ostream &out, NetworkEvent::NetworkDeviceTy
   return out;
 }
 
+inline std::ostream &operator<<(std::ostream &out, NetworkEvent::EventBoundaryType type) {
+  switch (type) {
+    case NetworkEvent::EventBoundaryType::kWithinSimulator: {
+      out << "kWithinSimulator";
+      break;
+    }
+    case NetworkEvent::EventBoundaryType::kFromAdapter: {
+      out << "kFromAdapter";
+      break;
+    }
+    case NetworkEvent::EventBoundaryType::kToAdapter: {
+      out << "kToAdapter";
+      break;
+    }
+    default:out << "unknown";
+      break;
+  }
+  return out;
+}
+
 class NetworkEnqueue : public NetworkEvent {
  public:
   explicit NetworkEnqueue(uint64_t ts,
@@ -1134,6 +1167,7 @@ class NetworkEnqueue : public NetworkEvent {
                           int device,
                           const NetworkDeviceType device_type,
                           size_t payload_size,
+                          const EventBoundaryType boundary_type,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                           const std::optional<Ipv4Header> &ip_header = std::nullopt)
       : NetworkEvent(ts,
@@ -1145,6 +1179,7 @@ class NetworkEnqueue : public NetworkEvent {
                      device,
                      device_type,
                      payload_size,
+                     boundary_type,
                      ethernet_header,
                      ip_header) {}
 
@@ -1170,6 +1205,7 @@ class NetworkDequeue : public NetworkEvent {
                           int device,
                           const NetworkDeviceType device_type,
                           size_t payload_size,
+                          const EventBoundaryType boundary_type,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                           const std::optional<Ipv4Header> &ip_header = std::nullopt)
       : NetworkEvent(ts,
@@ -1181,6 +1217,7 @@ class NetworkDequeue : public NetworkEvent {
                      device,
                      device_type,
                      payload_size,
+                     boundary_type,
                      ethernet_header,
                      ip_header) {}
 
@@ -1206,6 +1243,7 @@ class NetworkDrop : public NetworkEvent {
                        int device,
                        const NetworkDeviceType device_type,
                        size_t payload_size,
+                       const EventBoundaryType boundary_type,
                        const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
                        const std::optional<Ipv4Header> &ip_header = std::nullopt)
       : NetworkEvent(ts,
@@ -1217,6 +1255,7 @@ class NetworkDrop : public NetworkEvent {
                      device,
                      device_type,
                      payload_size,
+                     boundary_type,
                      ethernet_header,
                      ip_header) {}
 
@@ -1248,6 +1287,10 @@ inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
 }
 
 bool IsType(const std::shared_ptr<Event> &event_ptr, EventType type);
+
+bool IsAnyType(std::shared_ptr<Event> &event_ptr, const std::vector<EventType> &types);
+
+bool IsAnyType(std::shared_ptr<Event> &event_ptr, const std::set<EventType> &types);
 
 bool IsType(const Event &event, EventType type);
 

@@ -16,6 +16,7 @@
 +  1946404561000 /$ns3::NodeListPriv/NodeList/1/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/RxPacketFromNetwork ns3::EthernetHeader( length/type=0x6fb2, source=00:02:5c:1a:f9:8b, destination=00:01:08:00:06:04) Payload (size=42)
 -  1946404561000 /$ns3::NodeListPriv/NodeList/1/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/TxPacketToAdapter ns3::EthernetHeader ( length/type=0x806, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f) Payload (size=42)
 
+
 +  1946922071000 /$ns3::NodeListPriv/NodeList/1/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/RxPacketFromAdapter ns3::EthernetHeader( length/type=0x800, source=cc:18:61:cf:61:4f, destination=5c:1a:f9:8b:6f:b2) Payload (size=98)
 -  1946922071000 /$ns3::NodeListPriv/NodeList/1/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/TxPacketToNetwork ns3::EthernetHeader( length/type=0x800, source=cc:18:61:cf:61:4f, destination=5c:1a:f9:8b:6f:b2) Payload (size=98)
 +  1946922071000 /$ns3::NodeListPriv/NodeList/1/$ns3::Node/DeviceList/1/$ns3::SimpleNetDevice/TxQueue/Enqueue ns3::EthernetHeader( length/type=0xc0a8, source=40:00:40:01:cc:6d, destination=45:00:00:54:6c:e7) ns3::Ipv4Header (tos 0x0 DSCP Default ECN Not-ECT ttl 64 id 27879 protocol 1 offset (bytes) 0 flags [DF] length: 84 192.168.64.2 > 192.168.64.1) Payload (size=98)
@@ -24,6 +25,7 @@
 -  1946922071000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/1/$ns3::SimpleNetDevice/TxPacketToAttachedDevice ns3::EthernetHeader( length/type=0xc0a8, source=40:00:40:01:cc:6d, destination=45:00:00:54:6c:e7) ns3::Ipv4Header(tos 0x0 DSCP Default ECN Not-ECT ttl 64 id 27879 protocol 1 offset (bytes) 0 flags [DF] length: 84 192.168.64.2 > 192.168.64.1) ns3::Ipv4Header (tos 0x0 DSCP Default ECN Not-ECT ttl 64 id 27879 protocol 1 offset (bytes) 0 flags [DF] length: 84 192.168.64.2 > 192.168.64.1) Payload (size=98)
 +  1946922071000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/RxPacketFromNetwork ns3::EthernetHeader( length/type=0xc0a8, source=40:00:40:01:cc:6d, destination=45:00:00:54:6c:e7) ns3::Ipv4Header (tos 0x0 DSCP Default ECN Not-ECT ttl 64 id 27879 protocol 1 offset (bytes) 0 flags [DF] length: 84 192.168.64.2 > 192.168.64.1) Payload (size=98)
 -  1946922071000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/TxPacketToAdapter ns3::EthernetHeader ( length/type=0x800, source=cc:18:61:cf:61:4f, destination=5c:1a:f9:8b:6f:b2) ns3::Ipv4Header (tos 0x0 DSCP Default ECN Not-ECT ttl 64 id 27879 protocol 1 offset (bytes) 0 flags [DF] length: 84 192.168.64.2 > 192.168.64.1) Payload (size=98)
+
 
 +  1947453940000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/RxPacketFromAdapter ns3::EthernetHeader( length/type=0x800, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f) Payload (size=98)
 -  1947453940000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/TxPacketToNetwork ns3::EthernetHeader( length/type=0x800, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f) Payload (size=98)

@@ -146,6 +146,7 @@ set(TRACE_LIB_SOURCE_FILES
         source/analytics/spanner.cpp
         source/analytics/nicSpanner.cc
         source/analytics/hostSpanner.cc
+        source/analytics/networkSpanner.cpp
         )
 add_library(${PROJECT_NAME} ${TRACE_LIB_HEADER_FILES} ${TRACE_LIB_SOURCE_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC

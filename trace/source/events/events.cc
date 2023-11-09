@@ -24,6 +24,8 @@
 
 #include "events/events.h"
 
+#include <algorithm>
+
 #include "util/utils.h"
 
 void Event::Display(std::ostream &out) {
@@ -571,6 +573,7 @@ void NetworkEvent::Display(std::ostream &out) {
   out << ", device=" << std::to_string(device_);
   out << ", device_name=" << device_type_;
   out << ", payload_size=" << std::to_string(payload_size_);
+  out << ", boundary_type=" << boundary_type_;
   if (HasEthernetHeader()) {
     out << ", ";
     const EthernetHeader &header = ethernet_header_.value();
@@ -595,9 +598,16 @@ NetworkEvent::NetworkDeviceType NetworkEvent::GetDeviceType() const {
   return device_type_;
 }
 
-
 size_t NetworkEvent::GetPayloadSize() const {
   return payload_size_;
+}
+
+NetworkEvent::EventBoundaryType NetworkEvent::GetBoundaryType() const {
+  return boundary_type_;
+}
+
+bool NetworkEvent::IsBoundaryType(NetworkEvent::EventBoundaryType boundary_type) const {
+  return boundary_type_ == boundary_type;
 }
 
 bool NetworkEvent::HasEthernetHeader() const {
@@ -642,7 +652,8 @@ bool NetworkEvent::Equal(const Event &other) {
   }
 
   return node_ == net->node_ and device_ == net->device_ and payload_size_ == net->payload_size_
-      and device_type_ == net->device_type_ and Event::Equal(other);
+      and device_type_ == net->device_type_ and boundary_type_ == net->boundary_type_
+      and Event::Equal(other);
 }
 
 void NetworkEnqueue::Display(std::ostream &out) {
@@ -684,4 +695,12 @@ bool IsType(const Event &event, EventType type) {
 
 bool IsType(const std::shared_ptr<Event> &event_ptr, EventType type) {
   return event_ptr && event_ptr->GetType() == type;
+}
+
+bool IsAnyType(const std::shared_ptr<Event> &event_ptr, const std::vector<EventType> &types) {
+  return event_ptr and std::ranges::any_of(types, [&](EventType type) { return IsType(event_ptr, type); });
+}
+
+bool IsAnyType(std::shared_ptr<Event> &event_ptr, const std::set<EventType> &types) {
+  return event_ptr and types.contains(event_ptr->GetType());
 }

@@ -31,6 +31,12 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                                  int device,
                                                  const NetworkEvent::NetworkDeviceType device_type) {
   line_handler.TrimL();
+  NetworkEvent::EventBoundaryType boundary_type = NetworkEvent::EventBoundaryType::kWithinSimulator;
+  if (line_handler.ConsumeAndTrimTillString("RxPacketFromAdapter")) {
+    boundary_type = NetworkEvent::EventBoundaryType::kFromAdapter;
+  } else if (line_handler.ConsumeAndTrimTillString("TxPacketToAdapter")) {
+    boundary_type = NetworkEvent::EventBoundaryType::kToAdapter;
+  }
 
   std::optional<NetworkEvent::EthernetHeader> eth_header;
   eth_header = TryParseEthernetHeader(line_handler);
@@ -53,6 +59,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            device,
                                            device_type,
                                            payload_size,
+                                           boundary_type,
                                            eth_header,
                                            ip_header);
     }
@@ -65,6 +72,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            device,
                                            device_type,
                                            payload_size,
+                                           boundary_type,
                                            eth_header,
                                            ip_header);
     }
@@ -77,6 +85,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                         device,
                                         device_type,
                                         payload_size,
+                                        boundary_type,
                                         eth_header,
                                         ip_header);
     }
@@ -129,7 +138,6 @@ NS3Parser::ParseEvent(LineHandler &line_handler) {
     co_return nullptr;
   }
 
-  line_handler.SkipTillWhitespace();
   event_ptr = ParseNetDevice(line_handler, timestamp, type, node, device, device_type);
   co_return event_ptr;
 }

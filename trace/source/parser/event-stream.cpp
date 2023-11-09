@@ -29,20 +29,24 @@ bool EventStreamParser::ParseNetworkEvent(LineHandler &line_handler,
                                           int &device,
                                           NetworkEvent::NetworkDeviceType &device_type,
                                           uint64_t &payload_size,
+                                          NetworkEvent::EventBoundaryType &boundary_type,
                                           std::optional<NetworkEvent::EthernetHeader> &eth_h,
                                           std::optional<NetworkEvent::Ipv4Header> &ip_h) {
   static std::function<bool(unsigned char)> device_name_pre = [](unsigned char chara) {
     return sim_string_utils::is_alnum(chara) or chara == ':';
   };
   std::string device_name;
-  if (not line_handler.ConsumeAndTrimTillString("node=") or
+  std::string boundary_type_str;
+  if (not line_handler.ConsumeAndTrimString(", node=") or
       not line_handler.ParseInt(node) or
-      not line_handler.ConsumeAndTrimTillString("device=") or
+      not line_handler.ConsumeAndTrimString(", device=") or
       not line_handler.ParseInt(device) or
-      not line_handler.ConsumeAndTrimTillString("device_name=") or
+      not line_handler.ConsumeAndTrimString(", device_name=") or
       not line_handler.ExtractAndSubstrUntilInto(device_name, device_name_pre) or
-      not line_handler.ConsumeAndTrimTillString("payload_size=") or
-      not line_handler.ParseUintTrim(10, payload_size)) {
+      not line_handler.ConsumeAndTrimString(", payload_size=") or
+      not line_handler.ParseUintTrim(10, payload_size) or
+      not line_handler.ConsumeAndTrimString(", boundary_type=") or
+      not line_handler.ExtractAndSubstrUntilInto(boundary_type_str, sim_string_utils::is_alnum)) {
     return false;
   }
 
@@ -50,6 +54,16 @@ bool EventStreamParser::ParseNetworkEvent(LineHandler &line_handler,
     device_type = NetworkEvent::kCosimNetDevice;
   } else if (device_name == "ns3::SimpleNetDevice") {
     device_type = NetworkEvent::kSimpleNetDevice;
+  } else {
+    return false;
+  }
+
+  if (boundary_type_str == "kToAdapter") {
+    boundary_type = NetworkEvent::EventBoundaryType::kToAdapter;
+  } else if (boundary_type_str == "kFromAdapter") {
+    boundary_type = NetworkEvent::EventBoundaryType::kFromAdapter;
+  } else if (boundary_type_str == "kWithinSimulator") {
+    boundary_type = NetworkEvent::EventBoundaryType::kWithinSimulator;
   } else {
     return false;
   }
@@ -94,6 +108,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   bool posted;
   std::string function, component;
   NetworkEvent::NetworkDeviceType device_type;
+  NetworkEvent::EventBoundaryType boundary_type;
   std::optional<NetworkEvent::EthernetHeader> eth_h;
   std::optional<NetworkEvent::Ipv4Header> ip_h;
 
@@ -365,10 +380,10 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
     event = std::make_shared<NicRx>(ts, parser_ident,
                                     parser_name, len, addr);
   } else if (event_name == "NetworkEnqueue") {
-    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, eth_h, ip_h)) {
+    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, boundary_type, eth_h, ip_h)) {
       co_return nullptr;
     }
-    co_return create_shared<NetworkEnqueue>("netowrk event null",
+    co_return create_shared<NetworkEnqueue>("netowork event null",
                                             ts,
                                             parser_ident,
                                             parser_name,
@@ -376,10 +391,11 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
                                             device,
                                             device_type,
                                             payload_size,
+                                            boundary_type,
                                             eth_h,
                                             ip_h);
   } else if (event_name == "NetworkDequeue") {
-    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, eth_h, ip_h)) {
+    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, boundary_type, eth_h, ip_h)) {
       co_return nullptr;
     }
     co_return create_shared<NetworkDequeue>("netowrk event null",
@@ -390,10 +406,11 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
                                             device,
                                             device_type,
                                             payload_size,
+                                            boundary_type,
                                             eth_h,
                                             ip_h);
   } else if (event_name == "NetworkDrop") {
-    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, eth_h, ip_h)) {
+    if (not ParseNetworkEvent(line_handler, node, device, device_type, payload_size, boundary_type, eth_h, ip_h)) {
       co_return nullptr;
     }
     co_return create_shared<NetworkDrop>("netowrk event null",
@@ -404,6 +421,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
                                          device,
                                          device_type,
                                          payload_size,
+                                         boundary_type,
                                          eth_h,
                                          ip_h);
   } else {

@@ -46,6 +46,7 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
 
   using ExecutorT = std::shared_ptr<concurrencpp::executor>;
   using EventT = std::shared_ptr<Event>;
+  using ChannelT = std::shared_ptr<CoroChannel<std::shared_ptr<Context>>>;
   using LazyResultT = concurrencpp::lazy_result<bool>;
   using HandlerT = std::function<LazyResultT(ExecutorT, EventT &)>;
   std::unordered_map<EventType, HandlerT> handler_;
@@ -186,6 +187,28 @@ struct NicSpanner : public Spanner {
   std::shared_ptr<EventSpan> last_causing_ = nullptr;
 
   std::list<std::shared_ptr<NicDmaSpan>> pending_nic_dma_spans_;
+};
+
+struct NetworkSpanner : public Spanner {
+
+  explicit NetworkSpanner(TraceEnvironment &trace_environment,
+                          std::string &&name,
+                          Tracer &tra,
+                          ChannelT from_host_,
+                          ChannelT to_host_);
+
+ private:
+
+  concurrencpp::lazy_result<bool> HandelNetworkEvent(ExecutorT resume_executor,
+                                                     std::shared_ptr<Event> &event_ptr);
+
+  // TODO: may need this to be a vector as well
+  std::shared_ptr<EventSpan> current_device_span_;
+
+  // TODO: make these vectors --> mechanism needed to decide to which host to send to
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host_;
+  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_;
+
 };
 
 #endif  // SIMBRICKS_TRACE_SPANNER_H_

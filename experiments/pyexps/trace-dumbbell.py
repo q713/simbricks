@@ -30,27 +30,45 @@ from simbricks.orchestration.simulators import (
 from simbricks.orchestration.simulator_utils import create_dctcp_hosts
 import simbricks.orchestration.experiments as exp
 
+
+
+class IPProvider():
+    def __init__(self):
+        self.base = '192.168.64'
+        self.next_ip = 0
+        self.max = 244
+
+    def GetNext(self) -> str:
+        if self.next_ip > self.max:
+            raise Exception("IP provider drained")
+        res = f'{self.base}.{self.next_ip}'
+        self.next_ip += 1
+        return res
+
+
+
+#################################
 # Start building the actual experiment
+#################################
 e = Experiment(name='trace-dumbbell-experiment')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
-
-# experiment configuration options
-# gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,PciHost,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecUser,ExecKernel,ExecOpClass,ExecRegDelta,ExecFaulting,ExecAsid,ExecFlags,ExecCPSeq,ExecFaulting,ExecFetchSeq'
+servers = []
+clients = []
+gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,PciHost,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecUser,ExecKernel,ExecOpClass,ExecRegDelta,ExecFaulting,ExecAsid,ExecFlags,ExecCPSeq,ExecFaulting,ExecFetchSeq'
+named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir/"
 # named_pipe_folder = "/usr/src/data-folder"
-# gem5_server_pipe = f"{named_pipe_folder}/gem5-server-log-pipe.pipe"
-# gem5_client_pipe = f"{named_pipe_folder}/gem5-client-log-pipe.pipe"
-# nicbm_server_pipe = f"{named_pipe_folder}/nicbm-server-log-pipe.pipe"
-# nicbm_client_pipe = f"{named_pipe_folder}/nicbm-client-log-pipe.pipe"
-# ns3_pipe = f'{named_pipe_folder}/ns3-log-pipe.pipe'
-#ns3_pipe = f' &> /local/jakobg/tracing-experiments/wrkdir/ns3-log-pipe.pipe'
-num_pairs = 2
 cpu_freq = '5GHz'
-mtu = 1500
-sys_clock = '1GHz'  # if not set, default 1GHz
-ip_start = '192.168.64.1'
 eth_latency = 500 * 10**3  # 500 us
+sys_clock = '1GHz'  # if not set, default 1GHz
+mtu = 1500
+ip_provider = IPProvider()
+num_pairs = 1
 
-# network sim
+
+
+#################################
+# network simulator (ns3)
+#################################
 network = NS3DumbbellNet()
 link_rate_gb_s = 10
 link_rate_opt = f'--LinkRate={link_rate_gb_s}Gb/s'
@@ -59,75 +77,79 @@ link_latency_opt = f'--LinkLatency={link_latency_ns}ns'
 ecn_th_opt = '--EcnTh=0'
 trace_file_path = '/local/jakobg/tracing-experiments/wrkdir/ns3-log-pipe.pipe'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
-network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {trace_file_path}'
+network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {trace_file_opt}'
 network.eth_latency = eth_latency
 
 e.add_network(network)
 
-# client and server
-def gem5_timing(node_config: NodeConfig):
-    h = Gem5Host(node_config)
-    #h.variant = 'fast'
-    #h.sys_clock = sys_clock
-    #client.name = 'client'
-    #client.wait = True  # wait for client simulator to finish execution
-    #gem5_client_log = f'--debug-file {gem5_client_pipe}'
-    #client.extra_main_args = [gem5_client_log, gem5DebugFlags]
-    #client.variant = 'opt'
-    #e.add_host(client)
-    #server_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
-    #server_config.ip = '10.0.0.2'
-    #server_config.app = IdleHost()
-    #server = Gem5Host(server_config)
-    #server.name = 'server'
-    #gem5_server_log = f'--debug-file {gem5_server_pipe}'
-    #server.extra_main_args = [gem5_server_log, gem5DebugFlags]
-    #server.variant = 'opt'
-    return h
-client_server_host_class = gem5_timing
 
-def ping_client():
-    c = PingClient()
-    c.count = 1
-    return c
-client_app = ping_client
 
-server_app = IdleHost
+#################################
+# server that produces log output
+#################################
+server_nic = I40eNIC()
+server_nic.eth_latency = eth_latency
+nicbm_server_pipe = f"{named_pipe_folder}/nicbm-server-log-pipe.pipe"
+server_nic.log_file = nicbm_server_pipe
+server_nic.set_network(network)
 
-# nics
-def client_server_nic_class_func():
-    n = I40eNIC()
-    n.eth_latency = eth_latency
-    return n
-client_server_nic_class = client_server_nic_class_func
-client_server_nic_node = I40eLinuxNode #I40eDCTCPNode
+server_config = I40eLinuxNode()
+server_config.mtu = mtu
+server_config.ip = ip_provider.GetNext()
+server_config.app = IdleHost()
 
-# create clients and servers
-servers = create_dctcp_hosts(
-    e,
-    num_pairs,
-    'server',
-    network,
-    client_server_nic_class,
-    client_server_host_class,
-    client_server_nic_node,
-    server_app,
-    cpu_freq,
-    mtu)
+server = Gem5Host(server_config)
+server.name = 'server.1'
+server.cpu_freq = cpu_freq
+server_pipe = f"{named_pipe_folder}/gem5-server-log-pipe.pipe"
+server_log = f'--debug-file {server_pipe}'
+server.extra_main_args = [server_log, gem5DebugFlags]
+server.variant = 'opt'
 
-clients = create_dctcp_hosts(
-    e,
-    num_pairs,
-    'client',
-    network,
-    client_server_nic_class,
-    client_server_host_class,
-    client_server_nic_node,
-    client_app,
-    cpu_freq,
-    mtu,
-    ip_start=num_pairs + 1)
+server.add_nic(server_nic)
+e.add_nic(server_nic)
+e.add_host(server)
 
+servers.append(server)
+
+
+
+#################################
+# client that produces log output
+#################################
+client_nic = I40eNIC()
+client_nic.eth_latency = eth_latency
+nicbm_client_pipe = f"{named_pipe_folder}/nicbm-client-log-pipe.pipe"
+client_nic.log_file = nicbm_client_pipe
+client_nic.set_network(network)
+
+client_config = I40eLinuxNode()
+client_config.mtu = mtu
+client_config.ip = ip_provider.GetNext()
+client_config.app = PingClient()
+client_config.app.count = 1
+
+client = Gem5Host(client_config)
+client.name = 'client.1'
+client.cpu_freq = cpu_freq
+client_pipe = f"{named_pipe_folder}/gem5-client-log-pipe.pipe"
+client_log = f'--debug-file {client_pipe}'
+client.extra_main_args = [client_log, gem5DebugFlags]
+client.variant = 'opt'
+
+client.add_nic(client_nic)
+e.add_nic(client_nic)
+e.add_host(client)
+
+clients.append(client)
+
+
+
+#################################
+# tell client apps about server ips
+#################################
+assert(len(servers) == len(clients))
+assert(len(clients) == 1)
 i = 0
 for cl in clients:
     cl.node_config.app.server_ip = servers[i].node_config.ip

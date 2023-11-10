@@ -78,7 +78,12 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
     auto context = Context::CreatePassOnContext<expectation::kRx>(current_device_span_);
     throw_if_empty(context, TraceException::kContextIsNull, source_loc::current());
 
-    bool could_push = co_await to_host_->Push(resume_executor, context);
+    throw_on_false(network_event->HasIpHeader(), "kToAdapter event has no ip header",
+                   source_loc::current());
+    const NetworkEvent::Ipv4Header &header = network_event->GetIpHeader();
+    auto to_host = to_host_channels_.GetValidChannel(header.dst_ip_);
+
+    bool could_push = co_await to_host->Push(resume_executor, context);
     throw_on_false(could_push, TraceException::kCouldNotPushToContextQueue, source_loc::current());
   }
 
@@ -89,10 +94,11 @@ NetworkSpanner::NetworkSpanner(TraceEnvironment &trace_environment,
                                std::string &&name,
                                Tracer &tra,
                                ChannelT from_host,
-                               ChannelT to_host)
-    : Spanner(trace_environment, std::move(name), tra), from_host_(std::move(from_host)), to_host_(std::move(to_host)) {
+                               const IpToChannelMap &to_host_channels)
+    : Spanner(trace_environment, std::move(name), tra),
+      from_host_(std::move(from_host)),
+      to_host_channels_(to_host_channels) {
   throw_if_empty(from_host_, TraceException::kQueueIsNull, source_loc::current());
-  throw_if_empty(to_host_, TraceException::kQueueIsNull, source_loc::current());
 
   auto handel_net_ev = [this](
       std::shared_ptr<concurrencpp::executor> resume_executor,

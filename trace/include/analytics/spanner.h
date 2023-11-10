@@ -34,6 +34,7 @@
 #include "env/traceEnvironment.h"
 #include "analytics/tracer.h"
 #include "analytics/timer.h"
+#include "parser/parser.h"
 
 #ifndef SIMBRICKS_TRACE_SPANNER_H_
 #define SIMBRICKS_TRACE_SPANNER_H_
@@ -191,11 +192,52 @@ struct NicSpanner : public Spanner {
 
 struct NetworkSpanner : public Spanner {
 
+  class IpToChannelMap {
+    using ChanT = std::shared_ptr<CoroChannel<std::shared_ptr<Context>>>;
+    std::unordered_map<uint32_t, ChanT> mapping_;
+
+   public:
+    explicit IpToChannelMap() = default;
+
+    IpToChannelMap &AddIpv4Mapping(uint32_t ipv4_address, ChanT channel) {
+      auto suc = mapping_.insert({ipv4_address, channel});
+      throw_on_false(suc.second, "NetworkSpanner ip address already mapped",
+                     source_loc::current());
+      return *this;
+    }
+
+    IpToChannelMap &AddIpv4Mapping(const std::string &ipv4_address, ChanT channel) {
+      LineHandler line_handler;
+      line_handler.SetLine(ipv4_address);
+
+      uint32_t ipv4;
+      throw_on_false(ParseIpAddress(line_handler, ipv4), "NetworkSpanner could not parse ipv4",
+                     source_loc::current());
+
+      AddIpv4Mapping(ipv4, channel);
+      return *this;
+    }
+
+    ChanT GetChannel(uint32_t ipv4_address) const {
+      auto iter = mapping_.find(ipv4_address);
+      if (iter != mapping_.end()) {
+        return iter->second;
+      }
+      return nullptr;
+    }
+
+    ChanT GetValidChannel(uint32_t ipv4_address) const {
+      auto result = GetChannel(ipv4_address);
+      throw_if_empty(result, TraceException::kChannelIsNull, source_loc::current());
+      return result;
+    }
+  };
+
   explicit NetworkSpanner(TraceEnvironment &trace_environment,
                           std::string &&name,
                           Tracer &tra,
                           ChannelT from_host_,
-                          ChannelT to_host_);
+                          const IpToChannelMap &to_host_channels);
 
  private:
 
@@ -207,8 +249,7 @@ struct NetworkSpanner : public Spanner {
 
   // TODO: make these vectors --> mechanism needed to decide to which host to send to
   std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host_;
-  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_;
-
+  const IpToChannelMap &to_host_channels_;
 };
 
 #endif  // SIMBRICKS_TRACE_SPANNER_H_

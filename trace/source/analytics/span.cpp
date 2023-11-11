@@ -516,6 +516,15 @@ bool NetDeviceSpan::IsConsistent(const std::shared_ptr<NetworkEvent> &event_a,
     return false;
   }
 
+  if ((event_a->HasArpHeader() and not event_b->HasArpHeader())
+      or (not event_a->HasArpHeader() and event_b->HasArpHeader())) {
+    return false;
+  }
+  // either both or non has an arp header
+  if (event_a->HasArpHeader() and event_a->GetArpHeader() != event_b->GetArpHeader()) {
+    return false;
+  }
+
   if ((event_a->HasIpHeader() and not event_b->HasIpHeader())
       or (not event_a->HasIpHeader() and event_b->HasIpHeader())) {
     return false;

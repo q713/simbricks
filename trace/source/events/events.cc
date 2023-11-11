@@ -535,35 +535,44 @@ int NicRx::GetPort() const {
   return port_;
 }
 
+void NetworkEvent::MacAddress::Display(std::ostream &out) const {
+  out << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(addr_[0]);
+  for (int index = 1; index < NetworkEvent::MacAddress::kMacSize; index++) {
+    out << ":" << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(addr_[index]);
+  }
+  out << std::setfill(' ');
+  out << std::dec;
+}
+
+void NetworkEvent::Ipv4::Display(std::ostream &out) const {
+  out << std::to_string(((0xff000000 & ip_) >> 24));
+  out << "." << std::to_string(((0x00ff0000 & ip_) >> 16));
+  out << "." << std::to_string(((0x0000ff00 & ip_) >> 8));
+  out << "." << std::to_string((0x000000ff & ip_));
+}
+
 void NetworkEvent::EthernetHeader::Display(std::ostream &out) const {
   out << "EthernetHeader(";
   out << "length/type=0x" << std::hex << length_type_;
-  out << ", source=";
-  out << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(src_mac_[0]);
-  for (int index = 1; index < kMacSize; index++) {
-    out << ":" << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(src_mac_[index]);
-  }
-  out << ", destination=" << "";
-  out << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(dst_mac_[0]);
-  for (int index = 1; index < kMacSize; index++) {
-    out << ":" << std::setfill('0') << std::setw(2) << std::hex << static_cast<unsigned int>(dst_mac_[index]);
-  }
+  out << ", source=" << src_mac_;
+  out << ", destination=" << dst_mac_;
   out << ")";
-  out << std::setfill(' ');
-  out << std::dec;
 }
 
 void NetworkEvent::Ipv4Header::Display(std::ostream &out) const {
   out << "Ipv4Header(";
   out << "length: " << length_;
-  out << " " << std::to_string(((0xff000000 & src_ip_) >> 24));
-  out << "." << std::to_string(((0x00ff0000 & src_ip_) >> 16));
-  out << "." << std::to_string(((0x0000ff00 & src_ip_) >> 8));
-  out << "." << std::to_string((0x000000ff & src_ip_));
-  out << " > " << std::to_string(((0xff000000 & dst_ip_) >> 24));
-  out << "." << std::to_string(((0x00ff0000 & dst_ip_) >> 16));
-  out << "." << std::to_string(((0x0000ff00 & dst_ip_) >> 8));
-  out << "." << std::to_string((0x000000ff & dst_ip_));
+  out << " " << src_ip_;
+  out << " > " << dst_ip_;
+  out << ")";
+}
+
+void NetworkEvent::ArpHeader::Display(std::ostream &out) const {
+  out << "ns3::ArpHeader(";
+  out << (is_request_ ? "request" : "reply");
+  // out << " source mac: " << src_mac_;
+  out << " source ipv4: " << src_ip_;
+  out << " dest ipv4: " << dst_ip_;
   out << ")";
 }
 
@@ -577,6 +586,11 @@ void NetworkEvent::Display(std::ostream &out) {
   if (HasEthernetHeader()) {
     out << ", ";
     const EthernetHeader &header = ethernet_header_.value();
+    header.Display(out);
+  }
+  if (HasArpHeader()) {
+    out << ", ";
+    const ArpHeader &header = GetArpHeader();
     header.Display(out);
   }
   if (HasIpHeader()) {
@@ -619,6 +633,15 @@ const NetworkEvent::EthernetHeader &NetworkEvent::GetEthernetHeader() const {
   return ethernet_header_.value();
 }
 
+bool NetworkEvent::HasArpHeader() const {
+  return arp_header_.has_value();
+}
+
+const NetworkEvent::ArpHeader &NetworkEvent::GetArpHeader() const {
+  throw_on_false(HasArpHeader(), "network event has no arp header", source_loc::current());
+  return arp_header_.value();
+}
+
 bool NetworkEvent::HasIpHeader() const {
   return ip_header_.has_value();
 }
@@ -640,6 +663,15 @@ bool NetworkEvent::Equal(const Event &other) {
   }
   // either both or non has an ethernet header
   if (HasEthernetHeader() and GetEthernetHeader() != net->GetEthernetHeader()) {
+    return false;
+  }
+
+  if ((HasArpHeader() and not net->HasArpHeader())
+      or (not HasArpHeader() and net->HasArpHeader())) {
+    return false;
+  }
+  // either both or non has an arp header
+  if (HasArpHeader() and GetArpHeader() != net->GetArpHeader()) {
     return false;
   }
 

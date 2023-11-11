@@ -39,12 +39,13 @@
 #include "env/traceEnvironment.h"
 #include "analytics/timer.h"
 
-bool ParseMacAddress(LineHandler &line_handler,
-                     std::array<unsigned char, NetworkEvent::EthernetHeader::kMacSize> &addr);
+bool ParseMacAddress(LineHandler &line_handler, NetworkEvent::MacAddress &addr);
 
-bool ParseIpAddress(LineHandler &line_handler, uint32_t &addr);
+bool ParseIpAddress(LineHandler &line_handler, NetworkEvent::Ipv4 &addr);
 
 std::optional<NetworkEvent::EthernetHeader> TryParseEthernetHeader(LineHandler &line_handler);
+
+std::optional<NetworkEvent::ArpHeader> TryParseArpHeader(LineHandler &line_handler);
 
 std::optional<NetworkEvent::Ipv4Header> TryParseIpHeader(LineHandler &line_handler);
 
@@ -74,7 +75,7 @@ class LogParser {
     return identifier_;
   }
 
-  inline std::string GetName() const {
+  inline const std::string &GetName() const {
     return name_;
   }
 

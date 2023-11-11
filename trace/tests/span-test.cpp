@@ -230,13 +230,9 @@ TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
   const auto from = NetworkEvent::EventBoundaryType::kFromAdapter;
   const auto to = NetworkEvent::EventBoundaryType::kToAdapter;
 
-  /*
-   * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-   * NetworkDequeue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0x800, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-   */
   SECTION("valid enqueue dequeue CosimNetDeviceSpan") {
-    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
     NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
     REQUIRE(net_device_span.IsPending());
     REQUIRE_FALSE(net_device_span.IsComplete());
@@ -249,10 +245,6 @@ TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
     REQUIRE(net_device_span.IsComplete());
   }
 
-  /*
-  * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-  * NetworkDrop: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=2, device_name=ns3::CosimNetDevice, payload_size=98, EthernetHeader(length/type=0x800, source=5c:1a:f9:8b:6f:b2, destination=cc:18:61:cf:61:4f), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-  */
   SECTION("valid enqueue drop CosimNetDeviceSpan") {
     auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt);
     auto dro = std::make_shared<NetworkDrop>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt);
@@ -268,13 +260,9 @@ TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
     REQUIRE(net_device_span.IsComplete());
   }
 
-  /*
-   * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-   * NetworkDequeue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-   */
   SECTION("valid enqueue dequeue SimpleNetDeviceSpan") {
-    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, std::nullopt, std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, std::nullopt, std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
     NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
     REQUIRE(net_device_span.IsPending());
     REQUIRE_FALSE(net_device_span.IsComplete());
@@ -287,13 +275,9 @@ TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
     REQUIRE(net_device_span.IsComplete());
   }
 
-  /*
-   * NetworkEnqueue: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-   * NetworkDrop: source_id=1, source_name=NS3Parser-test-parser, timestamp=1947453940000, node=1, device=1, device_name=ns3::SimpleNetDevice, payload_size=98, EthernetHeader(length/type=0xc0a8, source=00:00:40:01:71:b1, destination=45:00:00:54:07:a4), Ipv4Header(length: 84 192.168.64.1 > 192.168.64.2)
-   */
   SECTION("valid enqueue drop SimpleNetDeviceSpan") {
-    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto dro = std::make_shared<NetworkDrop>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto enq = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto dro = std::make_shared<NetworkDrop>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
     NetDeviceSpan net_device_span{trace_environment, trace_context, source_id, service_name};
     REQUIRE(net_device_span.IsPending());
     REQUIRE_FALSE(net_device_span.IsComplete());
@@ -307,8 +291,8 @@ TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
   }
 
   SECTION("cannot add CosimNetDevice to SimpleNetDevice") {
-    auto enq_a = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq_a = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto enq_a = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_a = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
     NetDeviceSpan net_device_span_a{trace_environment, trace_context, source_id, service_name};
     REQUIRE(net_device_span_a.IsPending());
     REQUIRE_FALSE(net_device_span_a.IsComplete());
@@ -322,13 +306,13 @@ TEST_CASE("Test netowrk spans for correctness", "[NetworkSpan]") {
   }
 
   SECTION("cannot add non matching events") {
-    auto enq_a = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq_a = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 1,  within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq_b = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0b8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq_c = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 254, 168, 64, 1, 192, 168, 64, 2));
-    auto deq_d = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt);
-    auto deq_e = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
-    auto deq_f = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto enq_a = std::make_shared<NetworkEnqueue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, from, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_a = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 1,  within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_b = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0b8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_c = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 254, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_d = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, std::nullopt);
+    auto deq_e = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, cosim_net_dev, 98, within, std::nullopt, std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
+    auto deq_f = std::make_shared<NetworkDequeue>(1947453940000, ident, parser_name, 1, 1, simple_net_dev, 98, within, CreateEthHeader(0xc0a8, 0x00, 0x00, 0x40, 0x01, 0x71, 0xb1, 0x45, 0x00, 0x00, 0x54, 0x07, 0xa4), std::nullopt, CreateIpHeader(84, 192, 168, 64, 1, 192, 168, 64, 2));
     NetDeviceSpan net_device_span_a{trace_environment, trace_context, source_id, service_name};
     REQUIRE(net_device_span_a.IsPending());
     REQUIRE_FALSE(net_device_span_a.IsComplete());

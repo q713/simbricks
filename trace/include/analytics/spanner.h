@@ -194,13 +194,13 @@ struct NetworkSpanner : public Spanner {
 
   class IpToChannelMap {
     using ChanT = std::shared_ptr<CoroChannel<std::shared_ptr<Context>>>;
-    std::unordered_map<uint32_t, ChanT> mapping_;
+    std::unordered_map<NetworkEvent::Ipv4, ChanT> mapping_;
 
    public:
     explicit IpToChannelMap() = default;
 
-    IpToChannelMap &AddIpv4Mapping(uint32_t ipv4_address, ChanT channel) {
-      auto suc = mapping_.insert({ipv4_address, channel});
+    IpToChannelMap &AddIpv4Mapping(const NetworkEvent::Ipv4 &ipv4, ChanT channel) {
+      auto suc = mapping_.insert({ipv4, channel});
       throw_on_false(suc.second, "NetworkSpanner ip address already mapped",
                      source_loc::current());
       return *this;
@@ -210,15 +210,16 @@ struct NetworkSpanner : public Spanner {
       LineHandler line_handler;
       line_handler.SetLine(ipv4_address);
 
-      uint32_t ipv4;
-      throw_on_false(ParseIpAddress(line_handler, ipv4), "NetworkSpanner could not parse ipv4",
+      NetworkEvent::Ipv4 ipv4;
+      throw_on_false(ParseIpAddress(line_handler, ipv4),
+                     "NetworkSpanner could not parse ipv4",
                      source_loc::current());
 
-      AddIpv4Mapping(ipv4, channel);
+      AddIpv4Mapping(ipv4, std::move(channel));
       return *this;
     }
 
-    ChanT GetChannel(uint32_t ipv4_address) const {
+    ChanT GetChannel(const NetworkEvent::Ipv4 &ipv4_address) const {
       auto iter = mapping_.find(ipv4_address);
       if (iter != mapping_.end()) {
         return iter->second;
@@ -226,7 +227,7 @@ struct NetworkSpanner : public Spanner {
       return nullptr;
     }
 
-    ChanT GetValidChannel(uint32_t ipv4_address) const {
+    ChanT GetValidChannel(const NetworkEvent::Ipv4 &ipv4_address) const {
       auto result = GetChannel(ipv4_address);
       throw_if_empty(result, TraceException::kChannelIsNull, source_loc::current());
       return result;

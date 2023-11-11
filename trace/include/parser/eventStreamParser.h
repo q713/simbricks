@@ -71,6 +71,7 @@ class EventStreamParser : public LogParser {
                          uint64_t &payload_size,
                          NetworkEvent::EventBoundaryType &boundary_type,
                          std::optional<NetworkEvent::EthernetHeader> &eth_h,
+                         std::optional<NetworkEvent::ArpHeader> &arp_h,
                          std::optional<NetworkEvent::Ipv4Header> &ip_h);
 
  public:

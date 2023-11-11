@@ -41,6 +41,9 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
   std::optional<NetworkEvent::EthernetHeader> eth_header;
   eth_header = TryParseEthernetHeader(line_handler);
 
+  std::optional<NetworkEvent::ArpHeader> arp_header;
+  arp_header = TryParseArpHeader(line_handler);
+
   std::optional<NetworkEvent::Ipv4Header> ip_header;
   ip_header = TryParseIpHeader(line_handler);
 
@@ -61,6 +64,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            payload_size,
                                            boundary_type,
                                            eth_header,
+                                           arp_header,
                                            ip_header);
     }
     case EventType::kNetworkDequeueT: {
@@ -74,6 +78,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            payload_size,
                                            boundary_type,
                                            eth_header,
+                                           arp_header,
                                            ip_header);
     }
     case EventType::kNetworkDropT: {
@@ -87,6 +92,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                         payload_size,
                                         boundary_type,
                                         eth_header,
+                                        arp_header,
                                         ip_header);
     }
     default: {

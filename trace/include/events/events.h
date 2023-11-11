@@ -47,11 +47,10 @@ class LogParser;
 /* Parent class for all events of interest */
 class Event {
   EventType type_;
-  std::string name_;
+  const std::string name_;
   uint64_t timestamp_;
   const size_t parser_identifier_;
-  // TODO: optimize string name out in later versions
-  const std::string parser_name_;
+  const std::string &parser_name_;
 
  public:
   inline size_t GetParserIdent() const {
@@ -85,12 +84,12 @@ class Event {
   virtual ~Event() = default;
 
  protected:
-  explicit Event(uint64_t ts, const size_t parser_identifier,
-                 const std::string parser_name, EventType type,
-                 std::string name)
+  explicit Event(uint64_t timestamp, const size_t parser_identifier,
+                 const std::string &parser_name, EventType type,
+                 const std::string &&name)
       : type_(type),
-        name_(std::move(name)),
-        timestamp_(ts),
+        name_(name),
+        timestamp_(timestamp),
         parser_identifier_(parser_identifier),
         parser_name_(parser_name) {
   }
@@ -101,9 +100,9 @@ class Event {
 /* Simbricks Events */
 class SimSendSync : public Event {
  public:
-  explicit SimSendSync(uint64_t ts, const size_t parser_identifier,
-                       const std::string parser_name)
-      : Event(ts, parser_identifier, parser_name, EventType::kSimSendSyncT,
+  explicit SimSendSync(uint64_t timestamp, const size_t parser_identifier,
+                       const std::string &parser_name)
+      : Event(timestamp, parser_identifier, parser_name, EventType::kSimSendSyncT,
               "SimSendSyncSimSendSync") {
   }
 
@@ -117,14 +116,14 @@ class SimSendSync : public Event {
 
   void Display(std::ostream &out) override;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class SimProcInEvent : public Event {
  public:
-  explicit SimProcInEvent(uint64_t ts, const size_t parser_identifier,
-                          const std::string parser_name)
-      : Event(ts, parser_identifier, parser_name,
+  explicit SimProcInEvent(uint64_t timestamp, const size_t parser_identifier,
+                          const std::string &parser_name)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kSimProcInEventT, "SimProcInEvent") {
   }
 
@@ -148,16 +147,16 @@ class HostInstr : public Event {
   uint64_t pc_;
 
  public:
-  HostInstr(uint64_t ts, const size_t parser_identifier,
-            const std::string parser_name, uint64_t pc)
-      : Event(ts, parser_identifier, std::move(parser_name),
+  HostInstr(uint64_t timestamp, const size_t parser_identifier,
+            const std::string &parser_name, uint64_t pc)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostInstrT, "HostInstr"),
         pc_(pc) {
   }
 
-  HostInstr(uint64_t ts, size_t parser_identifier, std::string parser_name,
-            uint64_t pc, EventType type, std::string name)
-      : Event(ts, parser_identifier, std::move(parser_name), type, name),
+  HostInstr(uint64_t timestamp, size_t parser_identifier, const std::string &parser_name,
+            uint64_t pc, EventType type, const std::string &&name)
+      : Event(timestamp, parser_identifier, parser_name, type, std::move(name)),
         pc_(pc) {
   }
 
@@ -173,7 +172,7 @@ class HostInstr : public Event {
 
   void Display(std::ostream &out) override;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class HostCall : public HostInstr {
@@ -182,11 +181,11 @@ class HostCall : public HostInstr {
   const std::string *comp_;
 
  public:
-  explicit HostCall(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, uint64_t pc,
+  explicit HostCall(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, uint64_t pc,
                     const std::string *func,
                     const std::string *comp)
-      : HostInstr(ts, parser_identifier, parser_name, pc,
+      : HostInstr(timestamp, parser_identifier, parser_name, pc,
                   EventType::kHostCallT, "HostCall"),
         func_(func),
         comp_(comp) {
@@ -211,9 +210,9 @@ class HostCall : public HostInstr {
 
 class HostMmioImRespPoW : public Event {
  public:
-  explicit HostMmioImRespPoW(uint64_t ts, const size_t parser_identifier,
-                             const std::string parser_name)
-      : Event(ts, parser_identifier, parser_name,
+  explicit HostMmioImRespPoW(uint64_t timestamp, const size_t parser_identifier,
+                             const std::string &parser_name)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostMmioImRespPoWT, "HostMmioImRespPoW") {
   }
 
@@ -243,27 +242,27 @@ class HostIdOp : public Event {
   }
 
  protected:
-  explicit HostIdOp(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, EventType type,
-                    std::string name, uint64_t id)
-      : Event(ts, parser_identifier, parser_name, type,
+  explicit HostIdOp(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, EventType type,
+                    const std::string &&name, uint64_t ident)
+      : Event(timestamp, parser_identifier, parser_name, type,
               std::move(name)),
-        id_(id) {
+        id_(ident) {
   }
 
   HostIdOp(const HostIdOp &other) = default;
 
   ~HostIdOp() override = default;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class HostMmioCR : public HostIdOp {
  public:
-  explicit HostMmioCR(uint64_t ts, const size_t parser_identifier,
-                      const std::string parser_name, uint64_t id)
-      : HostIdOp(ts, parser_identifier, parser_name,
-                 EventType::kHostMmioCRT, "HostMmioCR", id) {
+  explicit HostMmioCR(uint64_t timestamp, const size_t parser_identifier,
+                      const std::string &parser_name, uint64_t ident)
+      : HostIdOp(timestamp, parser_identifier, parser_name,
+                 EventType::kHostMmioCRT, "HostMmioCR", ident) {
   }
 
   HostMmioCR(const HostMmioCR &other) = default;
@@ -280,10 +279,10 @@ class HostMmioCR : public HostIdOp {
 };
 class HostMmioCW : public HostIdOp {
  public:
-  explicit HostMmioCW(uint64_t ts, const size_t parser_identifier,
-                      const std::string parser_name, uint64_t id)
-      : HostIdOp(ts, parser_identifier, parser_name,
-                 EventType::kHostMmioCWT, "HostMmioCW", id) {
+  explicit HostMmioCW(uint64_t timestamp, const size_t parser_identifier,
+                      const std::string &parser_name, uint64_t ident)
+      : HostIdOp(timestamp, parser_identifier, parser_name,
+                 EventType::kHostMmioCWT, "HostMmioCW", ident) {
   }
 
   HostMmioCW(const HostMmioCW &other) = default;
@@ -316,12 +315,12 @@ class HostAddrSizeOp : public HostIdOp {
   }
 
  protected:
-  explicit HostAddrSizeOp(uint64_t ts, const size_t parser_identifier,
-                          const std::string parser_name, EventType type,
-                          std::string name, uint64_t id, uint64_t addr,
+  explicit HostAddrSizeOp(uint64_t timestamp, const size_t parser_identifier,
+                          const std::string &parser_name, EventType type,
+                          const std::string &&name, uint64_t ident, uint64_t addr,
                           size_t size)
-      : HostIdOp(ts, parser_identifier, parser_name, type,
-                 std::move(name), id),
+      : HostIdOp(timestamp, parser_identifier, parser_name, type,
+                 std::move(name), ident),
         addr_(addr),
         size_(size) {
   }
@@ -330,7 +329,7 @@ class HostAddrSizeOp : public HostIdOp {
 
   ~HostAddrSizeOp() override = default;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class HostMmioOp : public HostAddrSizeOp {
@@ -350,26 +349,26 @@ class HostMmioOp : public HostAddrSizeOp {
   }
 
  protected:
-  explicit HostMmioOp(uint64_t ts, const size_t parser_identifier,
-                      const std::string parser_name, EventType type,
-                      std::string name, uint64_t id, uint64_t addr,
+  explicit HostMmioOp(uint64_t timestamp, const size_t parser_identifier,
+                      const std::string &parser_name, EventType type,
+                      const std::string &&name, uint64_t ident, uint64_t addr,
                       size_t size, int bar, uint64_t offset)
-      : HostAddrSizeOp(ts, parser_identifier, parser_name, type,
-                       std::move(name), id, addr, size), bar_(bar), offset_(offset) {
+      : HostAddrSizeOp(timestamp, parser_identifier, parser_name, type,
+                       std::move(name), ident, addr, size), bar_(bar), offset_(offset) {
   }
 
   HostMmioOp(const HostMmioOp &other) = default;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class HostMmioR : public HostMmioOp {
  public:
-  explicit HostMmioR(uint64_t ts, const size_t parser_identifier,
-                     const std::string parser_name, uint64_t id, uint64_t addr,
+  explicit HostMmioR(uint64_t timestamp, const size_t parser_identifier,
+                     const std::string &parser_name, uint64_t ident, uint64_t addr,
                      size_t size, int bar, uint64_t offset)
-      : HostMmioOp(ts, parser_identifier, parser_name,
-                   EventType::kHostMmioRT, "HostMmioR", id, addr, size, bar,
+      : HostMmioOp(timestamp, parser_identifier, parser_name,
+                   EventType::kHostMmioRT, "HostMmioR", ident, addr, size, bar,
                    offset) {
   }
 
@@ -392,11 +391,11 @@ class HostMmioW : public HostMmioOp {
  public:
   bool IsPosted() const;
 
-  explicit HostMmioW(uint64_t ts, const size_t parser_identifier,
-                     const std::string parser_name, uint64_t id, uint64_t addr,
+  explicit HostMmioW(uint64_t timestamp, const size_t parser_identifier,
+                     const std::string &parser_name, uint64_t ident, uint64_t addr,
                      size_t size, int bar, uint64_t offset, bool posted)
-      : HostMmioOp(ts, parser_identifier, parser_name,
-                   EventType::kHostMmioWT, "HostMmioW", id, addr, size, bar,
+      : HostMmioOp(timestamp, parser_identifier, parser_name,
+                   EventType::kHostMmioWT, "HostMmioW", ident, addr, size, bar,
                    offset), posted_(posted) {
   }
 
@@ -415,10 +414,10 @@ class HostMmioW : public HostMmioOp {
 
 class HostDmaC : public HostIdOp {
  public:
-  explicit HostDmaC(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, uint64_t id)
-      : HostIdOp(ts, parser_identifier, parser_name,
-                 EventType::kHostDmaCT, "HostDmaC", id) {
+  explicit HostDmaC(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, uint64_t ident)
+      : HostIdOp(timestamp, parser_identifier, parser_name,
+                 EventType::kHostDmaCT, "HostDmaC", ident) {
   }
 
   HostDmaC(const HostDmaC &other) = default;
@@ -436,11 +435,11 @@ class HostDmaC : public HostIdOp {
 
 class HostDmaR : public HostAddrSizeOp {
  public:
-  explicit HostDmaR(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, uint64_t id, uint64_t addr,
+  explicit HostDmaR(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, uint64_t ident, uint64_t addr,
                     size_t size)
-      : HostAddrSizeOp(ts, parser_identifier, parser_name,
-                       EventType::kHostDmaRT, "HostDmaR", id, addr, size) {
+      : HostAddrSizeOp(timestamp, parser_identifier, parser_name,
+                       EventType::kHostDmaRT, "HostDmaR", ident, addr, size) {
   }
 
   HostDmaR(const HostDmaR &other) = default;
@@ -458,11 +457,11 @@ class HostDmaR : public HostAddrSizeOp {
 
 class HostDmaW : public HostAddrSizeOp {
  public:
-  explicit HostDmaW(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, uint64_t id, uint64_t addr,
+  explicit HostDmaW(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, uint64_t ident, uint64_t addr,
                     size_t size)
-      : HostAddrSizeOp(ts, parser_identifier, parser_name,
-                       EventType::kHostDmaWT, "HostDmaW", id, addr, size) {
+      : HostAddrSizeOp(timestamp, parser_identifier, parser_name,
+                       EventType::kHostDmaWT, "HostDmaW", ident, addr, size) {
   }
 
   HostDmaW(const HostDmaW &other) = default;
@@ -483,9 +482,9 @@ class HostMsiX : public Event {
   uint64_t vec_;
 
  public:
-  explicit HostMsiX(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, uint64_t vec)
-      : Event(ts, parser_identifier, parser_name,
+  explicit HostMsiX(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, uint64_t vec)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostMsiXT, "HostMsiX"),
         vec_(vec) {
   }
@@ -515,10 +514,10 @@ class HostConf : public Event {
   bool is_read_;
 
  public:
-  explicit HostConf(uint64_t ts, const size_t parser_identifier,
-                    const std::string parser_name, uint64_t dev, uint64_t func,
+  explicit HostConf(uint64_t timestamp, const size_t parser_identifier,
+                    const std::string &parser_name, uint64_t dev, uint64_t func,
                     uint64_t reg, size_t bytes, uint64_t data, bool is_read)
-      : Event(ts, parser_identifier, parser_name,
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostConfT,
               is_read ? "HostConfRead" : "HostConfWrite"),
         dev_(dev),
@@ -556,9 +555,9 @@ class HostConf : public Event {
 
 class HostClearInt : public Event {
  public:
-  explicit HostClearInt(uint64_t ts, const size_t parser_identifier,
-                        const std::string parser_name)
-      : Event(ts, parser_identifier, parser_name,
+  explicit HostClearInt(uint64_t timestamp, const size_t parser_identifier,
+                        const std::string &parser_name)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostClearIntT, "HostClearInt") {
   }
 
@@ -577,9 +576,9 @@ class HostClearInt : public Event {
 
 class HostPostInt : public Event {
  public:
-  explicit HostPostInt(uint64_t ts, const size_t parser_identifier,
-                       const std::string parser_name)
-      : Event(ts, parser_identifier, parser_name,
+  explicit HostPostInt(uint64_t timestamp, const size_t parser_identifier,
+                       const std::string &parser_name)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostPostIntT, "HostPostInt") {
   }
 
@@ -604,10 +603,10 @@ class HostPciRW : public Event {
 
  public:
 
-  explicit HostPciRW(uint64_t ts, const size_t parser_identifier,
-                     const std::string parser_name, uint64_t offset,
+  explicit HostPciRW(uint64_t timestamp, const size_t parser_identifier,
+                     const std::string &parser_name, uint64_t offset,
                      size_t size, bool is_read)
-      : Event(ts, parser_identifier, parser_name,
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kHostPciRWT, is_read ? "HostPciR" : "HostPciW"),
         offset_(offset),
         size_(size),
@@ -641,9 +640,9 @@ class NicMsix : public Event {
 
  public:
 
-  NicMsix(uint64_t ts, const size_t parser_identifier,
-          const std::string parser_name, uint16_t vec, bool isX)
-      : Event(ts, parser_identifier, parser_name,
+  NicMsix(uint64_t timestamp, const size_t parser_identifier,
+          const std::string &parser_name, uint16_t vec, bool isX)
+      : Event(timestamp, parser_identifier, parser_name,
               EventType::kNicMsixT, isX ? "NicMsix" : "NicMsi"),
         vec_(vec),
         isX_(isX) {
@@ -687,12 +686,12 @@ class NicDma : public Event {
   }
 
  protected:
-  NicDma(uint64_t ts, const size_t parser_identifier,
-         const std::string parser_name, EventType type, std::string name,
-         uint64_t id, uint64_t addr, size_t len)
-      : Event(ts, parser_identifier, parser_name, type,
+  NicDma(uint64_t timestamp, const size_t parser_identifier,
+         const std::string &parser_name, EventType type, const std::string &&name,
+         uint64_t ident, uint64_t addr, size_t len)
+      : Event(timestamp, parser_identifier, parser_name, type,
               std::move(name)),
-        id_(id),
+        id_(ident),
         addr_(addr),
         len_(len) {
   }
@@ -701,7 +700,7 @@ class NicDma : public Event {
 
   ~NicDma() override = default;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class SetIX : public Event {
@@ -710,9 +709,9 @@ class SetIX : public Event {
 
  public:
 
-  SetIX(uint64_t ts, const size_t parser_identifier,
-        const std::string parser_name, uint64_t intr)
-      : Event(ts, parser_identifier, parser_name, EventType::kSetIXT,
+  SetIX(uint64_t timestamp, const size_t parser_identifier,
+        const std::string &parser_name, uint64_t intr)
+      : Event(timestamp, parser_identifier, parser_name, EventType::kSetIXT,
               "SetIX"),
         intr_(intr) {
   }
@@ -734,10 +733,10 @@ class SetIX : public Event {
 
 class NicDmaI : public NicDma {
  public:
-  NicDmaI(uint64_t ts, const size_t parser_identifier,
-          const std::string parser_name, uint64_t id, uint64_t addr,
+  NicDmaI(uint64_t timestamp, const size_t parser_identifier,
+          const std::string &parser_name, uint64_t id, uint64_t addr,
           size_t len)
-      : NicDma(ts, parser_identifier, parser_name,
+      : NicDma(timestamp, parser_identifier, parser_name,
                EventType::kNicDmaIT, "NicDmaI", id, addr, len) {
   }
 
@@ -756,10 +755,10 @@ class NicDmaI : public NicDma {
 
 class NicDmaEx : public NicDma {
  public:
-  NicDmaEx(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t id, uint64_t addr,
+  NicDmaEx(uint64_t timestamp, const size_t parser_identifier,
+           const std::string &parser_name, uint64_t id, uint64_t addr,
            size_t len)
-      : NicDma(ts, parser_identifier, parser_name,
+      : NicDma(timestamp, parser_identifier, parser_name,
                EventType::kNicDmaExT, "NicDmaEx", id, addr, len) {
   }
 
@@ -778,10 +777,10 @@ class NicDmaEx : public NicDma {
 
 class NicDmaEn : public NicDma {
  public:
-  NicDmaEn(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t id, uint64_t addr,
+  NicDmaEn(uint64_t timestamp, const size_t parser_identifier,
+           const std::string &parser_name, uint64_t id, uint64_t addr,
            size_t len)
-      : NicDma(ts, parser_identifier, parser_name,
+      : NicDma(timestamp, parser_identifier, parser_name,
                EventType::kNicDmaEnT, "NicDmaEn", id, addr, len) {
   }
 
@@ -800,10 +799,10 @@ class NicDmaEn : public NicDma {
 
 class NicDmaCR : public NicDma {
  public:
-  NicDmaCR(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t id, uint64_t addr,
+  NicDmaCR(uint64_t timestamp, const size_t parser_identifier,
+           const std::string &parser_name, uint64_t id, uint64_t addr,
            size_t len)
-      : NicDma(ts, parser_identifier, parser_name,
+      : NicDma(timestamp, parser_identifier, parser_name,
                EventType::kNicDmaCRT, "NicDmaCR", id, addr, len) {
   }
 
@@ -822,10 +821,10 @@ class NicDmaCR : public NicDma {
 
 class NicDmaCW : public NicDma {
  public:
-  NicDmaCW(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t id, uint64_t addr,
+  NicDmaCW(uint64_t timestamp, const size_t parser_identifier,
+           const std::string &parser_name, uint64_t id, uint64_t addr,
            size_t len)
-      : NicDma(ts, parser_identifier, parser_name,
+      : NicDma(timestamp, parser_identifier, parser_name,
                EventType::kNicDmaCWT, "NicDmaCW", id, addr, len) {
   }
 
@@ -850,7 +849,7 @@ class NicMmio : public Event {
 
  public:
 
-  virtual void Display(std::ostream &out) override;
+  void Display(std::ostream &out) override;
 
   uint64_t GetOff() const;
 
@@ -863,11 +862,10 @@ class NicMmio : public Event {
   }
 
  protected:
-  NicMmio(uint64_t ts, const size_t parser_identifier,
-          const std::string parser_name, EventType type, std::string name,
+  NicMmio(uint64_t timestamp, const size_t parser_identifier,
+          const std::string &parser_name, EventType type, const std::string &&name,
           uint64_t off, size_t len, uint64_t val)
-      : Event(ts, parser_identifier, parser_name, type,
-              std::move(name)),
+      : Event(timestamp, parser_identifier, parser_name, type, std::move(name)),
         off_(off),
         len_(len),
         val_(val) {
@@ -877,15 +875,15 @@ class NicMmio : public Event {
 
   ~NicMmio() override = default;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class NicMmioR : public NicMmio {
  public:
-  NicMmioR(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t off, size_t len,
+  NicMmioR(uint64_t timestamp, const size_t parser_identifier,
+           const std::string &parser_name, uint64_t off, size_t len,
            uint64_t val)
-      : NicMmio(ts, parser_identifier, parser_name,
+      : NicMmio(timestamp, parser_identifier, parser_name,
                 EventType::kNicMmioRT, "NicMmioR", off, len, val) {
   }
 
@@ -909,10 +907,10 @@ class NicMmioW : public NicMmio {
 
   bool IsPosted() const;
 
-  NicMmioW(uint64_t ts, const size_t parser_identifier,
-           const std::string parser_name, uint64_t off, size_t len,
+  NicMmioW(uint64_t timestamp, const size_t parser_identifier,
+           const std::string &parser_name, uint64_t off, size_t len,
            uint64_t val, bool posted)
-      : NicMmio(ts, parser_identifier, parser_name,
+      : NicMmio(timestamp, parser_identifier, parser_name,
                 EventType::kNicMmioWT, "NicMmioW", off, len, val), posted_(posted) {
   }
 
@@ -948,11 +946,10 @@ class NicTrx : public Event {
   }
 
  protected:
-  NicTrx(uint64_t ts, const size_t parser_identifier,
-         const std::string parser_name, EventType type, std::string name,
+  NicTrx(uint64_t timestamp, const size_t parser_identifier,
+         const std::string &parser_name, EventType type, const std::string &&name,
          size_t len, bool is_read)
-      : Event(ts, parser_identifier, parser_name, type,
-              std::move(name)),
+      : Event(timestamp, parser_identifier, parser_name, type, std::move(name)),
         len_(len), is_read_(is_read) {
   }
 
@@ -960,14 +957,14 @@ class NicTrx : public Event {
 
   ~NicTrx() override = default;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 };
 
 class NicTx : public NicTrx {
  public:
-  NicTx(uint64_t ts, const size_t parser_identifier,
-        const std::string parser_name, size_t len)
-      : NicTrx(ts, parser_identifier, parser_name,
+  NicTx(uint64_t timestamp, const size_t parser_identifier,
+        const std::string &parser_name, size_t len)
+      : NicTrx(timestamp, parser_identifier, parser_name,
                EventType::kNicTxT, "NicTx", len, false) {
   }
 
@@ -988,9 +985,9 @@ class NicRx : public NicTrx {
   int port_;
 
  public:
-  NicRx(uint64_t ts, const size_t parser_identifier,
-        const std::string parser_name, int port, size_t len)
-      : NicTrx(ts, parser_identifier, parser_name,
+  NicRx(uint64_t timestamp, const size_t parser_identifier,
+        const std::string &parser_name, int port, size_t len)
+      : NicTrx(timestamp, parser_identifier, parser_name,
                EventType::kNicRxT, "NicRx", len, true),
         port_(port) {
   }
@@ -1013,29 +1010,68 @@ class NicRx : public NicTrx {
 class NetworkEvent : public Event {
 
  public:
+
+  struct MacAddress {
+    static constexpr size_t kMacSize = 6;
+    std::array<unsigned char, kMacSize> addr_ = {0, 0, 0, 0, 0, 0};
+
+    explicit MacAddress() = default;
+
+    explicit MacAddress(const std::array<unsigned char, kMacSize> &addr)
+        : addr_(addr) {}
+
+    void Display(std::ostream &out) const;
+
+    bool operator==(const MacAddress &other) const {
+      return std::ranges::equal(addr_, other.addr_);
+    }
+  };
+
   struct EthernetHeader {
     size_t length_type_ = 0;
-    static constexpr size_t kMacSize = 6;
-    std::array<unsigned char, kMacSize> src_mac_ = {0, 0, 0, 0, 0, 0};
-    std::array<unsigned char, kMacSize> dst_mac_ = {0, 0, 0, 0, 0, 0};
+    MacAddress src_mac_;
+    MacAddress dst_mac_;
 
     void Display(std::ostream &out) const;
 
     bool operator==(const EthernetHeader &other) const {
-      for (int index = 0; index < kMacSize; index++) {
-        if (src_mac_[index] != other.src_mac_[index] or dst_mac_[index] != other.dst_mac_[index]) {
-          return false;
-        }
-      }
-      return length_type_ == other.length_type_;
+      return src_mac_ == other.src_mac_ and dst_mac_ == other.dst_mac_ and length_type_ == other.length_type_;
+    }
+  };
+
+  struct Ipv4 {
+    uint32_t ip_ = 0;
+
+    explicit Ipv4() = default;
+
+    explicit Ipv4(uint32_t ipa) : ip_(ipa) {}
+
+    void Display(std::ostream &out) const;
+
+    bool operator==(const Ipv4 &other) const {
+      return ip_ == other.ip_;
+    }
+  };
+
+  struct ArpHeader {
+    // MacAddress src_mac_;
+    Ipv4 src_ip_;
+    Ipv4 dst_ip_;
+    bool is_request_ = false;
+
+    void Display(std::ostream &out) const;
+
+    bool operator==(const ArpHeader &other) const {
+      return /*src_mac_ == other.src_mac_ and*/ src_ip_ == other.src_ip_ and dst_ip_ == other.dst_ip_
+          and is_request_ == other.is_request_;
     }
   };
 
   struct Ipv4Header {
     // NOTE: currently only Ipv4 is supported!!
     size_t length_;
-    uint32_t src_ip_;
-    uint32_t dst_ip_;
+    Ipv4 src_ip_;
+    Ipv4 dst_ip_;
 
     void Display(std::ostream &out) const;
 
@@ -1062,6 +1098,7 @@ class NetworkEvent : public Event {
   const size_t payload_size_ = 0;
   const EventBoundaryType boundary_type_;
   const std::optional<EthernetHeader> ethernet_header_;
+  const std::optional<ArpHeader> arp_header_;
   const std::optional<Ipv4Header> ip_header_;
 
  public:
@@ -1088,32 +1125,38 @@ class NetworkEvent : public Event {
 
   const EthernetHeader &GetEthernetHeader() const;
 
+  bool HasArpHeader() const;
+
+  const ArpHeader &GetArpHeader() const;
+
   bool HasIpHeader() const;
 
   const Ipv4Header &GetIpHeader() const;
 
-  virtual bool Equal(const Event &other) override;
+  bool Equal(const Event &other) override;
 
  protected:
-  explicit NetworkEvent(uint64_t ts,
+  explicit NetworkEvent(uint64_t timetsamp,
                         const size_t parser_identifier,
-                        const std::string parser_name,
+                        const std::string &parser_name,
                         EventType type,
-                        std::string name,
+                        const std::string &&name,
                         int node,
                         int device,
                         const NetworkDeviceType device_type,
                         size_t payload_size,
                         const EventBoundaryType boundary_type,
                         const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                        const std::optional<ArpHeader> arp_header = std::nullopt,
                         const std::optional<Ipv4Header> &ip_header = std::nullopt)
-      : Event(ts, parser_identifier, parser_name, type, name),
+      : Event(timetsamp, parser_identifier, parser_name, type, std::move(name)),
         node_(node),
         device_(device),
         device_type_(device_type),
         payload_size_(payload_size),
         boundary_type_(boundary_type),
         ethernet_header_(ethernet_header),
+        arp_header_(arp_header),
         ip_header_(ip_header) {
   }
 
@@ -1158,19 +1201,37 @@ inline std::ostream &operator<<(std::ostream &out, NetworkEvent::EventBoundaryTy
   return out;
 }
 
+inline std::ostream &operator<<(std::ostream &out, const NetworkEvent::MacAddress &mac) {
+  mac.Display(out);
+  return out;
+}
+
+inline std::ostream &operator<<(std::ostream &out, const NetworkEvent::Ipv4 &ipv_4) {
+  ipv_4.Display(out);
+  return out;
+}
+
+template<>
+struct std::hash<NetworkEvent::Ipv4> {
+  std::size_t operator()(const NetworkEvent::Ipv4 &ipv4) const {
+    return ipv4.ip_;
+  }
+};
+
 class NetworkEnqueue : public NetworkEvent {
  public:
-  explicit NetworkEnqueue(uint64_t ts,
+  explicit NetworkEnqueue(uint64_t timetsamp,
                           const size_t parser_identifier,
-                          const std::string parser_name,
+                          const std::string &parser_name,
                           int node,
                           int device,
                           const NetworkDeviceType device_type,
                           size_t payload_size,
                           const EventBoundaryType boundary_type,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                          const std::optional<ArpHeader> arp_header = std::nullopt,
                           const std::optional<Ipv4Header> &ip_header = std::nullopt)
-      : NetworkEvent(ts,
+      : NetworkEvent(timetsamp,
                      parser_identifier,
                      parser_name,
                      EventType::kNetworkEnqueueT,
@@ -1181,6 +1242,7 @@ class NetworkEnqueue : public NetworkEvent {
                      payload_size,
                      boundary_type,
                      ethernet_header,
+                     arp_header,
                      ip_header) {}
 
   NetworkEnqueue(const NetworkEnqueue &other) = default;
@@ -1198,17 +1260,18 @@ class NetworkEnqueue : public NetworkEvent {
 
 class NetworkDequeue : public NetworkEvent {
  public:
-  explicit NetworkDequeue(uint64_t ts,
+  explicit NetworkDequeue(uint64_t timetsamp,
                           const size_t parser_identifier,
-                          const std::string parser_name,
+                          const std::string &parser_name,
                           int node,
                           int device,
                           const NetworkDeviceType device_type,
                           size_t payload_size,
                           const EventBoundaryType boundary_type,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                          const std::optional<ArpHeader> arp_header = std::nullopt,
                           const std::optional<Ipv4Header> &ip_header = std::nullopt)
-      : NetworkEvent(ts,
+      : NetworkEvent(timetsamp,
                      parser_identifier,
                      parser_name,
                      EventType::kNetworkDequeueT,
@@ -1219,6 +1282,7 @@ class NetworkDequeue : public NetworkEvent {
                      payload_size,
                      boundary_type,
                      ethernet_header,
+                     arp_header,
                      ip_header) {}
 
   NetworkDequeue(const NetworkDequeue &other) = default;
@@ -1236,17 +1300,18 @@ class NetworkDequeue : public NetworkEvent {
 
 class NetworkDrop : public NetworkEvent {
  public:
-  explicit NetworkDrop(uint64_t ts,
+  explicit NetworkDrop(uint64_t timetsamp,
                        const size_t parser_identifier,
-                       const std::string parser_name,
+                       const std::string &parser_name,
                        int node,
                        int device,
                        const NetworkDeviceType device_type,
                        size_t payload_size,
                        const EventBoundaryType boundary_type,
                        const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
+                       const std::optional<ArpHeader> arp_header = std::nullopt,
                        const std::optional<Ipv4Header> &ip_header = std::nullopt)
-      : NetworkEvent(ts,
+      : NetworkEvent(timetsamp,
                      parser_identifier,
                      parser_name,
                      EventType::kNetworkDropT,
@@ -1257,6 +1322,7 @@ class NetworkDrop : public NetworkEvent {
                      payload_size,
                      boundary_type,
                      ethernet_header,
+                     arp_header,
                      ip_header) {}
 
   NetworkDrop(const NetworkDrop &other) = default;

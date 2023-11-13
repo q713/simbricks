@@ -39,7 +39,6 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   if (current_device_span_ and current_device_span_->AddToSpan(network_event)) {
     // we have a pending span, here we complete it
     if (current_device_span_->IsComplete()) {
-      // this should always be true -> may remove if statement
       tracer_.MarkSpanAsDone(current_device_span_);
     }
     co_return true;

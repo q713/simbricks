@@ -135,7 +135,7 @@ class OtlpSpanExporter : public SpanExporter {
     //auto con_opt = context_map_.Find(span_id);
     auto con_opt = context_map_.find(span_id);
     throw_on(con_opt == context_map_.end(), "could not find context for key",
-                           source_loc::current());
+             source_loc::current());
     //auto con = OrElseThrow(con_opt, "could not find context for key",
     //                       source_loc::current());
     //return con;
@@ -442,6 +442,38 @@ class OtlpSpanExporter : public SpanExporter {
     attributes.insert({"port", std::to_string(event->GetPort())});
   }
 
+  static void add_NetworkEvent(std::map<std::string, std::string> &attributes,
+                               const std::shared_ptr<NetworkEvent> &event) {
+    assert(event and "event is not null");
+    add_Event(attributes, event);
+    attributes.insert({"node", std::to_string(event->GetNode())});
+    attributes.insert({"device", std::to_string(event->GetDevice())});
+    attributes.insert({"device-type", sim_string_utils::ValueToString(event->GetDeviceType())});
+    attributes.insert({"payload-size", std::to_string(event->GetPayloadSize())});
+    attributes.insert({"boundary-type", sim_string_utils::ValueToString(event->GetBoundaryType())});
+    attributes.insert({"device-tpe", sim_string_utils::ValueToString(event->GetDeviceType())});
+    if (event->HasEthernetHeader()) {
+      const NetworkEvent::EthernetHeader &header = event->GetEthernetHeader();
+      attributes.insert({"src-mac", sim_string_utils::ValueToString(header.src_mac_)});
+      attributes.insert({"dst-mac", sim_string_utils::ValueToString(header.dst_mac_)});
+      std::stringstream len_ty;
+      len_ty << "0x" << std::hex << header.length_type_;
+      attributes.insert({"length-type", len_ty.str()});
+    }
+    if (event->HasArpHeader()) {
+      const NetworkEvent::ArpHeader &header = event->GetArpHeader();
+      attributes.insert({"request", BoolToString(header.is_request_)});
+      attributes.insert({"src-ip", sim_string_utils::ValueToString(header.src_ip_)});
+      attributes.insert({"dst-ip", sim_string_utils::ValueToString(header.dst_ip_)});
+    }
+    if (event->HasIpHeader()) {
+      const NetworkEvent::Ipv4Header &header = event->GetIpHeader();
+      attributes.insert({"length", std::to_string(header.length_)});
+      attributes.insert({"src-ip", sim_string_utils::ValueToString(header.src_ip_)});
+      attributes.insert({"dst-ip", sim_string_utils::ValueToString(header.dst_ip_)});
+    }
+  }
+
   opentelemetry::trace::StartSpanOptions GetSpanStartOpts(const std::shared_ptr<EventSpan> &span) {
     opentelemetry::trace::StartSpanOptions span_options;
     if (span->HasParent()) {
@@ -529,6 +561,15 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("is-transmit", BoolToString(old_span->IsTransmit()));
   }
 
+  static void set_NetDeviceSpanAttr(span_t &new_span, std::shared_ptr<NetDeviceSpan> &old_span) {
+    set_EventSpanAttr(new_span, old_span);
+    new_span->SetAttribute("is-arp", BoolToString(old_span->IsArp()));
+    if (old_span->HasIpsSet()) {
+      new_span->SetAttribute("src-ip", old_span->GetSrcIpStr());
+      new_span->SetAttribute("dst-ip", old_span->GetDstIpStr());
+    }
+  }
+
   void set_Attr(span_t &span, std::shared_ptr<EventSpan> &to_end) {
     switch (to_end->GetType()) {
       case kHostCall: {
@@ -564,6 +605,11 @@ class OtlpSpanExporter : public SpanExporter {
       case kNicEth: {
         auto eth_span = std::static_pointer_cast<NicEthSpan>(to_end);
         set_NicEthSpanAttr(span, eth_span);
+        break;
+      }
+      case kNetDeviceSpan: {
+        auto net_span = std::static_pointer_cast<NetDeviceSpan>(to_end);
+        set_NetDeviceSpanAttr(span, net_span);
         break;
       }
       case kNicMsix:
@@ -678,6 +724,12 @@ class OtlpSpanExporter : public SpanExporter {
         }
         case EventType::kNicMsixT: {
           add_NicMsix(attributes, std::static_pointer_cast<NicMsix>(action));
+          break;
+        }
+        case EventType::kNetworkEnqueueT:
+        case EventType::kNetworkDequeueT:
+        case EventType::kNetworkDropT: {
+          add_NetworkEvent(attributes, std::static_pointer_cast<NetworkEvent>(action));
           break;
         }
         default: {

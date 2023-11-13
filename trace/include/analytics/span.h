@@ -50,8 +50,7 @@ enum span_type {
   kNicMmio,
   kNicEth,
   kNicMsix,
-  kCosimNetDeviceSpan,
-  kSimpleNetDeviceSpan,
+  kNetDeviceSpan,
   kGenericSingle
 };
 
@@ -79,9 +78,7 @@ inline std::ostream &operator<<(std::ostream &out, span_type type) {
       break;
     case span_type::kGenericSingle:out << "kGenericSingle";
       break;
-    case span_type::kCosimNetDeviceSpan:out << "kCosimNetDeviceSpan";
-      break;
-    case span_type::kSimpleNetDeviceSpan:out << "kSimpleNetDeviceSpan";
+    case span_type::kNetDeviceSpan:out << "kNetDeviceSpan";
       break;
     default:out << "could not represent given span type";
       break;
@@ -671,7 +668,7 @@ class NetDeviceSpan : public EventSpan {
                          std::shared_ptr<TraceContext> &trace_context,
                          uint64_t source_id,
                          std::string &service_name)
-      : EventSpan(trace_environment, trace_context, source_id, span_type::kCosimNetDeviceSpan, service_name) {
+      : EventSpan(trace_environment, trace_context, source_id, span_type::kNetDeviceSpan, service_name) {
   }
 
   NetDeviceSpan(const NetDeviceSpan &other) = default;
@@ -690,6 +687,16 @@ class NetDeviceSpan : public EventSpan {
   inline bool HasIpsSet() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return ips_set_;
+  }
+
+  inline std::string GetSrcIpStr() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return IpToString(src_);
+  }
+
+  inline std::string GetDstIpStr() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return IpToString(dst_);
   }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override;

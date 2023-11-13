@@ -201,6 +201,14 @@ inline bool ends_with(std::string src, std::string match) {
   return 0 == src.compare(src_l - match_l, match_l, match);
 }
 
+template<typename ToPrint>
+requires Printable<ToPrint>
+inline std::string ValueToString(const ToPrint &to_print) {
+  std::stringstream str_val;
+  str_val << to_print;
+  return str_val.str();
+}
+
 }  // namespace sim_string_utils
 
 #endif  // SIMBRICKS_STRING_UTILS_H_

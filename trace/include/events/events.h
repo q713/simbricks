@@ -1211,6 +1211,12 @@ inline std::ostream &operator<<(std::ostream &out, const NetworkEvent::Ipv4 &ipv
   return out;
 }
 
+inline std::string IpToString(const NetworkEvent::Ipv4 &ipv_4) {
+  std::stringstream out;
+  ipv_4.Display(out);
+  return out.str();
+}
+
 template<>
 struct std::hash<NetworkEvent::Ipv4> {
   std::size_t operator()(const NetworkEvent::Ipv4 &ipv4) const {

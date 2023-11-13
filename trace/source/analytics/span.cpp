@@ -516,12 +516,11 @@ bool NetDeviceSpan::IsConsistent(const std::shared_ptr<NetworkEvent> &event_a,
     return false;
   }
 
-  if ((event_a->HasArpHeader() and not event_b->HasArpHeader())
-      or (not event_a->HasArpHeader() and event_b->HasArpHeader())) {
-    return false;
-  }
-  // either both or non has an arp header
-  if (event_a->HasArpHeader() and event_a->GetArpHeader() != event_b->GetArpHeader()) {
+  // NOTE we are not that strict with ARP headers, we only require that in case both have an arp header,
+  // that the arp headers match. As a result one event may have an arp header and the other one not,
+  // still the events may be compatible!!!
+  if (event_a->HasArpHeader() and event_b->HasArpHeader() and
+      event_a->GetArpHeader() != event_b->GetArpHeader()) {
     return false;
   }
 
@@ -538,6 +537,151 @@ bool NetDeviceSpan::IsConsistent(const std::shared_ptr<NetworkEvent> &event_a,
       and event_a->GetPayloadSize() == event_b->GetPayloadSize();
 }
 
+bool NetDeviceSpan::SetAndCheckPotentialArp(const std::shared_ptr<NetworkEvent> &event_ptr) {
+  // NOTE: Lock must be held when calling this method!
+  assert(event_ptr);
+
+  // we return true in case no arp information is present to indicate that there is no violation
+  if (not event_ptr->HasArpHeader()) {
+    return true;
+  }
+
+  const NetworkEvent::ArpHeader &header = event_ptr->GetArpHeader();
+  if (not ips_set_) {
+    src_ = header.src_ip_;
+    dst_ = header.dst_ip_;
+    ips_set_ = true;
+    is_arp_ = true;
+    return true;
+  }
+
+  return src_ == header.src_ip_ and dst_ == header.dst_ip_;
+}
+
+bool NetDeviceSpan::SetAndCheckPotentialIp(const std::shared_ptr<NetworkEvent> &event_ptr) {
+  // NOTE: Lock must be held when calling this method!
+  assert(event_ptr);
+
+  // we return true in case no ip information is present to indicate that there is no violation
+  if (not event_ptr->HasIpHeader()) {
+    return true;
+  }
+
+  const NetworkEvent::Ipv4Header &header = event_ptr->GetIpHeader();
+  if (not ips_set_) {
+    src_ = header.src_ip_;
+    dst_ = header.dst_ip_;
+    ips_set_ = true;
+    return true;
+  }
+
+  return src_ == header.src_ip_ and dst_ == header.dst_ip_;
+}
+
+bool NetDeviceSpan::HandelEnqueue(const std::shared_ptr<NetworkEvent> &event_ptr) {
+  // NOTE: Lock must be held when calling this method!
+  assert(event_ptr);
+
+  if ((dev_a_enqueue_ and dev_b_enqueue_) or drop_) {
+    return false;
+  }
+
+  if (dev_a_enqueue_) {
+    // we got an enqueue for the SECOND device
+    throw_on(dev_b_enqueue_ != nullptr, "we should never have enqueue for device b set here",
+             source_loc::current());
+    // device a events must have been completed
+    if (not dev_a_enqueue_ or not dev_a_dequeue_) {
+      return false;
+    }
+    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+      return false;
+    }
+    dev_b_enqueue_ = event_ptr;
+    device_type_b_ = event_ptr->GetDeviceType();
+
+  } else {
+    // we got an enqueue for the FIRST device
+    throw_on(dev_a_enqueue_ != nullptr, "we should never have enqueue for device a set here",
+             source_loc::current());
+    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+      return false;
+    }
+    dev_a_enqueue_ = event_ptr;
+    device_type_a_ = event_ptr->GetDeviceType();
+  }
+
+  events_.push_back(event_ptr);
+  return true;
+}
+
+bool NetDeviceSpan::HandelDequeue(const std::shared_ptr<NetworkEvent> &event_ptr) {
+  // NOTE: Lock must be held when calling this method!
+  assert(event_ptr);
+
+  if ((not dev_a_enqueue_ and not dev_b_enqueue_) or drop_) {
+    return false;
+  }
+
+  if (dev_a_enqueue_ and not dev_a_dequeue_) {
+    if (not IsConsistent(dev_a_enqueue_, event_ptr)) {
+      return false;
+    }
+    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+      return false;
+    }
+    dev_a_dequeue_ = event_ptr;
+
+  } else if (dev_a_enqueue_ and dev_a_dequeue_ and dev_b_enqueue_ and not dev_b_dequeue_) {
+    if (not IsConsistent(dev_b_enqueue_, event_ptr)) {
+      return false;
+    }
+    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+      return false;
+    }
+    dev_b_dequeue_ = event_ptr;
+    is_pending_ = false;
+
+  } else {
+    return false;
+  }
+
+  events_.push_back(event_ptr);
+  return true;
+}
+
+bool NetDeviceSpan::HandelDrop(const std::shared_ptr<NetworkEvent> &event_ptr) {
+  // NOTE: Lock must be held when calling this method!
+  assert(event_ptr);
+
+  if ((not dev_a_enqueue_ and not dev_b_enqueue_) or drop_) {
+    return false;
+  }
+
+  if (dev_a_enqueue_ and not dev_a_dequeue_) {
+    if (not IsConsistent(dev_a_enqueue_, event_ptr)) {
+      return false;
+    }
+    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+      return false;
+    }
+  } else if (dev_a_enqueue_ and dev_a_dequeue_ and dev_b_enqueue_ and not dev_b_dequeue_) {
+    if (not IsConsistent(dev_b_enqueue_, event_ptr)) {
+      return false;
+    }
+    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+      return false;
+    }
+  } else {
+    return false;
+  }
+
+  drop_ = event_ptr;
+  is_pending_ = false;
+  events_.push_back(event_ptr);
+  return true;
+}
+
 bool NetDeviceSpan::AddToSpan(std::shared_ptr<Event> event_ptr) {
   const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
@@ -547,43 +691,16 @@ bool NetDeviceSpan::AddToSpan(std::shared_ptr<Event> event_ptr) {
 
   switch (event_ptr->GetType()) {
     case EventType::kNetworkEnqueueT: {
-      if (enqueue_ or dequeue_ or drop_) {
-        return false;
-      }
-      auto network_event = std::static_pointer_cast<NetworkEvent>(event_ptr);
-      device_type_ = network_event->GetDeviceType();
-      enqueue_ = event_ptr;
-      break;
+      return HandelEnqueue(std::static_pointer_cast<NetworkEvent>(event_ptr));
     }
     case EventType::kNetworkDequeueT: {
-      if (not enqueue_ or dequeue_ or drop_) {
-        return false;
-      }
-      auto enq = std::static_pointer_cast<NetworkEvent>(enqueue_);
-      auto deq = std::static_pointer_cast<NetworkEvent>(event_ptr);
-      if (not IsConsistent(enq, deq)) {
-        return false;
-      }
-      dequeue_ = event_ptr;
-      is_pending_ = false;
-      break;
+      return HandelDequeue(std::static_pointer_cast<NetworkEvent>(event_ptr));
     }
     case EventType::kNetworkDropT: {
-      if (not enqueue_ or dequeue_ or drop_) {
-        return false;
-      }
-      auto enq = std::static_pointer_cast<NetworkEvent>(enqueue_);
-      auto dro = std::static_pointer_cast<NetworkEvent>(event_ptr);
-      if (not IsConsistent(enq, dro)) {
-        return false;
-      }
-      drop_ = event_ptr;
-      is_pending_ = false;
-      break;
+      return HandelDrop(std::static_pointer_cast<NetworkEvent>(event_ptr));
     }
-    default:return false;
+    default: {
+      return false;
+    }
   }
-
-  events_.push_back(event_ptr);
-  return true;
 }

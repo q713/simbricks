@@ -639,12 +639,32 @@ class NicEthSpan : public EventSpan {
 
 class NetDeviceSpan : public EventSpan {
 
-  std::shared_ptr<Event> enqueue_;
-  std::shared_ptr<Event> dequeue_;
-  std::shared_ptr<Event> drop_;
-  NetworkEvent::NetworkDeviceType device_type_;
+  std::shared_ptr<NetworkEvent> dev_a_enqueue_ = nullptr;
+  std::shared_ptr<NetworkEvent> dev_a_dequeue_ = nullptr;
+
+  std::shared_ptr<NetworkEvent> dev_b_enqueue_ = nullptr;
+  std::shared_ptr<NetworkEvent> dev_b_dequeue_ = nullptr;
+
+  std::shared_ptr<NetworkEvent> drop_ = nullptr;
+  NetworkEvent::NetworkDeviceType device_type_a_;
+  NetworkEvent::NetworkDeviceType device_type_b_;
+
+  NetworkEvent::Ipv4 src_{0};
+  NetworkEvent::Ipv4 dst_{0};
+  bool ips_set_ = false;
+  bool is_arp_ = false;
 
   static bool IsConsistent(const std::shared_ptr<NetworkEvent> &event_a, const std::shared_ptr<NetworkEvent> &event_b);
+
+  bool SetAndCheckPotentialArp(const std::shared_ptr<NetworkEvent> &event_ptr);
+
+  bool SetAndCheckPotentialIp(const std::shared_ptr<NetworkEvent> &event_ptr);
+
+  bool HandelEnqueue(const std::shared_ptr<NetworkEvent> &event_ptr);
+
+  bool HandelDequeue(const std::shared_ptr<NetworkEvent> &event_ptr);
+
+  bool HandelDrop(const std::shared_ptr<NetworkEvent> &event_ptr);
 
  public:
   explicit NetDeviceSpan(TraceEnvironment &trace_environment,
@@ -661,6 +681,16 @@ class NetDeviceSpan : public EventSpan {
   }
 
   ~NetDeviceSpan() override = default;
+
+  inline bool IsArp() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return is_arp_;
+  }
+
+  inline bool HasIpsSet() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return ips_set_;
+  }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
 };

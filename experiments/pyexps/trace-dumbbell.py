@@ -146,14 +146,63 @@ clients.append(client)
 
 
 #################################
+# server that produces NO output
+#################################
+server_nic = I40eNIC()
+server_nic.eth_latency = eth_latency
+server_nic.set_network(network)
+
+server_config = I40eLinuxNode()
+server_config.mtu = mtu
+server_config.ip = ip_provider.GetNext()
+server_config.app = IdleHost()
+
+server = Gem5Host(server_config)
+server.name = 'server.2'
+server.cpu_freq = cpu_freq
+
+server.add_nic(server_nic)
+e.add_nic(server_nic)
+e.add_host(server)
+
+servers.append(server)
+
+
+
+#################################
+# client that produces NO output
+#################################
+client_nic = I40eNIC()
+client_nic.eth_latency = eth_latency
+client_nic.set_network(network)
+
+client_config = I40eLinuxNode()
+client_config.mtu = mtu
+client_config.ip = ip_provider.GetNext()
+client_config.app = PingClient()
+client_config.app.count = 1
+
+client = Gem5Host(client_config)
+client.name = 'client.2'
+client.cpu_freq = cpu_freq
+
+client.add_nic(client_nic)
+e.add_nic(client_nic)
+e.add_host(client)
+
+clients.append(client)
+
+
+
+#################################
 # tell client apps about server ips
 #################################
 assert(len(servers) == len(clients))
-assert(len(clients) == 1)
-i = 0
-for cl in clients:
-    cl.node_config.app.server_ip = servers[i].node_config.ip
-    i += 1
+assert(len(clients) == 2)
+assert(num_pairs == len(clients))
+
+clients[0].node_config.app.server_ip = servers[0].node_config.ip
+clients[1].node_config.app.server_ip = servers[1].node_config.ip
 
 clients[num_pairs - 1].node_config.app.is_last = True
 clients[num_pairs - 1].wait = True

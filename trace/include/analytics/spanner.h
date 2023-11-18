@@ -225,50 +225,6 @@ struct NetworkSpanner : public Spanner {
     }
   };
 
-  class IpFilter {
-    std::unordered_set<NetworkEvent::Ipv4> allowed_ips_;
-
-   public:
-    explicit IpFilter() = default;
-
-    void AddIp(const NetworkEvent::Ipv4 &ipv_4) {
-      auto suc = allowed_ips_.insert(ipv_4);
-      throw_on_false(suc.second, "NetworkSpanner ip address already within filter",
-                     source_loc::current());
-    }
-
-    void AddIp(const std::string &ipv4_address) {
-      LineHandler line_handler;
-      line_handler.SetLine(ipv4_address);
-
-      NetworkEvent::Ipv4 ipv4;
-      throw_on_false(ParseIpAddress(line_handler, ipv4),
-                     "NetworkSpanner could not parse ipv4",
-                     source_loc::current());
-
-      AddIp(ipv4);
-    }
-
-    bool PassOn(const NetworkEvent::Ipv4 &ipv_4) const {
-      return allowed_ips_.contains(ipv_4);
-    }
-
-    bool PassOn(const std::shared_ptr<NetDeviceSpan> &span) const {
-      if (span->HasIpsSet()) {
-        return PassOn(span->GetSrcIp()) and PassOn(span->GetDstIp());
-      }
-      return true;
-    }
-
-    bool FilterOut(const NetworkEvent::Ipv4 &ipv_4) const {
-      return not PassOn(ipv_4);
-    }
-
-    bool FilterOut(const std::shared_ptr<NetDeviceSpan> &span) const {
-      return not PassOn(span);
-    }
-  };
-
   class NodeDeviceFilter {
     std::set<std::pair<int, int>> interesting_node_device_pairs_;
 

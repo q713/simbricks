@@ -229,9 +229,6 @@ class EventSpan {
 
   uint64_t GetValidTraceId() {
     const uint64_t trace_id = GetTraceId();
-    if (not TraceEnvironment::IsValidId(trace_id)) {
-      std::cout << "sdajfhdsjkfbjdskbkj" << std::endl;
-    }
     throw_on_false(TraceEnvironment::IsValidId(trace_id),
                    TraceException::kInvalidId, source_loc::current());
     return trace_id;

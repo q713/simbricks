@@ -108,6 +108,30 @@ class NonCoroChannel {
   }
 };
 
+template<typename ValueType>
+class NonCoroChannelSink : public NonCoroChannel<ValueType> {
+ public:
+  NonCoroChannelSink() = default;
+
+  NonCoroChannelSink(const NonCoroChannelSink<ValueType> &) = delete;
+
+  NonCoroChannelSink(NonCoroChannelSink<ValueType> &&) = delete;
+
+  NonCoroChannelSink<ValueType> &operator=(
+      const NonCoroChannelSink<ValueType> &) noexcept = delete;
+
+  NonCoroChannelSink<ValueType> &operator=(
+      NonCoroChannelSink<ValueType> &&) noexcept = delete;
+
+  bool Push([[maybe_unused]] ValueType value) override {
+    return true;
+  };
+
+  bool TryPush([[maybe_unused]] ValueType value) override {
+    return true;
+  }
+};
+
 template<typename ValueType, size_t BufferSize> requires SizeLagerZero<BufferSize>
 class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
 
@@ -462,6 +486,33 @@ class CoroChannel {
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::function<bool(ValueType &)> &predicate) {
     co_return std::nullopt;
+  }
+};
+
+template<typename ValueType>
+class CoroChannelSink : public CoroChannel<ValueType> {
+
+ public:
+  explicit CoroChannelSink() = default;
+
+  CoroChannelSink(const CoroChannelSink<ValueType> &) = delete;
+
+  CoroChannelSink(CoroChannelSink<ValueType> &&) = delete;
+
+  CoroChannelSink<ValueType> &operator=(const CoroChannelSink<ValueType> &) noexcept = delete;
+
+  CoroChannelSink<ValueType> &operator=(CoroChannelSink<ValueType> &&) noexcept = delete;
+
+  concurrencpp::lazy_result<bool> Push(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      ValueType value) {
+    co_return true;
+  };
+
+  concurrencpp::lazy_result<bool> TryPush(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      ValueType value) {
+    co_return true;
   }
 };
 

@@ -192,21 +192,52 @@ struct NicSpanner : public Spanner {
 
 struct NetworkSpanner : public Spanner {
 
-  class IpToChannelMap {
+  class NodeDeviceToChannelMap {
     using ChanT = std::shared_ptr<CoroChannel<std::shared_ptr<Context>>>;
-    std::unordered_map<NetworkEvent::Ipv4, ChanT> mapping_;
+    std::map<std::pair<int, int>, ChanT> mapping_;
 
-   public:
-    explicit IpToChannelMap() = default;
-
-    IpToChannelMap &AddIpv4Mapping(const NetworkEvent::Ipv4 &ipv4, ChanT channel) {
-      auto suc = mapping_.insert({ipv4, channel});
+    void AddMapping(const std::pair<int, int> &key, const ChanT &channel) {
+      auto suc = mapping_.insert({key, channel});
       throw_on_false(suc.second, "NetworkSpanner ip address already mapped",
                      source_loc::current());
-      return *this;
     }
 
-    IpToChannelMap &AddIpv4Mapping(const std::string &ipv4_address, ChanT channel) {
+    ChanT GetChannel(const std::pair<int, int> &node_device) const {
+      auto iter = mapping_.find(node_device);
+      if (iter != mapping_.end()) {
+        return iter->second;
+      }
+      return nullptr;
+    }
+
+   public:
+    explicit NodeDeviceToChannelMap() = default;
+
+    void AddMapping(int node, int device, const ChanT &channel) {
+      auto key = std::make_pair(node, device);
+      AddMapping(key, channel);
+    }
+
+    ChanT GetValidChannel(int node, int device) const {
+      auto result = GetChannel(std::make_pair(node, device));
+      throw_if_empty(result, TraceException::kChannelIsNull, source_loc::current());
+      return result;
+    }
+  };
+
+  class IpFilter {
+    std::unordered_set<NetworkEvent::Ipv4> allowed_ips_;
+
+   public:
+    explicit IpFilter() = default;
+
+    void AddIp(const NetworkEvent::Ipv4 &ipv_4) {
+      auto suc = allowed_ips_.insert(ipv_4);
+      throw_on_false(suc.second, "NetworkSpanner ip address already within filter",
+                     source_loc::current());
+    }
+
+    void AddIp(const std::string &ipv4_address) {
       LineHandler line_handler;
       line_handler.SetLine(ipv4_address);
 
@@ -215,22 +246,67 @@ struct NetworkSpanner : public Spanner {
                      "NetworkSpanner could not parse ipv4",
                      source_loc::current());
 
-      AddIpv4Mapping(ipv4, std::move(channel));
-      return *this;
+      AddIp(ipv4);
     }
 
-    ChanT GetChannel(const NetworkEvent::Ipv4 &ipv4_address) const {
-      auto iter = mapping_.find(ipv4_address);
-      if (iter != mapping_.end()) {
-        return iter->second;
+    bool PassOn(const NetworkEvent::Ipv4 &ipv_4) const {
+      return allowed_ips_.contains(ipv_4);
+    }
+
+    bool PassOn(const std::shared_ptr<NetDeviceSpan> &span) const {
+      if (span->HasIpsSet()) {
+        return PassOn(span->GetSrcIp()) and PassOn(span->GetDstIp());
       }
-      return nullptr;
+      return true;
     }
 
-    ChanT GetValidChannel(const NetworkEvent::Ipv4 &ipv4_address) const {
-      auto result = GetChannel(ipv4_address);
-      throw_if_empty(result, TraceException::kChannelIsNull, source_loc::current());
-      return result;
+    bool FilterOut(const NetworkEvent::Ipv4 &ipv_4) const {
+      return not PassOn(ipv_4);
+    }
+
+    bool FilterOut(const std::shared_ptr<NetDeviceSpan> &span) const {
+      return not PassOn(span);
+    }
+  };
+
+  class NodeDeviceFilter {
+    std::set<std::pair<int, int>> interesting_node_device_pairs_;
+
+   public:
+    explicit NodeDeviceFilter() = default;
+
+    void AddNodeDevice(const std::pair<int, int> &node_device) {
+      interesting_node_device_pairs_.insert(node_device);
+    }
+
+    void AddNodeDevice(int node, int device) {
+      interesting_node_device_pairs_.insert({node, device});
+    }
+
+    void AddNodeDevice(const std::shared_ptr<NetworkEvent> &event) {
+      if (not event) {
+        return;
+      }
+      const int node = event->GetNode();
+      const int device = event->GetDevice();
+      interesting_node_device_pairs_.insert({node, device});
+    }
+
+    bool IsInterestingNodeDevice(int node, int device) const {
+      return interesting_node_device_pairs_.contains({node, device});
+    }
+
+    bool IsInterestingNodeDevice(const std::shared_ptr<NetworkEvent> &event) const {
+      if (not event) {
+        return false;
+      }
+      const int node = event->GetNode();
+      const int device = event->GetDevice();
+      return IsInterestingNodeDevice(node, device);
+    }
+
+    bool IsNotInterestingNodeDevice(const std::shared_ptr<NetworkEvent> &event) const {
+      return not IsInterestingNodeDevice(event);
     }
   };
 
@@ -238,7 +314,8 @@ struct NetworkSpanner : public Spanner {
                           std::string &&name,
                           Tracer &tra,
                           ChannelT from_host_,
-                          const IpToChannelMap &to_host_channels);
+                          const NodeDeviceToChannelMap &to_host_channels,
+                          const NodeDeviceFilter &node_device_filter);
 
  private:
 
@@ -246,11 +323,13 @@ struct NetworkSpanner : public Spanner {
                                                      std::shared_ptr<Event> &event_ptr);
 
   // TODO: may need this to be a vector as well
-  std::shared_ptr<EventSpan> current_device_span_;
+  std::shared_ptr<NetDeviceSpan> last_finished_device_span_ = nullptr;
+  std::shared_ptr<NetDeviceSpan> current_device_span_ = nullptr;
 
   // TODO: make these vectors --> mechanism needed to decide to which host to send to
   std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host_;
-  const IpToChannelMap &to_host_channels_;
+  const NodeDeviceToChannelMap &to_host_channels_;
+  const NodeDeviceFilter &node_device_filter_;
 };
 
 #endif  // SIMBRICKS_TRACE_SPANNER_H_

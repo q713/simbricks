@@ -140,8 +140,10 @@ class TraceEnvironment {
     return 0;
   }
 
+  static constexpr uint64_t kInvalidId = 0;
+
   static inline bool IsValidId(uint64_t ident) {
-    return ident != 0;
+    return ident != kInvalidId;
   }
 
   inline uint64_t GetNextParserId() {

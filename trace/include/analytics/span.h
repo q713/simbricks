@@ -229,6 +229,9 @@ class EventSpan {
 
   uint64_t GetValidTraceId() {
     const uint64_t trace_id = GetTraceId();
+    if (not TraceEnvironment::IsValidId(trace_id)) {
+      std::cout << "sdajfhdsjkfbjdskbkj" << std::endl;
+    }
     throw_on_false(TraceEnvironment::IsValidId(trace_id),
                    TraceException::kInvalidId, source_loc::current());
     return trace_id;
@@ -636,20 +639,20 @@ class NicEthSpan : public EventSpan {
 
 class NetDeviceSpan : public EventSpan {
 
-  std::shared_ptr<NetworkEvent> dev_a_enqueue_ = nullptr;
-  std::shared_ptr<NetworkEvent> dev_a_dequeue_ = nullptr;
-
-  std::shared_ptr<NetworkEvent> dev_b_enqueue_ = nullptr;
-  std::shared_ptr<NetworkEvent> dev_b_dequeue_ = nullptr;
+  std::shared_ptr<NetworkEvent> dev_enq_ = nullptr;
+  std::shared_ptr<NetworkEvent> dev_deq_ = nullptr;
 
   std::shared_ptr<NetworkEvent> drop_ = nullptr;
-  NetworkEvent::NetworkDeviceType device_type_a_;
-  NetworkEvent::NetworkDeviceType device_type_b_;
+  NetworkEvent::NetworkDeviceType device_type_;
 
   NetworkEvent::Ipv4 src_{0};
   NetworkEvent::Ipv4 dst_{0};
   bool ips_set_ = false;
   bool is_arp_ = false;
+  std::set<NetworkEvent::EventBoundaryType> boundary_types_;
+  bool interesting_flag_ = false;
+  int node = -1;
+  int device = -1;
 
   static bool IsConsistent(const std::shared_ptr<NetworkEvent> &event_a, const std::shared_ptr<NetworkEvent> &event_b);
 
@@ -689,14 +692,39 @@ class NetDeviceSpan : public EventSpan {
     return ips_set_;
   }
 
-  inline std::string GetSrcIpStr() {
+  inline bool ContainsBoundaryType(NetworkEvent::EventBoundaryType boundary_type) {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return IpToString(src_);
+    return boundary_types_.contains(boundary_type);
   }
 
-  inline std::string GetDstIpStr() {
+  inline NetworkEvent::Ipv4 GetSrcIp() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return IpToString(dst_);
+    return src_;
+  }
+
+  inline NetworkEvent::Ipv4 GetDstIp() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return dst_;
+  }
+
+  inline bool InterestingFlag() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return interesting_flag_;
+  }
+
+  inline bool IsDrop() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return drop_ != nullptr;
+  }
+
+  inline int GetNode() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return node;
+  }
+
+  inline int GetDevice() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return device;
   }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override;

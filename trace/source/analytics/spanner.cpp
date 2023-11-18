@@ -40,7 +40,7 @@ concurrencpp::result<void> Spanner::consume(
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, TraceException::kEventIsNull, source_loc::current());
 
-    //std::cout << name_ << " try handel: " << *event_ptr << '\n';
+    // std::cout << name_ << " try handel: " << *event_ptr << '\n';
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {
       std::cerr << "Spanner: could not find handler for the following event: ";

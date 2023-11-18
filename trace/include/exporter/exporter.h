@@ -565,8 +565,8 @@ class OtlpSpanExporter : public SpanExporter {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-arp", BoolToString(old_span->IsArp()));
     if (old_span->HasIpsSet()) {
-      new_span->SetAttribute("src-ip", old_span->GetSrcIpStr());
-      new_span->SetAttribute("dst-ip", old_span->GetDstIpStr());
+      new_span->SetAttribute("src-ip", sim_string_utils::ValueToString(old_span->GetSrcIp()));
+      new_span->SetAttribute("dst-ip", sim_string_utils::ValueToString(old_span->GetDstIp()));
     }
   }
 

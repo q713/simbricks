@@ -38,6 +38,15 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
     boundary_type = NetworkEvent::EventBoundaryType::kToAdapter;
   }
 
+  bool interesting = false;
+  uint64_t packet_uid = 0;
+  if (not line_handler.ConsumeAndTrimTillString("Packet-Uid=") or
+      not line_handler.ParseUintTrim(10, packet_uid) or
+      not line_handler.ConsumeAndTrimTillString("Intersting=") or
+      not line_handler.ParseBoolFromStringRepr(interesting)) {
+    return nullptr;
+  }
+
   std::optional<NetworkEvent::EthernetHeader> eth_header;
   eth_header = TryParseEthernetHeader(line_handler);
 
@@ -61,6 +70,8 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            node,
                                            device,
                                            device_type,
+                                           packet_uid,
+                                           interesting,
                                            payload_size,
                                            boundary_type,
                                            eth_header,
@@ -75,6 +86,8 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                            node,
                                            device,
                                            device_type,
+                                           packet_uid,
+                                           interesting,
                                            payload_size,
                                            boundary_type,
                                            eth_header,
@@ -89,6 +102,8 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
                                         node,
                                         device,
                                         device_type,
+                                        packet_uid,
+                                        interesting,
                                         payload_size,
                                         boundary_type,
                                         eth_header,

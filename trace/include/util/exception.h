@@ -41,8 +41,8 @@ class TraceException : public std::exception {
 
   static std::string build_error_msg(const std::string_view location,
                                      const std::string_view message) noexcept {
-    std::stringstream err_msg{"TraceException"};
-    err_msg << "occured in " << location << ": " << message;
+    std::stringstream err_msg;
+    err_msg << "TraceException occured in " << location << ": " << message;
     return err_msg.str();
   }
 

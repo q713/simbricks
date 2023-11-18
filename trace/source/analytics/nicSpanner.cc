@@ -119,36 +119,21 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
   if (IsType(event_ptr, EventType::kNicTxT)) {
     parent = last_causing_;
 
-    if (not IsType(parent, span_type::kNicMmio)) {
-      std::cerr << "error" << '\n';
-    }
-
-    if (std::static_pointer_cast<NicMmioSpan>(parent)->IsRead()) {
-      std::cerr << "error" << '\n';
-    }
-
     throw_if_empty(parent, TraceException::kSpanIsNull, source_loc::current());
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
-    //std::cout
-    //    << name_
-    //    << " NicSpanner::HandelTxrx: trying to push tx context to other side"
-    //    << std::endl;
+    //std::cout << name_ << " NicSpanner::HandelTxrx: trying to push tx context to other side" << std::endl;
     auto context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
              "HandelTxrx: could not write network context ",
              source_loc::current());
-    //std::cout << name_
-    //          << " NicSpanner::HandelTxrx: pushed tx context to other side"
-    //          << std::endl;
+    //std::cout << name_ << " NicSpanner::HandelTxrx: pushed tx context to other side" << std::endl;
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
-    // std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context
-    // from other side" << std::endl;
+    std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context from other side" << std::endl;
     auto con_opt = co_await from_network_queue_->Pop(resume_executor);
-    // std::cout << name_ << " NicSpanner::HandelTxrx: pulled tx context from
-    // other side" << std::endl;
+    std::cout << name_ << " NicSpanner::HandelTxrx: pulled tx context from other side" << std::endl;
     auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(con, expectation::kRx),
              "nic_spanner: received non kRx context", source_loc::current());

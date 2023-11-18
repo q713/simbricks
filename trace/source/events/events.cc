@@ -581,6 +581,8 @@ void NetworkEvent::Display(std::ostream &out) {
   out << ", node=" << std::to_string(node_);
   out << ", device=" << std::to_string(device_);
   out << ", device_name=" << device_type_;
+  out << ", packet-uid=" << std::to_string(packet_uid_);
+  out << ", interesting=" << BoolToString(interesting_flag_);
   out << ", payload_size=" << std::to_string(payload_size_);
   out << ", boundary_type=" << boundary_type_;
   if (HasEthernetHeader()) {
@@ -610,6 +612,14 @@ int NetworkEvent::GetDevice() const {
 
 NetworkEvent::NetworkDeviceType NetworkEvent::GetDeviceType() const {
   return device_type_;
+}
+
+uint64_t NetworkEvent::GetPacketUid() const {
+  return packet_uid_;
+}
+
+bool NetworkEvent::InterestingFlag() const {
+  return interesting_flag_;
 }
 
 size_t NetworkEvent::GetPayloadSize() const {
@@ -685,6 +695,7 @@ bool NetworkEvent::Equal(const Event &other) {
 
   return node_ == net->node_ and device_ == net->device_ and payload_size_ == net->payload_size_
       and device_type_ == net->device_type_ and boundary_type_ == net->boundary_type_
+      and packet_uid_ == net->packet_uid_ and interesting_flag_ == net->interesting_flag_
       and Event::Equal(other);
 }
 
@@ -733,6 +744,6 @@ bool IsAnyType(const std::shared_ptr<Event> &event_ptr, const std::vector<EventT
   return event_ptr and std::ranges::any_of(types, [&](EventType type) { return IsType(event_ptr, type); });
 }
 
-bool IsAnyType(std::shared_ptr<Event> &event_ptr, const std::set<EventType> &types) {
+bool IsAnyType(const std::shared_ptr<Event> &event_ptr, const std::set<EventType> &types) {
   return event_ptr and types.contains(event_ptr->GetType());
 }

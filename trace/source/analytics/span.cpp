@@ -76,8 +76,8 @@ bool EventSpan::SetContext(const std::shared_ptr<TraceContext> &traceContext, bo
   if (not traceContext->HasParent()) {
     return false;
   }
-  assert(traceContext->GetParentId() != 0);
-  if (traceContext->GetParentStartingTs() >= GetStartingTs()) {
+  assert(traceContext->GetParentId() != TraceEnvironment::kInvalidId);
+  if (traceContext->GetParentStartingTs() > GetStartingTs()) {
     return false;
   }
 
@@ -508,13 +508,14 @@ bool NicEthSpan::AddToSpan(std::shared_ptr<Event> event_ptr) {
 
 bool NetDeviceSpan::IsConsistent(const std::shared_ptr<NetworkEvent> &event_a,
                                  const std::shared_ptr<NetworkEvent> &event_b) {
-  if ((event_a->HasEthernetHeader() and not event_b->HasEthernetHeader())
-      or (not event_a->HasEthernetHeader() and event_b->HasEthernetHeader())) {
-    return false;
-  }
-  if (event_a->HasEthernetHeader() and event_a->GetEthernetHeader() != event_b->GetEthernetHeader()) {
-    return false;
-  }
+  // TODO: not necessarily consistent to each other, often length different!
+  // if ((event_a->HasEthernetHeader() and not event_b->HasEthernetHeader())
+  //     or (not event_a->HasEthernetHeader() and event_b->HasEthernetHeader())) {
+  //   return false;
+  // }
+  // if (event_a->HasEthernetHeader() and event_a->GetEthernetHeader() != event_b->GetEthernetHeader()) {
+  //   return false;
+  // }
 
   // NOTE we are not that strict with ARP headers, we only require that in case both have an arp header,
   // that the arp headers match. As a result one event may have an arp header and the other one not,
@@ -533,7 +534,8 @@ bool NetDeviceSpan::IsConsistent(const std::shared_ptr<NetworkEvent> &event_a,
   }
 
   return event_a->GetNode() == event_b->GetNode() and event_a->GetDevice() == event_b->GetDevice()
-      and event_a->GetDeviceType() == event_b->GetDeviceType()
+      and event_a->GetDeviceType() == event_b->GetDeviceType() and event_a->GetPacketUid() == event_b->GetPacketUid()
+      and event_a->InterestingFlag() == event_b->InterestingFlag()
       and event_a->GetPayloadSize() == event_b->GetPayloadSize();
 }
 
@@ -582,35 +584,22 @@ bool NetDeviceSpan::HandelEnqueue(const std::shared_ptr<NetworkEvent> &event_ptr
   // NOTE: Lock must be held when calling this method!
   assert(event_ptr);
 
-  if ((dev_a_enqueue_ and dev_b_enqueue_) or drop_) {
+  if (dev_enq_ and (dev_deq_ or drop_)) {
     return false;
   }
 
-  if (dev_a_enqueue_) {
-    // we got an enqueue for the SECOND device
-    throw_on(dev_b_enqueue_ != nullptr, "we should never have enqueue for device b set here",
-             source_loc::current());
-    // device a events must have been completed
-    if (not dev_a_enqueue_ or not dev_a_dequeue_) {
-      return false;
-    }
-    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
-      return false;
-    }
-    dev_b_enqueue_ = event_ptr;
-    device_type_b_ = event_ptr->GetDeviceType();
-
-  } else {
-    // we got an enqueue for the FIRST device
-    throw_on(dev_a_enqueue_ != nullptr, "we should never have enqueue for device a set here",
-             source_loc::current());
-    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
-      return false;
-    }
-    dev_a_enqueue_ = event_ptr;
-    device_type_a_ = event_ptr->GetDeviceType();
+  throw_on(dev_enq_ != nullptr, "we should never have enqueue for device a set here",
+           source_loc::current());
+  if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
+    return false;
   }
 
+  dev_enq_ = event_ptr;
+  device_type_ = event_ptr->GetDeviceType();
+  boundary_types_.insert(event_ptr->GetBoundaryType());
+  interesting_flag_ = event_ptr->InterestingFlag();
+  node = event_ptr->GetNode();
+  device = event_ptr->GetDevice();
   events_.push_back(event_ptr);
   return true;
 }
@@ -619,33 +608,20 @@ bool NetDeviceSpan::HandelDequeue(const std::shared_ptr<NetworkEvent> &event_ptr
   // NOTE: Lock must be held when calling this method!
   assert(event_ptr);
 
-  if ((not dev_a_enqueue_ and not dev_b_enqueue_) or drop_) {
+  if (not dev_enq_ or drop_ or dev_deq_) {
     return false;
   }
 
-  if (dev_a_enqueue_ and not dev_a_dequeue_) {
-    if (not IsConsistent(dev_a_enqueue_, event_ptr)) {
-      return false;
-    }
-    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
-      return false;
-    }
-    dev_a_dequeue_ = event_ptr;
-
-  } else if (dev_a_enqueue_ and dev_a_dequeue_ and dev_b_enqueue_ and not dev_b_dequeue_) {
-    if (not IsConsistent(dev_b_enqueue_, event_ptr)) {
-      return false;
-    }
-    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
-      return false;
-    }
-    dev_b_dequeue_ = event_ptr;
-    is_pending_ = false;
-
-  } else {
+  if (not IsConsistent(dev_enq_, event_ptr)) {
+    return false;
+  }
+  if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
     return false;
   }
 
+  dev_deq_ = event_ptr;
+  is_pending_ = false;
+  boundary_types_.insert(event_ptr->GetBoundaryType());
   events_.push_back(event_ptr);
   return true;
 }
@@ -654,30 +630,20 @@ bool NetDeviceSpan::HandelDrop(const std::shared_ptr<NetworkEvent> &event_ptr) {
   // NOTE: Lock must be held when calling this method!
   assert(event_ptr);
 
-  if ((not dev_a_enqueue_ and not dev_b_enqueue_) or drop_) {
+  if (not dev_enq_ or drop_ or dev_deq_) {
     return false;
   }
 
-  if (dev_a_enqueue_ and not dev_a_dequeue_) {
-    if (not IsConsistent(dev_a_enqueue_, event_ptr)) {
-      return false;
-    }
-    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
-      return false;
-    }
-  } else if (dev_a_enqueue_ and dev_a_dequeue_ and dev_b_enqueue_ and not dev_b_dequeue_) {
-    if (not IsConsistent(dev_b_enqueue_, event_ptr)) {
-      return false;
-    }
-    if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
-      return false;
-    }
-  } else {
+  if (not IsConsistent(dev_enq_, event_ptr)) {
+    return false;
+  }
+  if (not SetAndCheckPotentialIp(event_ptr) or not SetAndCheckPotentialArp(event_ptr)) {
     return false;
   }
 
   drop_ = event_ptr;
   is_pending_ = false;
+  boundary_types_.insert(event_ptr->GetBoundaryType());
   events_.push_back(event_ptr);
   return true;
 }

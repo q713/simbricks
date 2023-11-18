@@ -1095,6 +1095,8 @@ class NetworkEvent : public Event {
   const int node_;
   const int device_;
   const NetworkDeviceType device_type_;
+  const uint64_t packet_uid_;
+  const bool interesting_flag_;
   const size_t payload_size_ = 0;
   const EventBoundaryType boundary_type_;
   const std::optional<EthernetHeader> ethernet_header_;
@@ -1114,6 +1116,10 @@ class NetworkEvent : public Event {
   int GetDevice() const;
 
   NetworkDeviceType GetDeviceType() const;
+
+  uint64_t GetPacketUid() const;
+
+  bool InterestingFlag() const;
 
   size_t GetPayloadSize() const;
 
@@ -1144,6 +1150,8 @@ class NetworkEvent : public Event {
                         int node,
                         int device,
                         const NetworkDeviceType device_type,
+                        uint64_t packet_uid,
+                        bool interesting_flag,
                         size_t payload_size,
                         const EventBoundaryType boundary_type,
                         const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
@@ -1153,6 +1161,8 @@ class NetworkEvent : public Event {
         node_(node),
         device_(device),
         device_type_(device_type),
+        packet_uid_(packet_uid),
+        interesting_flag_(interesting_flag),
         payload_size_(payload_size),
         boundary_type_(boundary_type),
         ethernet_header_(ethernet_header),
@@ -1232,6 +1242,8 @@ class NetworkEnqueue : public NetworkEvent {
                           int node,
                           int device,
                           const NetworkDeviceType device_type,
+                          uint64_t packet_uid,
+                          bool interesting_flag,
                           size_t payload_size,
                           const EventBoundaryType boundary_type,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
@@ -1245,6 +1257,8 @@ class NetworkEnqueue : public NetworkEvent {
                      node,
                      device,
                      device_type,
+                     packet_uid,
+                     interesting_flag,
                      payload_size,
                      boundary_type,
                      ethernet_header,
@@ -1272,6 +1286,8 @@ class NetworkDequeue : public NetworkEvent {
                           int node,
                           int device,
                           const NetworkDeviceType device_type,
+                          uint64_t packet_uid,
+                          bool interesting_flag,
                           size_t payload_size,
                           const EventBoundaryType boundary_type,
                           const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
@@ -1285,6 +1301,8 @@ class NetworkDequeue : public NetworkEvent {
                      node,
                      device,
                      device_type,
+                     packet_uid,
+                     interesting_flag,
                      payload_size,
                      boundary_type,
                      ethernet_header,
@@ -1312,6 +1330,8 @@ class NetworkDrop : public NetworkEvent {
                        int node,
                        int device,
                        const NetworkDeviceType device_type,
+                       uint64_t packet_uid,
+                       bool interesting_flag,
                        size_t payload_size,
                        const EventBoundaryType boundary_type,
                        const std::optional<EthernetHeader> &ethernet_header = std::nullopt,
@@ -1325,6 +1345,8 @@ class NetworkDrop : public NetworkEvent {
                      node,
                      device,
                      device_type,
+                     packet_uid,
+                     interesting_flag,
                      payload_size,
                      boundary_type,
                      ethernet_header,
@@ -1360,11 +1382,24 @@ inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
 
 bool IsType(const std::shared_ptr<Event> &event_ptr, EventType type);
 
-bool IsAnyType(std::shared_ptr<Event> &event_ptr, const std::vector<EventType> &types);
+bool IsAnyType(const std::shared_ptr<Event> &event_ptr, const std::vector<EventType> &types);
 
-bool IsAnyType(std::shared_ptr<Event> &event_ptr, const std::set<EventType> &types);
+bool IsAnyType(const std::shared_ptr<Event> &event_ptr, const std::set<EventType> &types);
 
 bool IsType(const Event &event, EventType type);
+
+inline bool IsBoundaryType(const std::shared_ptr<Event> &event) {
+  if (event and IsAnyType(event, std::vector<EventType>{
+      EventType::kNetworkEnqueueT, EventType::kNetworkDequeueT, EventType::kNetworkDropT})) {
+    return IsBoundaryType(std::static_pointer_cast<NetworkEvent>(event));
+  }
+  return false;
+}
+
+inline bool IsBoundaryType(const std::shared_ptr<NetworkEvent> &event,
+                           NetworkEvent::EventBoundaryType boundary_type) {
+  return event and event->GetBoundaryType() == boundary_type;
+}
 
 class EventPrinter : public consumer<std::shared_ptr<Event>>,
                      public cpipe<std::shared_ptr<Event>> {

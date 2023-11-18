@@ -192,11 +192,13 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
   NonCoroBufferedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
   WeakTimer &timer_;
+  std::list<std::shared_ptr<Event>> event_buffer_;
 
   concurrencpp::result<void>
   FillBuffer() {
-    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
-    line_handler_buffer.OpenFile(log_file_path_, true);
+    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true}; // TODO: make variable!!
+    //line_handler_buffer.OpenFile(log_file_path_, true);
+    line_handler_buffer.OpenFile(log_file_path_, false);
 
     std::pair<bool, LineHandler *> bh_p;
     std::shared_ptr<Event> event_ptr;
@@ -208,6 +210,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
       if (not event_ptr) {
         continue;
       }
+      //std::cout << name_ << " got next line" << std::endl;
 
       const bool could_push = event_buffer_channel_.Push(event_ptr);
       throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel",
@@ -241,12 +244,64 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null",
                    source_loc::current());
 
+    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true}; // TODO: make variable!!
+    //line_handler_buffer.OpenFile(log_file_path_, true);
+    line_handler_buffer.OpenFile(log_file_path_, false);
+
+    std::pair<bool, LineHandler *> bh_p;
+    std::shared_ptr<Event> event_ptr;
+    for (bh_p = line_handler_buffer.NextHandler(); bh_p.first; bh_p = line_handler_buffer.NextHandler()) {
+      assert(bh_p.first);
+      LineHandler &line_handler = *bh_p.second;
+
+      event_ptr = co_await log_parser_.ParseEvent(line_handler);
+      if (not event_ptr) {
+        continue;
+      }
+
+      event_buffer_.push_back(event_ptr);
+
+      if (event_buffer_.size() < EventBufferSize) {
+        continue;
+      }
+
+      while (not event_buffer_.empty()) {
+        auto event = event_buffer_.front();
+
+        const bool could_push = co_await tar_chan->Push(resume_executor, event);
+        throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel",
+                 source_loc::current());
+
+        event_buffer_.pop_front();
+      }
+    }
+
+    while (not event_buffer_.empty()) {
+      auto event = event_buffer_.front();
+
+      const bool could_push = co_await tar_chan->Push(resume_executor, event);
+      throw_on(not could_push, "BufferedEventProvider::FillBuffer: could not push event to channel",
+               source_loc::current());
+    }
+
+    co_await tar_chan->CloseChannel(resume_executor);
+  }
+
+#if 0
+  concurrencpp::result<void>
+  produce(std::shared_ptr<concurrencpp::executor> resume_executor,
+          std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
+    throw_if_empty(resume_executor, "BufferedEventProvider::process: resume executor is null",
+                   source_loc::current());
+    throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null",
+                   source_loc::current());
+
     concurrencpp::result<concurrencpp::result<void>>
         producer_task = trace_environment_.GetThreadExecutor()->submit([&]() {
       return FillBuffer();
     });
 
-    size_t timer_key = co_await timer_.Register(resume_executor);
+    //size_t timer_key = co_await timer_.Register(resume_executor);
 
     std::optional<std::shared_ptr<Event>> event_opt;
     std::shared_ptr<Event> event_ptr = nullptr;
@@ -255,7 +310,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
       assert(event_opt.has_value());
       event_ptr = event_opt.value();
 
-      co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
+      //co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
 
       const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);
       throw_on(not could_push,
@@ -266,10 +321,11 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     co_await co_await producer_task;
     co_await tar_chan->CloseChannel(resume_executor);
 
-    co_await timer_.Done(resume_executor, timer_key);
+    //co_await timer_.Done(resume_executor, timer_key);
     std::cout << "BufferedEventProvider exits" << '\n';
     co_return;
   }
+#endif
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

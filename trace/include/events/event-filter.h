@@ -83,7 +83,7 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
 };
 
 class GenericEventFilter : public EventStreamActor {
-  std::function<bool(std::shared_ptr<Event> event)> &to_filter_;
+  std::function<bool(const std::shared_ptr<Event> &event)> &to_filter_;
 
  public:
   bool act_on(std::shared_ptr<Event> &event) override {
@@ -91,7 +91,7 @@ class GenericEventFilter : public EventStreamActor {
   }
 
   explicit GenericEventFilter(TraceEnvironment &trace_environment,
-                              std::function<bool(std::shared_ptr<Event> event)> &to_filter)
+                              std::function<bool(const std::shared_ptr<Event> &event)> &to_filter)
       : EventStreamActor(trace_environment), to_filter_(to_filter) {
   }
 };

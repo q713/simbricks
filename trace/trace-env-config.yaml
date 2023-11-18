@@ -22,8 +22,8 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
-MaxBackgroundThreads: 5
-MaxCpuThreads: 10
+MaxBackgroundThreads: 1
+MaxCpuThreads: 5
 JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
@@ -113,6 +113,8 @@ BlacklistFunctions:
   - "vmalloc_node"
   - "__kfifo_poke_n"
   - "__count_numa_events.isra.0"
+  - "use_mwaitx_delay"
+  - "orc_sort_cmp"
 TypesToFilter:
   - "kHostInstrT"
   - "kSimProcInEventT"
@@ -126,12 +128,12 @@ TypesToFilter:
   #- "kNicMmioWT"
 SymbolTables:
   - Identifier: "Linuxvm-Symbols"
-    Path: "/usr/src/data-folder/trace/linux_dumps/vmlinux-image-syms.dump"
-    #Path: "linux_dumps/vmlinux-image-syms.dump"
+    #Path: "/usr/src/data-folder/trace/linux_dumps/vmlinux-image-syms.dump"
+    Path: "linux_dumps/vmlinux-image-syms.dump"
     AddressOffset: 0
     Type: kSyms
   - Identifier: "Nicdriver-Symbols"
-    Path: "/usr/src/data-folder/trace/linux_dumps/i40e-image-syms.dump"
-    #Path: "linux_dumps/i40e-image-syms.dump"
+    #Path: "/usr/src/data-folder/trace/linux_dumps/i40e-image-syms.dump"
+    Path: "linux_dumps/i40e-image-syms.dump"
     AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
     Type: kSyms

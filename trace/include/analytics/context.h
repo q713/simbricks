@@ -112,6 +112,40 @@ class Context {
 
 };
 
+class NicNetworkContext : public Context {
+  // this is introduced due to arp messages caused by traces not of interest,
+  // that cause events within the nic to indicate that in this case no context
+  // shall be propagated to // TODO: check if events within the host simulator are caused
+  const bool is_interesting_;
+
+ public:
+  explicit NicNetworkContext(uint64_t trace_id,
+                             expectation expectation,
+                             uint64_t parent_id,
+                             uint64_t parent_start_ts,
+                             bool is_interesting)
+      : Context(trace_id, expectation, parent_id, parent_start_ts), is_interesting_(is_interesting) {
+  }
+
+  inline bool IsInteresting() const {
+    return is_interesting_;
+  }
+
+  template<expectation Exp>
+  static std::shared_ptr<NicNetworkContext> CreatePassOnContext(const std::shared_ptr<EventSpan> &parent_span,
+                                                                bool is_interesting) {
+    throw_if_empty(parent_span, TraceException::kSpanIsNull, source_loc::current());
+    auto context = create_shared<NicNetworkContext>(TraceException::kContextIsNull,
+                                                    parent_span->GetValidTraceId(),
+                                                    Exp,
+                                                    parent_span->GetValidId(),
+                                                    parent_span->GetStartingTs(),
+                                                    is_interesting);
+    assert(context);
+    return context;
+  }
+};
+
 inline bool is_expectation(const std::shared_ptr<Context> &con, expectation exp) {
   return con && con->GetExpectation() == exp;
 }

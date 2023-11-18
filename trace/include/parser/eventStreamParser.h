@@ -64,15 +64,11 @@ class EventStreamParser : public LogParser {
     return line_handler.ParseUintTrim(10, ts);
   }
 
-  bool ParseNetworkEvent(LineHandler &line_handler,
-                         int &node,
-                         int &device,
-                         NetworkEvent::NetworkDeviceType &device_type,
-                         uint64_t &payload_size,
-                         NetworkEvent::EventBoundaryType &boundary_type,
-                         std::optional<NetworkEvent::EthernetHeader> &eth_h,
-                         std::optional<NetworkEvent::ArpHeader> &arp_h,
-                         std::optional<NetworkEvent::Ipv4Header> &ip_h);
+  std::shared_ptr<NetworkEvent> ParseNetworkEvent(LineHandler &line_handler,
+                                                  EventType event_type,
+                                                  uint64_t timestamp,
+                                                  size_t parser_ident,
+                                                  const std::string &parser_name);
 
  public:
   explicit EventStreamParser(TraceEnvironment &trace_environment, std::string name)

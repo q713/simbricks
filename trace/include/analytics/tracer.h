@@ -408,10 +408,36 @@ class Tracer {
     const uint64_t parent_id = parent_context->GetParentId();
     const uint64_t parent_starting_ts = parent_context->GetParentStartingTs();
     auto trace_context = RegisterCreateContextParent(trace_id, parent_id, parent_starting_ts);
-    span_to_register->SetContext(trace_context, true);
+    const bool could_set = span_to_register->SetContext(trace_context, true);
+    throw_on_false(could_set, "StartSpanSetParentContext could not set context",
+                   source_loc::current());
 
     // must add span to trace manually
     AddSpanToTraceIfTraceExists(trace_id, span_to_register);
+  }
+
+  // will create a new span not belonging to any trace, must be made manually by using one of the methods above
+  template<class SpanType, class... Args>
+  std::shared_ptr<SpanType> StartOrphanSpan(std::shared_ptr<Event> starting_event, Args &&... args) {
+    // NOTE: As we create an orphan, we do not make any bookkeeping, as a result we
+    //       don't need to take ownership of the lock!
+    throw_if_empty(starting_event, "StartOrphanSpan(...) starting_event is null",
+                   source_loc::current());
+
+    auto invalid_trace_context = create_shared<TraceContext>(
+        "StartOrphanSpan couldnt create context",
+        TraceEnvironment::kInvalidId, TraceEnvironment::kInvalidId);
+
+    std::shared_ptr<SpanType> new_span = create_shared<SpanType>(
+        "StartOrphanSpan(...) could not create a new span",
+        trace_environment_, invalid_trace_context, args...);
+    const bool was_added = new_span->AddToSpan(starting_event);
+    throw_on(not was_added, "StartOrphanSpan(...) could not add first event",
+             source_loc::current());
+
+    // NOTE: span is not added to any trace!!!
+    assert(new_span);
+    return new_span;
   }
 
   explicit Tracer(TraceEnvironment &trace_environment,

@@ -59,10 +59,10 @@ concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
       };
 
   while (context_opt) {
-    // std::cout << name_ << " host try poll on true nic receive" << std::endl;
+    //std::cout << name_ << " host try poll on true nic receive" << std::endl;
     context_opt = co_await from_nic_receives_queue_->TryPopOnTrue(
         resume_executor, did_arrive_before_receive_syscall);
-    // std::cout << name_ << " host polled on true nic receive" << std::endl;
+    //std::cout << name_ << " host polled on true nic receive" << std::endl;
     if (not context_opt.has_value()) {
       break;
     }
@@ -102,21 +102,6 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
       not co_await CreateTraceStartingSpan(resume_executor, event_ptr, false)) {
     co_return false;
   }
-
-  // if (pending_host_call_span_) {
-  //   if (found_transmit_ and TraceEnvironment::IsKernelOrDriverRx(event_ptr))
-  //   {
-  //     auto created = CreateTraceStartingSpan(event_ptr, true);
-  //     assert(created and "HostSpanner: CreateTraceStartingSpan could not
-  //     create new span");
-  //   }
-  //
-  //   if (found_receive_ and TraceEnvironment::IsKernelOrDriverTx(event_ptr)) {
-  //     auto created = CreateTraceStartingSpan(event_ptr, true);
-  //     assert(created and "HostSpanner: CreateTraceStartingSpan could not
-  //     create new span");
-  //   }
-  // }
 
   throw_if_empty(pending_host_call_span_, TraceException::kSpanIsNull, source_loc::current());
   if (pending_host_call_span_->AddToSpan(event_ptr)) {
@@ -190,49 +175,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
   pending_host_mmio_spans_.push_back(pending_mmio_span);
   co_return true;
 }
-/*
 
-
-  if (not pending_mmio_span) {
-    // create a pack that belongs to the trace of the current host call span
-    auto mmio = std::static_pointer_cast<HostMmioOp>(event_ptr);
-    pending_mmio_span = tracer_.StartSpanByParent<HostMmioSpan>(
-        pending_host_call_span_, event_ptr, event_ptr->GetParserIdent(), name_,
-        mmio->GetBar());
-    if (not pending_mmio_span) {
-      co_return false;
-    }
-
-    assert(
-        (IsType(event_ptr, EventType::kHostMmioWT) or
-            IsType(event_ptr, EventType::kHostMmioRT)) and
-            "try to create mmio host span but event is neither read nor write");
-
-    if (not pci_write_before_ and trace_environment_.IsToDeviceBarNumber(
-        pending_mmio_span->GetBarNumber())) {
-      //std::cout << name_ << " host try push mmio" << std::endl;
-      auto context =
-          create_shared<Context>("HandelMmio could not create context",
-                                 expectation::kMmio, pending_mmio_span);
-      if (not co_await to_nic_queue_->Push(resume_executor, context)) {
-        std::cerr << "could not push to nic that mmio is expected" << '\n';
-        // note: we will not return false as the span creation itself id work
-      }
-      //std::cout << name_ << " host pushed mmio" << std::endl;
-    }
-
-    if (trace_environment_.IsMsixNotToDeviceBarNumber(
-        pending_mmio_span->GetBarNumber()) and
-        pending_mmio_span->IsComplete()) {
-      tracer_.MarkSpanAsDone(pending_mmio_span);
-    }
-    pending_host_mmio_spans_.push_back(pending_mmio_span);
-    co_return true;
-  }
-
-  co_return false;
-
- */
 concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
@@ -258,15 +201,6 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
     pending_pci_span_->MarkAsDone();
     tracer_.MarkSpanAsDone(pending_pci_span_);
   }
-
-  //if (not pending_host_call_span_) {
-  //  std::stringstream e_str{""};
-  //  e_str << *event_ptr;
-  //  std::cout << "HostSpanner::HandelPci: no host call span started yet. Create trace starting pci span by event "
-  //            << std::quoted(e_str.str()) << '\n';
-  //  pending_pci_span_ = tracer_.StartSpan<HostPciSpan>(event_ptr, event_ptr->GetParserIdent(), name_);
-  //  co_return true;
-  //}
 
   throw_if_empty(pending_host_call_span_, TraceException::kSpanIsNull, source_loc::current());
   pending_pci_span_ = tracer_.StartSpanByParent<HostPciSpan>(

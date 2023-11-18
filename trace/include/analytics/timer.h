@@ -73,7 +73,7 @@ class Timer {
     {
       concurrencpp::scoped_async_lock guard = co_await timer_lock_.lock(resume_executor);
       co_await timer_cv_.await(resume_executor, guard, [this, timestamp]() {
-        return (waiters_that_reached_maximum_ == amount_waiters_ and waiters_.top() == timestamp)
+        return (waiters_that_reached_maximum_ >= amount_waiters_ and waiters_.top() == timestamp)
             or (cur_maximum_ >= timestamp);
       });
       if (timestamp > cur_maximum_) {

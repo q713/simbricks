@@ -131,17 +131,18 @@ int main(int argc, char *argv[]) {
       = TraceEnvConfig::CreateFromYaml(result["trace-env-config"].as<std::string>());
   TraceEnvironment trace_environment{trace_env_config};
 
-  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
-                                              trace_env_config.GetJaegerUrl(),
-                                              false,
-                                              "trace"};
-  //simbricks::trace::NoOpExporter exporter{trace_environment};
+  //simbricks::trace::OtlpSpanExporter exporter{trace_environment,
+  //                                            trace_env_config.GetJaegerUrl(),
+  //                                            false,
+  //                                            "trace"};
+  simbricks::trace::NoOpExporter exporter{trace_environment};
 
   Tracer tracer{trace_environment, exporter};
 
-  constexpr size_t kAmountSources = 4;
+  constexpr size_t kAmountSources = 5;
   constexpr size_t kLineBufferSize = 1;
-  constexpr size_t kEventBufferSize = 100'000'000;
+  //constexpr size_t kEventBufferSize = 10'000'000;
+  constexpr size_t kEventBufferSize = 1;
   //Timer timer{kAmountSources};
   WeakTimer timer{kAmountSources};
 
@@ -156,8 +157,13 @@ int main(int argc, char *argv[]) {
     auto client_nh = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto nic_cn = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto nic_sn = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nic_s_from_network = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nic_c_from_network = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nics_to_network = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto server_n_h_receive = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto client_n_h_receive = create_shared<QueueT>(TraceException::kChannelIsNull);
+    using SinkT = CoroChannelSink<std::shared_ptr<Context>>;
+    auto sink_chan = create_shared<SinkT>(TraceException::kChannelIsNull);
 
     std::vector<EventTimeBoundary> timestamp_bounds{EventTimeBoundary{lower_bound, upper_bound}};
 
@@ -181,8 +187,8 @@ int main(int argc, char *argv[]) {
                                                  trace_environment,
                                                  "NIC-Server",
                                                  tracer,
-                                                 nic_sn,
-                                                 nic_cn,
+                                                 nics_to_network,
+                                                 nic_s_from_network,
                                                  server_nh,
                                                  server_hn,
                                                  server_n_h_receive);
@@ -191,29 +197,29 @@ int main(int argc, char *argv[]) {
                                                  trace_environment,
                                                  "Client-NIC",
                                                  tracer,
-                                                 nic_cn,
-                                                 nic_sn,
+                                                 nics_to_network,
+                                                 nic_c_from_network,
                                                  client_nh,
                                                  client_hn,
                                                  client_n_h_receive);
 
-    // TODO: the network spanner needs a vector of channels to pass the context to the correct node
-    NetworkSpanner::IpToChannelMap ip_to_channel_map;
-    // TODO: init mapping using nic channels
+    NetworkSpanner::NodeDeviceToChannelMap node_device_to_channel_map;
+    node_device_to_channel_map.AddMapping(0, 2, nic_s_from_network);
+    node_device_to_channel_map.AddMapping(1, 2, nic_c_from_network);
+    node_device_to_channel_map.AddMapping(0, 3, sink_chan);
+    node_device_to_channel_map.AddMapping(1, 3, sink_chan);
+    // NOTE: this filtering could also be done using an event stream filter within the pipeline
+    NetworkSpanner::NodeDeviceFilter node_device_filter;
+    node_device_filter.AddNodeDevice(0, 2);
+    node_device_filter.AddNodeDevice(1, 2);
+
     auto spanner_ns3 = create_shared<NetworkSpanner>(TraceException::kSpannerIsNull,
                                                      trace_environment,
                                                      "NS3",
                                                      tracer,
-                                                     )
-
-    NicSpanner(TraceEnvironment &trace_environment,
-        std::string &&name,
-        Tracer &tra,
-        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_network,
-        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_network,
-        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host,
-        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host,
-        std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to_host_receives
+                                                     nics_to_network,
+                                                     node_device_to_channel_map,
+                                                     node_device_filter);
 
     if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")
         and result.count("nicbm-server-event-stream") and result.count("nicbm-client-event-stream")
@@ -279,9 +285,22 @@ int main(int argc, char *argv[]) {
       std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
       const pipeline<std::shared_ptr<Event>> pl_n_c{event_pro_n_c, pipeline_n_c, spanner_n_c};
 
-      // TODO: ns3 pipeline
+      EventStreamParser parser_ns3{trace_environment, "ns3-event-parser"};
+      auto event_pro_ns3 = create_shared<BufferedEventProvider<1, 1>>(
+          TraceException::kBufferedEventProviderIsNull,
+          trace_environment,
+          "BufferedEventProviderNs3",
+          result["ns3-event-stream"].as<std::string>(),
+          parser_ns3,
+          timer
+      );
+      auto filter_ns3 = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
+                                                            trace_environment,
+                                                            timestamp_bounds);
+      std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_ns3{filter_h_c};
+      const pipeline<std::shared_ptr<Event>> pipeline_def_ns3{event_pro_ns3, pipeline_ns3, spanner_ns3};
 
-      std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s};
+      std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s, pipeline_def_ns3};
       run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
 
       exit(EXIT_SUCCESS);
@@ -466,19 +485,18 @@ int main(int argc, char *argv[]) {
     if (not printer_n_c) {
       exit(EXIT_FAILURE);
     }
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> ns3_pipes{timestamp_filter_ns3, event_filter_ns3, printer_ns3};
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+        ns3_pipes{timestamp_filter_ns3, event_filter_ns3, printer_ns3};
     const pipeline<std::shared_ptr<Event>> ns3_pipeline{
-        ns3_buf_pro, client_nic_pipes, }; // TODO: add ns3 spanner
-    ("ns3-log", "file path to a log file written by ns3", cxxopts::value<std::string>())
-        ("ns3-events", "file to which the ns3 event stream is written to", cxxopts::value<std::string>())
+        ns3_buf_pro, ns3_pipes, spanner_ns3};
 
     std::vector<pipeline<std::shared_ptr<Event>>>
-        pipelines{client_host_pipeline, client_nic_pipeline, server_host_pipeline, server_nic_pipeline};
+        pipelines{client_host_pipeline, server_host_pipeline, client_nic_pipeline, server_nic_pipeline, ns3_pipeline};
     run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
   } catch (TraceException &err) {
     std::cerr << err.what() << '\n';
     exit(EXIT_FAILURE);
   }
-  // std::cout << "runtime goes out of scope!!!!!" << std::endl;
+// std::cout << "runtime goes out of scope!!!!!" << std::endl;
   exit(EXIT_SUCCESS);
 }

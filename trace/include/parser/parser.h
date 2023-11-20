@@ -182,7 +182,7 @@ concurrencpp::result<void> FillBuffer(concurrencpp::executor_tag,
   co_await event_buffer_channel.CloseChannel(resume_executor);
 };
 
-template<size_t LineBufferSize, size_t EventBufferSize = 1> requires
+template<bool NamedPipe, size_t LineBufferSize, size_t EventBufferSize = 1> requires
 SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
 class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
@@ -244,9 +244,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     throw_if_empty(tar_chan, "BufferedEventProvider::process: target channel is null",
                    source_loc::current());
 
-    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true}; // TODO: make variable!!
-    //line_handler_buffer.OpenFile(log_file_path_, true);
-    line_handler_buffer.OpenFile(log_file_path_, false);
+    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
+    line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
 
     std::pair<bool, LineHandler *> bh_p;
     std::shared_ptr<Event> event_ptr;

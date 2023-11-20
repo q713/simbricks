@@ -143,6 +143,7 @@ int main(int argc, char *argv[]) {
   constexpr size_t kLineBufferSize = 1;
   //constexpr size_t kEventBufferSize = 10'000'000;
   constexpr size_t kEventBufferSize = 1;
+  constexpr bool kNamedPipes = true;
   //Timer timer{kAmountSources};
   WeakTimer timer{kAmountSources};
 
@@ -241,7 +242,7 @@ int main(int argc, char *argv[]) {
       const pipeline<std::shared_ptr<Event>> pl_h_s{event_pro_h_s, pipeline_h_s, spanner_h_s};
 
       EventStreamParser parser_h_c{trace_environment, "gem5-client-reader"};
-      auto event_pro_h_c = create_shared<BufferedEventProvider<1, 1>>(
+      auto event_pro_h_c = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
           TraceException::kBufferedEventProviderIsNull,
           trace_environment,
           "BufferedEventProviderHostClient",
@@ -256,7 +257,7 @@ int main(int argc, char *argv[]) {
       const pipeline<std::shared_ptr<Event>> pl_h_c{event_pro_h_c, pipeline_h_c, spanner_h_c};
 
       EventStreamParser parser_n_s{trace_environment, "nicbm-server-reader"};
-      auto event_pro_n_s = create_shared<BufferedEventProvider<1, 1>>(
+      auto event_pro_n_s = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
           TraceException::kBufferedEventProviderIsNull,
           trace_environment,
           "BufferedEventProviderNicServer",
@@ -271,7 +272,7 @@ int main(int argc, char *argv[]) {
       const pipeline<std::shared_ptr<Event>> pl_n_s{event_pro_n_s, pipeline_n_s, spanner_n_s};
 
       EventStreamParser parser_n_c{trace_environment, "nicbm-client-reader"};
-      auto event_pro_n_c = create_shared<BufferedEventProvider<1, 1>>(
+      auto event_pro_n_c = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
           TraceException::kBufferedEventProviderIsNull,
           trace_environment,
           "BufferedEventProviderNicClient",
@@ -286,7 +287,7 @@ int main(int argc, char *argv[]) {
       const pipeline<std::shared_ptr<Event>> pl_n_c{event_pro_n_c, pipeline_n_c, spanner_n_c};
 
       EventStreamParser parser_ns3{trace_environment, "ns3-event-parser"};
-      auto event_pro_ns3 = create_shared<BufferedEventProvider<1, 1>>(
+      auto event_pro_ns3 = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
           TraceException::kBufferedEventProviderIsNull,
           trace_environment,
           "BufferedEventProviderNs3",
@@ -331,7 +332,7 @@ int main(int argc, char *argv[]) {
     Gem5Parser gem5_server_par{trace_environment,
                                "Gem5ServerParser",
                                comp_filter_server};
-    auto gem5_ser_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
+    auto gem5_ser_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
         TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "Gem5ServerEventProvider",
@@ -370,7 +371,7 @@ int main(int argc, char *argv[]) {
     Gem5Parser gem5_client_par{trace_environment,
                                "Gem5ClientParser",
                                comp_filter_client};
-    auto gem5_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
+    auto gem5_client_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
         TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "Gem5ClientEventProvider",
@@ -407,7 +408,7 @@ int main(int argc, char *argv[]) {
                                                                     timestamp_bounds);
     NicBmParser nicbm_ser_par{trace_environment,
                               "NicbmServerParser"};
-    auto nicbm_ser_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
+    auto nicbm_ser_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
         TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "NicbmServerEventProvider",
@@ -440,7 +441,7 @@ int main(int argc, char *argv[]) {
                                                                     timestamp_bounds);
     NicBmParser nicbm_client_par{trace_environment,
                                  "NicbmClientParser"};
-    auto nicbm_client_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
+    auto nicbm_client_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
         TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "NicbmClientEventProvider",
@@ -472,7 +473,7 @@ int main(int argc, char *argv[]) {
                                                                     trace_environment,
                                                                     timestamp_bounds);
     NS3Parser ns3_parser{trace_environment, "NicbmClientParser"};
-    auto ns3_buf_pro = create_shared<BufferedEventProvider<kLineBufferSize, kEventBufferSize>>(
+    auto ns3_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
         TraceException::kBufferedEventProviderIsNull,
         trace_environment,
         "Ns3EventProvider",

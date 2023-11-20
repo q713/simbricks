@@ -648,8 +648,8 @@ class NetDeviceSpan : public EventSpan {
   bool is_arp_ = false;
   std::set<NetworkEvent::EventBoundaryType> boundary_types_;
   bool interesting_flag_ = false;
-  int node = -1;
-  int device = -1;
+  int node_ = -1;
+  int device_ = -1;
 
   static bool IsConsistent(const std::shared_ptr<NetworkEvent> &event_a, const std::shared_ptr<NetworkEvent> &event_b);
 
@@ -716,12 +716,18 @@ class NetDeviceSpan : public EventSpan {
 
   inline int GetNode() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return node;
+    return node_;
   }
 
   inline int GetDevice() {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
-    return device;
+    return device_;
+  }
+
+  inline std::set<NetworkEvent::EventBoundaryType>
+  GetBoundaryTypes() {
+    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+    return boundary_types_;
   }
 
   bool AddToSpan(std::shared_ptr<Event> event_ptr) override;

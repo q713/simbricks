@@ -568,6 +568,23 @@ class OtlpSpanExporter : public SpanExporter {
       new_span->SetAttribute("src-ip", sim_string_utils::ValueToString(old_span->GetSrcIp()));
       new_span->SetAttribute("dst-ip", sim_string_utils::ValueToString(old_span->GetDstIp()));
     }
+    std::stringstream boundary_types;
+    std::ranges::for_each(old_span->GetBoundaryTypes(), [&boundary_types](NetworkEvent::EventBoundaryType boundT) {
+      boundary_types << boundT << ",";
+    });
+    new_span->SetAttribute("boundary-types", boundary_types.str());
+    new_span->SetAttribute("is-interesting", BoolToString(old_span->InterestingFlag()));
+    new_span->SetAttribute("node", std::to_string(old_span->GetNode()));
+    new_span->SetAttribute("device", std::to_string(old_span->GetDevice()));
+
+    NetworkEvent::Ipv4 src_{0};
+    NetworkEvent::Ipv4 dst_{0};
+    bool ips_set_ = false;
+    bool is_arp_ = false;
+    std::set<NetworkEvent::EventBoundaryType> boundary_types_;
+    bool interesting_flag_ = false;
+    int node_ = -1;
+    int device_ = -1;
   }
 
   void set_Attr(span_t &span, std::shared_ptr<EventSpan> &to_end) {

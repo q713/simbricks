@@ -598,8 +598,8 @@ bool NetDeviceSpan::HandelEnqueue(const std::shared_ptr<NetworkEvent> &event_ptr
   device_type_ = event_ptr->GetDeviceType();
   boundary_types_.insert(event_ptr->GetBoundaryType());
   interesting_flag_ = event_ptr->InterestingFlag();
-  node = event_ptr->GetNode();
-  device = event_ptr->GetDevice();
+  node_ = event_ptr->GetNode();
+  device_ = event_ptr->GetDevice();
   events_.push_back(event_ptr);
   return true;
 }

@@ -55,14 +55,14 @@ e.checkpoint = True  # use checkpoint and restore to speed up simulation
 servers = []
 clients = []
 gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,PciHost,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecUser,ExecKernel,ExecOpClass,ExecRegDelta,ExecFaulting,ExecAsid,ExecFlags,ExecCPSeq,ExecFaulting,ExecFetchSeq'
-named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir/"
-# named_pipe_folder = "/usr/src/data-folder"
+# named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir/"
+named_pipe_folder = "/usr/src/data-folder"
 cpu_freq = '5GHz'
 eth_latency = 500 * 10**3  # 500 us
 sys_clock = '1GHz'  # if not set, default 1GHz
 mtu = 1500
 ip_provider = IPProvider()
-num_pairs = 1
+num_pairs = 2
 
 
 
@@ -75,7 +75,7 @@ link_rate_opt = f'--LinkRate={link_rate_gb_s}Gb/s'
 link_latency_ns = 500
 link_latency_opt = f'--LinkLatency={link_latency_ns}ns'
 ecn_th_opt = '--EcnTh=0'
-trace_file_path = '/local/jakobg/tracing-experiments/wrkdir/ns3-log-pipe.pipe'
+trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {trace_file_opt}'
 network.eth_latency = eth_latency

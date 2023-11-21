@@ -48,8 +48,10 @@
  * - "poll_n2d: unsupported type=%u", t
  * - "warn: SimbricksNicIfSync failed (t=%lu)\n", main_time_
  * - "exit main_time: %lu\n", main_time_
+ * - "main_time = %lu: nicbm: sync message\n"
  * - statistics output at the end....
  */
+
 
 bool NicBmParser::ParseSyncInfo(LineHandler &line_handler, bool &sync_pcie, bool &sync_eth) {
   if (line_handler.ConsumeAndTrimTillString("sync_pci")) {
@@ -263,7 +265,11 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
       co_return nullptr;
     }
 
-    if (line_handler.ConsumeAndTrimTillString("read(")) {
+    if (line_handler.ConsumeAndTrimTillString("sending sync message")) {
+      event_ptr = create_shared<SimSendSync>(TraceException::kEventIsNull,
+                                             timestamp, GetIdent(), GetName());
+      co_return event_ptr;
+    } else if (line_handler.ConsumeAndTrimTillString("read(")) {
       if (!ParseOffLenValComma(line_handler, off, len, val)) {
         co_return nullptr;
       }
@@ -276,7 +282,7 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
         co_return nullptr;
       }
       if (not line_handler.ConsumeAndTrimTillString("posted=")
-           or not line_handler.ParseBoolFromUint(10, posted)) {
+          or not line_handler.ParseBoolFromUint(10, posted)) {
         co_return nullptr;
       }
       event_ptr = std::make_shared<NicMmioW>(timestamp, GetIdent(),

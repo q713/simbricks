@@ -1221,6 +1221,10 @@ inline std::ostream &operator<<(std::ostream &out, const NetworkEvent::Ipv4 &ipv
   return out;
 }
 
+inline bool IsDeviceType(const std::shared_ptr<NetworkEvent> &event, NetworkEvent::NetworkDeviceType device_type) {
+  return event and event->GetDeviceType() == device_type;
+}
+
 inline std::string IpToString(const NetworkEvent::Ipv4 &ipv_4) {
   std::stringstream out;
   ipv_4.Display(out);

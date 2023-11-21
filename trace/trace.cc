@@ -131,21 +131,21 @@ int main(int argc, char *argv[]) {
       = TraceEnvConfig::CreateFromYaml(result["trace-env-config"].as<std::string>());
   TraceEnvironment trace_environment{trace_env_config};
 
-  //simbricks::trace::OtlpSpanExporter exporter{trace_environment,
-  //                                            trace_env_config.GetJaegerUrl(),
-  //                                            false,
-  //                                            "trace"};
-  simbricks::trace::NoOpExporter exporter{trace_environment};
+  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
+                                              trace_env_config.GetJaegerUrl(),
+                                              false,
+                                              "trace"};
+  //simbricks::trace::NoOpExporter exporter{trace_environment};
 
   Tracer tracer{trace_environment, exporter};
 
   constexpr size_t kAmountSources = 5;
   constexpr size_t kLineBufferSize = 1;
-  //constexpr size_t kEventBufferSize = 10'000'000;
-  constexpr size_t kEventBufferSize = 1;
+  constexpr size_t kEventBufferSize = 100'000'000;
+  //constexpr size_t kEventBufferSize = 1;
   constexpr bool kNamedPipes = true;
-  //Timer timer{kAmountSources};
-  WeakTimer timer{kAmountSources};
+  Timer timer{kAmountSources};
+  //WeakTimer timer{kAmountSources};
 
   const std::set<std::string> blacklist_functions{trace_env_config.BeginBlacklistFuncIndicator(),
                                                   trace_env_config.EndBlacklistFuncIndicator()};
@@ -213,6 +213,8 @@ int main(int argc, char *argv[]) {
     NetworkSpanner::NodeDeviceFilter node_device_filter;
     node_device_filter.AddNodeDevice(0, 2);
     node_device_filter.AddNodeDevice(1, 2);
+    node_device_filter.AddNodeDevice(0, 1);
+    node_device_filter.AddNodeDevice(1, 1);
 
     auto spanner_ns3 = create_shared<NetworkSpanner>(TraceException::kSpannerIsNull,
                                                      trace_environment,

@@ -150,6 +150,7 @@ class NS3Parser : public LogParser {
   ParseEvent(LineHandler &line_handler) override;
 };
 
+#if 0
 template<size_t LineBufferSize, size_t EventBufferSize = 1>
 requires SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
 concurrencpp::result<void> FillBuffer(concurrencpp::executor_tag,
@@ -181,6 +182,7 @@ concurrencpp::result<void> FillBuffer(concurrencpp::executor_tag,
 
   co_await event_buffer_channel.CloseChannel(resume_executor);
 };
+#endif
 
 template<bool NamedPipe, size_t LineBufferSize, size_t EventBufferSize = 1> requires
 SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
@@ -191,14 +193,14 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
   NonCoroBufferedChannel<std::shared_ptr<Event>, EventBufferSize> event_buffer_channel_;
-  WeakTimer &timer_;
+  //WeakTimer &timer_;
+  Timer &timer_;
   std::list<std::shared_ptr<Event>> event_buffer_;
 
   concurrencpp::result<void>
   FillBuffer() {
-    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true}; // TODO: make variable!!
-    //line_handler_buffer.OpenFile(log_file_path_, true);
-    line_handler_buffer.OpenFile(log_file_path_, false);
+    ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
+    line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
 
     std::pair<bool, LineHandler *> bh_p;
     std::shared_ptr<Event> event_ptr;
@@ -225,7 +227,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
                                  const std::string name,
                                  const std::string log_file_path,
                                  LogParser &log_parser,
-                                 WeakTimer &timer_)
+      //WeakTimer &timer_)
+                                 Timer &timer_)
       : producer<std::shared_ptr<Event>>(),
         trace_environment_(trace_environment),
         name_(name),
@@ -236,6 +239,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
   ~BufferedEventProvider() = default;
 
+#if 0
   concurrencpp::result<void>
   produce(std::shared_ptr<concurrencpp::executor> resume_executor,
           std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
@@ -285,8 +289,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
 
     co_await tar_chan->CloseChannel(resume_executor);
   }
+#endif
 
-#if 0
   concurrencpp::result<void>
   produce(std::shared_ptr<concurrencpp::executor> resume_executor,
           std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan) override {
@@ -310,6 +314,8 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
       event_ptr = event_opt.value();
 
       //co_await timer_.MoveForward(resume_executor, timer_key, event_ptr->GetTs());
+      // TODO: to enable the timer we need sync events from ns3 as well as the nicbm
+      //co_await timer_.MoveForward(resume_executor, event_ptr->GetTs());
 
       const bool could_push = co_await tar_chan->Push(resume_executor, event_ptr);
       throw_on(not could_push,
@@ -317,6 +323,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
                source_loc::current());
     }
 
+    //co_await timer_.Done(resume_executor);
     co_await co_await producer_task;
     co_await tar_chan->CloseChannel(resume_executor);
 
@@ -324,7 +331,6 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     std::cout << "BufferedEventProvider exits" << '\n';
     co_return;
   }
-#endif
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

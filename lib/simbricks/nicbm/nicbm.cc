@@ -679,6 +679,10 @@ int Runner::RunMain() {
   bool is_sync = sync_pcie || sync_net;
 
   while (!exiting) {
+#ifdef DEBUG_NICBM
+    DFLOGINFLOG(log_, "main_time = %lu: nicbm: sending sync message\n",
+                main_time_);
+#endif
     while (SimbricksNicIfSync(&nicif_, main_time_)) {
       DFLOGERRLOG(log_, "warn: SimbricksNicIfSync failed (t=%lu)\n",
                   main_time_);

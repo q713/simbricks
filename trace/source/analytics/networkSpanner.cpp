@@ -106,6 +106,9 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
   std::shared_ptr<Context> context_to_connect_with;
   if (IsBoundaryType(network_event, NetworkEvent::EventBoundaryType::kFromAdapter)) {
+    throw_on_false(IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice),
+                   "trying to create a span depending on a nic side event based on a non cosim device",
+                   source_loc::current());
     // is it a fromAdapter event, we need to poll from the host queue to get the parent
     //std::cout << "NetworkSpanner::HandelNetworkEvent: try pop kFromAdapter context " << event_ptr << std::endl;
     auto con_opt = co_await from_host_->Pop(resume_executor);

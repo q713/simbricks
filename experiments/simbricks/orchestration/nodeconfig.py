@@ -21,6 +21,7 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 from __future__ import annotations
+from enum import Enum
 
 import io
 import tarfile
@@ -111,8 +112,8 @@ class NodeConfig():
             exit_es = ['poweroff -f']
 
         es = self.prepare_pre_cp() + self.app.prepare_pre_cp() + cp_es + \
-            self.prepare_post_cp() + self.app.prepare_post_cp() + \
-            self.run_cmds() + self.cleanup_cmds() + exit_es
+             self.prepare_post_cp() + self.app.prepare_post_cp() + \
+             self.run_cmds() + self.cleanup_cmds() + exit_es
         return '\n'.join(es)
 
     def make_tar(self, path):
@@ -144,7 +145,7 @@ class NodeConfig():
             'export HOME=/root',
             'export LANG=en_US',
             'export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:' + \
-                '/usr/bin:/sbin:/bin:/usr/games:/usr/local/games"'
+            '/usr/bin:/sbin:/bin:/usr/games:/usr/local/games"'
         ]
 
     def prepare_post_cp(self) -> tp.List[str]:
@@ -249,7 +250,7 @@ class MtcpNode(NodeConfig):
             'mkdir -p /dev/shm',
             'mount -t tmpfs tmpfs /dev/shm',
             'echo ' + str(self.num_hugepages) + ' > /sys/devices/system/' + \
-                    'node/node0/hugepages/hugepages-2048kB/nr_hugepages',
+            'node/node0/hugepages/hugepages-2048kB/nr_hugepages',
         ]
 
     def prepare_post_cp(self):
@@ -269,15 +270,15 @@ class MtcpNode(NodeConfig):
                 self.strfile(
                     'io = dpdk\n'
                     'num_cores = ' + str(self.cores) + '\n'
-                    'num_mem_ch = 4\n'
-                    'port = dpdk0\n'
-                    'max_concurrency = 4096\n'
-                    'max_num_buffers = 4096\n'
-                    'rcvbuf = 8192\n'
-                    'sndbuf = 8192\n'
-                    'tcp_timeout = 10\n'
-                    'tcp_timewait = 0\n'
-                    '#stat_print = dpdk0\n'
+                                                       'num_mem_ch = 4\n'
+                                                       'port = dpdk0\n'
+                                                       'max_concurrency = 4096\n'
+                                                       'max_num_buffers = 4096\n'
+                                                       'rcvbuf = 8192\n'
+                                                       'sndbuf = 8192\n'
+                                                       'tcp_timeout = 10\n'
+                                                       'tcp_timewait = 0\n'
+                                                       '#stat_print = dpdk0\n'
                 )
         }
 
@@ -304,7 +305,7 @@ class TASNode(NodeConfig):
             'mkdir -p /dev/shm',
             'mount -t tmpfs tmpfs /dev/shm',
             'echo ' + str(self.num_hugepages) + ' > /sys/devices/system/' + \
-                    'node/node0/hugepages/hugepages-2048kB/nr_hugepages',
+            'node/node0/hugepages/hugepages-2048kB/nr_hugepages',
         ]
 
     def prepare_post_cp(self):
@@ -441,8 +442,8 @@ class DctcpClient(AppConfig):
 
 
 class PingClient(AppConfig):
-    
-    def __init__(self, server_ip = '192.168.64.1', count = 100):
+
+    def __init__(self, server_ip='192.168.64.1', count=100):
         super().__init__()
         self.server_ip = server_ip
         self.count = count
@@ -578,18 +579,32 @@ class NetperfClient(AppConfig):
             )
         ]
 
-class SimpleNetperfClient(AppConfig):
 
-    def __init__(self, server_ip = '10.0.0.1'):
+class ColumboNetperfClient(AppConfig):
+    class SenderType(Enum):
+        # Request Response tests a.k.a latency measurement
+        TCP_RR = 0
+        # Bulk transfer tests a.k.a throughput
+        TCP_STREAM = 1
+
+        def __str__(self):
+            return self.name
+
+        @classmethod
+        def to_string(cls) -> str:
+            # cls here is the enumeration
+            return str(cls)
+
+    def __init__(self, server_ip='10.0.0.1', sender_type=SenderType.TCP_RR, test_len=10):
         super().__init__()
         self.server_ip = server_ip
-        self.duration_tp = 10
-        self.duration_lat = 10
+        self.sender_type = sender_type
+        self.test_len = test_len
 
     def run_cmds(self, node):
         return [
-            f'netperf -H {self.server_ip} -l {self.duration_lat} -t TCP_RR'
-            ' -- -o mean_latency'
+            f'netperf -H {self.server_ip} -l {self.test_len} -t {self.sender_type}'
+            ' -- -o mean_latency,p50_latency,p90_latency,p99_latency'
         ]
 
 
@@ -649,7 +664,7 @@ class NOPaxosClient(AppConfig):
         for ip in self.server_ips:
             cmds.append('ping -c 2 ' + ip)
         cmd = '/root/nopaxos/bench/client -c /root/nopaxos.config ' + \
-                '-m nopaxos -u 2 -h ' + node.ip
+              '-m nopaxos -u 2 -h ' + node.ip
         if self.use_ehseq:
             cmd += ' -e'
         cmds.append(cmd)
@@ -789,7 +804,7 @@ class HTTPC(AppConfig):
         super().__init__()
         self.server_ip = '10.0.0.1'
         self.conns = 1000
-        #self.requests = 10000000
+        # self.requests = 10000000
         self.requests = 10000
         self.threads = 1
         self.url = '/file'

@@ -82,6 +82,11 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   if (not IsType(network_event, EventType::kNetworkEnqueueT)) {
     co_return false;
   }
+  if (not network_event->InterestingFlag()) {
+    std::cout << "NetworkSpanner::HandelNetworkEvent filtered NOT interesting event"
+              << network_event << '\n';
+    co_return true;
+  }
 
   throw_on(current_device_span_ and current_device_span_->IsPending(),
            "NetworkSpanner::HandelNetworkEvent : current device span is still pending",

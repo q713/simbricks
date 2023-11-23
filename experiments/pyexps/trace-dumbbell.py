@@ -22,7 +22,7 @@
 
 from simbricks.orchestration.experiments import Experiment
 from simbricks.orchestration.nodeconfig import (
-    NodeConfig, I40eLinuxNode, IdleHost, PingClient, I40eDCTCPNode
+    NodeConfig, I40eLinuxNode, IdleHost, PingClient, I40eDCTCPNode, ColumboNetperfClient, NetperfServer
 )
 from simbricks.orchestration.simulators import (
     Gem5Host, I40eNIC, SwitchNet, NS3DumbbellNet
@@ -63,6 +63,7 @@ sys_clock = '1GHz'  # if not set, default 1GHz
 mtu = 1500
 ip_provider = IPProvider()
 num_pairs = 2
+use_pressure = False
 
 
 
@@ -96,7 +97,7 @@ server_nic.set_network(network)
 server_config = I40eLinuxNode()
 server_config.mtu = mtu
 server_config.ip = ip_provider.GetNext()
-server_config.app = IdleHost()
+server_config.app = NetperfServer()
 
 server = Gem5Host(server_config)
 server.name = 'server.1'
@@ -126,8 +127,9 @@ client_nic.set_network(network)
 client_config = I40eLinuxNode()
 client_config.mtu = mtu
 client_config.ip = ip_provider.GetNext()
-client_config.app = PingClient()
-client_config.app.count = 1
+client_config.app = ColumboNetperfClient()
+client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_RR
+client_config.app.test_len = 2
 
 client = Gem5Host(client_config)
 client.name = 'client.1'
@@ -155,7 +157,10 @@ server_nic.set_network(network)
 server_config = I40eLinuxNode()
 server_config.mtu = mtu
 server_config.ip = ip_provider.GetNext()
-server_config.app = IdleHost()
+if use_pressure:
+    server_config.app = NetperfServer()
+else:
+    server_config.app = IdleHost()
 
 server = Gem5Host(server_config)
 server.name = 'server.2'
@@ -179,8 +184,12 @@ client_nic.set_network(network)
 client_config = I40eLinuxNode()
 client_config.mtu = mtu
 client_config.ip = ip_provider.GetNext()
-client_config.app = PingClient()
-client_config.app.count = 1
+if use_pressure:
+    client_config.app = ColumboNetperfClient()
+    client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_STREAM
+    client_config.app.test_len = 10
+else:
+    server_config.app = IdleHost()
 
 client = Gem5Host(client_config)
 client.name = 'client.2'

@@ -35,7 +35,7 @@ import simbricks.orchestration.experiments as exp
 class IPProvider():
     def __init__(self):
         self.base = '192.168.64'
-        self.next_ip = 0
+        self.next_ip = 1
         self.max = 244
 
     def GetNext(self) -> str:
@@ -211,7 +211,8 @@ assert(len(clients) == 2)
 assert(num_pairs == len(clients))
 
 clients[0].node_config.app.server_ip = servers[0].node_config.ip
-clients[1].node_config.app.server_ip = servers[1].node_config.ip
+if use_pressure:
+    clients[1].node_config.app.server_ip = servers[1].node_config.ip
 
 clients[num_pairs - 1].node_config.app.is_last = True
 clients[num_pairs - 1].wait = True

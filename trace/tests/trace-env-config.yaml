@@ -28,6 +28,7 @@ MaxCpuThreads: 2
 JaegerUrl: "http://jaeger:4318/v1/traces"#"http://localhost:4318/v1/traces"
 LineBufferSize: 1
 EventBufferSize: 60000000
+LogLevel: "debug"
 LinuxFuncIndicator:
   - "netdev_start_xmit"
 DriverFuncIndicator:

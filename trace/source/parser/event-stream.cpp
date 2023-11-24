@@ -155,8 +155,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   };
   std::string event_name = line_handler.ExtractAndSubstrUntil(pred);
   if (event_name.empty()) {
-    std::cout << "could not parse event name: "
-              << line_handler.GetRawLine() << '\n';
+    spdlog::info("could not parse event name: {}", line_handler.GetRawLine());
     co_return nullptr;
   }
 
@@ -164,8 +163,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   size_t parser_ident;
   std::string p_name;
   if (not ParseIdentNameTs(line_handler, parser_ident, p_name, ts)) {
-    std::cout << "could not parse timestamp or source: "
-              << line_handler.GetRawLine() << '\n';
+    spdlog::info("could not parse timestamp or source: {}", line_handler.GetRawLine());
     co_return nullptr;
   }
   const std::string &parser_name = *(trace_environment_.InternalizeAdditional(p_name));
@@ -202,7 +200,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ConsumeAndTrimString(", comp=") or
         not line_handler.ExtractAndSubstrUntilInto(
             component, sim_string_utils::is_alnum_dot_bar)) {
-      std::cout << "error parsing HostInstr" << '\n';
+      spdlog::info("error parsing HostInstr");
       co_return nullptr;
     }
     const std::string *func_ptr =
@@ -222,8 +220,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
       event_name == "HostDmaC") {
     if (not line_handler.ConsumeAndTrimString(", id=") or
         not line_handler.ParseUintTrim(10, id)) {
-      std::cout << "error parsing HostMmioCR, HostMmioCW or HostDmaC"
-                << '\n';
+      spdlog::info("error parsing HostMmioCR, HostMmioCW or HostDmaC");
       co_return nullptr;
     }
 
@@ -247,9 +244,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ParseUintTrim(16, addr) or
         not line_handler.ConsumeAndTrimString(", size=") or
         not line_handler.ParseUintTrim(16, size)) {
-      std::cout
-          << "error parsing HostMmioR, HostMmioW, HostDmaR or HostDmaW"
-          << '\n';
+      spdlog::info("error parsing HostMmioR, HostMmioW, HostDmaR or HostDmaW");
       co_return nullptr;
     }
 
@@ -259,16 +254,14 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
           not line_handler.ParseInt(bar) or
           not line_handler.ConsumeAndTrimString(", offset=") or
           not line_handler.ParseUintTrim(16, offset)) {
-        std::cout
-            << "error parsing HostMmioR, HostMmioW bar or offset"
-            << '\n';
+        spdlog::info("error parsing HostMmioR, HostMmioW bar or offset");
         co_return nullptr;
       }
 
       if (event_name == "HostMmioW") {
         if (not line_handler.ConsumeAndTrimString(", posted=") or
             not line_handler.ParseBoolFromStringRepr(posted)) {
-          std::cout << "error parsing HostMmioW posted" << '\n';
+          spdlog::info("error parsing HostMmioW posted");
           co_return nullptr;
         }
         event = std::make_shared<HostMmioW>(ts, parser_ident, parser_name,
@@ -288,7 +281,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   } else if (event_name == "HostMsiX") {
     if (not line_handler.ConsumeAndTrimString(", vec=") or
         not line_handler.ParseUintTrim(10, vec)) {
-      std::cout << "error parsing HostMsiX" << '\n';
+      spdlog::info("error parsing HostMsiX");
       co_return nullptr;
     }
     event = std::make_shared<HostMsiX>(ts, parser_ident, parser_name, vec);
@@ -305,8 +298,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ParseUintTrim(10, bytes) or
         not line_handler.ConsumeAndTrimString(", data=") or
         not line_handler.ParseUintTrim(16, data)) {
-      std::cout << "error parsing HostConfRead or HostConfWrite"
-                << '\n';
+      spdlog::info("error parsing HostConfRead or HostConfWrite");
       co_return nullptr;
     }
 
@@ -330,7 +322,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ParseUintTrim(16, offset) or
         not line_handler.ConsumeAndTrimString(", size=") or
         not line_handler.ParseUintTrim(10, size)) {
-      std::cout << "error parsing HostPciR or HostPciW" << '\n';
+      spdlog::info("error parsing HostPciR or HostPciW");
       co_return nullptr;
     }
 
@@ -346,7 +338,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
       event_name == "NicMsi") {
     if (not line_handler.ConsumeAndTrimString(", vec=") or
         not line_handler.ParseUintTrim(10, vec)) {
-      std::cout << "error parsing NicMsix" << '\n';
+      spdlog::info("error parsing NicMsix");
       co_return nullptr;
     }
 
@@ -377,9 +369,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ParseUintTrim(16, addr) or
         not line_handler.ConsumeAndTrimString(", size=") or
         not line_handler.ParseUintTrim(16, len)) {
-      std::cout << "error parsing NicDmaI, NicDmaEx, NicDmaEn, NicDmaCR or "
-                   "NicDmaCW"
-                << '\n';
+      spdlog::info("error parsing NicDmaI, NicDmaEx, NicDmaEn, NicDmaCR or NicDmaCW");
       co_return nullptr;
     }
 
@@ -408,8 +398,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ParseUintTrim(16, len) or
         not line_handler.ConsumeAndTrimString(", val=") or
         not line_handler.ParseUintTrim(16, val)) {
-      std::cout << "error parsing NicMmioR or NicMmioW: "
-                << line_handler.GetRawLine() << '\n';
+      spdlog::info("error parsing NicMmioR or NicMmioW: {}", line_handler.GetRawLine());
       co_return nullptr;
     }
 
@@ -419,8 +408,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
     } else {
       if (not line_handler.ConsumeAndTrimString(", posted=") or
           not line_handler.ParseBoolFromStringRepr(posted)) {
-        std::cout << "error parsing NicMmioW: "
-                  << line_handler.GetRawLine() << '\n';
+        spdlog::info("error parsing NicMmioW: {}", line_handler.GetRawLine());
         co_return nullptr;
       }
       event = std::make_shared<NicMmioW>(ts, parser_ident, parser_name,
@@ -430,7 +418,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   } else if (event_name == "NicTx") {
     if (not line_handler.ConsumeAndTrimString(", len=") or
         not line_handler.ParseUintTrim(16, len)) {
-      std::cout << "error parsing NicTx" << '\n';
+      spdlog::info("error parsing NicTx");
       co_return nullptr;
     }
     event = std::make_shared<NicTx>(ts, parser_ident, parser_name, len);
@@ -441,7 +429,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
         not line_handler.ConsumeAndTrimString(", is_read=true") or
         not line_handler.ConsumeAndTrimString(", port=") or
         not line_handler.ParseInt(port)) {
-      std::cout << "error parsing NicRx" << '\n';
+      spdlog::info("error parsing NicRx");
       co_return nullptr;
     }
     event = std::make_shared<NicRx>(ts, parser_ident,
@@ -453,7 +441,7 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
   } else if (event_name == "NetworkDrop") {
     co_return ParseNetworkEvent(line_handler, EventType::kNetworkDropT, ts, parser_ident, parser_name);
   } else {
-    std::cout << "unknown event found, it will be skipped" << '\n';
+    spdlog::info("unknown event found, it will be skipped");
     co_return nullptr;
   }
 

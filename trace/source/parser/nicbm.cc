@@ -22,8 +22,6 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// #define PARSER_DEBUG_NICBM_ 1
-
 #include "parser/parser.h"
 #include "util/log.h"
 #include "util/exception.h"
@@ -56,10 +54,8 @@
 bool NicBmParser::ParseSyncInfo(LineHandler &line_handler, bool &sync_pcie, bool &sync_eth) {
   if (line_handler.ConsumeAndTrimTillString("sync_pci")) {
     if (!line_handler.ConsumeAndTrimChar('=')) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               GetName().c_str(), line_handler.GetCurString().c_str());
-#endif
+      spdlog::debug("{}: sync_pcie/sync_eth line '{}' has wrong format",
+                    GetName(), line_handler.GetCurString());
       return false;
     }
 
@@ -68,26 +64,20 @@ bool NicBmParser::ParseSyncInfo(LineHandler &line_handler, bool &sync_pcie, bool
     } else if (line_handler.ConsumeAndTrimChar('0')) {
       sync_pcie = false;
     } else {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: sync_pcie/sync_eth line '{}' has wrong format",
+                    GetName(), line_handler.GetRawLine());
       return false;
     }
 
     if (!line_handler.ConsumeAndTrimTillString("sync_eth")) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: could not find sync_eth in line '%s'\n",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: could not find sync_eth in line '{}'",
+                    GetName(), line_handler.GetRawLine());
       return false;
     }
 
     if (!line_handler.ConsumeAndTrimChar('=')) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: sync_pcie/sync_eth line '{}' has wrong format",
+                    GetName(), line_handler.GetRawLine());
       return false;
     }
 
@@ -96,17 +86,13 @@ bool NicBmParser::ParseSyncInfo(LineHandler &line_handler, bool &sync_pcie, bool
     } else if (line_handler.ConsumeAndTrimChar('0')) {
       sync_eth = false;
     } else {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: sync_pcie/sync_eth line '%s' has wrong format\n",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: sync_pcie/sync_eth line '{}' has wrong format",
+                    GetName(), line_handler.GetRawLine());
       return false;
     }
 
     return true;
   }
-
-  std::cout << "not entered first if" << std::endl;
 
   return false;
 }
@@ -114,10 +100,8 @@ bool NicBmParser::ParseSyncInfo(LineHandler &line_handler, bool &sync_pcie, bool
 bool NicBmParser::ParseMacAddress(LineHandler &line_handler, uint64_t &address) {
   if (line_handler.ConsumeAndTrimTillString("mac_addr")) {
     if (!line_handler.ConsumeAndTrimChar('=')) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: mac_addr line '%s' has wrong format\n", GetName().c_str(),
-               line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: mac_addr line '{}' has wrong format", GetName(),
+                    line_handler.GetRawLine());
       return false;
     }
 
@@ -133,10 +117,8 @@ bool NicBmParser::ParseOffLenValComma(LineHandler &line_handler, uint64_t &off, 
                                       uint64_t &val) {
   // parse off
   if (!line_handler.ConsumeAndTrimTillString("off=0x")) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse off=0x in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse off=0x in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
   if (!ParseAddress(line_handler, off)) {
@@ -146,19 +128,15 @@ bool NicBmParser::ParseOffLenValComma(LineHandler &line_handler, uint64_t &off, 
   // parse len
   if (!line_handler.ConsumeAndTrimTillString("len=") ||
       !line_handler.ParseUintTrim(10, len)) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse len= in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse len= in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
 
   // parse val
   if (!line_handler.ConsumeAndTrimTillString("val=0x")) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse off=0x in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse off=0x in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
   if (!ParseAddress(line_handler, val)) {
@@ -173,10 +151,8 @@ bool NicBmParser::ParseOpAddrLenPending(LineHandler &line_handler, uint64_t &op,
                                         bool with_pending) {
   // parse op
   if (!line_handler.ConsumeAndTrimTillString("op 0x")) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse op 0x in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse op 0x in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
   if (!ParseAddress(line_handler, op)) {
@@ -185,10 +161,8 @@ bool NicBmParser::ParseOpAddrLenPending(LineHandler &line_handler, uint64_t &op,
 
   // parse addr
   if (!line_handler.ConsumeAndTrimTillString("addr ")) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse addr in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse addr in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
   if (!ParseAddress(line_handler, addr)) {
@@ -198,10 +172,8 @@ bool NicBmParser::ParseOpAddrLenPending(LineHandler &line_handler, uint64_t &op,
   // parse len
   if (!line_handler.ConsumeAndTrimTillString("len ") ||
       !line_handler.ParseUintTrim(10, len)) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse len in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse len in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
 
@@ -212,10 +184,8 @@ bool NicBmParser::ParseOpAddrLenPending(LineHandler &line_handler, uint64_t &op,
   // parse pending
   if (!line_handler.ConsumeAndTrimTillString("pending ") ||
       !line_handler.ParseUintTrim(10, pending)) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not parse pending in line '%s'\n", GetName().c_str(),
-             line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse pending in line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return false;
   }
 
@@ -225,9 +195,7 @@ bool NicBmParser::ParseOpAddrLenPending(LineHandler &line_handler, uint64_t &op,
 concurrencpp::lazy_result<std::shared_ptr<Event>>
 NicBmParser::ParseEvent(LineHandler &line_handler) {
   if (line_handler.IsEmpty()) {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGERR("%s: could not create reader\n", GetName().c_str());
-#endif
+    spdlog::debug("{}: could not create reader", GetName());
     co_return nullptr;
   }
 
@@ -242,26 +210,20 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
   if (line_handler.ConsumeAndTrimTillString(
       "main_time")) {  // main parsing
     if (!line_handler.ConsumeAndTrimString(" = ")) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: main line '%s' has wrong format\n", GetName().c_str(),
-               line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: main line '{}' has wrong format", GetName(),
+                    line_handler.GetRawLine());
       co_return nullptr;
     }
 
     if (!ParseTimestamp(line_handler, timestamp)) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: could not parse timestamp in line '%s'",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: could not parse timestamp in line '%s'",
+                    GetName(), line_handler.GetRawLine());
       co_return nullptr;
     }
 
     if (!line_handler.ConsumeAndTrimTillString("nicbm")) {
-#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: line '%s' has wrong format for parsing event info",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: line '{}' has wrong format for parsing event info",
+                    GetName(), line_handler.GetRawLine());
       co_return nullptr;
     }
 
@@ -384,17 +346,13 @@ NicBmParser::ParseEvent(LineHandler &line_handler) {
       co_return nullptr;
 
     } else {
-//#ifdef PARSER_DEBUG_NICBM_
-      DFLOGERR("%s: line '%s' did not match any expected main line\n",
-               GetName().c_str(), line_handler.GetRawLine().c_str());
-//#endif
+      spdlog::debug("{}: line '{}' did not match any expected main line",
+                    GetName(), line_handler.GetRawLine());
       co_return nullptr;
     }
   } else {
-#ifdef PARSER_DEBUG_NICBM_
-    DFLOGWARN("%s: could not parse given line '%s'\n", GetName().c_str(),
-              line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse given line '{}'\n", GetName(),
+                  line_handler.GetRawLine());
     co_return nullptr;
   }
 

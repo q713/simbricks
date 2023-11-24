@@ -24,6 +24,7 @@
 
 #include "analytics/spanner.h"
 #include "util/exception.h"
+#include "events/printer.h"
 
 concurrencpp::result<void> Spanner::consume(
     ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> src_chan) {
@@ -40,24 +41,17 @@ concurrencpp::result<void> Spanner::consume(
     event_ptr = event_ptr_opt.value();
     throw_if_empty(event_ptr, TraceException::kEventIsNull, source_loc::current());
 
-    // std::cout << name_ << " try handel: " << *event_ptr << '\n';
+    spdlog::debug("{} try handel: {}", name_, *event_ptr);
     auto handler_it = handler_.find(event_ptr->GetType());
     if (handler_it == handler_.end()) {
-      std::cerr << "Spanner: could not find handler for the following event: ";
-      if (event_ptr) {
-        std::cerr << *event_ptr;
-      } else {
-        std::cerr << "null";
-      }
-      std::cerr << '\n';
+      spdlog::critical("Spanner: could not find handler for the following event: {}", *event_ptr);
       continue;
     }
 
     auto handler = handler_it->second;
     added = co_await handler(resume_executor, event_ptr);
     if (not added) {
-      std::cout << "found event that could not be added to a pack: "
-                << *event_ptr << '\n';
+      spdlog::debug("found event that could not be added to a pack: {}", *event_ptr);
     }
   }
 

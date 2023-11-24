@@ -37,8 +37,8 @@ concept ContextInterface = requires(Type con)
   { con.GetParentStartingTs() } -> std::convertible_to<uint64_t>;
 };
 
-template <typename ToPrint>
-concept Printable = requires(std::ostream& out, ToPrint to_print)
+template<typename ToPrint>
+concept Printable = requires(std::ostream &out, ToPrint to_print)
 {
   out << to_print;
 };

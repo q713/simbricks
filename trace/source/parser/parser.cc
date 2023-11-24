@@ -22,18 +22,14 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#define PARSER_DEBUG_ 1
-
 #include "parser/parser.h"
 #include "util/log.h"
 
 bool LogParser::ParseTimestamp(LineHandler &line_handler, uint64_t &timestamp) {
   line_handler.TrimL();
   if (!line_handler.ParseUintTrim(10, timestamp)) {
-#ifdef PARSER_DEBUG_
-    DFLOGERR("%s, could not parse string repr. of timestamp from line '%s'\n",
-             name_.c_str(), line_handler.GetRawLine().c_str());
-#endif
+    spdlog::info("{}: could not parse string repr. of timestamp from line '{}'",
+                 name_, line_handler.GetRawLine());
     return false;
   }
   return true;
@@ -41,10 +37,8 @@ bool LogParser::ParseTimestamp(LineHandler &line_handler, uint64_t &timestamp) {
 
 bool LogParser::ParseAddress(LineHandler &line_handler, uint64_t &address) {
   if (!line_handler.ParseUintTrim(16, address)) {
-#ifdef PARSER_DEBUG_
-    DFLOGERR("%s: could not parse address from line '%s'\n",
-             name_.c_str(), line_handler.GetRawLine().c_str());
-#endif
+    spdlog::info("{}: could not parse address from line '{}'",
+                 name_, line_handler.GetRawLine());
     return false;
   }
   return true;
@@ -126,9 +120,9 @@ std::optional<NetworkEvent::ArpHeader> TryParseArpHeader(LineHandler &line_handl
   if (/*not line_handler.ConsumeAndTrimString(" source mac: ") or
       not ParseMacAddress(line_handler, header.src_mac_) or*/
       not line_handler.ConsumeAndTrimTillString(" source ipv4: ") or
-      not ParseIpAddress(line_handler, header.src_ip_) or
-      not line_handler.ConsumeAndTrimTillString(" dest ipv4: ") or
-      not ParseIpAddress(line_handler, header.dst_ip_)) {
+          not ParseIpAddress(line_handler, header.src_ip_) or
+          not line_handler.ConsumeAndTrimTillString(" dest ipv4: ") or
+          not ParseIpAddress(line_handler, header.dst_ip_)) {
     return std::nullopt;
   }
 

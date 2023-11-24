@@ -1370,11 +1370,6 @@ class NetworkDrop : public NetworkEvent {
   bool Equal(const Event &other) override;
 };
 
-inline std::ostream &operator<<(std::ostream &out, Event &event) {
-  event.Display(out);
-  return out;
-}
-
 inline std::shared_ptr<Event> CloneShared(const std::shared_ptr<Event> &other) {
   if (not other) {
     return {};
@@ -1405,69 +1400,17 @@ inline bool IsBoundaryType(const std::shared_ptr<NetworkEvent> &event,
   return event and event->GetBoundaryType() == boundary_type;
 }
 
-class EventPrinter : public consumer<std::shared_ptr<Event>>,
-                     public cpipe<std::shared_ptr<Event>> {
-  std::ostream &out_;
-
-  inline void print(const std::shared_ptr<Event> &event) {
-    throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
-    out_ << *event << '\n';
-    out_.flush();
-  }
-
- public:
-
-  explicit EventPrinter(std::ostream &out) : out_(out) {
-  }
-
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan
-  ) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
-    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
-
-    std::optional<std::shared_ptr<Event>> msg;
-    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->Pop(resume_executor)) {
-      const std::shared_ptr<Event> &event = msg.value();
-      print(event);
-    }
-
-    co_return;
-  }
-
-  concurrencpp::result<void> process(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan
-  ) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
-    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
-    throw_if_empty(tar_chan, TraceException::kChannelIsNull, source_loc::current());
-
-    std::optional<std::shared_ptr<Event>> msg;
-    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->Pop(resume_executor)) {
-      std::shared_ptr<Event> event = msg.value();
-      print(event);
-      const bool was_pushed = co_await tar_chan->Push(resume_executor, event);
-      throw_on(not was_pushed,
-               "EventPrinter::process: Could not push to target channel",
-               source_loc::current());
-    }
-
-    co_await tar_chan->CloseChannel(resume_executor);
-    co_return;
-  }
-};
-
 struct EventComperator {
   bool operator()(const std::shared_ptr<Event> &ev1,
                   const std::shared_ptr<Event> &ev2) const {
     return ev1->GetTs() > ev2->GetTs();
   }
 };
+
+inline std::ostream &operator<<(std::ostream &out, Event &event) {
+  event.Display(out);
+  return out;
+}
 
 inline std::string GetTypeStr(const std::shared_ptr<Event> &event) {
   if (not event) {

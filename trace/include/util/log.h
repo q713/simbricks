@@ -96,7 +96,7 @@ class Logger {
  private:
   const char *prefix_;
 
-  template <typename... Args>
+  template<typename... Args>
   inline void log_internal(FILE *out, const char *format, Args... args) {
     fprintf(out, "%s", prefix_);
     fprintf(out, format, args...);
@@ -126,12 +126,12 @@ class Logger {
     return logger;
   }
 
-  template <typename... Args>
+  template<typename... Args>
   inline void log_stdout_f(const char *format, const Args &...args) {
     this->log_internal(stdout, format, args...);
   }
 
-  template <typename... Args>
+  template<typename... Args>
   inline void log_stderr_f(const char *format, const Args &...args) {
     this->log_internal(stderr, format, args...);
   }
@@ -144,7 +144,7 @@ class Logger {
     this->log_internal(stderr, to_print);
   }
 
-  template <typename... Args>
+  template<typename... Args>
   void log_f(log_upt &log, const char *format, const Args &...args) {
     if (log->file_ == nullptr) {
       this->log_stderr("log file is null. it should not be!\n");

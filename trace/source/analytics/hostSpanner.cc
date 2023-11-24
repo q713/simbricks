@@ -26,6 +26,7 @@
 
 #include "analytics/spanner.h"
 #include "util/exception.h"
+#include "events/printer.h"
 
 concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
     std::shared_ptr<concurrencpp::executor> resume_executor) {
@@ -38,12 +39,10 @@ concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
     co_return;
   }
 
-  // std::cout << "host tryna eceive receive update. Current queue: " <<
-  // std::endl; from_nic_receives_queue_->Display(resume_executor, std::cout);
-
-  //std::cout << name_ << " host try poll nic receive" << std::endl;
+  spdlog::info("{} host try poll nic receive", name_);
   auto context_opt = co_await from_nic_receives_queue_->Pop(resume_executor);
-  //std::cout << name_ << " host polled nic receive" << std::endl;
+  spdlog::info("{} host polled nic receive", name_);
+
   auto context = OrElseThrow(
       context_opt,
       "HostSpanner::CreateTraceStartingSpan could not receive rx context",
@@ -59,10 +58,11 @@ concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
       };
 
   while (context_opt) {
-    //std::cout << name_ << " host try poll on true nic receive" << std::endl;
+    spdlog::info("{} host try poll on true nic receive", name_);
     context_opt = co_await from_nic_receives_queue_->TryPopOnTrue(
         resume_executor, did_arrive_before_receive_syscall);
-    //std::cout << name_ << " host polled on true nic receive" << std::endl;
+    spdlog::info("{} host polled on true nic receive", name_);
+
     if (not context_opt.has_value()) {
       break;
     }
@@ -115,9 +115,8 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
                "HostSpanner: CreateTraceStartingSpan could not create new span");
 
     if (not pending_host_call_span_) {
-      std::cerr << "found new syscall entry, could not add "
-                   "pending_host_call_span_"
-                << '\n';
+      spdlog::warn("found new syscall entry, could not add "
+                   "pending_host_call_span_");
       co_return false;
     }
 
@@ -158,13 +157,13 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
 
   if (not pci_write_before_ and trace_environment_.IsToDeviceBarNumber(
       pending_mmio_span->GetBarNumber())) {
-    //std::cout << name_ << " host try push mmio" << std::endl;
+    spdlog::info("{} host try push mmio", name_);
     auto context = Context::CreatePassOnContext<expectation::kMmio>(pending_mmio_span);
     if (not co_await to_nic_queue_->Push(resume_executor, context)) {
-      std::cerr << "could not push to nic that mmio is expected" << '\n';
+      spdlog::critical("could not push to nic that mmio is expected");
       // note: we will not return false as the span creation itself id work
     }
-    //std::cout << name_ << " host pushed mmio" << std::endl;
+    spdlog::info("{} host pushed mmio", name_);
   }
 
   if (trace_environment_.IsMsixNotToDeviceBarNumber(
@@ -238,12 +237,13 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
 
   // when receiving a dma, we expect to get a context from the nic simulator,
   // hence poll this context blocking!!
-  //std::cout << name_ << " host try poll dma: " << *event_ptr << std::endl;
+  spdlog::info("{} host try poll dma: {}", name_, *event_ptr);
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
   const auto con = OrElseThrow(con_opt,
                                TraceException::kContextIsNull, source_loc::current());
   throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
-  //std::cout << name_ << " host polled dma" << std::endl;
+  spdlog::info("{} host polled dma", name_);
+
   if (not is_expectation(con_opt.value(), expectation::kDma)) {
     std::cerr << "when polling for dma context, no dma context was fetched"
               << '\n';
@@ -271,11 +271,12 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  //std::cout << name_ << " host try poll msix" << std::endl;
+  spdlog::info("{} host try poll msix", name_);
   auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
   const auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
   throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
-  //std::cout << name_ << " host polled msix" << std::endl;
+  spdlog::info("{} host polled msix", name_);
+
   if (not is_expectation(con, expectation::kMsix)) {
     std::cerr << "did not receive msix on context queue" << '\n';
     co_return false;

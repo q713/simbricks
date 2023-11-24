@@ -26,6 +26,7 @@
 #include <string>
 #include <set>
 
+#include "spdlog/spdlog.h"
 #include "concurrencpp/runtime/runtime.h"
 #include "util/utils.h"
 #include "util/exception.h"
@@ -79,6 +80,14 @@ class TraceEnvConfig {
     throw_on(to_check.empty(), "string to check is empty", source_loc::current());
   }
 
+  inline static spdlog::level::level_enum ResolveLogLevel(const std::string &level_name) {
+    auto level = spdlog::level::from_str(level_name);
+    if (level == spdlog::level::off) {
+      level = spdlog::level::info;
+    }
+    return level;
+  }
+
   class SymTableConf {
    public:
     inline const std::string &GetIdentifier() const {
@@ -117,9 +126,10 @@ class TraceEnvConfig {
     }
 
    private:
-    explicit SymTableConf() = default;
 
+    explicit SymTableConf() = default;
     constexpr static const char *kIdentifierKey{"Identifier"};
+
     std::string identifier_;
     constexpr static const char *kPathKey{"Path"};
     std::string path_;
@@ -225,6 +235,9 @@ class TraceEnvConfig {
     CheckKeyAndType<YAML::NodeType::Scalar>(kEventBufferSize, config_root);
     trace_config.event_buffer_size_ = config_root[kEventBufferSize].as<size_t>();
     throw_on(trace_config.event_buffer_size_ == 0, "event buffer size 0", source_loc::current());
+
+    CheckKey(kLogLevelKey, config_root);
+    trace_config.log_level_ = ResolveLogLevel(config_root[kLogLevelKey].as<std::string>());
 
     return trace_config;
   }
@@ -337,6 +350,10 @@ class TraceEnvConfig {
     return event_buffer_size_;
   }
 
+  inline spdlog::level::level_enum GetLogLevel() const {
+    return log_level_;
+  };
+
   concurrencpp::runtime_options GetRuntimeOptions() const {
     auto concurren_options = concurrencpp::runtime_options();
     concurren_options.max_cpu_threads = GetMaxCpuThreads();
@@ -381,6 +398,8 @@ class TraceEnvConfig {
   size_t line_buffer_size_;
   constexpr static const char *kEventBufferSize{"EventBufferSize"};
   size_t event_buffer_size_;
+  constexpr static const char *kLogLevelKey{"LogLevel"};
+  spdlog::level::level_enum log_level_ = spdlog::level::info;
 };
 
 #endif // SIMBRICKS_TRACE_CONFIG_H_

@@ -58,6 +58,19 @@ FetchContent_Declare(
     )
 FetchContent_MakeAvailable(Catch2)
 
+#######################################
+# Spdlog
+#######################################
+FetchContent_Declare(
+        spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG        v1.12.0
+)
+FetchContent_MakeAvailable(spdlog)
+
+#######################################
+# Yaml-Cpp
+#######################################
 FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
@@ -110,6 +123,7 @@ set(TRACE_LIB_HEADER_FILES
         include/events/events.h
         include/events/event-filter.h
         include/parser/eventStreamParser.h
+        include/events/printer.h
         # config
         include/config/config.h
         # tracing environment
@@ -167,6 +181,7 @@ endif()
 # link coroutine library
 target_link_libraries(${PROJECT_NAME} PUBLIC
         yaml-cpp
+        spdlog::spdlog
         concurrencpp::concurrencpp
         Catch2::Catch2WithMain
         opentelemetry_trace

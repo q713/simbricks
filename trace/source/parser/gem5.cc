@@ -22,8 +22,6 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-// #define PARSER_DEBUG_GEM5_ 1
-
 #include "util/log.h"
 #include "parser/parser.h"
 #include "util/string_util.h"
@@ -55,10 +53,8 @@ Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp)
   uint64_t addr;
   if (!line_handler.ConsumeAndTrimTillString("0x") ||
       !line_handler.ParseUintTrim(16, addr)) {
-#ifdef PARSER_DEBUG_GEM5_
-    DFLOGWARN("%s: could not parse address from line '%s'\n", GetName().c_str(),
-              line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse address from line '{}'", GetName(),
+                  line_handler.GetRawLine());
     return nullptr;
   }
 
@@ -300,10 +296,8 @@ Gem5Parser::ParseEvent(LineHandler &line_handler) {
   std::string component;
   uint64_t timestamp;
   if (!ParseTimestamp(line_handler, timestamp)) {
-#ifdef PARSER_DEBUG_GEM5_
-    DFLOGWARN("%s: could not parse timestamp from line '%s'\n", GetName().c_str(),
-              line_handler.GetRawLine().c_str());
-#endif
+    spdlog::debug("{}: could not parse timestamp from line '{}'", GetName(),
+                  line_handler.GetRawLine());
     co_return nullptr;
   }
   if (!line_handler.ConsumeAndTrimChar(':')) {
@@ -316,10 +310,8 @@ Gem5Parser::ParseEvent(LineHandler &line_handler) {
       component_table_.filter("global")) {
     event_ptr = ParseGlobalEvent(line_handler, timestamp);
     if (!event_ptr) {
-#ifdef PARSER_DEBUG_GEM5_
-      DFLOGWARN("%s: could not parse global event from line '%s'\n",
-                GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: could not parse global event from line '{}'",
+                    GetName(), line_handler.GetRawLine());
       co_return nullptr;
     }
     // got event
@@ -327,11 +319,8 @@ Gem5Parser::ParseEvent(LineHandler &line_handler) {
       component_table_.filter("system.switch_cpus")) {
     event_ptr = ParseSystemSwitchCpus(line_handler, timestamp);
     if (!event_ptr) {
-#ifdef PARSER_DEBUG_GEM5_
-      DFLOGWARN(
-          "%s: could not parse system.switch_cpus event from line '%s'\n",
-          GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+      spdlog::debug("{}: could not parse system.switch_cpus event from line '{}'",
+                    GetName(), line_handler.GetRawLine());
       co_return nullptr;
     }
     // got event
@@ -341,24 +330,17 @@ Gem5Parser::ParseEvent(LineHandler &line_handler) {
           component_table_.filter("system.pc.pci_host.interface")) {
         event_ptr = ParseSystemPcPciHostInterface(line_handler, timestamp);
         if (!event_ptr) {
-#ifdef PARSER_DEBUG_GEM5_
-          DFLOGWARN(
-              "%s: could not parse system.pc.pci_host.interface event from "
-              "line '%s'\n",
-              GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+          spdlog::debug("{}: could not parse system.pc.pci_host.interface event from "
+                        "line '{}'",
+                        GetName(), line_handler.GetRawLine());
           co_return nullptr;
         }
         // got event
       } else if (component_table_.filter("system.pc.pci_host")) {
         event_ptr = ParseSystemPcPciHost(line_handler, timestamp);
         if (!event_ptr) {
-#ifdef PARSER_DEBUG_GEM5_
-          DFLOGWARN(
-              "%s: could not parse system.pc.pci_host event from "
-              "line '%s'\n",
-              GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+          spdlog::debug("{}: could not parse system.pc.pci_host event from "
+                        "line '{}'", GetName(), line_handler.GetRawLine());
           co_return nullptr;
         }
       }
@@ -366,23 +348,17 @@ Gem5Parser::ParseEvent(LineHandler &line_handler) {
         component_table_.filter("system.pc.simbricks")) {
       event_ptr = ParseSystemPcSimbricks(line_handler, timestamp);
       if (!event_ptr) {
-#ifdef PARSER_DEBUG_GEM5_
-        DFLOGWARN(
-            "%s: could not parse system.pc.simbricks event from line "
-            "'%s'\n",
-            GetName().c_str(), line_handler.GetRawLine().c_str());
-#endif
+        spdlog::debug("{}: could not parse system.pc.simbricks event from line '{}'",
+                      GetName(), line_handler.GetRawLine());
         co_return nullptr;
       }
       // got event
     }
   }
 
-#ifdef PARSER_DEBUG_GEM5_
   if (not event_ptr) {
-    DFLOGWARN("%s: could not parse event in line '%s'\n", GetName().c_str(),
-              line_handler.GetRawLine().c_str());
+    spdlog::debug("{}: could not parse event in line '{}'", GetName(),
+                  line_handler.GetRawLine());
   }
-#endif
   co_return event_ptr;
 }

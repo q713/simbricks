@@ -30,18 +30,19 @@
 
 #include "analytics/spanner.h"
 #include "util/exception.h"
+#include "events/printer.h"
 
 concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  //std::cout << "Nic try handel: " << *event_ptr << std::endl;
-  //std::cout << name_ << " nic try poll mmio" << std::endl;
+  spdlog::info("{} nic try poll mmio", name_);
   auto con_opt = co_await from_host_queue_->Pop(resume_executor);
   auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
   throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
-  //std::cout << name_ << " nic polled mmio" << std::endl;
+  spdlog::info("{} nic polled mmio", name_);
+
   if (not is_expectation(con, expectation::kMmio)) {
     std::cerr << "nic_spanner: could not poll mmio context" << '\n';
     co_return false;
@@ -67,7 +68,6 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
-  //std::cout << "Nic try handel: " << *event_ptr << std::endl;
   auto pending_dma =
       iterate_add_erase<NicDmaSpan>(pending_nic_dma_spans_, event_ptr);
   if (pending_dma) {
@@ -75,12 +75,12 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
       tracer_.MarkSpanAsDone(pending_dma);
     } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
-      //std::cout << name_ << " nic try push dma: " << *event_ptr << std::endl;
+      spdlog::info("{} nic try push dma: {}", name_, *event_ptr);
       auto context = Context::CreatePassOnContext<expectation::kDma>(pending_dma);
       throw_on(not co_await to_host_queue_->Push(resume_executor, context),
                TraceException::kCouldNotPushToContextQueue,
                source_loc::current());
-      //std::cout << name_ << " nic pushed dma" << std::endl;
+      spdlog::info("{} nic pushed dma", name_);
     }
 
     co_return true;
@@ -123,12 +123,12 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
-    //std::cout << name_ << " NicSpanner::HandelTxrx: trying to push tx context to other side" << std::endl;
+    spdlog::info("{} NicSpanner::HandelTxrx: trying to push tx context to other side", name_);
     auto context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
              "HandelTxrx: could not write network context ",
              source_loc::current());
-    //std::cout << name_ << " NicSpanner::HandelTxrx: pushed tx context to other side" << std::endl;
+    spdlog::info("{} NicSpanner::HandelTxrx: pushed tx context to other side", name_);
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
     std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context from other side" << std::endl;
@@ -141,13 +141,13 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
         con, event_ptr, event_ptr->GetParserIdent(), name_);
     last_causing_ = eth_span;
 
-    //std::cout << name_ << " nic tryna push receive update." << std::endl;
+    spdlog::info("{} nic tryna push receive update.", name_);
     auto receive_context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
     const bool could_push = co_await to_host_receives_->Push(resume_executor, receive_context);
     throw_on_false(could_push,
                    "NicSpanner::HandelTxrx: could not write host receive context ",
                    source_loc::current());
-    //std::cout << name_ << " nic pushed receive update." << std::endl;
+    spdlog::info("{} nic pushed receive update.", name_);
 
   } else {
     std::cerr << "NicSpanner::HandelTxrx: unknown event type" << '\n';
@@ -177,12 +177,12 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
   assert(msix_span->IsComplete() and "msix span is not complete");
   tracer_.MarkSpanAsDone(msix_span);
 
-  //std::cout << name_ << " nic try push msix" << std::endl;
+  spdlog::info("{} nic try push msix", name_);
   auto context = Context::CreatePassOnContext<expectation::kMsix>(msix_span);
   throw_on(not co_await to_host_queue_->Push(resume_executor, context),
            TraceException::kCouldNotPushToContextQueue,
            source_loc::current());
-  //std::cout << name_ << " nic pushed msix" << std::endl;
+  spdlog::info("{} nic pushed msix", name_);
 
   co_return true;
 }

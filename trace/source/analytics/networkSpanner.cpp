@@ -25,6 +25,7 @@
 #include <utility>
 
 #include "analytics/spanner.h"
+#include "events/printer.h"
 
 concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<concurrencpp::executor> resume_executor,
                                                                    std::shared_ptr<Event> &event_ptr) {
@@ -32,7 +33,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
   if (not IsAnyType(event_ptr, std::vector<EventType>{
       EventType::kNetworkEnqueueT, EventType::kNetworkDequeueT, EventType::kNetworkDropT})) {
-    // std::cout << "NetworkSpanner::HandelNetworkEvent wrong event type: " << event_ptr << '\n';
+    spdlog::info("NetworkSpanner::HandelNetworkEvent wrong event type: {}", *event_ptr);
     co_return false;
   }
   auto network_event = std::static_pointer_cast<NetworkEvent>(event_ptr);
@@ -40,8 +41,8 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   // Handling events caused by messages marked as interesting that are not! (ARP)
   //       ---> filter out spans and events that end up in devices we are not interested in!
   if (network_event->InterestingFlag() and node_device_filter_.IsNotInterestingNodeDevice(network_event)) {
-    std::cout << "NetworkSpanner::HandelNetworkEvent filtered interesting event because of node device: "
-              << network_event << '\n';
+    spdlog::info("NetworkSpanner::HandelNetworkEvent filtered interesting event because of node device: {}",
+                 *network_event);
     co_return true;
   }
 
@@ -65,10 +66,11 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
       const int node = current_device_span_->GetNode();
       const int device = current_device_span_->GetDevice();
       auto to_host = to_host_channels_.GetValidChannel(node, device);
-      //std::cout << "NetworkSpanner::HandelNetworkEvent: try push kToAdapter context event="
-      //          << event_ptr << std::endl;
+
+      spdlog::info("NetworkSpanner::HandelNetworkEvent: try push kToAdapter context event={}", *event_ptr);
       bool could_push = co_await to_host->Push(resume_executor, context);
-      //std::cout << "NetworkSpanner::HandelNetworkEvent: did push kToAdapter context" << event_ptr << std::endl;
+      spdlog::info("NetworkSpanner::HandelNetworkEvent: did push kToAdapter context {}", *event_ptr);
+
       throw_on_false(could_push, TraceException::kCouldNotPushToContextQueue, source_loc::current());
 
     }
@@ -83,8 +85,8 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
     co_return false;
   }
   if (not network_event->InterestingFlag()) {
-    std::cout << "NetworkSpanner::HandelNetworkEvent filtered NOT interesting event"
-              << network_event << '\n';
+    spdlog::info("NetworkSpanner::HandelNetworkEvent filtered NOT interesting event {}",
+                 *network_event);
     co_return true;
   }
 
@@ -103,9 +105,9 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
       throw_if_empty(current_device_span_, TraceException::kSpanIsNull, source_loc::current());
       co_return true;
     }
-    //std::cout
-    //    << "NetworkSpanner::HandelNetworkEvent filtered non interesting potentially starting trace event because of node device: "
-    //    << network_event << '\n';
+    spdlog::info(
+        "NetworkSpanner::HandelNetworkEvent filtered non interesting potentially starting trace event because of node device: {}",
+        *network_event);
     co_return true;
   }
 
@@ -114,10 +116,12 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
     throw_on_false(IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice),
                    "trying to create a span depending on a nic side event based on a non cosim device",
                    source_loc::current());
+
     // is it a fromAdapter event, we need to poll from the host queue to get the parent
-    //std::cout << "NetworkSpanner::HandelNetworkEvent: try pop kFromAdapter context " << event_ptr << std::endl;
+    spdlog::info("NetworkSpanner::HandelNetworkEvent: try pop kFromAdapter context {}", *event_ptr);
     auto con_opt = co_await from_host_->Pop(resume_executor);
-    //std::cout << "NetworkSpanner::HandelNetworkEvent: succesfull pop kFromAdapter context" << std::endl;
+    spdlog::info("NetworkSpanner::HandelNetworkEvent: succesfull pop kFromAdapter context");
+
     context_to_connect_with = OrElseThrow(con_opt, TraceException::kContextIsNull,
                                           source_loc::current());
     throw_if_empty(context_to_connect_with, TraceException::kContextIsNull, source_loc::current());

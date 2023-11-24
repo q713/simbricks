@@ -25,6 +25,8 @@
 #ifndef SIMBRICKS_TRACE_EXCEPTION_H_
 #define SIMBRICKS_TRACE_EXCEPTION_H_
 
+#include "spdlog/spdlog.h"
+
 #include <exception>
 #include <stdexcept>
 #include <memory>
@@ -95,7 +97,7 @@ inline void throw_if_empty(const std::shared_ptr<Value> to_check,
                            const source_loc &location) {
   if (not to_check) {
     const TraceException trace_exception{LocationToString(location), message};
-    std::cerr << trace_exception.what() << std::endl;
+    spdlog::critical("{}", trace_exception.what());
     std::terminate();
     // throw TraceException(LocationToString(location), message);
   }
@@ -121,7 +123,7 @@ inline void throw_if_empty(const std::unique_ptr<Value> &to_check,
                            const source_loc &location) {
   if (not to_check) {
     const TraceException trace_exception{LocationToString(location), message};
-    std::cerr << trace_exception.what() << std::endl;
+    spdlog::critical("{}", trace_exception.what());
     std::terminate();
     //throw TraceException(LocationToString(location), message);
   }
@@ -147,7 +149,7 @@ inline void throw_if_empty(const Value *to_check,
                            const source_loc &location) {
   if (not to_check) {
     const TraceException trace_exception{LocationToString(location), message};
-    std::cerr << trace_exception.what() << std::endl;
+    spdlog::critical("{}", trace_exception.what());
     std::terminate();
     // throw TraceException(LocationToString(location), message);
   }
@@ -166,7 +168,7 @@ inline void throw_if_empty(const Value *to_check, const std::string &&message, c
 inline void throw_on(bool should_throw, const char *message, const source_loc &location) {
   if (should_throw) {
     const TraceException trace_exception{LocationToString(location), message};
-    std::cerr << trace_exception.what() << std::endl;
+    spdlog::critical("{}", trace_exception.what());
     std::terminate();
     //throw trace_exception;
   }
@@ -222,7 +224,7 @@ inline void throw_just(const source_loc &location, Args &&... args) {
   std::cout << "exception thrown" << std::endl;
   const std::string message{message_builder.str()};
   const TraceException trace_exception{LocationToString(location), message};
-  std::cerr << trace_exception.what() << std::endl;
+  spdlog::critical("{}", trace_exception.what());
   std::terminate();
   // throw TraceException(LocationToString(location), message);
 }

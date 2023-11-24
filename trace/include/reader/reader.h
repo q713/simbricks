@@ -29,6 +29,8 @@
 
 #include <fcntl.h>
 
+#include "spdlog/spdlog.h"
+
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -172,7 +174,7 @@ class ReaderBuffer {
     while (index < BufferSize) {
       if (not IsStreamStillGood()) {
         if (tries > 0) {
-          std::cout << name_ << " try to read later more" << '\n';
+          spdlog::debug("{} try to read later more", name_);
           std::this_thread::sleep_for(std::chrono::seconds{3});
           --tries;
           continue;
@@ -185,7 +187,7 @@ class ReaderBuffer {
 
       if (input_stream_.fail()) {
         if (tries > 0) {
-          std::cout << name_ << " try to read later more" << '\n';
+          spdlog::debug("{} try to read later more", name_);
           std::this_thread::sleep_for(std::chrono::seconds{3});
           --tries;
           continue;
@@ -223,7 +225,7 @@ class ReaderBuffer {
 
   std::pair<bool, LineHandler *> NextHandler() {
     if (not HasStillLine()) {
-      std::cout << "ReaderBuffer has no line left, impossible to read more" << '\n';
+      spdlog::debug("ReaderBuffer has no line left, impossible to read more");
       return std::make_pair(false, nullptr);
     }
 
@@ -231,7 +233,7 @@ class ReaderBuffer {
       FillBuffer();
       // maybe we have nothing buffered but the stream still appears to be good
       if (not StillBuffered()) {
-        std::cout << "ReaderBuffer has no line buffered left" << '\n';
+        spdlog::debug("ReaderBuffer has no line buffered left");
         return std::make_pair(false, nullptr);
       }
     }
@@ -262,9 +264,9 @@ class ReaderBuffer {
       throw_on(file_descriptor == -1, "ReaderBuffer: could not obtain fd", source_loc::current());
       const int suc = fcntl(file_descriptor, F_SETPIPE_SZ, kBufSize);
       if (suc != kBufSize) {
-        std::cout << "ReaderBuffer: could not change '" << file_path << "' size to " << kBufSize << '\n';
+        spdlog::warn("ReaderBuffer: could not change '{}' size to {}", file_path, kBufSize);
       } else {
-        std::cout << "ReaderBuffer: changed size successfully" << '\n';
+        spdlog::debug("ReaderBuffer: changed size successfully");
       }
     }
 

@@ -31,6 +31,8 @@
 #include <utility>
 #include <vector>
 
+#include "spdlog/spdlog.h"
+
 #include "util/exception.h"
 #include "util/componenttable.h"
 #include "sync/corobelt.h"
@@ -328,7 +330,7 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     co_await tar_chan->CloseChannel(resume_executor);
 
     //co_await timer_.Done(resume_executor, timer_key);
-    std::cout << "BufferedEventProvider exits" << '\n';
+    spdlog::debug("BufferedEventProvider '{}' exits", name_);
     co_return;
   }
 };

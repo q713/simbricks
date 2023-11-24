@@ -29,6 +29,8 @@
 #include <string>
 #include <vector>
 
+#include "spdlog/spdlog.h"
+
 #include "sync/corobelt.h"
 #include "config/config.h"
 #include "env/traceEnvironment.h"
@@ -42,6 +44,7 @@
 #include "util/log.h"
 #include "util/factory.h"
 #include "exporter/exporter.h"
+#include "events/printer.h"
 
 std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
                                             cxxopts::ParseResult &result,
@@ -130,6 +133,8 @@ int main(int argc, char *argv[]) {
   const TraceEnvConfig trace_env_config
       = TraceEnvConfig::CreateFromYaml(result["trace-env-config"].as<std::string>());
   TraceEnvironment trace_environment{trace_env_config};
+
+  spdlog::set_level(trace_env_config.GetLogLevel());
 
   simbricks::trace::OtlpSpanExporter exporter{trace_environment,
                                               trace_env_config.GetJaegerUrl(),
@@ -304,8 +309,9 @@ int main(int argc, char *argv[]) {
       const pipeline<std::shared_ptr<Event>> pipeline_def_ns3{event_pro_ns3, pipeline_ns3, spanner_ns3};
 
       std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s, pipeline_def_ns3};
+      spdlog::info("START TRACING PIPELINE FROM PREPROCESSED EVENT STREAM");
       run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
-
+      spdlog::info("FINISHED PIPELINE");
       exit(EXIT_SUCCESS);
     }
 
@@ -492,10 +498,16 @@ int main(int argc, char *argv[]) {
         ns3_pipes{timestamp_filter_ns3, event_filter_ns3, printer_ns3};
     const pipeline<std::shared_ptr<Event>> ns3_pipeline{
         ns3_buf_pro, ns3_pipes, spanner_ns3};
+    // std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+    //     ns3_pipes{timestamp_filter_ns3, event_filter_ns3};
+    // const pipeline<std::shared_ptr<Event>> ns3_pipeline{
+    //     ns3_buf_pro, ns3_pipes, printer_ns3};
 
     std::vector<pipeline<std::shared_ptr<Event>>>
         pipelines{client_host_pipeline, server_host_pipeline, client_nic_pipeline, server_nic_pipeline, ns3_pipeline};
+    spdlog::info("START TRACING PIPELINE FROM RAW SIMULATOR OUTPUT");
     run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
+    spdlog::info("FINISHED PIPELINE");
   } catch (TraceException &err) {
     std::cerr << err.what() << '\n';
     exit(EXIT_FAILURE);

@@ -28,6 +28,7 @@ JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
 EventBufferSize: 60000000
+LogLevel: "info"
 LinuxFuncIndicator:
   - "__sys_socket"
   - "__x64_sys_socket"

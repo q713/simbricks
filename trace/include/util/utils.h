@@ -68,7 +68,7 @@ inline void WriteIdent(std::ostream &out, unsigned ident) {
 }
 
 template<typename ObjT>
-inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<ObjT> &to_write) {
+inline std::ostream &operator<<(std::ostream &out, const std::shared_ptr<ObjT> &to_write) {
   if (to_write) {
     out << *to_write;
   } else {

@@ -509,6 +509,8 @@ class OtlpSpanExporter : public SpanExporter {
       const uint64_t parent_id = context->GetParentId();
       new_span->SetAttribute("parent_id", parent_id);
     }
+    new_span->SetAttribute("start-ts", std::to_string(old_span->GetStartingTs()));
+    new_span->SetAttribute("end-ts", std::to_string(old_span->GetCompletionTs()));
   }
 
   static void set_HostCallSpanAttr(span_t &new_span, std::shared_ptr<HostCallSpan> &old_span) {
@@ -564,6 +566,7 @@ class OtlpSpanExporter : public SpanExporter {
   static void set_NetDeviceSpanAttr(span_t &new_span, std::shared_ptr<NetDeviceSpan> &old_span) {
     set_EventSpanAttr(new_span, old_span);
     new_span->SetAttribute("is-arp", BoolToString(old_span->IsArp()));
+    new_span->SetAttribute("is-drop", BoolToString(old_span->IsDrop()));
     if (old_span->HasIpsSet()) {
       new_span->SetAttribute("src-ip", sim_string_utils::ValueToString(old_span->GetSrcIp()));
       new_span->SetAttribute("dst-ip", sim_string_utils::ValueToString(old_span->GetDstIp()));
@@ -576,15 +579,6 @@ class OtlpSpanExporter : public SpanExporter {
     new_span->SetAttribute("is-interesting", BoolToString(old_span->InterestingFlag()));
     new_span->SetAttribute("node", std::to_string(old_span->GetNode()));
     new_span->SetAttribute("device", std::to_string(old_span->GetDevice()));
-
-    NetworkEvent::Ipv4 src_{0};
-    NetworkEvent::Ipv4 dst_{0};
-    bool ips_set_ = false;
-    bool is_arp_ = false;
-    std::set<NetworkEvent::EventBoundaryType> boundary_types_;
-    bool interesting_flag_ = false;
-    int node_ = -1;
-    int device_ = -1;
   }
 
   void set_Attr(span_t &span, std::shared_ptr<EventSpan> &to_end) {

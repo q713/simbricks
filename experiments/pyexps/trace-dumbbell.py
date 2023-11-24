@@ -189,7 +189,7 @@ if use_pressure:
     client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_STREAM
     client_config.app.test_len = 10
 else:
-    server_config.app = IdleHost()
+    client_config.app = IdleHost()
 
 client = Gem5Host(client_config)
 client.name = 'client.2'

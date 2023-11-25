@@ -584,7 +584,7 @@ bool NetDeviceSpan::HandelEnqueue(const std::shared_ptr<NetworkEvent> &event_ptr
   // NOTE: Lock must be held when calling this method!
   assert(event_ptr);
 
-  if (dev_enq_ and (dev_deq_ or drop_)) {
+  if (dev_enq_ or (dev_enq_ and (dev_deq_ or drop_))) {
     return false;
   }
 

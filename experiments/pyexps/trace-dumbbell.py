@@ -63,7 +63,7 @@ sys_clock = '1GHz'  # if not set, default 1GHz
 mtu = 1500
 ip_provider = IPProvider()
 num_pairs = 2
-use_pressure = False
+use_pressure = True
 
 
 
@@ -187,7 +187,7 @@ client_config.ip = ip_provider.GetNext()
 if use_pressure:
     client_config.app = ColumboNetperfClient()
     client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_STREAM
-    client_config.app.test_len = 10
+    client_config.app.test_len = 4
 else:
     client_config.app = IdleHost()
 

@@ -87,9 +87,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
   }
 
   if (not IsType(event_ptr, EventType::kNicDmaIT)) {
-    std::cout << "NicSpanner::HandelDma: Found non start Dma event, but neeed "
-                 "to start"
-              << '\n';
+    spdlog::warn("NicSpanner::HandelDma: Found non start Dma event, but neeed to start");
     co_return false;
   }
 
@@ -101,7 +99,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
   pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(
       last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_dma) {
-    std::cerr << "could not register new pending dma action" << '\n';
+    spdlog::warn("could not register new pending dma action");
     co_return false;
   }
 
@@ -123,7 +121,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     eth_span = tracer_.StartSpanByParent<NicEthSpan>(
         parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
-    spdlog::info("{} NicSpanner::HandelTxrx: trying to push tx context to other side", name_);
+    spdlog::info("{} NicSpanner::HandelTxrx: trying to push tx context to other side - {}",
+                 name_, *event_ptr);
     auto context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
     throw_on(not co_await to_network_queue_->Push(resume_executor, context),
              "HandelTxrx: could not write network context ",
@@ -131,9 +130,11 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     spdlog::info("{} NicSpanner::HandelTxrx: pushed tx context to other side", name_);
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
-    std::cout << name_ << " NicSpanner::HandelTxrx: trying to pull tx context from other side" << std::endl;
+    spdlog::info("{} NicSpanner::HandelTxrx: trying to pull tx context from other side - {}",
+                 name_, *event_ptr);
     auto con_opt = co_await from_network_queue_->Pop(resume_executor);
-    std::cout << name_ << " NicSpanner::HandelTxrx: pulled tx context from other side" << std::endl;
+    spdlog::info("{} NicSpanner::HandelTxrx: pulled tx context from other side", name_);
+
     auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(con, expectation::kRx),
              "nic_spanner: received non kRx context", source_loc::current());

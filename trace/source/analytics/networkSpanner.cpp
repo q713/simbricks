@@ -46,25 +46,26 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
     co_return true;
   }
 
-  if (current_device_span_ and current_device_span_->AddToSpan(network_event)) {
+  auto current_device_span = iterate_add_erase(current_active_device_spans_, network_event);
+  if (current_device_span) {
 
-    throw_on_false(current_device_span_->IsComplete(),
+    throw_on_false(current_device_span->IsComplete(),
                    "network spanner, after adding event, span must be complete",
                    source_loc::current());
 
     // we make the connection at the end to sending NIC
-    if (current_device_span_->ContainsBoundaryType(NetworkEvent::EventBoundaryType::kToAdapter)
-        and not current_device_span_->IsDrop()) {
+    if (current_device_span->ContainsBoundaryType(NetworkEvent::EventBoundaryType::kToAdapter)
+        and not current_device_span->IsDrop()) {
 
       // if we have a "to" adapter event we need to push a context to a host
-      auto context = Context::CreatePassOnContext<expectation::kRx>(current_device_span_);
+      auto context = Context::CreatePassOnContext<expectation::kRx>(current_device_span);
       throw_if_empty(context, TraceException::kContextIsNull, source_loc::current());
 
-      throw_on_false(current_device_span_->HasIpsSet(), "kToAdapter event has no ip header",
+      throw_on_false(current_device_span->HasIpsSet(), "kToAdapter event has no ip header",
                      source_loc::current());
 
-      const int node = current_device_span_->GetNode();
-      const int device = current_device_span_->GetDevice();
+      const int node = current_device_span->GetNode();
+      const int device = current_device_span->GetDevice();
       auto to_host = to_host_channels_.GetValidChannel(node, device);
 
       spdlog::info("NetworkSpanner::HandelNetworkEvent: try push kToAdapter context event={}", *event_ptr);
@@ -75,34 +76,31 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
     }
 
-    last_finished_device_span_ = current_device_span_;
-    tracer_.MarkSpanAsDone(current_device_span_);
+    last_finished_device_span_ = current_device_span;
+    tracer_.MarkSpanAsDone(current_device_span);
     co_return true;
   }
 
   // this can happen due to the interestingness (ARP) issues...
   if (not IsType(network_event, EventType::kNetworkEnqueueT)) {
+    spdlog::info("NetworkSpanner::HandelNetworkEvent filtered NOT interesting event type {}",
+                 *network_event);
     co_return false;
   }
-  if (not network_event->InterestingFlag()) {
-    spdlog::info("NetworkSpanner::HandelNetworkEvent filtered NOT interesting event {}",
-                 *network_event);
-    co_return true;
-  }
-
-  throw_on(current_device_span_ and current_device_span_->IsPending(),
-           "NetworkSpanner::HandelNetworkEvent : current device span is still pending",
-           source_loc::current());
 
   // Handling events caused by messages started by not interesting devices (ARP)
-  //       ---> in case a span is not interesting but ends up in an interesting device, start a new trace...
+  //       ---> in case a span is not interesting but ends up in an interesting device attached to am actual simulator,
+  //            start a new trace...
   if (not network_event->InterestingFlag()) {
-    if (node_device_filter_.IsInterestingNodeDevice(network_event)) {
+    if (node_device_filter_.IsInterestingNodeDevice(network_event)
+        and IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice)) {
+
       //std::cout << "NetworkSpanner::HandelNetworkEvent: started new trace by network event, arp?!" << std::endl;
-      current_device_span_ = tracer_.StartSpan<NetDeviceSpan>(network_event,
-                                                              network_event->GetParserIdent(),
-                                                              name_);
-      throw_if_empty(current_device_span_, TraceException::kSpanIsNull, source_loc::current());
+      auto current_device_span = tracer_.StartSpan<NetDeviceSpan>(network_event,
+                                                                  network_event->GetParserIdent(),
+                                                                  name_);
+      throw_if_empty(current_device_span, TraceException::kSpanIsNull, source_loc::current());
+      current_active_device_spans_.push_back(current_device_span);
       co_return true;
     }
     spdlog::info(
@@ -119,7 +117,10 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
     // is it a fromAdapter event, we need to poll from the host queue to get the parent
     spdlog::info("NetworkSpanner::HandelNetworkEvent: try pop kFromAdapter context {}", *event_ptr);
-    auto con_opt = co_await from_host_->Pop(resume_executor);
+    const int node = network_event->GetNode();
+    const int device = network_event->GetDevice();
+    auto from_host_chan = from_host_channels_.GetValidChannel(node, device);
+    auto con_opt = co_await from_host_chan->Pop(resume_executor);
     spdlog::info("NetworkSpanner::HandelNetworkEvent: succesfull pop kFromAdapter context");
 
     context_to_connect_with = OrElseThrow(con_opt, TraceException::kContextIsNull,
@@ -133,25 +134,25 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   }
   assert(context_to_connect_with);
 
-  current_device_span_ = tracer_.StartSpanByParentPassOnContext<NetDeviceSpan>(context_to_connect_with,
+  auto cur_device_span = tracer_.StartSpanByParentPassOnContext<NetDeviceSpan>(context_to_connect_with,
                                                                                network_event,
                                                                                network_event->GetParserIdent(),
                                                                                name_);
-  throw_if_empty(current_device_span_, TraceException::kSpanIsNull, source_loc::current());
+  throw_if_empty(cur_device_span, TraceException::kSpanIsNull, source_loc::current());
+  current_active_device_spans_.push_back(cur_device_span);
   co_return true;
 }
 
 NetworkSpanner::NetworkSpanner(TraceEnvironment &trace_environment,
                                std::string &&name,
                                Tracer &tra,
-                               ChannelT from_host,
+                               const NodeDeviceToChannelMap &from_host_channels,
                                const NodeDeviceToChannelMap &to_host_channels,
                                const NodeDeviceFilter &node_device_filter)
     : Spanner(trace_environment, std::move(name), tra),
-      from_host_(std::move(from_host)),
+      from_host_channels_(from_host_channels),
       to_host_channels_(to_host_channels),
       node_device_filter_(node_device_filter) {
-  throw_if_empty(from_host_, TraceException::kQueueIsNull, source_loc::current());
 
   auto handel_net_ev = [this](
       std::shared_ptr<concurrencpp::executor> resume_executor,

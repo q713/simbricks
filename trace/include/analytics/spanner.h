@@ -269,7 +269,7 @@ struct NetworkSpanner : public Spanner {
   explicit NetworkSpanner(TraceEnvironment &trace_environment,
                           std::string &&name,
                           Tracer &tra,
-                          ChannelT from_host_,
+                          const NodeDeviceToChannelMap &from_host_channels,
                           const NodeDeviceToChannelMap &to_host_channels,
                           const NodeDeviceFilter &node_device_filter);
 
@@ -280,10 +280,10 @@ struct NetworkSpanner : public Spanner {
 
   // TODO: may need this to be a vector as well
   std::shared_ptr<NetDeviceSpan> last_finished_device_span_ = nullptr;
-  std::shared_ptr<NetDeviceSpan> current_device_span_ = nullptr;
+  std::list<std::shared_ptr<NetDeviceSpan>> current_active_device_spans_;
+  //std::shared_ptr<NetDeviceSpan> current_device_span_ = nullptr;
 
-  // TODO: make these vectors --> mechanism needed to decide to which host to send to
-  std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from_host_;
+  const NodeDeviceToChannelMap &from_host_channels_;
   const NodeDeviceToChannelMap &to_host_channels_;
   const NodeDeviceFilter &node_device_filter_;
 };

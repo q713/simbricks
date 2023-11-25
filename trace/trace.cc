@@ -136,11 +136,11 @@ int main(int argc, char *argv[]) {
 
   spdlog::set_level(trace_env_config.GetLogLevel());
 
-  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
-                                              trace_env_config.GetJaegerUrl(),
-                                              false,
-                                              "trace"};
-  //simbricks::trace::NoOpExporter exporter{trace_environment};
+  //simbricks::trace::OtlpSpanExporter exporter{trace_environment,
+  //                                            trace_env_config.GetJaegerUrl(),
+  //                                            false,
+  //                                            "trace"};
+  simbricks::trace::NoOpExporter exporter{trace_environment};
 
   Tracer tracer{trace_environment, exporter};
 
@@ -161,11 +161,10 @@ int main(int argc, char *argv[]) {
     auto server_nh = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto client_hn = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto client_nh = create_shared<QueueT>(TraceException::kChannelIsNull);
-    auto nic_cn = create_shared<QueueT>(TraceException::kChannelIsNull);
-    auto nic_sn = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nic_c_to_network = create_shared<QueueT>(TraceException::kChannelIsNull);
+    auto nic_s_to_network = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto nic_s_from_network = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto nic_c_from_network = create_shared<QueueT>(TraceException::kChannelIsNull);
-    auto nics_to_network = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto server_n_h_receive = create_shared<QueueT>(TraceException::kChannelIsNull);
     auto client_n_h_receive = create_shared<QueueT>(TraceException::kChannelIsNull);
     using SinkT = CoroChannelSink<std::shared_ptr<Context>>;
@@ -193,7 +192,7 @@ int main(int argc, char *argv[]) {
                                                  trace_environment,
                                                  "NIC-Server",
                                                  tracer,
-                                                 nics_to_network,
+                                                 nic_s_to_network,
                                                  nic_s_from_network,
                                                  server_nh,
                                                  server_hn,
@@ -203,17 +202,22 @@ int main(int argc, char *argv[]) {
                                                  trace_environment,
                                                  "Client-NIC",
                                                  tracer,
-                                                 nics_to_network,
+                                                 nic_c_to_network,
                                                  nic_c_from_network,
                                                  client_nh,
                                                  client_hn,
                                                  client_n_h_receive);
 
-    NetworkSpanner::NodeDeviceToChannelMap node_device_to_channel_map;
-    node_device_to_channel_map.AddMapping(0, 2, nic_s_from_network);
-    node_device_to_channel_map.AddMapping(1, 2, nic_c_from_network);
-    node_device_to_channel_map.AddMapping(0, 3, sink_chan);
-    node_device_to_channel_map.AddMapping(1, 3, sink_chan);
+    NetworkSpanner::NodeDeviceToChannelMap to_host_map;
+    to_host_map.AddMapping(0, 2, nic_s_from_network);
+    to_host_map.AddMapping(1, 2, nic_c_from_network);
+    to_host_map.AddMapping(0, 3, sink_chan);
+    to_host_map.AddMapping(1, 3, sink_chan);
+    NetworkSpanner::NodeDeviceToChannelMap from_host_map;
+    from_host_map.AddMapping(0, 2, nic_s_to_network);
+    from_host_map.AddMapping(1, 2, nic_c_to_network);
+    from_host_map.AddMapping(0, 3, sink_chan);
+    from_host_map.AddMapping(1, 3, sink_chan);
     // NOTE: this filtering could also be done using an event stream filter within the pipeline
     NetworkSpanner::NodeDeviceFilter node_device_filter;
     node_device_filter.AddNodeDevice(0, 2);
@@ -225,8 +229,8 @@ int main(int argc, char *argv[]) {
                                                      trace_environment,
                                                      "NS3",
                                                      tracer,
-                                                     nics_to_network,
-                                                     node_device_to_channel_map,
+                                                     from_host_map,
+                                                     to_host_map,
                                                      node_device_filter);
 
     if (result.count("gem5-server-event-stream") and result.count("gem5-client-event-stream")

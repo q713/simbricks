@@ -231,7 +231,7 @@ target_include_directories(${TEST_TAR} PUBLIC
         include
         source
         )
-target_link_libraries(${TEST_TAR} PUBLIC concurrencpp::concurrencpp)
+target_link_libraries(${TEST_TAR} PUBLIC concurrencpp::concurrencpp spdlog::spdlog)
 
 
 #######################################

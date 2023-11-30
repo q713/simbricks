@@ -42,6 +42,8 @@
 #include "opentelemetry/exporters/ostream/span_exporter_factory.h"
 #include "opentelemetry/trace/scope.h"
 #include "opentelemetry/common/timestamp.h"
+#include "opentelemetry/sdk/trace/processor.h"
+#include "opentelemetry/sdk/trace/batch_span_processor_options.h"
 
 #include "util/exception.h"
 #include "events/events.h"
@@ -179,9 +181,12 @@ class OtlpSpanExporter : public SpanExporter {
     throw_if_empty(processor, TraceException::kSpanProcessorNull, source_loc::current());
 
     // create trace provider
+    static uint64_t next_instance_id = 0;
     auto resource_attr = opentelemetry::sdk::resource::ResourceAttributes{
-        {"service.name", service_name}
+        {"service.name", service_name},
+        {"service-instance", std::to_string(next_instance_id)}
     };
+    ++next_instance_id;
     auto resource = opentelemetry::sdk::resource::Resource::Create(resource_attr);
     const provider_t
         provider = opentelemetry::sdk::trace::TracerProviderFactory::Create(std::move(processor), resource);
@@ -192,7 +197,7 @@ class OtlpSpanExporter : public SpanExporter {
     //opentelemetry::trace::Provider::SetTracerProvider(provider);
 
     // set tracer
-    auto tracer = provider->GetTracer(lib_name_, OPENTELEMETRY_SDK_VERSION);
+    auto tracer = provider->GetTracer(lib_name_);//g, OPENTELEMETRY_SDK_VERSION);
     return tracer;
   }
 
@@ -483,6 +488,9 @@ class OtlpSpanExporter : public SpanExporter {
     }
     span_options.start_system_time = ToSystemNanoseconds(span->GetStartingTs());
     span_options.start_steady_time = ToSteadyNanoseconds(span->GetStartingTs());
+
+    // 'hack' for jaeger ui...
+    span_options.kind = opentelemetry::trace::SpanKind::kServer;
 
     return std::move(span_options);
   }
@@ -791,6 +799,7 @@ class OtlpSpanExporter : public SpanExporter {
     auto span_name = GetTypeStr(to_start);
     auto tracer = GetTracerLazy(to_start->GetServiceName());
     auto span = tracer->StartSpan(span_name, span_opts);
+    span->SetStatus(opentelemetry::trace::StatusCode::kOk);
     InsertNewSpan(to_start, span);
 
     const uint64_t span_id = to_start->GetId();

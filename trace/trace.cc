@@ -136,11 +136,11 @@ int main(int argc, char *argv[]) {
 
   spdlog::set_level(trace_env_config.GetLogLevel());
 
-  //simbricks::trace::OtlpSpanExporter exporter{trace_environment,
-  //                                            trace_env_config.GetJaegerUrl(),
-  //                                            false,
-  //                                            "trace"};
-  simbricks::trace::NoOpExporter exporter{trace_environment};
+  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
+                                              trace_env_config.GetJaegerUrl(),
+                                              false,
+                                              "trace"};
+  //simbricks::trace::NoOpExporter exporter{trace_environment};
 
   Tracer tracer{trace_environment, exporter};
 

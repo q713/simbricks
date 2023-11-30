@@ -24,11 +24,12 @@
 
 MaxBackgroundThreads: 1
 MaxCpuThreads: 5
-JaegerUrl: "http://jaeger:4318/v1/traces"
+JaegerUrl: "http://otel_collector:14278/v1/traces"
+#JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
 EventBufferSize: 60000000
-LogLevel: "info"
+LogLevel: "critical"
 LinuxFuncIndicator:
   - "__sys_socket"
   - "__x64_sys_socket"
@@ -129,12 +130,12 @@ TypesToFilter:
   #- "kNicMmioWT"
 SymbolTables:
   - Identifier: "Linuxvm-Symbols"
-    #Path: "/usr/src/data-folder/trace/linux_dumps/vmlinux-image-syms.dump"
-    Path: "linux_dumps/vmlinux-image-syms.dump"
+    Path: "/config/dir/linux_dumps/vmlinux-image-syms.dump"
+    #Path: "linux_dumps/vmlinux-image-syms.dump"
     AddressOffset: 0
     Type: kSyms
   - Identifier: "Nicdriver-Symbols"
-    #Path: "/usr/src/data-folder/trace/linux_dumps/i40e-image-syms.dump"
-    Path: "linux_dumps/i40e-image-syms.dump"
+    Path: "/config/dir/linux_dumps/i40e-image-syms.dump"
+    #Path: "linux_dumps/i40e-image-syms.dump"
     AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
     Type: kSyms

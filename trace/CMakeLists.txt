@@ -31,9 +31,11 @@ project(simbricks-trace LANGUAGES CXX DESCRIPTION "simbricks trace utility for a
 # can be spedcified by -DCMAKE_BUILD_TYPE=Debug or -DCMAKE_BUILD_TYPE=Release
 #######################################
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    message(STATUS "Build_Type Debug")
     set(CMAKE_BUILD_TYPE Debug)
     add_compile_options(-fno-omit-frame-pointer)
 else()
+    message(STATUS "Build_Type Release")
     set(CMAKE_BUILD_TYPE Release)
     add_compile_options(-O2)
 endif()
@@ -46,6 +48,17 @@ if(NOT CMAKE_CXX_STANDARD)
 endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+#######################################
+# Option to enable address and UB sanitizers
+#######################################
+option(ENABLE_SANITIZER "Enable address and UB sanitizers" OFF)
+if (ENABLE_SANITIZER)
+    message(STATUS "ENABLED address and UB sanitizers")
+    add_compile_options(-fsanitize=address,undefined)
+    add_link_options(-fsanitize=address,undefined)
+else ()
+    message(STATUS "DISABLED address and UB sanitizers")
+endif ()
 
 #######################################
 # Catch 2

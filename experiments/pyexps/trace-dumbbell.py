@@ -58,7 +58,8 @@ gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,Pc
 # named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir/"
 named_pipe_folder = "/usr/src/data-folder"
 cpu_freq = '5GHz'
-eth_latency = 500 * 10**3  # 500 us
+eth_latency_ns = 20 * 10**3  # 20 us == 20.000ns
+link_latency_ns = 200 * 10**3 # 200 us == 200.000ns
 sys_clock = '1GHz'  # if not set, default 1GHz
 mtu = 1500
 ip_provider = IPProvider()
@@ -73,13 +74,12 @@ use_pressure = True
 network = NS3DumbbellNet()
 link_rate_gb_s = 10
 link_rate_opt = f'--LinkRate={link_rate_gb_s}Gb/s'
-link_latency_ns = 500
 link_latency_opt = f'--LinkLatency={link_latency_ns}ns'
 ecn_th_opt = '--EcnTh=0'
 trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {trace_file_opt}'
-network.eth_latency = eth_latency
+network.eth_latency = eth_latency_ns
 
 e.add_network(network)
 
@@ -89,7 +89,7 @@ e.add_network(network)
 # server that produces log output
 #################################
 server_nic = I40eNIC()
-server_nic.eth_latency = eth_latency
+server_nic.eth_latency = eth_latency_ns
 nicbm_server_pipe = f"{named_pipe_folder}/nicbm-server-log-pipe.pipe"
 server_nic.log_file = nicbm_server_pipe
 server_nic.set_network(network)
@@ -119,7 +119,7 @@ servers.append(server)
 # client that produces log output
 #################################
 client_nic = I40eNIC()
-client_nic.eth_latency = eth_latency
+client_nic.eth_latency = eth_latency_ns
 nicbm_client_pipe = f"{named_pipe_folder}/nicbm-client-log-pipe.pipe"
 client_nic.log_file = nicbm_client_pipe
 client_nic.set_network(network)
@@ -151,7 +151,7 @@ clients.append(client)
 # server that produces NO output
 #################################
 server_nic = I40eNIC()
-server_nic.eth_latency = eth_latency
+server_nic.eth_latency = eth_latency_ns
 server_nic.set_network(network)
 
 server_config = I40eLinuxNode()
@@ -178,7 +178,7 @@ servers.append(server)
 # client that produces NO output
 #################################
 client_nic = I40eNIC()
-client_nic.eth_latency = eth_latency
+client_nic.eth_latency = eth_latency_ns
 client_nic.set_network(network)
 
 client_config = I40eLinuxNode()

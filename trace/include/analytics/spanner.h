@@ -26,15 +26,16 @@
 #include <memory>
 #include <utility>
 
+#include "util/exception.h"
+#include "env/traceEnvironment.h"
 #include "sync/corobelt.h"
 #include "events/events.h"
-#include "util/exception.h"
+#include "parser/parser.h"
 #include "analytics/context.h"
 #include "analytics/span.h"
-#include "env/traceEnvironment.h"
 #include "analytics/tracer.h"
 #include "analytics/timer.h"
-#include "parser/parser.h"
+#include "analytics/helper.h"
 
 #ifndef SIMBRICKS_TRACE_SPANNER_H_
 #define SIMBRICKS_TRACE_SPANNER_H_
@@ -191,80 +192,6 @@ struct NicSpanner : public Spanner {
 };
 
 struct NetworkSpanner : public Spanner {
-
-  class NodeDeviceToChannelMap {
-    using ChanT = std::shared_ptr<CoroChannel<std::shared_ptr<Context>>>;
-    std::map<std::pair<int, int>, ChanT> mapping_;
-
-    void AddMapping(const std::pair<int, int> &key, const ChanT &channel) {
-      auto suc = mapping_.insert({key, channel});
-      throw_on_false(suc.second, "NetworkSpanner ip address already mapped",
-                     source_loc::current());
-    }
-
-    ChanT GetChannel(const std::pair<int, int> &node_device) const {
-      auto iter = mapping_.find(node_device);
-      if (iter != mapping_.end()) {
-        return iter->second;
-      }
-      return nullptr;
-    }
-
-   public:
-    explicit NodeDeviceToChannelMap() = default;
-
-    void AddMapping(int node, int device, const ChanT &channel) {
-      auto key = std::make_pair(node, device);
-      AddMapping(key, channel);
-    }
-
-    ChanT GetValidChannel(int node, int device) const {
-      auto result = GetChannel(std::make_pair(node, device));
-      throw_if_empty(result, TraceException::kChannelIsNull, source_loc::current());
-      return result;
-    }
-  };
-
-  class NodeDeviceFilter {
-    std::set<std::pair<int, int>> interesting_node_device_pairs_;
-
-   public:
-    explicit NodeDeviceFilter() = default;
-
-    void AddNodeDevice(const std::pair<int, int> &node_device) {
-      interesting_node_device_pairs_.insert(node_device);
-    }
-
-    void AddNodeDevice(int node, int device) {
-      interesting_node_device_pairs_.insert({node, device});
-    }
-
-    void AddNodeDevice(const std::shared_ptr<NetworkEvent> &event) {
-      if (not event) {
-        return;
-      }
-      const int node = event->GetNode();
-      const int device = event->GetDevice();
-      interesting_node_device_pairs_.insert({node, device});
-    }
-
-    bool IsInterestingNodeDevice(int node, int device) const {
-      return interesting_node_device_pairs_.contains({node, device});
-    }
-
-    bool IsInterestingNodeDevice(const std::shared_ptr<NetworkEvent> &event) const {
-      if (not event) {
-        return false;
-      }
-      const int node = event->GetNode();
-      const int device = event->GetDevice();
-      return IsInterestingNodeDevice(node, device);
-    }
-
-    bool IsNotInterestingNodeDevice(const std::shared_ptr<NetworkEvent> &event) const {
-      return not IsInterestingNodeDevice(event);
-    }
-  };
 
   explicit NetworkSpanner(TraceEnvironment &trace_environment,
                           std::string &&name,

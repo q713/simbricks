@@ -151,6 +151,7 @@ set(TRACE_LIB_HEADER_FILES
         include/analytics/traceContext.h
         include/analytics/spanner.h
         include/analytics/timer.h
+        include/analytics/helper.h
         # exporter
         include/exporter/exporter.h
         )

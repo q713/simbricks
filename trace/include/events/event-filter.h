@@ -31,6 +31,7 @@
 #include "events/events.h"
 #include "util/exception.h"
 #include "events/eventTimeBoundary.h"
+#include "analytics/helper.h"
 
 /* general operator to act on an event stream */
 class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
@@ -41,8 +42,8 @@ class EventStreamActor : public cpipe<std::shared_ptr<Event>> {
  public:
   /* this method acts on an event within the stream,
    * if true is returned, the event is after acting on
-   * it pased on, in case false is returned, the event
-   * is filtered */
+   * , passed on, in case false is returned, the event
+   * is filtered out */
   virtual bool act_on(std::shared_ptr<Event> &event) {
     return true;
   }
@@ -172,6 +173,40 @@ class HostCallFuncFilter : public EventStreamActor {
       list_.insert(sym);
     }
   }
+};
+
+class NS3EventFilter : public EventStreamActor {
+  using EveTyList = std::vector<EventType>;
+
+  const NodeDeviceFilter &node_device_filter_;
+
+ public:
+  bool act_on(std::shared_ptr<Event> &event) override {
+    if (not event) {
+      return false; // filter null
+    }
+
+    if (not IsAnyType(event,
+                      EveTyList{EventType::kNetworkEnqueueT, EventType::kNetworkDequeueT,
+                                EventType::kNetworkDequeueT})) {
+      return true; // we only apply this filter on network events
+    }
+
+    const auto &network_event = std::static_pointer_cast<NetworkEvent>(event);
+    if (network_event->InterestingFlag() and node_device_filter_.IsNotInterestingNodeDevice(network_event)) {
+      return false;
+    }
+    if (not network_event->InterestingFlag() and (node_device_filter_.IsNotInterestingNodeDevice(network_event)
+        or not IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice))) {
+      return false;
+    }
+
+    return true;
+  }
+
+  explicit NS3EventFilter(TraceEnvironment &trace_environment,
+                          const NodeDeviceFilter &node_device_filter)
+      : EventStreamActor(trace_environment), node_device_filter_(node_device_filter) {}
 };
 
 #endif // SIMBRICKS_TRACE_EVENT_FILTER_H_

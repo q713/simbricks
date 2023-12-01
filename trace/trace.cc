@@ -45,6 +45,7 @@
 #include "util/factory.h"
 #include "exporter/exporter.h"
 #include "events/printer.h"
+#include "analytics/helper.h"
 
 std::shared_ptr<EventPrinter> createPrinter(std::ofstream &out,
                                             cxxopts::ParseResult &result,
@@ -208,18 +209,18 @@ int main(int argc, char *argv[]) {
                                                  client_hn,
                                                  client_n_h_receive);
 
-    NetworkSpanner::NodeDeviceToChannelMap to_host_map;
+    NodeDeviceToChannelMap to_host_map;
     to_host_map.AddMapping(0, 2, nic_s_from_network);
     to_host_map.AddMapping(1, 2, nic_c_from_network);
     to_host_map.AddMapping(0, 3, sink_chan);
     to_host_map.AddMapping(1, 3, sink_chan);
-    NetworkSpanner::NodeDeviceToChannelMap from_host_map;
+    NodeDeviceToChannelMap from_host_map;
     from_host_map.AddMapping(0, 2, nic_s_to_network);
     from_host_map.AddMapping(1, 2, nic_c_to_network);
     from_host_map.AddMapping(0, 3, sink_chan);
     from_host_map.AddMapping(1, 3, sink_chan);
     // NOTE: this filtering could also be done using an event stream filter within the pipeline
-    NetworkSpanner::NodeDeviceFilter node_device_filter;
+    NodeDeviceFilter node_device_filter;
     node_device_filter.AddNodeDevice(0, 2);
     node_device_filter.AddNodeDevice(1, 2);
     node_device_filter.AddNodeDevice(0, 1);
@@ -498,14 +499,17 @@ int main(int argc, char *argv[]) {
     if (not printer_n_c) {
       exit(EXIT_FAILURE);
     }
+    auto ns3_event_filter = create_shared<NS3EventFilter>(TraceException::kActorIsNull,
+                                                          trace_environment,
+                                                          node_device_filter);
     std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        ns3_pipes{timestamp_filter_ns3, event_filter_ns3, printer_ns3};
+        ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter, printer_ns3};
     const pipeline<std::shared_ptr<Event>> ns3_pipeline{
         ns3_buf_pro, ns3_pipes, spanner_ns3};
-    // std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //     ns3_pipes{timestamp_filter_ns3, event_filter_ns3};
-    // const pipeline<std::shared_ptr<Event>> ns3_pipeline{
-    //     ns3_buf_pro, ns3_pipes, printer_ns3};
+    //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+    //ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter};
+    //const pipeline<std::shared_ptr<Event>> ns3_pipeline{
+    //  ns3_buf_pro, ns3_pipes, printer_ns3};
 
     std::vector<pipeline<std::shared_ptr<Event>>>
         pipelines{client_host_pipeline, server_host_pipeline, client_nic_pipeline, server_nic_pipeline, ns3_pipeline};

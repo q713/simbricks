@@ -29,6 +29,8 @@
 #include <iostream>
 #include <memory>
 
+#include "spdlog/spdlog.h"
+
 #include "sync/channel.h"
 #include "util/exception.h"
 #include "util/factory.h"
@@ -95,6 +97,8 @@ inline concurrencpp::result<void> run_pipeline_impl(
     pipeline<ValueType> &pipeline) {
   throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
 
+  spdlog::info("start a pipeline");
+
   const size_t amount_channels = pipeline.pipes_.size() + 1;
   std::vector<std::shared_ptr<CoroChannel<ValueType>>> channels{amount_channels};
   std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
@@ -121,6 +125,9 @@ inline concurrencpp::result<void> run_pipeline_impl(
     co_await channels[index]->CloseChannel(executor);
   }
   co_await tasks[amount_channels];
+
+  spdlog::info("finished a pipeline");
+
   co_return;
 }
 
@@ -202,6 +209,7 @@ inline void run_pipelines_parallel(
   //    amount_tasks};
   std::vector<concurrencpp::result<void>> pipelns{amount_tasks};
 
+  spdlog::info("start running pipelines in parallel");
   try {
     // create asynchronous(NOTE: asynchronous does not equal parallel) coroutines
     for (size_t index = 0; index < amount_tasks; index++) {
@@ -212,7 +220,6 @@ inline void run_pipelines_parallel(
     // suspend to get result
     for (size_t index = 0; index < amount_tasks; index++) {
       pipelns[index].get();
-      std::cout << "one pipeline finished" << '\n';
     }
   } catch (TraceException &exe) {
     std::cerr << exe.what() << '\n';
@@ -220,7 +227,7 @@ inline void run_pipelines_parallel(
     exit(EXIT_FAILURE);
   }
 
-  std::cout << "all pipelines finished" << '\n';
+  spdlog::info("all pipelines finished");
 }
 
 inline void await_results(std::vector<concurrencpp::result<void>> &results) {

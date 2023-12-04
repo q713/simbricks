@@ -24,8 +24,9 @@
 
 #include <iostream>
 
+#include "spdlog/spdlog.h"
+
 #include "util/cxxopts.hpp"
-#include "env/traceEnvironment.h"
 #include "reader/reader.h"
 #include "concurrencpp/concurrencpp.h"
 
@@ -91,7 +92,7 @@ int main(int argc, char *argv[]) {
   const ExecutorT executor = runtime.thread_pool_executor();
   std::array<concurrencpp::result<concurrencpp::result<void>>, 5> tasks;
 
-  std::cout << "start running exhaustion" << '\n';
+  spdlog::info("START RUNNING EXHAUSTION");
 
   // SERVER HOST PIPELINE
   ReaderBuffer<kLineBufferSize> gem5_ser_buf_pro{"Gem5ServerEventProvider", true};
@@ -132,7 +133,7 @@ int main(int argc, char *argv[]) {
     task.get().get();
   }
 
-  std::cout << "finished exhaustion" << '\n';
+  spdlog::info("FINISHED EXHAUSTION");
 
   exit(EXIT_SUCCESS);
 }

@@ -30,7 +30,7 @@ services:
     image: jaegertracing/all-in-one:latest
     volumes:
       - /local/jakobg/simbricks-fork/trace:/config/dir
-    command: --query.ui-config /config/dir/jaeger-ui.json
+    command: --query.ui-config /config/dir/jaeger-ui.json # --prometheus.query.support-spanmetrics-connector=true
     environment:
       - METRICS_STORAGE_TYPE=prometheus
       - PROMETHEUS_SERVER_URL=http://prometheus:9090

@@ -367,7 +367,7 @@ int main(int argc, char *argv[]) {
     const pipeline<std::shared_ptr<Event>> server_host_pipeline{
         gem5_ser_buf_pro, server_host_pipes, spanner_h_s};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    server_host_pipes{timestamp_filter_h_s, event_filter_h_s};
+    //    server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s};
     //const pipeline<std::shared_ptr<Event>> server_host_pipeline{
     //    gem5_ser_buf_pro, server_host_pipes, printer_h_s};
 
@@ -406,7 +406,7 @@ int main(int argc, char *argv[]) {
     const pipeline<std::shared_ptr<Event>> client_host_pipeline{
         gem5_client_buf_pro, client_host_pipes, spanner_h_c};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    client_host_pipes{timestamp_filter_h_c, event_filter_h_c};
+    //    client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c};
     //const pipeline<std::shared_ptr<Event>> client_host_pipeline{
     //    gem5_client_buf_pro, client_host_pipes, printer_h_c};
 

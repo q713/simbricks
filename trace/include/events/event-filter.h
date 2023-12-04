@@ -196,9 +196,11 @@ class NS3EventFilter : public EventStreamActor {
     if (network_event->InterestingFlag() and node_device_filter_.IsNotInterestingNodeDevice(network_event)) {
       return false;
     }
-    if (not network_event->InterestingFlag() and (node_device_filter_.IsNotInterestingNodeDevice(network_event)
-        or not IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice))) {
-      return false;
+
+    if (not network_event->InterestingFlag()) {
+      const bool res = node_device_filter_.IsInterestingNodeDevice(network_event)
+          and IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice);
+      return res;
     }
 
     return true;

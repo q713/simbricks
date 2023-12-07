@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
 
   constexpr size_t kAmountSources = 5;
   constexpr size_t kLineBufferSize = 1;
-  constexpr size_t kEventBufferSize = 100'000'000;
+  constexpr size_t kEventBufferSize = 10'000'000;
   //constexpr size_t kEventBufferSize = 1;
   constexpr bool kNamedPipes = true;
   Timer timer{kAmountSources};
@@ -362,14 +362,14 @@ int main(int argc, char *argv[]) {
                                                              trace_environment,
                                                              blacklist_functions,
                                                              true);
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s, printer_h_s};
-    const pipeline<std::shared_ptr<Event>> server_host_pipeline{
-        gem5_ser_buf_pro, server_host_pipes, spanner_h_s};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s};
+    //    server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s, printer_h_s};
     //const pipeline<std::shared_ptr<Event>> server_host_pipeline{
-    //    gem5_ser_buf_pro, server_host_pipes, printer_h_s};
+    //    gem5_ser_buf_pro, server_host_pipes, spanner_h_s};
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+        server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s};
+    const pipeline<std::shared_ptr<Event>> server_host_pipeline{
+        gem5_ser_buf_pro, server_host_pipes, printer_h_s};
 
     // CLIENT HOST PIPELINE
     auto event_filter_h_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -401,14 +401,14 @@ int main(int argc, char *argv[]) {
                                                              trace_environment,
                                                              blacklist_functions,
                                                              true);
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c, printer_h_c};
-    const pipeline<std::shared_ptr<Event>> client_host_pipeline{
-        gem5_client_buf_pro, client_host_pipes, spanner_h_c};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c};
+    //    client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c, printer_h_c};
     //const pipeline<std::shared_ptr<Event>> client_host_pipeline{
-    //    gem5_client_buf_pro, client_host_pipes, printer_h_c};
+    //    gem5_client_buf_pro, client_host_pipes, spanner_h_c};
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+        client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c};
+    const pipeline<std::shared_ptr<Event>> client_host_pipeline{
+        gem5_client_buf_pro, client_host_pipes, printer_h_c};
 
     // SERVER NIC PIPELINE
     auto event_filter_n_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -434,14 +434,14 @@ int main(int argc, char *argv[]) {
     if (not printer_n_s) {
       exit(EXIT_FAILURE);
     }
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        server_nic_pipes{timestamp_filter_n_s, event_filter_n_s, printer_n_s};
-    const pipeline<std::shared_ptr<Event>> server_nic_pipeline{
-        nicbm_ser_buf_pro, server_nic_pipes, spanner_n_s};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    server_nic_pipes{timestamp_filter_n_s, event_filter_n_s};
+    //    server_nic_pipes{timestamp_filter_n_s, event_filter_n_s, printer_n_s};
     //const pipeline<std::shared_ptr<Event>> server_nic_pipeline{
-    //    nicbm_ser_buf_pro, server_nic_pipes, printer_n_s};
+    //    nicbm_ser_buf_pro, server_nic_pipes, spanner_n_s};
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+        server_nic_pipes{timestamp_filter_n_s, event_filter_n_s};
+    const pipeline<std::shared_ptr<Event>> server_nic_pipeline{
+        nicbm_ser_buf_pro, server_nic_pipes, printer_n_s};
 
     // CLIENT NIC PIPELINE
     auto event_filter_n_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -467,14 +467,14 @@ int main(int argc, char *argv[]) {
     if (not printer_n_c) {
       exit(EXIT_FAILURE);
     }
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        client_nic_pipes{timestamp_filter_n_c, event_filter_n_c, printer_n_c};
-    const pipeline<std::shared_ptr<Event>> client_nic_pipeline{
-        nicbm_client_buf_pro, client_nic_pipes, spanner_n_c};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    client_nic_pipes{timestamp_filter_n_c, event_filter_n_c};
+    //    client_nic_pipes{timestamp_filter_n_c, event_filter_n_c, printer_n_c};
     //const pipeline<std::shared_ptr<Event>> client_nic_pipeline{
-    //    nicbm_client_buf_pro, client_nic_pipes, printer_n_c};
+    //    nicbm_client_buf_pro, client_nic_pipes, spanner_n_c};
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+        client_nic_pipes{timestamp_filter_n_c, event_filter_n_c};
+    const pipeline<std::shared_ptr<Event>> client_nic_pipeline{
+        nicbm_client_buf_pro, client_nic_pipes, printer_n_c};
 
     // NS3 PIPELINE
     auto event_filter_ns3 = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -502,14 +502,14 @@ int main(int argc, char *argv[]) {
     auto ns3_event_filter = create_shared<NS3EventFilter>(TraceException::kActorIsNull,
                                                           trace_environment,
                                                           node_device_filter);
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter, printer_ns3};
-    const pipeline<std::shared_ptr<Event>> ns3_pipeline{
-        ns3_buf_pro, ns3_pipes, spanner_ns3};
     //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter};
+    //    ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter, printer_ns3};
     //const pipeline<std::shared_ptr<Event>> ns3_pipeline{
-    //  ns3_buf_pro, ns3_pipes, printer_ns3};
+    //    ns3_buf_pro, ns3_pipes, spanner_ns3};
+    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
+        ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter};
+    const pipeline<std::shared_ptr<Event>> ns3_pipeline{
+        ns3_buf_pro, ns3_pipes, printer_ns3};
 
     std::vector<pipeline<std::shared_ptr<Event>>>
         pipelines{client_host_pipeline, server_host_pipeline, client_nic_pipeline, server_nic_pipeline, ns3_pipeline};

@@ -245,14 +245,13 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
   spdlog::info("{} host polled dma", name_);
 
   if (not is_expectation(con_opt.value(), expectation::kDma)) {
-    std::cerr << "when polling for dma context, no dma context was fetched"
-              << '\n';
+    spdlog::critical("when polling for dma context, no dma context was fetched");
     co_return false;
   }
 
   // TODO: investigate this case further
   if (IsType(event_ptr, EventType::kHostDmaCT)) {
-    std::cerr << "unexpected event: " << *event_ptr << '\n';
+    spdlog::warn("unexpected event: ", *event_ptr);
     co_return false;
   }
   assert(not IsType(event_ptr, EventType::kHostDmaCT) and
@@ -278,7 +277,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
   spdlog::info("{} host polled msix", name_);
 
   if (not is_expectation(con, expectation::kMsix)) {
-    std::cerr << "did not receive msix on context queue" << '\n';
+   spdlog::warn("did not receive msix on context queue");
     co_return false;
   }
 

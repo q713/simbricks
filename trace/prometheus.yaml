@@ -22,9 +22,15 @@
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
 scrape_configs:
   - job_name: 'aggregated-trace-metrics'
-    scrape_interval: 10s
+    scrape_interval: 15s
+    scrape_timeout: 10s
     static_configs:
-      - targets: ['otel_collector:8889']
-      - targets: ['otel_collector:8888']
+      - targets:
+          - otel_collector:8889
+        #- otel_collector:8888

@@ -32,11 +32,10 @@ receivers:
 exporters:
   prometheus:
     endpoint: "0.0.0.0:8889"
-
-    #prometheusremotewrite:
-    #  endpoint: http://prometheus:9090/api/v1/write
-    #target_info:
-    #  enabled: true
+  #prometheusremotewrite:
+  #  endpoint: http://prometheus:9090/api/v1/write
+  #  target_info:
+  #    enabled: true
 
   debug:
 
@@ -47,16 +46,42 @@ exporters:
 
 connectors:
   spanmetrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
   #  namespace: span_metrics
 
 processors:
-  batch:
+  tail_sampling:
+    decision_wait: 360s
+    policies: [
+      {
+        name: is-receive-span,
+        type: ottl_condition,
+        ottl_condition: {
+          error_mode: propagate,
+          span: [
+            "attributes[\"kernel-receive\"] == \"true\"",
+          ]
+        }
+      },
+      {
+        name: is-transmit-span,
+        type: ottl_condition,
+        ottl_condition: {
+          error_mode: propagate,
+          span: [
+            "attributes[\"driver-transmit\"] == \"true\"",
+          ]
+        }
+      }
+    ]
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
-      processors: [batch]
+      processors: [tail_sampling]
       exporters: [spanmetrics, otlp]
     metrics/spanmetrics:
       receivers: [spanmetrics]

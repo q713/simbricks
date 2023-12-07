@@ -64,7 +64,7 @@ link_latency_ns = 10 * 10**3 # 10 us == 10.000ns
 sys_clock = '1GHz'  # if not set, default 1GHz
 mtu = 1500
 ip_provider = IPProvider()
-num_pairs = 2
+num_pairs = 1
 use_pressure = True
 synchronized = 1
 
@@ -158,61 +158,61 @@ clients.append(client)
 #################################
 # server that produces NO output
 #################################
-server_nic = I40eNIC()
-server_nic.eth_latency = eth_latency_ns
-server_nic.sync_mode = synchronized
-server_nic.set_network(network)
-
-server_config = I40eLinuxNode()
-server_config.mtu = mtu
-server_config.ip = ip_provider.GetNext()
-if use_pressure:
-    server_config.app = NetperfServer()
-else:
-    server_config.app = IdleHost()
-
-server = Gem5Host(server_config)
-server.name = 'server.2'
-server.cpu_freq = cpu_freq
-server.sync_mode = synchronized
-
-server.add_nic(server_nic)
-e.add_nic(server_nic)
-e.add_host(server)
-
-servers.append(server)
+#server_nic = I40eNIC()
+#server_nic.eth_latency = eth_latency_ns
+#server_nic.sync_mode = synchronized
+#server_nic.set_network(network)
+#
+#server_config = I40eLinuxNode()
+#server_config.mtu = mtu
+#server_config.ip = ip_provider.GetNext()
+#if use_pressure:
+#    server_config.app = NetperfServer()
+#else:
+#    server_config.app = IdleHost()
+#
+#server = Gem5Host(server_config)
+#server.name = 'server.2'
+#server.cpu_freq = cpu_freq
+#server.sync_mode = synchronized
+#
+#server.add_nic(server_nic)
+#e.add_nic(server_nic)
+#e.add_host(server)
+#
+#servers.append(server)
 
 
 
 #################################
 # client that produces NO output
 #################################
-client_nic = I40eNIC()
-client_nic.eth_latency = eth_latency_ns
-client_nic.sync_mode = synchronized
-client_nic.set_network(network)
-
-client_config = I40eLinuxNode()
-client_config.mtu = mtu
-client_config.ip = ip_provider.GetNext()
-if use_pressure:
-    client_config.app = ColumboNetperfClient()
-    client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_STREAM
-    client_config.app.test_len = 10
-else:
-    client_config.app = IdleHost()
-
-client = Gem5Host(client_config)
-client.name = 'client.2'
-client.cpu_freq = cpu_freq
-client.wait = True
-client.sync_mode = synchronized
-
-client.add_nic(client_nic)
-e.add_nic(client_nic)
-e.add_host(client)
-
-clients.append(client)
+#client_nic = I40eNIC()
+#client_nic.eth_latency = eth_latency_ns
+#client_nic.sync_mode = synchronized
+#client_nic.set_network(network)
+#
+#client_config = I40eLinuxNode()
+#client_config.mtu = mtu
+#client_config.ip = ip_provider.GetNext()
+#if use_pressure:
+#    client_config.app = ColumboNetperfClient()
+#    client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_STREAM
+#    client_config.app.test_len = 10
+#else:
+#    client_config.app = IdleHost()
+#
+#client = Gem5Host(client_config)
+#client.name = 'client.2'
+#client.cpu_freq = cpu_freq
+#client.wait = True
+#client.sync_mode = synchronized
+#
+#client.add_nic(client_nic)
+#e.add_nic(client_nic)
+#e.add_host(client)
+#
+#clients.append(client)
 
 
 
@@ -220,12 +220,13 @@ clients.append(client)
 # tell client apps about server ips
 #################################
 assert(len(servers) == len(clients))
-assert(len(clients) == 2)
+#assert(len(clients) == 2)
+assert(len(clients) == 1)
 assert(num_pairs == len(clients))
 
 clients[0].node_config.app.server_ip = servers[0].node_config.ip
-if use_pressure:
-    clients[1].node_config.app.server_ip = servers[1].node_config.ip
+#if use_pressure:
+#    clients[1].node_config.app.server_ip = servers[1].node_config.ip
 
 clients[num_pairs - 1].node_config.app.is_last = True
 clients[num_pairs - 1].wait = True

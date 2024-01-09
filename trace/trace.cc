@@ -147,7 +147,7 @@ int main(int argc, char *argv[]) {
 
   constexpr size_t kAmountSources = 5;
   constexpr size_t kLineBufferSize = 1;
-  constexpr size_t kEventBufferSize = 10'000'000;
+  constexpr size_t kEventBufferSize = 100'000'000;
   //constexpr size_t kEventBufferSize = 1;
   constexpr bool kNamedPipes = true;
   Timer timer{kAmountSources};

@@ -53,6 +53,7 @@ class TraceException : public std::exception {
   inline static const std::string kChannelIsNull{"channel<ValueType> is null"};
   inline static const std::string kPipeIsNull{"pipe<ValueType> is null"};
   inline static const std::string kConsumerIsNull{"consumer<ValueType> is null"};
+  inline static const std::string kHandlerIsNull{"consumer<ValueType> is null"};
   inline static const std::string kProducerIsNull{"producer<ValueType> is null"};
   inline static const std::string kEventIsNull{"Event is null"};
   inline static const std::string kTraceIsNull{"Trace is null"};
@@ -197,7 +198,7 @@ inline void throw_on_false(bool should_throw, const std::string &&message, const
 template<typename ValueType>
 ValueType OrElseThrow(std::optional<ValueType> &val_opt, const char *message, const source_loc &location) {
   throw_on(not val_opt.has_value(), message, location);
-  return val_opt.value();
+  return *val_opt;
 }
 
 template<typename ValueType>

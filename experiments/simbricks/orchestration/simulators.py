@@ -134,7 +134,7 @@ class NICSim(PCIDevSim):
         self.eth_latency = 500
         """Ethernet latency in nanoseconds from this NIC to the network
         component."""
-        self.log_file: tp.Optional[str] = None 
+        self.log_file: tp.Optional[str] = None
 
     def set_network(self, net: NetSim):
         """Connect this NIC to a network simulator."""
@@ -872,6 +872,10 @@ class TofinoNet(NetSim):
 
 class NS3DumbbellNet(NetSim):
 
+    def __init__(self, dumbbell_binary_name: str = 'cosim-dumbbell-example'):
+        super().__init__()
+        self.dumbbell_binary_name: str = dumbbell_binary_name
+
     def run_cmd(self, env):
         ports = ''
         for (n, s) in self.connect_sockets(env):
@@ -882,7 +886,7 @@ class NS3DumbbellNet(NetSim):
 
         cmd = (
             f'{env.repodir}/sims/external/ns-3'
-            f'/cosim-run.sh cosim cosim-dumbbell-example {ports} {self.opt}'
+            f'/cosim-run.sh cosim {self.dumbbell_binary_name} {ports} {self.opt}'
         )
         print(cmd)
 

@@ -251,7 +251,7 @@ class MtcpNode(NodeConfig):
             'mount -t tmpfs tmpfs /dev/shm',
             'echo ' + str(self.num_hugepages) + ' > /sys/devices/system/' + \
             'node/node0/hugepages/hugepages-2048kB/nr_hugepages',
-        ]
+            ]
 
     def prepare_post_cp(self):
         return super().prepare_post_cp() + [
@@ -306,7 +306,7 @@ class TASNode(NodeConfig):
             'mount -t tmpfs tmpfs /dev/shm',
             'echo ' + str(self.num_hugepages) + ' > /sys/devices/system/' + \
             'node/node0/hugepages/hugepages-2048kB/nr_hugepages',
-        ]
+            ]
 
     def prepare_post_cp(self):
         cmds = super().prepare_post_cp() + [
@@ -579,7 +579,6 @@ class NetperfClient(AppConfig):
             )
         ]
 
-
 class ColumboNetperfClient(AppConfig):
     class SenderType(Enum):
         # Request Response tests a.k.a latency measurement
@@ -605,6 +604,67 @@ class ColumboNetperfClient(AppConfig):
         return [
             f'netperf -H {self.server_ip} -l {self.test_len} -t {self.sender_type}'
             ' -- -o mean_latency,p50_latency,p90_latency,p99_latency'
+        ]
+
+class NTPServer(AppConfig):
+
+    def __init__(self):
+        super().__init__()
+        # see install-bash.sh
+
+    def prepare_pre_cp(self):
+        return super().prepare_pre_cp() + [
+            f"""
+echo "driftfile /var/lib/chrony/drift" >> /etc/chrochronyc trackingny.conf
+echo "local stratum 1" >> /etc/chrony.conf
+echo "allow 192.168.64.0/24" >> /etc/chrony.conf
+echo "ratelimit interval -2" >> /etc/chrony.conf
+"""
+        ]
+
+    def run_cmds(self, node):
+        return [
+            """
+            chronyd -4 -s -d -f /etc/chrony.conf
+            """
+        ]
+
+class NTPClient(AppConfig):
+
+    def __init__(self, server_ip='10.0.0.1'):
+        super().__init__()
+        # see install-bash.sh
+        self.server_ip = server_ip
+
+    def prepare_pre_cp(self):
+        # minpoll 2 maxpoll 2
+        # echo "makestep 0.1 3" >> /etc/chrony.conf
+        return super().prepare_pre_cp() + [
+            f"""
+echo "driftfile /var/lib/chrony/drift" >> /etc/chrony.conf
+echo "server {self.server_ip} iburst " >> /etc/chrony.conf
+echo "makestep 1 -1" >> /etc/chrony.conf
+
+echo "sleep 2" >> query.sh
+echo "for i in {{0..100}}" >> query.sh
+echo "do" >> query.sh
+echo "    sleep 2" >> query.sh
+echo "    chronyc -n tracking" >> query.sh
+echo "    chronyc -n sources" >> query.sh
+echo "    chronyc -n sourcestats" >> query.sh
+echo "done" >> query.sh
+chmod +x query.sh
+"""
+        ]
+
+    def run_cmds(self, node):
+        return [
+            """
+            chronyd -4 -d -d -f /etc/chrony.conf &
+            ./query.sh &
+            pid=$!
+            wait $pid
+            """
         ]
 
 

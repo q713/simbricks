@@ -22,10 +22,10 @@
 
 from simbricks.orchestration.experiments import Experiment
 from simbricks.orchestration.nodeconfig import (
-    NodeConfig, I40eLinuxNode, IdleHost, PingClient, I40eDCTCPNode, ColumboNetperfClient, NetperfServer
+    I40eLinuxNode, ColumboNetperfClient, NTPServer, NTPClient
 )
 from simbricks.orchestration.simulators import (
-    Gem5Host, I40eNIC, SwitchNet, NS3DumbbellNet
+    Gem5Host, I40eNIC, NS3DumbbellNet, QemuHost
 )
 from simbricks.orchestration.simulator_utils import create_dctcp_hosts
 import simbricks.orchestration.experiments as exp
@@ -50,12 +50,12 @@ class IPProvider():
 #################################
 # Start building the actual experiment
 #################################
-e = Experiment(name='trace-dumbbell-experiment')
+e = Experiment(name='simple-tp-exp')
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
 servers = []
 clients = []
 gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,PciHost,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecUser,ExecKernel,ExecOpClass,ExecRegDelta,ExecFaulting,ExecAsid,ExecFlags,ExecCPSeq,ExecFaulting,ExecFetchSeq'
-# named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir/"
+#named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir"
 named_pipe_folder = "/usr/src/data-folder"
 cpu_freq = '5GHz'
 eth_latency_ns = 500
@@ -73,20 +73,22 @@ synchronized = 1
 #################################
 # network simulator (ns3)
 #################################
-network = NS3DumbbellNet()
+network = NS3DumbbellNet('cosim-dumbbell-hybrid-example')
 link_rate_gb_s = 10
 link_rate_opt = f'--LinkRate={link_rate_gb_s}Gb/s'
 link_latency_opt = f'--LinkLatency={link_latency_ns}ns'
 ecn_th_opt = '--EcnTh=0'
 trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
+#trace_file_path = f'{named_pipe_folder}/ns3-log-pipe-raw-log.txt'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
-network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {trace_file_opt}'
+mtu_opt = f'--Mtu=1500'
+ns3_hosts_opt = '--NumNs3HostPairs=4'
+network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
+#network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt}'
 network.eth_latency = eth_latency_ns
 network.sync_mode = synchronized
 
 e.add_network(network)
-
-
 
 #################################
 # server that produces log output
@@ -101,7 +103,7 @@ server_nic.set_network(network)
 server_config = I40eLinuxNode()
 server_config.mtu = mtu
 server_config.ip = ip_provider.GetNext()
-server_config.app = NetperfServer()
+server_config.app = NTPServer()
 
 server = Gem5Host(server_config)
 server.name = 'server.1'
@@ -133,9 +135,7 @@ client_nic.set_network(network)
 client_config = I40eLinuxNode()
 client_config.mtu = mtu
 client_config.ip = ip_provider.GetNext()
-client_config.app = ColumboNetperfClient()
-client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_RR
-client_config.app.test_len = 2
+client_config.app = NTPClient(server_config.ip)
 
 client = Gem5Host(client_config)
 client.name = 'client.1'
@@ -153,82 +153,19 @@ e.add_host(client)
 
 clients.append(client)
 
-
-
-#################################
-# server that produces NO output
-#################################
-server_nic = I40eNIC()
-server_nic.eth_latency = eth_latency_ns
-server_nic.sync_mode = synchronized
-server_nic.set_network(network)
-
-server_config = I40eLinuxNode()
-server_config.mtu = mtu
-server_config.ip = ip_provider.GetNext()
-if use_pressure:
-    server_config.app = NetperfServer()
-else:
-    server_config.app = IdleHost()
-
-server = Gem5Host(server_config)
-server.name = 'server.2'
-server.cpu_freq = cpu_freq
-server.sync_mode = synchronized
-
-server.add_nic(server_nic)
-e.add_nic(server_nic)
-e.add_host(server)
-
-servers.append(server)
-
-
-
-#################################
-# client that produces NO output
-#################################
-client_nic = I40eNIC()
-client_nic.eth_latency = eth_latency_ns
-client_nic.sync_mode = synchronized
-client_nic.set_network(network)
-
-client_config = I40eLinuxNode()
-client_config.mtu = mtu
-client_config.ip = ip_provider.GetNext()
-if use_pressure:
-    client_config.app = ColumboNetperfClient()
-    client_config.app.sender_type = ColumboNetperfClient.SenderType.TCP_STREAM
-    client_config.app.test_len = 10
-else:
-    client_config.app = IdleHost()
-
-client = Gem5Host(client_config)
-client.name = 'client.2'
-client.cpu_freq = cpu_freq
-client.wait = True
-client.sync_mode = synchronized
-
-client.add_nic(client_nic)
-e.add_nic(client_nic)
-e.add_host(client)
-
-clients.append(client)
-
-
-
 #################################
 # tell client apps about server ips
 #################################
 assert(len(servers) == len(clients))
-assert(len(clients) == 2)
-#assert(len(clients) == 1)
-assert(num_pairs == len(clients))
+assert(len(clients) == 1)
+
 
 clients[0].node_config.app.server_ip = servers[0].node_config.ip
-if use_pressure:
-    clients[1].node_config.app.server_ip = servers[1].node_config.ip
-
-clients[num_pairs - 1].node_config.app.is_last = True
-clients[num_pairs - 1].wait = True
+clients[0].node_config.app.is_last = True
+clients[0].wait = True
 
 experiments = [e]
+
+#/local/jakobg/simbricks-fork/sims/external/qemu/build/x86_64-softmmu/qemu-system-x86_64 -machine q35,accel=kvm:tcg -serial mon:stdio -cpu Skylake-Server -display none -nic none -kernel /local/jakobg/simbricks-fork/images/bzImage -drive file=/local/jakobg/tracing-experiments/wrkdir/simple-ntp-exp/1/hdcopy.client.1,if=ide,index=0,media=disk -drive file=/local/jakobg/tracing-experiments/wrkdir/simple-ntp-exp/1/cfg.client.1.tar,if=ide,index=1,media=disk,driver=raw -append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 init=/home/ubuntu/guestinit.sh rw" -m 8192 -smp 1 -device simbricks-pci,socket=/local/jakobg/tracing-experiments/wrkdir/simple-ntp-exp/1/dev.pci.client.1.,sync=off
+#/local/jakobg/simbricks-fork/sims/external/qemu/build/x86_64-softmmu/qemu-system-x86_64 -machine q35,accel=kvm:tcg -serial mon:stdio -cpu Skylake-Server -display none -nic none -kernel /local/jakobg/simbricks-fork/images/bzImage -drive format=raw,file=/local/jakobg/simbricks-fork/images/output-base/base-client.raw -append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 init=/sbin/init rw" -m 8192 -smp 1
+#/local/jakobg/simbricks-fork/sims/external/qemu/build/x86_64-softmmu/qemu-system-x86_64 -machine q35,accel=kvm:tcg -serial mon:stdio -cpu Skylake-Server -display none -nic none -kernel /local/jakobg/simbricks-fork/images/bzImage -drive file=/local/jakobg/simbricks-fork/images/output-base/base-client.raw,if=ide,index=1,media=disk,driver=raw -append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 init=/sbin/init rw" -m 8192 -smp 1

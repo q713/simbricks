@@ -14,7 +14,7 @@ apt-get -y install \
     pciutils \
     busybox \
     numactl \
-    sysbench
+    chrony
 
 pushd /tmp/input
 mv guestinit.sh /home/ubuntu/guestinit.sh

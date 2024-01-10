@@ -23,7 +23,7 @@
 #
 
 MaxBackgroundThreads: 1
-MaxCpuThreads: 5
+MaxCpuThreads: 15
 JaegerUrl: "http://otel_collector:14278/v1/traces"
 #JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"

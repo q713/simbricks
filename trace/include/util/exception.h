@@ -50,6 +50,7 @@ class TraceException : public std::exception {
 
  public:
   inline static const std::string kResumeExecutorNull{"concurrencpp::executor is null"};
+  inline static const std::string kPipelineNull{"Pipeline is null"};
   inline static const std::string kChannelIsNull{"channel<ValueType> is null"};
   inline static const std::string kPipeIsNull{"pipe<ValueType> is null"};
   inline static const std::string kConsumerIsNull{"consumer<ValueType> is null"};

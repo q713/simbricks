@@ -219,12 +219,12 @@ class PrinterInt : public Consumer<int> {
 
 #define CREATE_PIPELINE(name, start, end, amount_adder, ss) \
   auto prod_##name = std::make_shared<ProducerInt>(start, end); \
-  std::vector<std::shared_ptr<Handler<int>>> adders_##name{amount_adder}; \
+  auto adders_##name = std::make_shared<std::vector<std::shared_ptr<Handler<int>>>>(amount_adder); \
   for (size_t index = 0; index < amount_adder; index++) { \
-    adders_##name[index] = std::make_shared<AdderInt>(); \
+    (*adders_##name)[index] = std::make_shared<AdderInt>(); \
   } \
   auto cons_##name = std::make_shared<PrinterInt>(ss); \
-  Pipeline<int> pipeline_##name{std::move(prod_##name), std::move(adders_##name), std::move(cons_##name)};
+  auto pipeline_##name = std::make_shared<Pipeline<int>>(prod_##name, adders_##name, cons_##name);
 
 std::string CreateExpectation(int start, int end) {
   std::stringstream ss;
@@ -260,7 +260,9 @@ TEST_CASE("Test NEW pipeline wrapper construct", "[run_pipeline]") {
     CREATE_PIPELINE(simple_a, 0, 3, 30, ss_a);
     CREATE_PIPELINE(simple_b, 100, 103, 30, ss_b);
 
-    std::vector<Pipeline<int>> pipelines{pipeline_simple_a, pipeline_simple_b};
+    auto pipelines = std::make_shared<std::vector<std::shared_ptr<Pipeline<int>>>>();
+    pipelines->push_back(pipeline_simple_a);
+    pipelines->push_back(pipeline_simple_b);
 
     REQUIRE_NOTHROW(RunPipelines<int>(thread_pool_executor, pipelines));
 
@@ -283,7 +285,9 @@ TEST_CASE("Test NEW pipeline wrapper construct", "[run_pipeline]") {
     CREATE_PIPELINE(simple_d, 0, 3, 90, ss_d);
     CREATE_PIPELINE(simple_e, 100, 103, 90, ss_e);
 
-    std::vector<Pipeline<int>> pipelines{pipeline_simple_d, pipeline_simple_e};
+    auto pipelines = std::make_shared<std::vector<std::shared_ptr<Pipeline<int>>>>();
+    pipelines->push_back(pipeline_simple_d);
+    pipelines->push_back(pipeline_simple_e);
 
     REQUIRE_NOTHROW(RunPipelines<int>(thread_pool_executor, pipelines));
 

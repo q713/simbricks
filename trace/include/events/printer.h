@@ -43,6 +43,33 @@ struct fmt::formatter<Etype> : fmt::formatter<std::string> {
   }
 };
 
+class EventPrinter : public Consumer<std::shared_ptr<Event>>,
+                     public Handler<std::shared_ptr<Event>> {
+  std::ostream &out_;
+
+  inline void print(const std::shared_ptr<Event> &event) {
+    throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
+    out_ << *event << '\n';
+    out_.flush();
+  }
+
+ public:
+
+  explicit EventPrinter(std::ostream &out) : out_(out) {
+  }
+
+  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, std::shared_ptr<Event> value) override {
+    print(value);
+    co_return;
+  }
+
+  concurrencpp::result<bool> handel(std::shared_ptr<concurrencpp::executor> executor, std::shared_ptr<Event> &value) override {
+    print(value);
+    co_return true;
+  };
+};
+
+#if 0
 class EventPrinter : public consumer<std::shared_ptr<Event>>,
                      public cpipe<std::shared_ptr<Event>> {
   std::ostream &out_;
@@ -99,5 +126,5 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
     co_return;
   }
 };
-
+#endif
 #endif // SIMBRICKS_TRACE_EVENTS_PRINTER_H_

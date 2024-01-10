@@ -102,7 +102,7 @@ class Producer {
     return false;
   };
 
-  virtual concurrencpp::result<std::optional<ValueType>> produce() {
+  virtual concurrencpp::result<std::optional<ValueType>> produce(std::shared_ptr<concurrencpp::executor> executor) {
     return {};
   };
 };
@@ -112,7 +112,7 @@ class Consumer {
  public:
   explicit Consumer() = default;
 
-  virtual concurrencpp::result<void> consume(ValueType value) {
+  virtual concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, ValueType value) {
     co_return;
   };
 };
@@ -122,7 +122,7 @@ class Handler {
  public:
   explicit Handler() = default;
 
-  virtual concurrencpp::result<bool> handel(ValueType &value) {
+  virtual concurrencpp::result<bool> handel(std::shared_ptr<concurrencpp::executor> executor, ValueType &value) {
     co_return false;
   };
 };
@@ -156,7 +156,7 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
   throw_if_empty(producer, TraceException::kProducerIsNull, source_loc::current());
 
   while (*producer) {
-    std::optional<ValueType> value = co_await producer->produce();
+    std::optional<ValueType> value = co_await producer->produce(tpe);
     if (not value.has_value()) {
       break;
     }
@@ -183,7 +183,7 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     ValueType value = *opt_val;
 
-    co_await consumer->consume(value);
+    co_await consumer->consume(tpe, value);
   }
 
   co_return;
@@ -204,7 +204,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     ValueType value = *opt_val;
 
-    const bool pass_on = co_await handler->handel(value);
+    const bool pass_on = co_await handler->handel(tpe, value);
 
     if (pass_on) {
       const bool could_push = co_await tar_chan->Push(tpe, value);

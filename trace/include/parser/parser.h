@@ -152,6 +152,92 @@ class NS3Parser : public LogParser {
   ParseEvent(LineHandler &line_handler) override;
 };
 
+template<bool NamedPipe, size_t LineBufferSize, size_t EventBufferSize = 1> requires
+SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
+class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
+
+  TraceEnvironment &trace_environment_;
+  const std::string name_;
+  const std::string log_file_path_;
+  LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
+  ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
+  std::vector<std::shared_ptr<Event>> event_buffer_{EventBufferSize};
+  size_t cur_size_ = 0;
+  size_t cur_line_index_ = 0;
+
+  //WeakTimer &timer_;
+  Timer &timer_;
+
+  concurrencpp::result<void>
+  ResetFillBuffer() {
+    cur_line_index_ = 0;
+    cur_size_ = 0;
+
+    for (size_t index = 0; index < EventBufferSize; index++) {
+
+      std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
+      if (not bh_p.first or not bh_p.second) {
+        break;
+      }
+
+      LineHandler &line_handler = *bh_p.second;
+
+      std::shared_ptr<Event> event = co_await log_parser_.ParseEvent(line_handler);
+      if (not event) {
+        continue;
+      }
+
+      event_buffer_[index] = event;
+      cur_size_++;
+    }
+
+    co_return;
+  }
+
+  bool StillBuffered() const {
+    return cur_size_ > 0 and cur_line_index_ < cur_size_;
+  }
+
+ public:
+  explicit BufferedEventProvider(TraceEnvironment &trace_environment,
+                                 const std::string name,
+                                 const std::string log_file_path,
+                                 LogParser &log_parser,
+      //WeakTimer &timer_)
+                                 Timer &timer_)
+      : Producer<std::shared_ptr<Event>>(),
+        trace_environment_(trace_environment),
+        name_(name),
+        log_file_path_(log_file_path),
+        log_parser_(log_parser),
+        timer_(timer_) {
+    line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
+  };
+
+  ~BufferedEventProvider() = default;
+
+  explicit operator bool() noexcept override {
+    if (not StillBuffered()) {
+      ResetFillBuffer().get();
+    }
+    return StillBuffered();
+  };
+
+  concurrencpp::result<std::optional<std::shared_ptr<Event>>> produce(std::shared_ptr<concurrencpp::executor> executor) override {
+    if (not StillBuffered()) {
+      co_await ResetFillBuffer();
+      if (not StillBuffered()) {
+        co_return std::nullopt;
+      }
+    }
+
+    size_t next = cur_line_index_;
+    ++cur_line_index_;
+    std::shared_ptr<Event> event = event_buffer_[next];
+    co_return event;
+  }
+};
+
 #if 0
 template<size_t LineBufferSize, size_t EventBufferSize = 1>
 requires SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
@@ -186,6 +272,7 @@ concurrencpp::result<void> FillBuffer(concurrencpp::executor_tag,
 };
 #endif
 
+#if 0
 template<bool NamedPipe, size_t LineBufferSize, size_t EventBufferSize = 1> requires
 SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
 class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
@@ -334,5 +421,6 @@ class BufferedEventProvider : public producer<std::shared_ptr<Event>> {
     co_return;
   }
 };
+#endif
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

@@ -186,7 +186,7 @@ class ProducerInt : public Producer<int> {
     return start < end;
   }
 
-  concurrencpp::result<std::optional<int>> produce() override {
+  concurrencpp::result<std::optional<int>> produce(std::shared_ptr<concurrencpp::executor> executor) override {
     int res = start;
     start++;
     co_return res;
@@ -197,7 +197,7 @@ class AdderInt : public Handler<int> {
  public:
   explicit AdderInt() : Handler<int>() {}
 
-  concurrencpp::result<bool> handel(int &value) override {
+  concurrencpp::result<bool> handel(std::shared_ptr<concurrencpp::executor> executor, int &value) override {
     value += 1;
     co_return true;
   }
@@ -210,7 +210,7 @@ class PrinterInt : public Consumer<int> {
 
   explicit PrinterInt(std::ostream &out) : Consumer<int>(), out_(out) {}
 
-  concurrencpp::result<void> consume(int value) override {
+  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, int value) override {
     out_ << "consumed: " << value << '\n';
     co_return;
   }

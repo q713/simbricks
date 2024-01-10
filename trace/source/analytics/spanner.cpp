@@ -26,6 +26,27 @@
 #include "util/exception.h"
 #include "events/printer.h"
 
+concurrencpp::result<void> Spanner::consume(std::shared_ptr<concurrencpp::executor> executor,
+                                            std::shared_ptr<Event> value) {
+  throw_if_empty(value, TraceException::kEventIsNull, source_loc::current());
+
+  spdlog::debug("{} try handel: {}", name_, *value);
+  auto handler_it = handler_.find(value->GetType());
+  if (handler_it == handler_.end()) {
+    spdlog::critical("Spanner: could not find handler for the following event: {}", *value);
+    co_return;
+  }
+
+  auto handler = handler_it->second;
+  const bool added = co_await handler(executor, value);
+  if (not added) {
+    spdlog::debug("found event that could not be added to a pack: {}", *value);
+  }
+
+  co_return;
+}
+
+#if 0
 concurrencpp::result<void> Spanner::consume(
     ExecutorT resume_executor, std::shared_ptr<CoroChannel<EventT>> src_chan) {
   throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
@@ -57,3 +78,4 @@ concurrencpp::result<void> Spanner::consume(
 
   co_return;
 }
+#endif

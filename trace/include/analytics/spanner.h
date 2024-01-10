@@ -40,6 +40,73 @@
 #ifndef SIMBRICKS_TRACE_SPANNER_H_
 #define SIMBRICKS_TRACE_SPANNER_H_
 
+struct Spanner : public Consumer<std::shared_ptr<Event>> {
+  TraceEnvironment &trace_environment_;
+  uint64_t id_;
+  std::string name_;
+  Tracer &tracer_;
+
+  using ExecutorT = std::shared_ptr<concurrencpp::executor>;
+  using EventT = std::shared_ptr<Event>;
+  using ChannelT = std::shared_ptr<CoroChannel<std::shared_ptr<Context>>>;
+  using LazyResultT = concurrencpp::lazy_result<bool>;
+  using HandlerT = std::function<LazyResultT(ExecutorT, EventT &)>;
+  std::unordered_map<EventType, HandlerT> handler_;
+
+  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, std::shared_ptr<Event> value) override;
+
+  explicit Spanner(TraceEnvironment &trace_environment,
+                   std::string &&name,
+                   Tracer &tra)
+      : trace_environment_(trace_environment),
+        id_(trace_environment_.GetNextSpannerId()),
+        name_(name),
+        tracer_(tra) {
+  }
+
+  explicit Spanner(TraceEnvironment &trace_environment,
+                   std::string &&name,
+                   Tracer &tra,
+                   std::unordered_map<EventType, HandlerT> &&handler)
+      : trace_environment_(trace_environment),
+        id_(trace_environment_.GetNextSpannerId()),
+        name_(name),
+        tracer_(tra),
+        handler_(handler) {
+  }
+
+  void RegisterHandler(EventType type, HandlerT &&handler) {
+    auto it_suc = handler_.insert({type, handler});
+    throw_on(not it_suc.second,
+             "Spanner::RegisterHandler Could not insert new handler",
+             source_loc::current());
+  }
+
+  inline uint64_t GetId() const {
+    return id_;
+  }
+
+  template<class St>
+  std::shared_ptr<St>
+  iterate_add_erase(std::list<std::shared_ptr<St>> &pending,
+                    std::shared_ptr<Event> event_ptr) {
+    std::shared_ptr<St> pending_span = nullptr;
+
+    for (auto it = pending.begin(); it != pending.end(); it++) {
+      pending_span = *it;
+      if (pending_span and pending_span->AddToSpan(event_ptr)) {
+        if (pending_span->IsComplete()) {
+          pending.erase(it);
+        }
+        return pending_span;
+      }
+    }
+
+    return nullptr;
+  }
+};
+
+#if 0
 struct Spanner : public consumer<std::shared_ptr<Event>> {
   TraceEnvironment &trace_environment_;
   uint64_t id_;
@@ -105,6 +172,7 @@ struct Spanner : public consumer<std::shared_ptr<Event>> {
     return nullptr;
   }
 };
+#endif
 
 struct HostSpanner : public Spanner {
 

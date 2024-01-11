@@ -33,7 +33,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
   if (not IsAnyType(event_ptr, std::vector<EventType>{
       EventType::kNetworkEnqueueT, EventType::kNetworkDequeueT, EventType::kNetworkDropT})) {
-    spdlog::info("NetworkSpanner::HandelNetworkEvent wrong event type: {}", *event_ptr);
+    spdlog::warn("NetworkSpanner::HandelNetworkEvent wrong event type: {}", *event_ptr);
     co_return false;
   }
   auto network_event = std::static_pointer_cast<NetworkEvent>(event_ptr);
@@ -41,7 +41,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   // Handling events caused by messages marked as interesting that are not! (ARP)
   //       ---> filter out spans and events that end up in devices we are not interested in!
   if (network_event->InterestingFlag() and node_device_filter_.IsNotInterestingNodeDevice(network_event)) {
-    spdlog::info("NetworkSpanner::HandelNetworkEvent filtered interesting event because of node device: {}",
+    spdlog::debug("NetworkSpanner::HandelNetworkEvent filtered interesting event because of node device: {}",
                  *network_event);
     co_return true;
   }
@@ -83,7 +83,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
   // this can happen due to the interestingness (ARP) issues...
   if (not IsType(network_event, EventType::kNetworkEnqueueT)) {
-    spdlog::info("NetworkSpanner::HandelNetworkEvent filtered NOT interesting event type {}",
+    spdlog::debug("NetworkSpanner::HandelNetworkEvent filtered NOT interesting event type {}",
                  *network_event);
     co_return false;
   }
@@ -103,7 +103,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
       current_active_device_spans_.push_back(current_device_span);
       co_return true;
     }
-    spdlog::info(
+    spdlog::debug(
         "NetworkSpanner::HandelNetworkEvent filtered non interesting potentially starting trace event because of node device: {}",
         *network_event);
     co_return true;

@@ -152,8 +152,7 @@ class NS3Parser : public LogParser {
   ParseEvent(LineHandler &line_handler) override;
 };
 
-template<bool NamedPipe, size_t LineBufferSize, size_t EventBufferSize = 1> requires
-SizeLagerZero<LineBufferSize> and SizeLagerZero<EventBufferSize>
+template<bool NamedPipe, size_t LineBufferSize> requires SizeLagerZero<LineBufferSize>
 class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 
   TraceEnvironment &trace_environment_;
@@ -161,7 +160,8 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
   ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
-  std::vector<std::shared_ptr<Event>> event_buffer_{EventBufferSize};
+  std::vector<std::shared_ptr<Event>> event_buffer_;
+  const size_t event_buffer_size_;
   size_t cur_size_ = 0;
   size_t cur_line_index_ = 0;
 
@@ -173,7 +173,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
     cur_line_index_ = 0;
     cur_size_ = 0;
 
-    for (size_t index = 0; index < EventBufferSize; index++) {
+    for (size_t index = 0; index < event_buffer_size_; index++) {
 
       std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
       if (not bh_p.first or not bh_p.second) {
@@ -194,7 +194,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
     co_return;
   }
 
-  bool StillBuffered() const {
+  [[nodiscard]] bool StillBuffered() const {
     return cur_size_ > 0 and cur_line_index_ < cur_size_;
   }
 
@@ -204,14 +204,20 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
                                  const std::string log_file_path,
                                  LogParser &log_parser,
       //WeakTimer &timer_)
-                                 Timer &timer_)
+                                 Timer &timer_,
+                                 size_t event_buffer_size)
       : Producer<std::shared_ptr<Event>>(),
         trace_environment_(trace_environment),
         name_(name),
         log_file_path_(log_file_path),
         log_parser_(log_parser),
-        timer_(timer_) {
+        timer_(timer_),
+        event_buffer_size_(event_buffer_size) {
     line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
+    throw_on_false(event_buffer_size_ > 0,
+                   "event buffer have size larger 0",
+                   source_loc::current());
+    event_buffer_.reserve(event_buffer_size);
   };
 
   ~BufferedEventProvider() = default;

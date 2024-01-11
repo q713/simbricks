@@ -228,10 +228,11 @@ inline concurrencpp::result<void> RunPipelineImpl(std::shared_ptr<concurrencpp::
   std::vector<std::shared_ptr<CoroChannel<ValueType>>> channels{amount_channels};
   std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
 
+  // start producer
   channels[0] = create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
   throw_if_empty(pipeline->prod_, TraceException::kProducerIsNull, source_loc::current());
   tasks[0] = Produce({}, tpe, pipeline->prod_, channels[0]);
-
+  // start handler
   for (int index = 0; index < pipeline->handler_->size(); index++) {
     auto &handl = *(pipeline->handler_);
     auto &handler = handl[index];
@@ -241,10 +242,13 @@ inline concurrencpp::result<void> RunPipelineImpl(std::shared_ptr<concurrencpp::
 
     tasks[index + 1] = Handel({}, tpe, handler, channels[index], channels[index + 1]);
   }
-
+  // start consumer
   throw_if_empty(pipeline->cons_, TraceException::kConsumerIsNull, source_loc::current());
   tasks[amount_channels] = Consume({}, tpe, pipeline->cons_, channels[amount_channels - 1]);
 
+  // wait for all tasks to finish
+  // NOTE: DO NOT USE concurrencpp::when_all(...) here, is
+  // important to wait here in order and to close the channels in order
   for (int index = 0; index < amount_channels; index++) {
     co_await tasks[index];
     co_await channels[index]->CloseChannel(tpe);
@@ -283,7 +287,11 @@ inline concurrencpp::result<void> RunPipelinesImpl(std::shared_ptr<concurrencpp:
     tasks[index] = RunPipelineParallelImpl({}, tpe, pipeline);
   }
 
-  co_await concurrencpp::when_all(tpe, tasks.begin(), tasks.end()).run();
+  // wait for all tasks to finish
+  auto all_done = co_await concurrencpp::when_all(tpe, tasks.begin(), tasks.end());
+  for (auto &done : all_done) {
+    co_await done;
+  }
   co_return;
 }
 

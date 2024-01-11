@@ -37,7 +37,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 else()
     message(STATUS "Build_Type Release")
     set(CMAKE_BUILD_TYPE Release)
-    add_compile_options(-O2)
+    add_compile_options(-O3)
 endif()
 
 #######################################

@@ -696,7 +696,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return std::move(result);
+    co_return result;
   }
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
@@ -725,7 +725,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return std::move(result);
+    co_return result;
   }
 };
 
@@ -836,7 +836,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return std::move(result);
+    co_return result;
   }
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
@@ -859,7 +859,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return std::move(result);
+    co_return result;
   }
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
@@ -887,7 +887,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return std::move(result);
+    co_return result;
   }
 };
 

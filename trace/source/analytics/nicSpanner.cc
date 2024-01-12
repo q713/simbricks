@@ -130,7 +130,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     spdlog::info("{} NicSpanner::HandelTxrx: pushed tx context to other side", name_);
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
-    spdlog::info("{} NicSpanner::HandelTxrx: trying to pull tx context from other side - {}",
+    spdlog::info("{} NicSpanner::HandelTxrx: trying to pull Rx context from other side - {}",
                  name_, *event_ptr);
     auto con_opt = co_await from_network_queue_->Pop(resume_executor);
     spdlog::info("{} NicSpanner::HandelTxrx: pulled tx context from other side", name_);

@@ -173,7 +173,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
     cur_line_index_ = 0;
     cur_size_ = 0;
 
-    for (size_t index = 0; index < event_buffer_size_; index++) {
+    while (cur_size_ < event_buffer_size_) {
 
       std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
       if (not bh_p.first or not bh_p.second) {
@@ -183,12 +183,13 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
       LineHandler &line_handler = *bh_p.second;
 
       std::shared_ptr<Event> event = co_await log_parser_.ParseEvent(line_handler);
-      if (not event) {
+      if (event == nullptr) {
         continue;
       }
 
-      event_buffer_[index] = event;
-      cur_size_++;
+      throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
+      event_buffer_[cur_size_] = std::move(event);
+      ++cur_size_;
     }
 
     co_return;
@@ -239,7 +240,8 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 
     size_t next = cur_line_index_;
     ++cur_line_index_;
-    std::shared_ptr<Event> event = event_buffer_[next];
+    std::shared_ptr<Event> event = std::move(event_buffer_[next]);
+    throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
     co_return event;
   }
 };

@@ -266,11 +266,11 @@ class EventSpan {
 
   virtual EventSpan *clone() = 0;
 
-  virtual bool AddToSpan(std::shared_ptr<Event> event_ptr) = 0;
+  virtual bool AddToSpan(const std::shared_ptr<Event> &event_ptr) = 0;
 
  protected:
   // When calling this method the lock must be held
-  bool IsPotentialAdd(std::shared_ptr<Event> &event_ptr);
+  bool IsPotentialAdd(const std::shared_ptr<Event> &event_ptr);
 };
 
 class HostCallSpan : public EventSpan {
@@ -342,7 +342,7 @@ class HostCallSpan : public EventSpan {
     is_pending_ = false;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class HostIntSpan : public EventSpan {
@@ -366,7 +366,7 @@ class HostIntSpan : public EventSpan {
 
   ~HostIntSpan() override = default;
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class HostDmaSpan : public EventSpan {
@@ -398,7 +398,7 @@ class HostDmaSpan : public EventSpan {
     return is_read_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class HostMmioSpan : public EventSpan {
@@ -445,7 +445,7 @@ class HostMmioSpan : public EventSpan {
     return is_posted_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class HostMsixSpan : public EventSpan {
@@ -469,7 +469,7 @@ class HostMsixSpan : public EventSpan {
 
   ~HostMsixSpan() override = default;
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class HostPciSpan : public EventSpan {
@@ -504,7 +504,7 @@ class HostPciSpan : public EventSpan {
     return not IsRead();
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class NicMsixSpan : public EventSpan {
@@ -527,7 +527,7 @@ class NicMsixSpan : public EventSpan {
 
   ~NicMsixSpan() override = default;
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class NicMmioSpan : public EventSpan {
@@ -562,7 +562,7 @@ class NicMmioSpan : public EventSpan {
     return not IsRead();
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class NicDmaSpan : public EventSpan {
@@ -596,7 +596,7 @@ class NicDmaSpan : public EventSpan {
     return is_read_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class NicEthSpan : public EventSpan {
@@ -631,7 +631,7 @@ class NicEthSpan : public EventSpan {
     return not IsTransmit();
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class NetDeviceSpan : public EventSpan {
@@ -730,7 +730,7 @@ class NetDeviceSpan : public EventSpan {
     return boundary_types_;
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override;
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override;
 };
 
 class GenericSingleSpan : public EventSpan {
@@ -751,7 +751,7 @@ class GenericSingleSpan : public EventSpan {
     return new GenericSingleSpan(*this);
   }
 
-  bool AddToSpan(std::shared_ptr<Event> event_ptr) override {
+  bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override {
     const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
     if (not IsPotentialAdd(event_ptr) or event_p_) {

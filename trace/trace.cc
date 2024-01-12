@@ -31,7 +31,7 @@
 
 #include "spdlog/spdlog.h"
 
-#include "sync/corobelt.h"
+#include "sync/specializations.h"
 #include "config/config.h"
 #include "env/traceEnvironment.h"
 #include "events/event-filter.h"

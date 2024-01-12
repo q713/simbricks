@@ -29,7 +29,7 @@ JaegerUrl: "http://otel_collector:14278/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
 EventBufferSize: 6000000
-LogLevel: "info"
+LogLevel: "warning"
 TypesToFilter:
   - "kHostInstrT"
   - "kSimProcInEventT"

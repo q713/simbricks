@@ -126,6 +126,8 @@ set(TRACE_LIB_HEADER_FILES
         include/sync/channel.h
         # coroutine wrappers
         include/sync/corobelt.h
+        # channel and corobelt template specializations for our use case
+        include/sync/specializations.h
         # reader
         include/reader/reader.h
         # parser

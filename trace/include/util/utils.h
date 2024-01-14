@@ -28,6 +28,8 @@
 #include <exception>
 #include <fstream>
 
+#include "concepts.h"
+
 #ifndef SIMBRICKS_TRACE_UTILS_H_
 #define SIMBRICKS_TRACE_UTILS_H_
 
@@ -75,6 +77,11 @@ inline std::ostream &operator<<(std::ostream &out, const std::shared_ptr<ObjT> &
     out << "null";
   }
   return out;
+}
+
+template<size_t PageSize = 4096> requires SizeLagerZero<PageSize>
+constexpr size_t MultiplePagesBytes(size_t times) {
+  return times * PageSize;
 }
 
 #endif //SIMBRICKS_TRACE_UTILS_H_

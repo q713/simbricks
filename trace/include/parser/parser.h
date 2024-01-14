@@ -41,6 +41,7 @@
 #include "reader/cReader.h"
 #include "env/traceEnvironment.h"
 #include "analytics/timer.h"
+#include "util/utils.h"
 
 bool ParseMacAddress(LineHandler &line_handler, NetworkEvent::MacAddress &addr);
 
@@ -161,7 +162,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
   const std::string log_file_path_;
   LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
   //ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
-  ReaderBuffer<32'768> line_handler_buffer{name_};
+  ReaderBuffer<MultiplePagesBytes(8)> line_handler_buffer{name_};
   std::vector<std::shared_ptr<Event>> event_buffer_;
   const size_t event_buffer_size_;
   size_t cur_size_ = 0;

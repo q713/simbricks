@@ -26,18 +26,17 @@
 
 #include "concurrencpp/concurrencpp.h"
 #include "reader/reader.h"
+#include "reader/cReader.h"
 #include "spdlog/spdlog.h"
 #include "util/cxxopts.hpp"
 
 using ExhaustFuncT = std::function<concurrencpp::result<void>()>;
 using ExecutorT = std::shared_ptr<concurrencpp::thread_pool_executor>;
 
-template <size_t LineBufferSize, size_t Tries>
-  requires SizeLagerZero<LineBufferSize>
 ExhaustFuncT MakeExhaustTask(const std::string &file_path, bool is_named_pipe) {
   ExhaustFuncT task = [&path = file_path,
                        is_pipe = is_named_pipe]() -> concurrencpp::result<void> {
-    ReaderBuffer<LineBufferSize, Tries> buffer{"exhauster", true};
+    ReaderBuffer<MultiplePagesBytes(8)> buffer{"exhauster"};
     buffer.OpenFile(path, is_pipe);
     std::pair<bool, LineHandler *> handler;
     for (handler = buffer.NextHandler();
@@ -89,7 +88,7 @@ int main(int argc, char *argv[]) {
 
   for (int index = 0; index < filenames.size(); index++) {
     const auto &file = filenames[index];
-    auto task = MakeExhaustTask<kLineBufferSize, kTries>(file, true);
+    auto task = MakeExhaustTask(file, true);
     tasks[index] = executor->submit(task);
   }
 

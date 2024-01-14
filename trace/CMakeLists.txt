@@ -130,6 +130,7 @@ set(TRACE_LIB_HEADER_FILES
         include/sync/specializations.h
         # reader
         include/reader/reader.h
+        include/reader/cReader.h
         # parser
         include/parser/parser.h
         # events

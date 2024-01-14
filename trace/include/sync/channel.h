@@ -664,12 +664,12 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     }
     assert(this->size_ > 0 and "trying to read from empty channel");
 
-    auto result = std::move(perform_read());
+    auto result = perform_read();
 
     guard.unlock();
     this->channel_cv_.notify_all();
 
-    co_return std::move(result);
+    co_return result;
   }
 
   concurrencpp::lazy_result<std::optional<ValueType>> TryPop(

@@ -41,7 +41,8 @@ TEST_CASE("Test ns3 parser produces expected event stream", "[NS3Parser]") {
   const TraceEnvConfig trace_env_config = TraceEnvConfig::CreateFromYaml("tests/trace-env-config.yaml");
   TraceEnvironment trace_environment{trace_env_config};
 
-  ReaderBuffer<10> reader_buffer{"test-reader", true};
+  //ReaderBuffer<10> reader_buffer{"test-reader", true};
+  ReaderBuffer<4096> reader_buffer{"test-reader"};
   REQUIRE_NOTHROW(reader_buffer.OpenFile(test_file_path));
 
   auto ns3_parser = create_shared<NS3Parser>(TraceException::kParserIsNull,

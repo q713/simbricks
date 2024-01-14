@@ -50,14 +50,14 @@ std::shared_ptr<T> copy_shared(const char *error_msg, std::shared_ptr<T> &other)
 }
 
 template<class T, typename ...Args>
-std::shared_ptr<T> create_unique(const char *error_msg, Args &&... args) {
+std::unique_ptr<T> create_unique(const char *error_msg, Args &&... args) {
   auto result = std::make_unique<T>(std::forward<Args>(args)...);
   throw_if_empty(result, error_msg, source_loc::current());
   return result;
 }
 
 template<class T, typename ...Args>
-std::shared_ptr<T> create_unique(const std::string &error_msg, Args &&... args) {
+std::unique_ptr<T> create_unique(const std::string &error_msg, Args &&... args) {
   auto result = std::make_unique<T>(std::forward<Args>(args)...);
   throw_if_empty(result, error_msg, source_loc::current());
   return result;

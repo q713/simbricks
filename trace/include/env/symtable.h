@@ -35,6 +35,7 @@
 
 #include "util/log.h"
 #include "reader/reader.h"
+#include "reader/cReader.h"
 #include "env/stringInternalizer.h"
 
 enum FilterType { kSyms, kS, kElf };
@@ -61,7 +62,7 @@ class SymsFilter {
  protected:
   uint64_t id_;
   const std::string component_;
-  ReaderBuffer<1> reader_buffer_;
+  ReaderBuffer<4096> reader_buffer_;
   //LineReader line_reader_;
   std::set<std::string> symbol_filter_;
   //SymTableT symbol_table_;
@@ -73,7 +74,8 @@ class SymsFilter {
                       StringInternalizer &i)
       : id_(id),
         component_(component),
-        reader_buffer_("symtable", true),
+        //reader_buffer_("symtable", true),
+        reader_buffer_("symtable"),
         symbol_filter_(std::move(symbol_filter)),
         i_(i) {};
 

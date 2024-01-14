@@ -44,6 +44,7 @@
 #include "util/utils.h"
 #include "util/concepts.h"
 
+#if 0
 class LineHandler {
   size_t cur_reading_pos_ = 0;
   // TODO: consider using string views instead of the iterator
@@ -290,5 +291,6 @@ class ReaderBuffer {
     Close();
   };
 };
+#endif
 
 #endif // SIMBRICKS_READER_H_

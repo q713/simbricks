@@ -24,6 +24,7 @@
 
 #include "reader/reader.h"
 
+#if 0
 bool LineHandler::MoveForward(size_t steps) {
   if (IsEmpty() || CurLength() < steps)
     return false;
@@ -57,9 +58,6 @@ std::string LineHandler::ExtractAndSubstrUntil(
     std::function<bool(unsigned char)> &predicate) {
   std::stringstream extract_builder;
   while (!IsEmpty()) {
-    std::string curLine = cur_line_;
-    auto s = cur_reading_pos_;
-    auto l = curLine.length();
     unsigned char letter = cur_line_[cur_reading_pos_];
     if (!predicate(letter)) {
       break;
@@ -243,3 +241,4 @@ bool LineHandler::ParseBoolFromInt(bool &target) {
   target = value != 0;
   return true;
 }
+#endif

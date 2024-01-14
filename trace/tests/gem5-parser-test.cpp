@@ -43,7 +43,8 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
 
   ComponentFilter comp_filter_client("ComponentFilter-Server");
 
-  ReaderBuffer<10> reader_buffer{"test-reader", true};
+  //ReaderBuffer<10> reader_buffer{"test-reader", true};
+  ReaderBuffer<10000> reader_buffer{"test-reader"};
   REQUIRE_NOTHROW(reader_buffer.OpenFile(test_file_path));
 
   auto gem5 = create_shared<Gem5Parser>(TraceException::kParserIsNull,
@@ -52,7 +53,6 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
                                         comp_filter_client);
 
   std::shared_ptr<Event> parsed_event;
-  LineHandler line_handler;
 
   const std::vector<std::shared_ptr<Event>> to_match{
       std::make_shared<HostMmioR>(1869691991749,
@@ -86,7 +86,7 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
     REQUIRE(reader_buffer.HasStillLine());
     REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
     REQUIRE(bh_p.first);
-    line_handler = *bh_p.second;
+    LineHandler &line_handler = *bh_p.second;
     parsed_event = gem5->ParseEvent(line_handler).run().get();
     REQUIRE(parsed_event);
     REQUIRE(parsed_event->Equal(*match));

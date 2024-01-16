@@ -173,6 +173,13 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 
   concurrencpp::result<void>
   ResetFillBuffer() {
+    if (not line_handler_buffer.IsOpen()) {
+      line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
+      throw_on_false(event_buffer_size_ > 0,
+                     "event buffer have size larger 0",
+                     source_loc::current());
+    }
+
     cur_line_index_ = 0;
     cur_size_ = 0;
 
@@ -217,10 +224,6 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
         log_parser_(log_parser),
         timer_(timer_),
         event_buffer_size_(event_buffer_size) {
-    line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
-    throw_on_false(event_buffer_size_ > 0,
-                   "event buffer have size larger 0",
-                   source_loc::current());
     event_buffer_.reserve(event_buffer_size);
   };
 

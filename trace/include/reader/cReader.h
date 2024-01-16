@@ -438,6 +438,10 @@ class ReaderBuffer {
     Close();
   }
 
+  [[nodiscard]] bool IsOpen() {
+    return file_ != nullptr and IsStreamStillGood();
+  }
+
   [[nodiscard]] bool HasStillLine() {
     while (cur_reading_pos_ < size_ and buffer_[cur_reading_pos_] == kLineEnd) {
       ++cur_reading_pos_;
@@ -480,6 +484,7 @@ class ReaderBuffer {
     throw_on(file_, "ReaderBuffer:OpenFile: already opened file to read",
              source_loc::current());
 
+    spdlog::debug("try open file path: ", file_path);
     file_ = fopen(file_path.c_str(), "r");
     throw_if_empty(file_, "ReaderBuffer: could not open file path", source_loc::current());
     reached_eof_ = 0;
@@ -494,6 +499,7 @@ class ReaderBuffer {
         spdlog::debug("ReaderBuffer: changed size successfully");
       }
     }
+    spdlog::debug("successfully opened file path: ", file_path);
   }
 
 };

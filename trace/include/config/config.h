@@ -159,6 +159,8 @@ class TraceEnvConfig {
   ~TraceEnvConfig() = default;
 
   inline static TraceEnvConfig CreateFromYaml(const std::string &config_path) {
+    spdlog::debug("TraceEnvConfig start CreateFromYaml");
+
     TraceEnvConfig trace_config;
 
     YAML::Node config_root = YAML::LoadFile(config_path);
@@ -238,6 +240,8 @@ class TraceEnvConfig {
 
     CheckKey(kLogLevelKey, config_root);
     trace_config.log_level_ = ResolveLogLevel(config_root[kLogLevelKey].as<std::string>());
+
+    spdlog::debug("TraceEnvConfig finished CreateFromYaml");
 
     return trace_config;
   }
@@ -395,9 +399,9 @@ class TraceEnvConfig {
   constexpr static const char *kJaegerUrlKey{"JaegerUrl"};
   std::string jaeger_url_;
   constexpr static const char *kLineBufferSizeKey{"LineBufferSize"};
-  size_t line_buffer_size_;
+  size_t line_buffer_size_ = 0;
   constexpr static const char *kEventBufferSize{"EventBufferSize"};
-  size_t event_buffer_size_;
+  size_t event_buffer_size_ = 0;
   constexpr static const char *kLogLevelKey{"LogLevel"};
   spdlog::level::level_enum log_level_ = spdlog::level::info;
 };

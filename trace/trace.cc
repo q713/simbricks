@@ -103,7 +103,7 @@ int main(int argc, char *argv[]) {
 
   } catch (cxxopts::exceptions::exception &e) {
     std::cerr << "Could not parse cli options: " << e.what() << '\n';
-    exit(EXIT_FAILURE);
+    throw_just(source_loc::current(), "cli parser error: ", e.what());
   }
 
   if (result.count("help")) {
@@ -129,7 +129,7 @@ int main(int argc, char *argv[]) {
   // Init the trace environment --> IMPORTANT
   if (1 > result.count("trace-env-config")) {
     std::cerr << "must provide a path to a yaml trace environment configuration file" << '\n';
-    exit(EXIT_FAILURE);
+    throw_just(source_loc::current(), "no trace environment config given");
   }
   const TraceEnvConfig trace_env_config
       = TraceEnvConfig::CreateFromYaml(result["trace-env-config"].as<std::string>());
@@ -433,7 +433,7 @@ int main(int argc, char *argv[]) {
         !result.count("ns3-log")) {
       std::cerr << "invalid arguments given" << '\n'
                 << options.help() << '\n';
-      exit(EXIT_FAILURE);
+      throw_just(source_loc::current(), "could not parse cmd arguments");
     }
 
     // SERVER HOST PIPELINE
@@ -463,7 +463,7 @@ int main(int argc, char *argv[]) {
     std::ofstream out_h_s;
     auto printer_h_s = createPrinter(out_h_s, result, "gem5-server-events", true);
     if (not printer_h_s) {
-      exit(EXIT_FAILURE);
+      throw_just(source_loc::current(), "could not create printer");
     }
     auto func_filter_h_s = create_shared<HostCallFuncFilter>(TraceException::kActorIsNull,
                                                              trace_environment,
@@ -505,6 +505,7 @@ int main(int argc, char *argv[]) {
     std::ofstream out_h_c;
     auto printer_h_c = createPrinter(out_h_c, result, "gem5-client-events", true);
     if (not printer_h_c) {
+      throw_just(source_loc::current(), "could not create printer");
       exit(EXIT_FAILURE);
     }
     auto func_filter_h_c = create_shared<HostCallFuncFilter>(TraceException::kActorIsNull,
@@ -545,7 +546,7 @@ int main(int argc, char *argv[]) {
     std::ofstream out_n_s;
     auto printer_n_s = createPrinter(out_n_s, result, "nicbm-server-events", true);
     if (not printer_n_s) {
-      exit(EXIT_FAILURE);
+      throw_just(source_loc::current(), "could not create printer");
     }
     auto handler_server_nic_pipeline =
         create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
@@ -577,6 +578,7 @@ int main(int argc, char *argv[]) {
     std::ofstream out_n_c;
     auto printer_n_c = createPrinter(out_n_c, result, "nicbm-client-events", true);
     if (not printer_n_c) {
+      throw_just(source_loc::current(), "could not create printer");
       exit(EXIT_FAILURE);
     }
     auto handler_client_nic_pipeline =
@@ -608,7 +610,7 @@ int main(int argc, char *argv[]) {
     std::ofstream out_ns3;
     auto printer_ns3 = createPrinter(out_ns3, result, "ns3-events", true);
     if (not printer_n_c) {
-      exit(EXIT_FAILURE);
+      throw_just(source_loc::current(), "could not create printer");
     }
     auto ns3_event_filter = create_shared<NS3EventFilter>(TraceException::kActorIsNull,
                                                           trace_environment,

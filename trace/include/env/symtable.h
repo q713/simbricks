@@ -34,6 +34,7 @@
 #include <utility>
 
 #include "util/log.h"
+#include "util/utils.h"
 #include "reader/reader.h"
 #include "reader/cReader.h"
 #include "env/stringInternalizer.h"
@@ -62,7 +63,7 @@ class SymsFilter {
  protected:
   uint64_t id_;
   const std::string component_;
-  ReaderBuffer<4096> reader_buffer_;
+  ReaderBuffer<MultiplePagesBytes(4)> reader_buffer_;
   //LineReader line_reader_;
   std::set<std::string> symbol_filter_;
   //SymTableT symbol_table_;

@@ -79,55 +79,14 @@ class LineHandler {
     return CurLength() <= 0;
   }
 
-  bool MoveForward(size_t steps) {
-    if (IsEmpty() || CurLength() < steps)
-      return false;
+  bool MoveForward(size_t steps);
 
-    cur_reading_pos_ += steps;
-    return true;
-  }
+  void TrimL();
 
-  void TrimL() {
-    if (IsEmpty())
-      return;
-
-    char *tmp = buf_ + cur_reading_pos_;
-    for (; tmp < buf_ + size_; tmp++) {
-      if (sim_string_utils::is_space(*tmp)) {
-        ++cur_reading_pos_;
-      } else {
-        break;
-      }
-    }
-  }
-
-  void TrimTillWhitespace() {
-    if (IsEmpty())
-      return;
-
-    char *tmp = buf_ + cur_reading_pos_;
-    for (; tmp < buf_ + size_; tmp++) {
-      if (not sim_string_utils::is_space(*tmp)) {
-        ++cur_reading_pos_;
-      } else {
-        break;
-      }
-    }
-  }
+  void TrimTillWhitespace();
 
   std::string ExtractAndSubstrUntil(
-      std::function<bool(unsigned char)> &predicate) {
-    std::stringstream extract_builder;
-    while (!IsEmpty()) {
-      unsigned char letter = *(buf_ + cur_reading_pos_);
-      if (!predicate(letter)) {
-        break;
-      }
-      extract_builder << letter;
-      ++cur_reading_pos_;
-    }
-    return extract_builder.str();
-  }
+      std::function<bool(unsigned char)> &predicate);
 
   bool ExtractAndSubstrUntilInto(
       std::string &target, std::function<bool(unsigned char)> &predicate) {
@@ -135,206 +94,27 @@ class LineHandler {
     return not target.empty();
   }
 
-  bool SkipTill(std::function<bool(unsigned char)> &predicate) {
-    if (IsEmpty()) {
-      return false;
-    }
-
-    size_t read = 0;
-    char *tmp = buf_ + cur_reading_pos_;
-    for (; tmp < buf_ + size_; tmp++) {
-      if (predicate(*tmp)) {
-        break;
-      } else {
-        read++;
-      }
-    }
-
-    if (buf_ + cur_reading_pos_ + read < buf_ + size_) {
-      cur_reading_pos_ += read;
-      return true;
-    }
-
-    return false;
-  }
+  bool SkipTill(std::function<bool(unsigned char)> &predicate);
 
   bool SkipTillWhitespace() {
     return SkipTill(sim_string_utils::is_space);
   }
 
-  bool ConsumeAndTrimTillString(const std::string &to_consume) {
-    if (IsEmpty() || CurLength() < to_consume.length()) {
-      return false;
-    }
+  bool ConsumeAndTrimTillString(const std::string &to_consume);
 
-    char *sub_start = buf_ + cur_reading_pos_;
-    char *sub_end = buf_ + size_;
-    auto tf_start = to_consume.begin();
-    auto tf_end = to_consume.end();
+  bool ConsumeAndTrimString(const std::string &to_consume);
 
-    size_t consumed = 0;
-    const size_t to_match = to_consume.length();
-    int matched;
-    while (sub_start != sub_end and tf_start != tf_end) {
-      // search for potential start
-      for (; *tf_start != *sub_start and sub_start != sub_end; sub_start++, consumed++);
-      if (sub_start == sub_end) {
-        return false;
-      }
+  bool ConsumeAndTrimChar(char to_consume);
 
-      // try matching
-      matched = 0;
-      for (; tf_start != tf_end; ++tf_start, ++sub_start, ++consumed) {
-        if (sub_start == sub_end) {
-          return false;
-        }
+  bool ParseUintTrim(int base, uint64_t &target);
 
-        const char trie = *tf_start;
-        const char match = *sub_start;
-        if (trie != match) {
-          break;
-        }
-        ++matched;
-      }
+  bool ParseInt(int &target);
 
-      if (matched == to_match) {
-        cur_reading_pos_ = cur_reading_pos_ + consumed;
-        return true;
-      }
-      tf_start -= matched;
-    }
+  bool ParseBoolFromUint(int base, bool &target);
 
-    return false;
-  }
+  bool ParseBoolFromStringRepr(bool &target);
 
-  bool ConsumeAndTrimString(const std::string &to_consume) {
-    if (IsEmpty() || CurLength() < to_consume.length()) {
-      return false;
-    }
-
-    char *sub_start = buf_ + cur_reading_pos_;
-    auto tf_start = to_consume.begin();
-    auto tf_end = to_consume.end();
-
-    size_t consumed = 0;
-    while (tf_start != tf_end) {
-      if (sub_start == buf_ + size_) {
-        return false;
-      }
-      const char to_match = *tf_start;
-      const char match = *sub_start;
-      if (to_match != match) {
-        return false;
-      }
-      ++sub_start;
-      ++tf_start;
-      ++consumed;
-    }
-
-    cur_reading_pos_ = cur_reading_pos_ + consumed;
-    return true;
-  }
-
-  bool ConsumeAndTrimChar(char to_consume) {
-    if (IsEmpty()) {
-      return false;
-    }
-    const char letter = buf_[cur_reading_pos_];
-    if (letter != to_consume)
-      return false;
-
-    ++cur_reading_pos_;
-    return true;
-  }
-
-  bool ParseUintTrim(int base, uint64_t &target) {
-    if (IsEmpty() or (base != 10 and base != 16)) {
-      return false;
-    }
-    auto pred =
-        base == 10 ? sim_string_utils::is_num : sim_string_utils::is_alnum;
-
-    const size_t old_reading_pos = cur_reading_pos_;
-    size_t length = 0;
-    while (!IsEmpty()) {
-      unsigned char letter = *(buf_ + old_reading_pos + length);
-      if (!pred(letter)) {
-        break;
-      }
-      ++length;
-    }
-    if (length == 0 or old_reading_pos + length > size_) {
-      cur_reading_pos_ = old_reading_pos;
-      return false;
-    }
-
-    char *end;
-    const uint64_t num = std::strtoul(buf_ + old_reading_pos, &end, base);
-    if (num == ULONG_MAX) {
-      cur_reading_pos_ = old_reading_pos;
-      return false;
-    }
-
-    target = num;
-    cur_reading_pos_ += length;
-    return true;
-  }
-
-  bool ParseInt(int &target) {
-    if (IsEmpty()) {
-      return false;
-    }
-
-    const size_t old_reading_pos = cur_reading_pos_;
-    size_t length = 0;
-    while (!IsEmpty()) {
-      unsigned char letter = *(buf_ + old_reading_pos + length);
-      if (!sim_string_utils::is_num(letter)) {
-        break;
-      }
-      ++length;
-    }
-    if (length == 0 or old_reading_pos + length > size_) {
-      cur_reading_pos_ = old_reading_pos;
-      return false;
-    }
-
-    char *end;
-    target = std::strtol(buf_ + old_reading_pos, &end, 10);
-    cur_reading_pos_ += length;
-    return true;
-  }
-
-  bool ParseBoolFromUint(int base, bool &target) {
-    uint64_t internal_target;
-    if (not ParseUintTrim(base, internal_target)) {
-      return false;
-    }
-
-    target = internal_target != 0;
-    return true;
-  }
-
-  bool ParseBoolFromStringRepr(bool &target) {
-    if (ConsumeAndTrimString("true")) {
-      target = true;
-      return true;
-    }
-    if (ConsumeAndTrimString("false")) {
-      target = false;
-      return true;
-    }
-    return false;
-  }
-
-  bool ParseBoolFromInt(bool &target) {
-    int value;
-    if (not ParseInt(value)) {
-      return false;
-    }
-    target = value != 0;
-    return true;
-  }
+  bool ParseBoolFromInt(bool &target);
 };
 
 template<size_t BlockSize = 4 * 1024> requires SizeLagerZero<BlockSize>
@@ -394,6 +174,10 @@ class ReaderBuffer {
     size_t tmp = cur_reading_pos_;
     for (; tmp < size_; tmp++) {
       if (buffer_[tmp] == kLineEnd) {
+        if (tmp == cur_reading_pos_) {
+          ++cur_reading_pos_;
+          continue;
+        }
         found_end = true;
         break;
       }

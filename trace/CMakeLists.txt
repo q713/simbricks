@@ -161,6 +161,7 @@ set(TRACE_LIB_HEADER_FILES
 set(TRACE_LIB_SOURCE_FILES
         # reader
         source/reader/reader.cc
+        source/reader/cReader.cpp
         # parser
         source/parser/parser.cc
         source/parser/nicbm.cc

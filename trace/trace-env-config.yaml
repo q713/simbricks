@@ -23,7 +23,7 @@
 #
 
 MaxBackgroundThreads: 1
-MaxCpuThreads: 5
+MaxCpuThreads: 1
 JaegerUrl: "http://otel_collector:14278/v1/traces"
 #JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
@@ -43,13 +43,13 @@ TypesToFilter:
   #- "kNicMmioWT"
 SymbolTables:
   - Identifier: "Linuxvm-Symbols"
-    Path: "/config/dir/linux_dumps/vmlinux-image-syms.dump"
-    #Path: "linux_dumps/vmlinux-image-syms.dump"
+    #Path: "/config/dir/linux_dumps/vmlinux-image-syms.dump"
+    Path: "linux_dumps/vmlinux-image-syms.dump"
     AddressOffset: 0
     Type: kSyms
   - Identifier: "Nicdriver-Symbols"
-    Path: "/config/dir/linux_dumps/i40e-image-syms.dump"
-    #Path: "linux_dumps/i40e-image-syms.dump"
+    #Path: "/config/dir/linux_dumps/i40e-image-syms.dump"
+    Path: "linux_dumps/i40e-image-syms.dump"
     AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
     Type: kSyms
 LinuxFuncIndicator:

@@ -22,6 +22,9 @@
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <cstddef>
+#include <iostream>
+
 #ifndef SIMBRICKS_TRACE_CONCEPTS_H_
 #define SIMBRICKS_TRACE_CONCEPTS_H_
 

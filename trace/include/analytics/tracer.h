@@ -58,7 +58,10 @@ class Tracer {
   simbricks::trace::SpanExporter &exporter_;
   using ExportTastT = const std::function<concurrencpp::null_result()>;
   NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>> to_export_queue_;
-  concurrencpp::result<concurrencpp::result<void>> exporter_thread_;
+
+  bool finished_export_ = false;
+  static constexpr size_t kAmountExporterThreads = 1;
+  std::array<concurrencpp::result<concurrencpp::result<void>>, kAmountExporterThreads> exporter_threads_;
 
   void InsertExportedSpan(uint64_t span_id) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
@@ -184,7 +187,7 @@ class Tracer {
       try {
         exporter_.ExportSpan(must_go);
       } catch (std::runtime_error &err) {
-        std::cerr << "error while trying to export a trace: " << err.what() << '\n';
+        spdlog::error("error while trying to export a trace: {}", err.what());
       }
       co_return;
     };
@@ -207,6 +210,7 @@ class Tracer {
                      "try to export span whos parent was not exported yet",
                      source_loc::current());
       MarkSpanAsExported(waiter);
+      assert(not waiter->HasParent() or exported_spans_.contains(waiter->GetParentId()));
       // TODO: fix background!!
       to_export_queue_.Push(waiter);
       //exporter_.ExportSpan(waiter);
@@ -281,6 +285,7 @@ class Tracer {
     if (WasParentExported(span)) {
       MarkSpanAsExported(span);
       // TODO: fix background!!
+      assert(not span->HasParent() or exported_spans_.contains(span->GetParentId()));
       to_export_queue_.Push(span);
       //exporter_.ExportSpan(span);
       //RunExportJobInBackground(span);
@@ -443,23 +448,36 @@ class Tracer {
   explicit Tracer(TraceEnvironment &trace_environment,
                   simbricks::trace::SpanExporter &exporter)
       : trace_environment_(trace_environment), exporter_(exporter) {
-    exporter_thread_ = trace_environment_.GetThreadExecutor()->submit([&]() -> concurrencpp::result<void> {
-      std::optional<std::shared_ptr<EventSpan>> opt;
-      std::shared_ptr<EventSpan> span_to_export;
-      for (opt = to_export_queue_.Pop(); opt.has_value(); opt = to_export_queue_.Pop()) {
-        span_to_export = std::move(opt.value());
-        assert(span_to_export);
-        exporter_.ExportSpan(span_to_export);
-      }
-      co_return;
-    });
+
+    auto thread_executor = trace_environment_.GetThreadExecutor();
+    for (size_t index = 0; index < kAmountExporterThreads; index++) {
+      exporter_threads_[index] = thread_executor->submit([&]() -> concurrencpp::result<void> {
+        std::optional<std::shared_ptr<EventSpan>> opt;
+        std::shared_ptr<EventSpan> span_to_export;
+        for (opt = to_export_queue_.Pop(); opt.has_value(); opt = to_export_queue_.Pop()) {
+          span_to_export = std::move(opt.value());
+          assert(span_to_export);
+          exporter_.ExportSpan(span_to_export);
+        }
+        co_return;
+      });
+    }
   };
 
-  ~Tracer() {
+  void FinishExport() {
     try {
-      exporter_thread_.get().get();
+      for (auto &task : exporter_threads_) {
+        task.get().get();
+      }
     } catch (std::exception &err) {
-      std::cerr << "error within exporter thread: " << err.what() << '\n';
+      spdlog::error("error within exporter thread: {}", err.what());
+    }
+    finished_export_ = true;
+  }
+
+  ~Tracer() {
+    if (not finished_export_) {
+      FinishExport();
     }
   };
 };

@@ -91,6 +91,7 @@ class NoOpExporter : public SpanExporter {
   }
 
   void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
+    spdlog::warn("NoOpExporter 'exported' Span a.k.a did nothing");
   }
 };
 
@@ -818,9 +819,13 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
-    const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
-    StartSpan(to_export);
-    EndSpan(to_export);
+    spdlog::debug("Start exporting Span");
+    {
+      const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
+      StartSpan(to_export);
+      EndSpan(to_export);
+    }
+    spdlog::debug("Exported Span");
   }
 };
 

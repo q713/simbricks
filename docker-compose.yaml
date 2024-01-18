@@ -27,7 +27,8 @@ services:
   #jaeger:
   #  networks:
   #    - tracing
-  #  image: jaegertracing/all-in-one:latest
+  #  # image: jaegertracing/all-in-one:latest
+  #  image: jaegertracing/all-in-one:1.51
   #  volumes:
   #    - /local/jakobg/simbricks-fork/trace:/config/dir
   #  command: --query.ui-config /config/dir/jaeger-ui.json # --prometheus.query.support-spanmetrics-connector=true
@@ -60,7 +61,8 @@ services:
   #  container_name: otel_collector
   #  networks:
   #    - tracing
-  #  image: otel/opentelemetry-collector-contrib:latest
+  #  # image: otel/opentelemetry-collector-contrib:latest
+  #  image: otel/opentelemetry-collector-contrib:0.91.0
   #  volumes:
   #    - /local/jakobg/simbricks-fork/trace:/config/dir
   #  ports:
@@ -87,8 +89,10 @@ services:
       - /bin/bash
       - -c
       - |
-        time build-docker/exhauster --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --ns3-log /usr/src/data-folder/ns3-log-pipe.pipe
+        time build-docker/exhauster /usr/src/data-folder/gem5-server-log-pipe.pipe /usr/src/data-folder/nicbm-server-log-pipe.pipe /usr/src/data-folder/gem5-client-log-pipe.pipe /usr/src/data-folder/nicbm-client-log-pipe.pipe /usr/src/data-folder/ns3-log-pipe.pipe
         time build-docker/trace --trace-env-config /config/dir/trace-env-config.yaml --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --ns3-log /usr/src/data-folder/ns3-log-pipe.pipe --gem5-server-events /usr/src/data-folder/gem5-server-events.txt --nicbm-server-events /usr/src/data-folder/nicbm-server-events.txt --gem5-client-events /usr/src/data-folder/gem5-client-events.txt --nicbm-client-events /usr/src/data-folder/nicbm-client-events.txt --ns3-events /usr/src/data-folder/ns3-events.txt
+    #time build-docker/exhauster --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --ns3-log /usr/src/data-folder/ns3-log-pipe.pipe
+    #time build-docker/exhauster --gem5-log-server /usr/src/data-folder/gem5-server-log-pipe.pipe --nicbm-log-server /usr/src/data-folder/nicbm-server-log-pipe.pipe --gem5-log-client /usr/src/data-folder/gem5-client-log-pipe.pipe --nicbm-log-client /usr/src/data-folder/nicbm-client-log-pipe.pipe --ns3-log /usr/src/data-folder/ns3-log-pipe.pipe
     volumes:
       - /local/jakobg/tracing-experiments/wrkdir:/usr/src/data-folder
       - /local/jakobg/simbricks-fork/trace:/config/dir
@@ -105,7 +109,8 @@ services:
       - -c
       - |
         make convert-images-raw 
-        time python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/trace-dumbbell.py
+        time python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/simple_ntp_exp.py
+        #time python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/trace-dumbbell.py
     volumes:
       - /local/jakobg/tracing-experiments/wrkdir:/usr/src/data-folder
       - /dev/kvm:/dev/kvm

@@ -76,6 +76,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
     }
 
+    assert(current_device_span->IsComplete());
     last_finished_device_span_ = current_device_span;
     tracer_.MarkSpanAsDone(current_device_span);
     co_return true;

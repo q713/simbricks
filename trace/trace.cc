@@ -137,11 +137,11 @@ int main(int argc, char *argv[]) {
 
   spdlog::set_level(trace_env_config.GetLogLevel());
 
-  //simbricks::trace::OtlpSpanExporter exporter{trace_environment,
-  //                                            trace_env_config.GetJaegerUrl(),
-  //                                            false,
-  //                                            "trace"};
-  simbricks::trace::NoOpExporter exporter{trace_environment};
+  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
+                                              trace_env_config.GetJaegerUrl(),
+                                              false,
+                                              "trace"};
+  //simbricks::trace::NoOpExporter exporter{trace_environment};
 
   Tracer tracer{trace_environment, exporter};
 
@@ -307,7 +307,7 @@ int main(int argc, char *argv[]) {
                                                             timestamp_bounds);
 
       auto handler_n_c = create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
-      handler_n_c->emplace_back(filter_h_c);
+      handler_n_c->emplace_back(filter_n_c);
       auto pl_n_c = create_shared<Pipeline<std::shared_ptr<Event>>>(
           TraceException::kPipelineNull, event_pro_n_c, handler_n_c, spanner_n_c);
 
@@ -474,12 +474,13 @@ int main(int argc, char *argv[]) {
     handler_server_host_pipeline->emplace_back(timestamp_filter_h_s);
     handler_server_host_pipeline->emplace_back(event_filter_h_s);
     handler_server_host_pipeline->emplace_back(func_filter_h_s);
-    handler_server_host_pipeline->emplace_back(printer_h_s);
+    //handler_server_host_pipeline->emplace_back(printer_h_s);
     auto server_host_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,
         gem5_ser_buf_pro,
         handler_server_host_pipeline,
-        spanner_h_s);
+        printer_h_s);
+        //spanner_h_s);
 
     // CLIENT HOST PIPELINE
     auto event_filter_h_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -518,12 +519,13 @@ int main(int argc, char *argv[]) {
     handler_client_host_pipeline->emplace_back(timestamp_filter_h_c);
     handler_client_host_pipeline->emplace_back(event_filter_h_c);
     handler_client_host_pipeline->emplace_back(func_filter_h_c);
-    handler_client_host_pipeline->emplace_back(printer_h_c);
+//    handler_client_host_pipeline->emplace_back(printer_h_c);
     auto client_host_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,
         gem5_client_buf_pro,
         handler_client_host_pipeline,
-        spanner_h_c);
+        printer_h_c);
+//        spanner_h_c);
 
     // SERVER NIC PIPELINE
     auto event_filter_n_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -554,9 +556,11 @@ int main(int argc, char *argv[]) {
         create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
     handler_server_nic_pipeline->emplace_back(timestamp_filter_n_s);
     handler_server_nic_pipeline->emplace_back(event_filter_n_s);
-    handler_server_nic_pipeline->emplace_back(printer_n_s);
+//    handler_server_nic_pipeline->emplace_back(printer_n_s);
     auto server_nic_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
-        TraceException::kPipelineNull, nicbm_ser_buf_pro, handler_server_nic_pipeline, spanner_n_s);
+        TraceException::kPipelineNull, nicbm_ser_buf_pro, handler_server_nic_pipeline,
+        printer_n_s);
+//        spanner_n_s);
 
     // CLIENT NIC PIPELINE
     auto event_filter_n_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -588,9 +592,11 @@ int main(int argc, char *argv[]) {
         create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
     handler_client_nic_pipeline->emplace_back(timestamp_filter_n_c);
     handler_client_nic_pipeline->emplace_back(event_filter_n_c);
-    handler_client_nic_pipeline->emplace_back(printer_n_c);
+//    handler_client_nic_pipeline->emplace_back(printer_n_c);
     auto client_nic_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
-        TraceException::kPipelineNull, nicbm_client_buf_pro, handler_client_nic_pipeline, spanner_n_c);
+        TraceException::kPipelineNull, nicbm_client_buf_pro, handler_client_nic_pipeline,
+        printer_n_c);
+//        spanner_n_c);
 
     // NS3 PIPELINE
     auto event_filter_ns3 = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -624,12 +630,13 @@ int main(int argc, char *argv[]) {
     handler_ns3_pipeline->emplace_back(timestamp_filter_ns3);
     handler_ns3_pipeline->emplace_back(event_filter_ns3);
     handler_ns3_pipeline->emplace_back(ns3_event_filter);
-    handler_ns3_pipeline->emplace_back(printer_ns3);
+//    handler_ns3_pipeline->emplace_back(printer_ns3);
     auto ns3_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,
         ns3_buf_pro,
         handler_ns3_pipeline,
-        spanner_ns3);
+        printer_ns3);
+//        spanner_ns3);
 
     auto pipelines = create_shared<std::vector<std::shared_ptr<Pipeline<std::shared_ptr<Event>>>>>("vector is null");
     pipelines->emplace_back(client_host_pipeline);
@@ -639,6 +646,7 @@ int main(int argc, char *argv[]) {
     pipelines->emplace_back(ns3_pipeline);
     spdlog::info("START TRACING PIPELINE FROM RAW SIMULATOR OUTPUT");
     RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
+    tracer.FinishExport();
     spdlog::info("FINISHED PIPELINE");
 
 #if 0

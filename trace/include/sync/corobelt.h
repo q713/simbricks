@@ -37,70 +37,11 @@
 #include "util/factory.h"
 #include "util/utils.h"
 
-template<typename ValueType>
-struct producer {
-  explicit producer() = default;
-
-  virtual concurrencpp::result<void> produce(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<ValueType>> tar_chan) {
-    co_return;
-  };
-};
-
-template<typename ValueType>
-struct consumer {
-  explicit consumer() = default;
-
-  virtual concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<ValueType>> src_chan) {
-    std::optional<ValueType> val_opt;
-    for (val_opt = co_await src_chan->Pop(resume_executor);
-         val_opt;
-         val_opt = co_await src_chan->Pop(resume_executor));
-    co_return;
-  };
-};
-
-template<typename ValueType>
-using NoOpConsumer = consumer<ValueType>;
-
-template<typename ValueType>
-struct cpipe {
-  explicit cpipe() = default;
-
-  virtual concurrencpp::result<void> process(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<ValueType>> src_chan,
-      std::shared_ptr<CoroChannel<ValueType>> tar_chan) {
-    co_return;
-  }
-};
-
-/* Wrapper class to allow passing multiple pipelines to method */
-template<typename ValueType>
-struct pipeline {
-  std::shared_ptr<producer<ValueType>> prod_;
-  std::vector<std::shared_ptr<cpipe<ValueType>>> &pipes_;
-  std::shared_ptr<consumer<ValueType>> cons_;
-
-  explicit pipeline(std::shared_ptr<producer<ValueType>> prod,
-                    std::vector<std::shared_ptr<cpipe<ValueType>>> &pipes,
-                    std::shared_ptr<consumer<ValueType>> cons)
-      : prod_(prod), pipes_(pipes), cons_(cons) {
-  }
-};
-
 // TODO: may make this a concurrencpp::generator<...>
 template<typename ValueType>
 class Producer {
  public:
   explicit Producer() = default;
-
-  virtual explicit operator bool() noexcept {
-    return false;
-  };
 
   virtual concurrencpp::result<std::optional<ValueType>> produce(std::shared_ptr<concurrencpp::executor> executor) {
     return {};
@@ -149,19 +90,16 @@ class Pipeline {
 
 template<typename ValueType>
 inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
-                                          std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                          std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Producer<ValueType>> producer,
                                           std::shared_ptr<CoroChannel<ValueType>> tar_chan) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
   throw_if_empty(tar_chan, TraceException::kChannelIsNull, source_loc::current());
   throw_if_empty(producer, TraceException::kProducerIsNull, source_loc::current());
 
-  while (*producer) {
-    std::optional<ValueType> value = co_await producer->produce(tpe);
-    if (not value.has_value()) {
-      break;
-    }
-
+  std::optional<ValueType> value;
+  for (value = co_await producer->produce(tpe); value.has_value();
+       value = co_await producer->produce(tpe)) {
     const bool could_push = co_await tar_chan->Push(tpe, *value);
     throw_on(not could_push,
              "unable to push next event to target channel",
@@ -173,7 +111,7 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
 
 template<typename ValueType>
 inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
-                                          std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                          std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Consumer<ValueType>> consumer,
                                           std::shared_ptr<CoroChannel<ValueType>> src_chan) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
@@ -192,7 +130,7 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
 
 template<typename ValueType>
 inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
-                                         std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                         std::shared_ptr<concurrencpp::executor> tpe,
                                          std::shared_ptr<Handler<ValueType>> handler,
                                          std::shared_ptr<CoroChannel<ValueType>> src_chan,
                                          std::shared_ptr<CoroChannel<ValueType>> tar_chan) {
@@ -219,7 +157,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
 }
 
 template<typename ValueType>
-inline concurrencpp::result<void> RunPipelineImpl(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline concurrencpp::result<void> RunPipelineImpl(std::shared_ptr<concurrencpp::executor> tpe,
                                                   std::shared_ptr<Pipeline<ValueType>> pipeline) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
   throw_if_empty(pipeline, TraceException::kPipelineNull, source_loc::current());
@@ -259,7 +197,7 @@ inline concurrencpp::result<void> RunPipelineImpl(std::shared_ptr<concurrencpp::
 }
 
 template<typename ValueType>
-inline void RunPipeline(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline void RunPipeline(std::shared_ptr<concurrencpp::executor> tpe,
                         std::shared_ptr<Pipeline<ValueType>> pipeline) {
   spdlog::info("start a pipeline");
   RunPipelineImpl(tpe, pipeline).get();
@@ -268,13 +206,13 @@ inline void RunPipeline(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
 
 template<typename ValueType>
 inline concurrencpp::result<void> RunPipelineParallelImpl(concurrencpp::executor_tag,
-                                                          std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                                          std::shared_ptr<concurrencpp::executor> tpe,
                                                           std::shared_ptr<Pipeline<ValueType>> pipeline) {
   co_await RunPipelineImpl(tpe, pipeline);
 }
 
 template<typename ValueType>
-inline concurrencpp::result<void> RunPipelinesImpl(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline concurrencpp::result<void> RunPipelinesImpl(std::shared_ptr<concurrencpp::executor> tpe,
                                                    std::shared_ptr<std::vector<std::shared_ptr<Pipeline<ValueType>>>> pipelines) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
   throw_if_empty(pipelines, "vector is null", source_loc::current());
@@ -296,157 +234,11 @@ inline concurrencpp::result<void> RunPipelinesImpl(std::shared_ptr<concurrencpp:
 }
 
 template<typename ValueType>
-inline void RunPipelines(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline void RunPipelines(std::shared_ptr<concurrencpp::executor> tpe,
                          std::shared_ptr<std::vector<std::shared_ptr<Pipeline<ValueType>>>> pipelines) {
   spdlog::info("start a pipeline");
   RunPipelinesImpl(tpe, pipelines).get();
   spdlog::info("finished a pipeline");
-}
-
-template<typename ValueType>
-inline concurrencpp::result<void> run_pipeline_impl(
-    std::shared_ptr<concurrencpp::executor> executor,
-    pipeline<ValueType> &pipeline) {
-  throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
-
-  spdlog::info("start a pipeline");
-
-  const size_t amount_channels = pipeline.pipes_.size() + 1;
-  std::vector<std::shared_ptr<CoroChannel<ValueType>>> channels{amount_channels};
-  std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
-  channels[0] = create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
-  throw_if_empty(pipeline.prod_, TraceException::kProducerIsNull, source_loc::current());
-  tasks[0] = pipeline.prod_->produce(executor, channels[0]);
-
-  for (size_t index = 0; index < pipeline.pipes_.size(); index++) {
-    auto &pipe = pipeline.pipes_[index];
-    throw_if_empty(pipe, TraceException::kPipeIsNull, source_loc::current());
-
-    channels[index + 1] =
-        create_shared<CoroBoundedChannel<ValueType>>(TraceException::kChannelIsNull);
-    tasks[index + 1] =
-        pipe->process(executor, channels[index], channels[index + 1]);
-  }
-
-  throw_if_empty(pipeline.cons_, TraceException::kConsumerIsNull, source_loc::current());
-  tasks[amount_channels] =
-      pipeline.cons_->consume(executor, channels[amount_channels - 1]);
-
-  //co_await concurrencpp::when_all(executor, tasks.begin(), tasks.end()).run();
-  for (size_t index = 0; index < amount_channels; index++) {
-    co_await tasks[index];
-    co_await channels[index]->CloseChannel(executor);
-  }
-  co_await tasks[amount_channels];
-
-  spdlog::info("finished a pipeline");
-
-  co_return;
-}
-
-template<typename ValueType>
-inline concurrencpp::result<void> run_pipeline_impl_parallel(
-    concurrencpp::executor_tag,
-    std::shared_ptr<concurrencpp::executor> executor,
-    pipeline<ValueType> &pipeline) {
-  co_await run_pipeline_impl(executor, pipeline);
-  co_return;
-}
-
-template<typename ValueType>
-inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
-                         pipeline<ValueType> &pipeline) {
-  try {
-    run_pipeline_impl(executor, pipeline).get();
-  } catch (TraceException &exe) {
-    std::cerr << exe.what() << '\n';
-    executor->shutdown();
-  }
-}
-
-template<typename ValueType>
-inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
-                         std::shared_ptr<producer<ValueType>> prod,
-                         std::vector<std::shared_ptr<cpipe<ValueType>>> &pipes,
-                         std::shared_ptr<consumer<ValueType>> cons) {
-  pipeline<ValueType> pipeline{prod, pipes, cons};
-
-  try {
-    run_pipeline_impl(executor, pipeline).get();
-  } catch (TraceException &exe) {
-    std::cerr << exe.what() << '\n';
-    executor->shutdown();
-    exit(EXIT_FAILURE);
-  }
-}
-
-template<typename ValueType>
-inline void run_pipeline(std::shared_ptr<concurrencpp::executor> executor,
-                         std::shared_ptr<producer<ValueType>> prod,
-                         std::shared_ptr<consumer<ValueType>> cons) {
-  std::vector<std::shared_ptr<cpipe<ValueType>>> dummy;
-  run_pipeline<ValueType>(executor, prod, dummy, cons);
-}
-
-template<typename ValueType>
-inline void run_pipelines(std::shared_ptr<concurrencpp::executor> executor,
-                          std::vector<pipeline<ValueType>> &pipelines) {
-  size_t amount_tasks = pipelines.size();
-  std::vector<concurrencpp::result<void>> pipelns{amount_tasks};
-
-  try {
-    // create asynchronous(NOTE: asynchronous does not equal parallel)
-    // coroutines
-    for (size_t index = 0; index < amount_tasks; index++) {
-      auto &pipel = pipelines[index];
-      pipelns[index] = run_pipeline_impl(executor, pipel);
-    }
-    // suspend to get result
-    for (size_t index = 0; index < amount_tasks; index++) {
-      pipelns[index].get();
-    }
-  } catch (TraceException &exe) {
-    std::cerr << exe.what() << '\n';
-    executor->shutdown();
-    exit(EXIT_FAILURE);
-  }
-}
-
-template<typename ValueType>
-inline void run_pipelines_parallel(
-    std::shared_ptr<concurrencpp::executor> executor,
-    std::vector<pipeline<ValueType>> &pipelines) {
-  throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
-  size_t amount_tasks = pipelines.size();
-  //std::vector<concurrencpp::result<concurrencpp::result<void>>> pipelns{
-  //    amount_tasks};
-  std::vector<concurrencpp::result<void>> pipelns{amount_tasks};
-
-  spdlog::info("start running pipelines in parallel");
-  try {
-    // create asynchronous(NOTE: asynchronous does not equal parallel) coroutines
-    for (size_t index = 0; index < amount_tasks; index++) {
-      //pipelns[index] = executor->submit(run_pipeline_impl<ValueType>, executor,
-      //                                  pipelines[index]);
-      pipelns[index] = run_pipeline_impl_parallel({}, executor, pipelines[index]);
-    }
-    // suspend to get result
-    for (size_t index = 0; index < amount_tasks; index++) {
-      pipelns[index].get();
-    }
-  } catch (TraceException &exe) {
-    std::cerr << exe.what() << '\n';
-    executor->shutdown();
-    exit(EXIT_FAILURE);
-  }
-
-  spdlog::info("all pipelines finished");
-}
-
-inline void await_results(std::vector<concurrencpp::result<void>> &results) {
-  for (auto &res : results) {
-    res.get();
-  }
 }
 
 #endif  // SIMBRICKS_TRACE_COROBELT_H_

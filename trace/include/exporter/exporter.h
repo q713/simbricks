@@ -60,10 +60,7 @@ namespace simbricks::trace {
 class SpanExporter {
 
  protected:
-  // TODO: support reader writer lock, normally all threads should
-  //       only read values after exporter initialization, as such
-  //       we can also execute them concurrently as long as they only read values!
-  std::recursive_mutex exporter_mutex_;
+  std::mutex exporter_mutex_;
 
   TraceEnvironment &trace_environment_;
 
@@ -77,6 +74,8 @@ class SpanExporter {
   virtual void EndSpan(std::shared_ptr<EventSpan> to_end) = 0;
 
   virtual void ExportSpan(std::shared_ptr<EventSpan> to_export) = 0;
+
+  virtual void ForceFlush() = 0;
 };
 
 // special span exporter that doies nothing, may be useful for debugging purposes
@@ -93,6 +92,8 @@ class NoOpExporter : public SpanExporter {
   void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
     spdlog::warn("NoOpExporter 'exported' Span a.k.a did nothing");
   }
+
+  void ForceFlush() override {}
 };
 
 class OtlpSpanExporter : public SpanExporter {
@@ -123,6 +124,8 @@ class OtlpSpanExporter : public SpanExporter {
 
   void InsertNewContext(uint64_t span_id,
                         context_t &context) {
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "invalid id", source_loc::current());
     //const bool suc = context_map_.Insert(span_id, context);
@@ -133,6 +136,8 @@ class OtlpSpanExporter : public SpanExporter {
 
   opentelemetry::trace::SpanContext
   GetContext(uint64_t span_id) {
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "GetContext context_to_get is null", source_loc::current());
     //auto con_opt = context_map_.Find(span_id);
@@ -150,6 +155,8 @@ class OtlpSpanExporter : public SpanExporter {
     throw_if_empty(old_span, "InsertNewSpan old span is null", source_loc::current());
     throw_on(not new_span, "InsertNewSpan new_span is null", source_loc::current());
 
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     const uint64_t span_id = old_span->GetId();
     auto iter = span_map_.insert({span_id, new_span});
     throw_on_false(iter.second, "InsertNewSpan could not insert into span map",
@@ -157,17 +164,21 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void RemoveSpan(const std::shared_ptr<EventSpan> &old_span) {
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     const size_t erased = span_map_.erase(old_span->GetId());
     throw_on(erased != 1, "RemoveSpan did not remove a single span", source_loc::current());
   }
 
   tracer_t CreateTracer(std::string &service_name) {
+    // NOTE: Lock must be held when calling this method!
+
     // create exporter
     opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
     opts.url = url_;
     auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
         opts);
-    //auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
+//    auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
     throw_if_empty(exporter, TraceException::kSpanExporterNull, source_loc::current());
 
     // create span processor
@@ -203,6 +214,8 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   tracer_t GetTracerLazy(std::string &service_name) {
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     auto iter = tracer_map_.find(service_name);
     if (iter != tracer_map_.end()) {
       return iter->second;
@@ -215,19 +228,26 @@ class OtlpSpanExporter : public SpanExporter {
 
   span_t GetSpan(std::shared_ptr<EventSpan> &span_to_get) {
     throw_if_empty(span_to_get, "GetSpan span_to_get is null", source_loc::current());
+
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     const uint64_t span_id = span_to_get->GetId();
     auto span = span_map_.find(span_id)->second;
     throw_on(not span, "InsertNewSpan span is null", source_loc::current());
     return span;
   }
 
-  opentelemetry::common::SteadyTimestamp ToSteadyNanoseconds(uint64_t timestamp_pico) const {
+  opentelemetry::common::SteadyTimestamp ToSteadyNanoseconds(uint64_t timestamp_pico) {
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     const std::chrono::nanoseconds nano_sec(time_offset_nanosec_ + timestamp_pico / kPicoToNanoDenominator);
     const ts_steady time_point(nano_sec);
     return opentelemetry::common::SteadyTimestamp(time_point);
   }
 
-  opentelemetry::common::SystemTimestamp ToSystemNanoseconds(uint64_t timestamp_pico) const {
+  opentelemetry::common::SystemTimestamp ToSystemNanoseconds(uint64_t timestamp_pico) {
+    std::lock_guard<std::mutex> guard(exporter_mutex_);
+
     const std::chrono::nanoseconds nano_sec(time_offset_nanosec_ + timestamp_pico / kPicoToNanoDenominator);
     const ts_system time_point(nano_sec);
     return opentelemetry::common::SystemTimestamp(time_point);
@@ -484,10 +504,13 @@ class OtlpSpanExporter : public SpanExporter {
     opentelemetry::trace::StartSpanOptions span_options;
     if (span->HasParent()) {
       const uint64_t parent_id = span->GetValidParentId();
+      // Note: lock bust be free
       auto open_context = GetContext(parent_id);
       span_options.parent = open_context;
     }
+    // Note: lock bust be free
     span_options.start_system_time = ToSystemNanoseconds(span->GetStartingTs());
+    // Note: lock bust be free
     span_options.start_steady_time = ToSteadyNanoseconds(span->GetStartingTs());
 
     // 'hack' for jaeger ui...
@@ -500,8 +523,11 @@ class OtlpSpanExporter : public SpanExporter {
     assert(old_span and "old span is null");
     assert(new_span and "new span is null");
     opentelemetry::trace::EndSpanOptions end_opts;
+    // Note: lock bust be free
     end_opts.end_steady_time = ToSteadyNanoseconds(old_span->GetCompletionTs());
     new_span->End(end_opts);
+
+    // Note: lock bust be free
     RemoveSpan(old_span);
   }
 
@@ -758,7 +784,9 @@ class OtlpSpanExporter : public SpanExporter {
         }
       }
 
-      span->AddEvent(type, ToSystemNanoseconds(action->GetTs()), attributes);
+      // Note: lock bust be free
+      const auto ts = ToSystemNanoseconds(action->GetTs());
+      span->AddEvent(type, ts, attributes);
     }
   }
 
@@ -786,42 +814,56 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   ~OtlpSpanExporter() {
-    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
-    if (provider) {
-      static_cast<opentelemetry::sdk::trace::TracerProvider *>(provider.get())->ForceFlush();
-    }
     const std::shared_ptr<opentelemetry::trace::TracerProvider> none;
     opentelemetry::trace::Provider::SetTracerProvider(none);
   }
 
+  void ForceFlush() override {
+    const std::lock_guard<std::mutex> guard(exporter_mutex_);
+    for (auto &str_tracer : tracer_map_) {
+      str_tracer.second->ForceFlush(std::chrono::seconds(60));
+    }
+    auto provider = opentelemetry::trace::Provider::GetTracerProvider();
+    if (provider) {
+      static_cast<opentelemetry::sdk::trace::TracerProvider *>(provider.get())->ForceFlush();
+    }
+  }
+
   void StartSpan(std::shared_ptr<EventSpan> to_start) override {
-    const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
     auto span_opts = GetSpanStartOpts(to_start);
     auto span_name = GetTypeStr(to_start);
+
+    // Note: lock bust be free
     auto tracer = GetTracerLazy(to_start->GetServiceName());
     auto span = tracer->StartSpan(span_name, span_opts);
     span->SetStatus(opentelemetry::trace::StatusCode::kOk);
+
+    // Note: lock bust be free
     InsertNewSpan(to_start, span);
 
     const uint64_t span_id = to_start->GetId();
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "invalid id", source_loc::current());
     auto new_context = span->GetContext();
+
+    // Note: lock bust be free
     InsertNewContext(span_id, new_context);
+    spdlog::debug("started span");
   }
 
   void EndSpan(std::shared_ptr<EventSpan> to_end) override {
-    const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
+    // Note: lock bust be free
     span_t span = GetSpan(to_end);
     set_Attr(span, to_end);
+    // Note: lock bust be free
     add_Events(span, to_end);
     end_span(to_end, span);
+    spdlog::debug("ended span");
   }
 
   void ExportSpan(std::shared_ptr<EventSpan> to_export) override {
     spdlog::debug("Start exporting Span");
     {
-      const std::lock_guard<std::recursive_mutex> guard(exporter_mutex_);
       StartSpan(to_export);
       EndSpan(to_export);
     }

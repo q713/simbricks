@@ -806,28 +806,4 @@ inline std::ostream &operator<<(std::ostream &out, std::shared_ptr<EventSpan> &s
   return out;
 }
 
-struct SpanPrinter
-    : public consumer<std::shared_ptr<EventSpan>> {
-  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                     std::shared_ptr<CoroChannel<std::shared_ptr<EventSpan>>> src_chan) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
-    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
-
-    std::optional<std::shared_ptr<EventSpan>> next_span_opt;
-    std::shared_ptr<EventSpan> next_span = nullptr;
-    for (next_span_opt = co_await src_chan->Pop(resume_executor); next_span_opt.has_value();
-         next_span_opt = co_await src_chan->Pop(resume_executor)) {
-      next_span = next_span_opt.value();
-      throw_if_empty(next_span, TraceException::kSpanIsNull, source_loc::current());
-      std::cout << next_span << '\n';
-    }
-
-    co_return;
-  }
-
-  SpanPrinter() = default;
-
-  ~SpanPrinter() = default;
-};
-
 #endif  // SIMBRICKS_TRACE_EVENT_SPAN_H_

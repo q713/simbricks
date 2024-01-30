@@ -233,25 +233,6 @@ target_include_directories(${UNIT_TESTS_TARGET} PUBLIC
 target_link_libraries(${UNIT_TESTS_TARGET} PUBLIC Catch2::Catch2WithMain)
 target_link_libraries(${UNIT_TESTS_TARGET} PUBLIC ${PROJECT_NAME})
 
-
-#######################################
-# Concurrencpp test file to play around with coroutines
-#######################################
-set(TEST_SRC
-        include/util/exception.h
-        include/sync/channel.h
-        include/sync/corobelt.h
-        source/corobelt/concurrencpp-test.cpp
-        )
-set(TEST_TAR concurrencpp-test)
-add_executable(${TEST_TAR} ${TEST_SRC})
-target_include_directories(${TEST_TAR} PUBLIC
-        include
-        source
-        )
-target_link_libraries(${TEST_TAR} PUBLIC concurrencpp::concurrencpp spdlog::spdlog)
-
-
 #######################################
 # Trace executable
 #######################################

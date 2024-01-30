@@ -40,7 +40,8 @@ exporters:
   debug:
 
   otlp:
-    endpoint: "jaeger:4317"
+    endpoint: "jaeger:4317" #gRPC
+    #endpoint: "jaeger:4318" # HTTP
     tls:
       insecure: true
 
@@ -53,7 +54,7 @@ connectors:
 
 processors:
   tail_sampling:
-    decision_wait: 360s
+    decision_wait: 120s
     policies: [
       {
         name: is-receive-span,

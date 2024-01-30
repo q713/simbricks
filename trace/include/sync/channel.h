@@ -236,6 +236,20 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
     return std::move(result);
   }
 
+  bool WaitTillValue() {
+    std::unique_lock lock{this->chan_numtex_};
+    this->chan_cond_var_.wait(lock, [this] {
+      return this->poisened_ || this->closed_ || this->size_ > 0;
+    });
+    if (this->poisened_) {
+      lock.unlock();
+      this->chan_cond_var_.notify_all();
+      return false; // when poisoned we do not want to read anymore...
+    }
+    assert(not this->poisened_ and "channel should not be poisened here");
+    return this->size_ > 0;
+  }
+
   std::optional<ValueType> TryPop() {
     std::unique_lock lock{this->chan_numtex_};
     if (this->poisened_ or this->size_ == 0) {

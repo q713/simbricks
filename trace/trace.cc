@@ -137,13 +137,16 @@ int main(int argc, char *argv[]) {
 
   spdlog::set_level(trace_env_config.GetLogLevel());
 
-  simbricks::trace::OtlpSpanExporter exporter{trace_environment,
-                                              trace_env_config.GetJaegerUrl(),
-                                              false,
-                                              "trace"};
-  //simbricks::trace::NoOpExporter exporter{trace_environment};
+  auto exporter = create_shared<simbricks::trace::OtlpSpanExporter>(
+      TraceException::kSpanExporterNull,
+      trace_environment,
+      trace_env_config.GetJaegerUrl(),
+      false,
+      "trace");
+//  auto exporter = create_shared<simbricks::trace::NoOpExporter>(
+//      TraceException::kSpanExporterNull, trace_environment);
 
-  Tracer tracer{trace_environment, exporter};
+  Tracer tracer{trace_environment, std::move(exporter)};
 
   constexpr size_t kAmountSources = 5;
   constexpr size_t kLineBufferSize = 1;
@@ -191,6 +194,8 @@ int main(int argc, char *argv[]) {
                                                  trace_environment,
                                                  "NIC-Server",
                                                  tracer,
+//                                                 nic_s_to_network,
+//                                                 nic_c_to_network,
                                                  nic_s_to_network,
                                                  nic_s_from_network,
                                                  server_nh,
@@ -201,6 +206,8 @@ int main(int argc, char *argv[]) {
                                                  trace_environment,
                                                  "Client-NIC",
                                                  tracer,
+//                                                 nic_c_to_network,
+//                                                 nic_s_to_network,
                                                  nic_c_to_network,
                                                  nic_c_from_network,
                                                  client_nh,
@@ -341,89 +348,6 @@ int main(int argc, char *argv[]) {
       RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
       spdlog::info("FINISHED PIPELINE");
       exit(EXIT_SUCCESS);
-
-#if 0
-      EventStreamParser parser_h_s{trace_environment, "gem5-server-reader"};
-      auto event_pro_h_s = create_shared<BufferedEventProvider<1, 1>>(
-          TraceException::kBufferedEventProviderIsNull,
-          trace_environment,
-          "BufferedEventProviderHostServer",
-          result["gem5-server-event-stream"].as<std::string>(),
-          parser_h_s,
-          timer
-      );
-      auto filter_h_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                            trace_environment,
-                                                            timestamp_bounds);
-      std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_s{filter_h_s};
-      const pipeline<std::shared_ptr<Event>> pl_h_s{event_pro_h_s, pipeline_h_s, spanner_h_s};
-
-      EventStreamParser parser_h_c{trace_environment, "gem5-client-reader"};
-      auto event_pro_h_c = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
-          TraceException::kBufferedEventProviderIsNull,
-          trace_environment,
-          "BufferedEventProviderHostClient",
-          result["gem5-client-event-stream"].as<std::string>(),
-          parser_h_c,
-          timer
-      );
-      auto filter_h_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                            trace_environment,
-                                                            timestamp_bounds);
-      std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_h_c{filter_h_c};
-      const pipeline<std::shared_ptr<Event>> pl_h_c{event_pro_h_c, pipeline_h_c, spanner_h_c};
-
-      EventStreamParser parser_n_s{trace_environment, "nicbm-server-reader"};
-      auto event_pro_n_s = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
-          TraceException::kBufferedEventProviderIsNull,
-          trace_environment,
-          "BufferedEventProviderNicServer",
-          result["nicbm-server-event-stream"].as<std::string>(),
-          parser_n_s,
-          timer
-      );
-      auto filter_n_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                            trace_environment,
-                                                            timestamp_bounds);
-      std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_s{filter_n_s};
-      const pipeline<std::shared_ptr<Event>> pl_n_s{event_pro_n_s, pipeline_n_s, spanner_n_s};
-
-      EventStreamParser parser_n_c{trace_environment, "nicbm-client-reader"};
-      auto event_pro_n_c = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
-          TraceException::kBufferedEventProviderIsNull,
-          trace_environment,
-          "BufferedEventProviderNicClient",
-          result["nicbm-client-event-stream"].as<std::string>(),
-          parser_n_c,
-          timer
-      );
-      auto filter_n_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                            trace_environment,
-                                                            timestamp_bounds);
-      std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_n_c{filter_h_c};
-      const pipeline<std::shared_ptr<Event>> pl_n_c{event_pro_n_c, pipeline_n_c, spanner_n_c};
-
-      EventStreamParser parser_ns3{trace_environment, "ns3-event-parser"};
-      auto event_pro_ns3 = create_shared<BufferedEventProvider<kNamedPipes, 1, 1>>(
-          TraceException::kBufferedEventProviderIsNull,
-          trace_environment,
-          "BufferedEventProviderNs3",
-          result["ns3-event-stream"].as<std::string>(),
-          parser_ns3,
-          timer
-      );
-      auto filter_ns3 = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                            trace_environment,
-                                                            timestamp_bounds);
-      std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>> pipeline_ns3{filter_h_c};
-      const pipeline<std::shared_ptr<Event>> pipeline_def_ns3{event_pro_ns3, pipeline_ns3, spanner_ns3};
-
-      std::vector<pipeline<std::shared_ptr<Event>>> pipelines{pl_h_c, pl_n_c, pl_h_s, pl_n_s, pipeline_def_ns3};
-      spdlog::info("START TRACING PIPELINE FROM PREPROCESSED EVENT STREAM");
-      run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
-      spdlog::info("FINISHED PIPELINE");
-      exit(EXIT_SUCCESS);
-#endif
     }
 
     if (!result.count("gem5-log-server") ||
@@ -474,13 +398,13 @@ int main(int argc, char *argv[]) {
     handler_server_host_pipeline->emplace_back(timestamp_filter_h_s);
     handler_server_host_pipeline->emplace_back(event_filter_h_s);
     handler_server_host_pipeline->emplace_back(func_filter_h_s);
-    //handler_server_host_pipeline->emplace_back(printer_h_s);
+    handler_server_host_pipeline->emplace_back(printer_h_s);
     auto server_host_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,
         gem5_ser_buf_pro,
         handler_server_host_pipeline,
-        printer_h_s);
-        //spanner_h_s);
+//        printer_h_s);
+        spanner_h_s);
 
     // CLIENT HOST PIPELINE
     auto event_filter_h_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -519,13 +443,13 @@ int main(int argc, char *argv[]) {
     handler_client_host_pipeline->emplace_back(timestamp_filter_h_c);
     handler_client_host_pipeline->emplace_back(event_filter_h_c);
     handler_client_host_pipeline->emplace_back(func_filter_h_c);
-//    handler_client_host_pipeline->emplace_back(printer_h_c);
+    handler_client_host_pipeline->emplace_back(printer_h_c);
     auto client_host_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,
         gem5_client_buf_pro,
         handler_client_host_pipeline,
-        printer_h_c);
-//        spanner_h_c);
+//        printer_h_c);
+        spanner_h_c);
 
     // SERVER NIC PIPELINE
     auto event_filter_n_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -556,11 +480,11 @@ int main(int argc, char *argv[]) {
         create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
     handler_server_nic_pipeline->emplace_back(timestamp_filter_n_s);
     handler_server_nic_pipeline->emplace_back(event_filter_n_s);
-//    handler_server_nic_pipeline->emplace_back(printer_n_s);
+    handler_server_nic_pipeline->emplace_back(printer_n_s);
     auto server_nic_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull, nicbm_ser_buf_pro, handler_server_nic_pipeline,
-        printer_n_s);
-//        spanner_n_s);
+//        printer_n_s);
+        spanner_n_s);
 
     // CLIENT NIC PIPELINE
     auto event_filter_n_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -592,11 +516,11 @@ int main(int argc, char *argv[]) {
         create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
     handler_client_nic_pipeline->emplace_back(timestamp_filter_n_c);
     handler_client_nic_pipeline->emplace_back(event_filter_n_c);
-//    handler_client_nic_pipeline->emplace_back(printer_n_c);
+    handler_client_nic_pipeline->emplace_back(printer_n_c);
     auto client_nic_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull, nicbm_client_buf_pro, handler_client_nic_pipeline,
-        printer_n_c);
-//        spanner_n_c);
+//        printer_n_c);
+        spanner_n_c);
 
     // NS3 PIPELINE
     auto event_filter_ns3 = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
@@ -630,13 +554,13 @@ int main(int argc, char *argv[]) {
     handler_ns3_pipeline->emplace_back(timestamp_filter_ns3);
     handler_ns3_pipeline->emplace_back(event_filter_ns3);
     handler_ns3_pipeline->emplace_back(ns3_event_filter);
-//    handler_ns3_pipeline->emplace_back(printer_ns3);
+    handler_ns3_pipeline->emplace_back(printer_ns3);
     auto ns3_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,
         ns3_buf_pro,
         handler_ns3_pipeline,
-        printer_ns3);
-//        spanner_ns3);
+//        printer_ns3);
+        spanner_ns3);
 
     auto pipelines = create_shared<std::vector<std::shared_ptr<Pipeline<std::shared_ptr<Event>>>>>("vector is null");
     pipelines->emplace_back(client_host_pipeline);
@@ -649,193 +573,6 @@ int main(int argc, char *argv[]) {
     tracer.FinishExport();
     spdlog::info("FINISHED PIPELINE");
 
-#if 0
-    const std::set<EventType> to_filter{trace_env_config.BeginTypesToFilter(), trace_env_config.EndTypesToFilter()};
-
-    auto event_filter_h_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
-                                                           trace_environment,
-                                                           to_filter,
-                                                           true);
-    //false);
-    auto timestamp_filter_h_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                                    trace_environment,
-                                                                    timestamp_bounds);
-    const ComponentFilter comp_filter_server("ComponentFilter-Server");
-    Gem5Parser gem5_server_par{trace_environment,
-                               "Gem5ServerParser",
-                               comp_filter_server};
-    auto gem5_ser_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
-        TraceException::kBufferedEventProviderIsNull,
-        trace_environment,
-        "Gem5ServerEventProvider",
-        result["gem5-log-server"].as<std::string>(),
-        gem5_server_par,
-        timer
-    );
-    std::ofstream out_h_s;
-    auto printer_h_s = createPrinter(out_h_s, result, "gem5-server-events", true);
-    if (not printer_h_s) {
-      exit(EXIT_FAILURE);
-    }
-    auto func_filter_h_s = create_shared<HostCallFuncFilter>(TraceException::kActorIsNull,
-                                                             trace_environment,
-                                                             blacklist_functions,
-                                                             true);
-    //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s, printer_h_s};
-    //const pipeline<std::shared_ptr<Event>> server_host_pipeline{
-    //    gem5_ser_buf_pro, server_host_pipes, spanner_h_s};
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        server_host_pipes{timestamp_filter_h_s, event_filter_h_s, func_filter_h_s};
-    const pipeline<std::shared_ptr<Event>> server_host_pipeline{
-        gem5_ser_buf_pro, server_host_pipes, printer_h_s};
-
-    // CLIENT HOST PIPELINE
-    auto event_filter_h_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
-                                                           trace_environment,
-                                                           to_filter,
-                                                           true);
-    //false);
-    auto timestamp_filter_h_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                                    trace_environment,
-                                                                    timestamp_bounds);
-    const ComponentFilter comp_filter_client("ComponentFilter-Server");
-    Gem5Parser gem5_client_par{trace_environment,
-                               "Gem5ClientParser",
-                               comp_filter_client};
-    auto gem5_client_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
-        TraceException::kBufferedEventProviderIsNull,
-        trace_environment,
-        "Gem5ClientEventProvider",
-        result["gem5-log-client"].as<std::string>(),
-        gem5_client_par,
-        timer
-    );
-    std::ofstream out_h_c;
-    auto printer_h_c = createPrinter(out_h_c, result, "gem5-client-events", true);
-    if (not printer_h_c) {
-      exit(EXIT_FAILURE);
-    }
-    auto func_filter_h_c = create_shared<HostCallFuncFilter>(TraceException::kActorIsNull,
-                                                             trace_environment,
-                                                             blacklist_functions,
-                                                             true);
-    //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c, printer_h_c};
-    //const pipeline<std::shared_ptr<Event>> client_host_pipeline{
-    //    gem5_client_buf_pro, client_host_pipes, spanner_h_c};
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        client_host_pipes{timestamp_filter_h_c, event_filter_h_c, func_filter_h_c};
-    const pipeline<std::shared_ptr<Event>> client_host_pipeline{
-        gem5_client_buf_pro, client_host_pipes, printer_h_c};
-
-    // SERVER NIC PIPELINE
-    auto event_filter_n_s = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
-                                                           trace_environment,
-                                                           to_filter,
-                                                           true);
-    //false);
-    auto timestamp_filter_n_s = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                                    trace_environment,
-                                                                    timestamp_bounds);
-    NicBmParser nicbm_ser_par{trace_environment,
-                              "NicbmServerParser"};
-    auto nicbm_ser_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
-        TraceException::kBufferedEventProviderIsNull,
-        trace_environment,
-        "NicbmServerEventProvider",
-        result["nicbm-log-server"].as<std::string>(),
-        nicbm_ser_par,
-        timer
-    );
-    std::ofstream out_n_s;
-    auto printer_n_s = createPrinter(out_n_s, result, "nicbm-server-events", true);
-    if (not printer_n_s) {
-      exit(EXIT_FAILURE);
-    }
-    //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    server_nic_pipes{timestamp_filter_n_s, event_filter_n_s, printer_n_s};
-    //const pipeline<std::shared_ptr<Event>> server_nic_pipeline{
-    //    nicbm_ser_buf_pro, server_nic_pipes, spanner_n_s};
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        server_nic_pipes{timestamp_filter_n_s, event_filter_n_s};
-    const pipeline<std::shared_ptr<Event>> server_nic_pipeline{
-        nicbm_ser_buf_pro, server_nic_pipes, printer_n_s};
-
-    // CLIENT NIC PIPELINE
-    auto event_filter_n_c = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
-                                                           trace_environment,
-                                                           to_filter,
-                                                           true);
-    //false);
-    auto timestamp_filter_n_c = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                                    trace_environment,
-                                                                    timestamp_bounds);
-    NicBmParser nicbm_client_par{trace_environment,
-                                 "NicbmClientParser"};
-    auto nicbm_client_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
-        TraceException::kBufferedEventProviderIsNull,
-        trace_environment,
-        "NicbmClientEventProvider",
-        result["nicbm-log-client"].as<std::string>(),
-        nicbm_client_par,
-        timer
-    );
-    std::ofstream out_n_c;
-    auto printer_n_c = createPrinter(out_n_c, result, "nicbm-client-events", true);
-    if (not printer_n_c) {
-      exit(EXIT_FAILURE);
-    }
-    //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    client_nic_pipes{timestamp_filter_n_c, event_filter_n_c, printer_n_c};
-    //const pipeline<std::shared_ptr<Event>> client_nic_pipeline{
-    //    nicbm_client_buf_pro, client_nic_pipes, spanner_n_c};
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        client_nic_pipes{timestamp_filter_n_c, event_filter_n_c};
-    const pipeline<std::shared_ptr<Event>> client_nic_pipeline{
-        nicbm_client_buf_pro, client_nic_pipes, printer_n_c};
-
-    // NS3 PIPELINE
-    auto event_filter_ns3 = create_shared<EventTypeFilter>(TraceException::kActorIsNull,
-                                                           trace_environment,
-                                                           to_filter,
-                                                           true);
-    //false);
-    auto timestamp_filter_ns3 = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
-                                                                    trace_environment,
-                                                                    timestamp_bounds);
-    NS3Parser ns3_parser{trace_environment, "NicbmClientParser"};
-    auto ns3_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSize, kEventBufferSize>>(
-        TraceException::kBufferedEventProviderIsNull,
-        trace_environment,
-        "Ns3EventProvider",
-        result["ns3-log"].as<std::string>(),
-        ns3_parser,
-        timer
-    );
-    std::ofstream out_ns3;
-    auto printer_ns3 = createPrinter(out_ns3, result, "ns3-events", true);
-    if (not printer_n_c) {
-      exit(EXIT_FAILURE);
-    }
-    auto ns3_event_filter = create_shared<NS3EventFilter>(TraceException::kActorIsNull,
-                                                          trace_environment,
-                                                          node_device_filter);
-    //std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-    //    ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter, printer_ns3};
-    //const pipeline<std::shared_ptr<Event>> ns3_pipeline{
-    //    ns3_buf_pro, ns3_pipes, spanner_ns3};
-    std::vector<std::shared_ptr<cpipe<std::shared_ptr<Event>>>>
-        ns3_pipes{timestamp_filter_ns3, event_filter_ns3, ns3_event_filter};
-    const pipeline<std::shared_ptr<Event>> ns3_pipeline{
-        ns3_buf_pro, ns3_pipes, printer_ns3};
-
-    std::vector<pipeline<std::shared_ptr<Event>>>
-        pipelines{client_host_pipeline, server_host_pipeline, client_nic_pipeline, server_nic_pipeline, ns3_pipeline};
-    spdlog::info("START TRACING PIPELINE FROM RAW SIMULATOR OUTPUT");
-    run_pipelines_parallel(trace_environment.GetPoolExecutor(), pipelines);
-    spdlog::info("FINISHED PIPELINE");
-#endif
   } catch (TraceException &err) {
     std::cerr << err.what() << '\n';
     exit(EXIT_FAILURE);

@@ -30,6 +30,7 @@
 #include <unordered_map>
 #include <set>
 #include <utility>
+#include <thread>
 
 #include "sync/corobelt.h"
 #include "sync/channel.h"
@@ -43,7 +44,7 @@
 #include "util/exception.h"
 
 class Tracer {
-  std::recursive_mutex tracer_mutex_;
+  std::mutex tracer_mutex_;
 
   TraceEnvironment &trace_environment_;
 
@@ -55,13 +56,15 @@ class Tracer {
   // parent_span_id -> list/vector of spans that wait for the parent to be exported
   std::unordered_map<uint64_t, std::vector<std::shared_ptr<EventSpan>>> waiting_list_;
 
-  simbricks::trace::SpanExporter &exporter_;
-  using ExportTastT = const std::function<concurrencpp::null_result()>;
-  NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>> to_export_queue_;
-
-  bool finished_export_ = false;
-  static constexpr size_t kAmountExporterThreads = 1;
-  std::array<concurrencpp::result<concurrencpp::result<void>>, kAmountExporterThreads> exporter_threads_;
+  std::shared_ptr<simbricks::trace::SpanExporter> exporter_;
+//  using ExportTastT = const std::function<concurrencpp::null_result()>;
+//  std::shared_ptr<NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>>> to_export_queue_;
+//  static constexpr size_t kAmountExporterThreads = 1;
+//   TODO: currently we can only use a single thread as we need to be sure that an otlp spans parent already exists when
+//         trying to export it. When using multiple threads we could not guarantee that an as a result we would trigger
+//         an exception which is correct in this case. When however making correct use of the exporter interface by harnessing
+//         the start and end span methods not alongside we could make use of multiple threads!
+//  std::unique_ptr<std::jthread> exporter_thread_;
 
   void InsertExportedSpan(uint64_t span_id) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
@@ -179,25 +182,27 @@ class Tracer {
     }
   }
 
-  void RunExportJobInBackground(const std::shared_ptr<EventSpan> &span_to_export) {
-    // NOTE: lock must be held when calling this method
-    assert(span_to_export);
-
-    ExportTastT export_task = [this, must_go = span_to_export]() -> concurrencpp::null_result {
-      try {
-        exporter_.ExportSpan(must_go);
-      } catch (std::runtime_error &err) {
-        spdlog::error("error while trying to export a trace: {}", err.what());
-      }
-      co_return;
-    };
-
-    auto executor = trace_environment_.GetBackgroundPoolExecutor();
-    executor->post(export_task);
-  }
+//  void RunExportJobInBackground(const std::shared_ptr<EventSpan> &span_to_export) {
+//    // NOTE: lock must be held when calling this method
+//    assert(span_to_export);
+//
+//    ExportTastT export_task = [this, must_go = span_to_export]() -> concurrencpp::null_result {
+//      try {
+//        exporter_.ExportSpan(must_go);
+//      } catch (std::runtime_error &err) {
+//        spdlog::error("error while trying to export a trace: {}", err.what());
+//      }
+//      co_return;
+//    };
+//
+//    auto executor = trace_environment_.GetBackgroundPoolExecutor();
+//    executor->post(export_task);
+//  }
 
   void ExportWaitingForParentVec(std::shared_ptr<EventSpan> &parent) {
-    // NOTE: lock must be held when calling this method
+    // NOTE: lock MUST NOT be held when calling this method
+    std::unique_lock<std::mutex> lock(tracer_mutex_);
+
     assert(parent and "span is null");
     const uint64_t parent_id = parent->GetId();
     auto iter = waiting_list_.find(parent_id);
@@ -212,10 +217,12 @@ class Tracer {
       MarkSpanAsExported(waiter);
       assert(not waiter->HasParent() or exported_spans_.contains(waiter->GetParentId()));
       // TODO: fix background!!
-      to_export_queue_.Push(waiter);
-      //exporter_.ExportSpan(waiter);
-      //RunExportJobInBackground(waiter);
+//      to_export_queue_->Push(waiter);
+      lock.unlock();
+      exporter_->ExportSpan(waiter);
+//      RunExportJobInBackground(waiter);
       ExportWaitingForParentVec(waiter);
+      lock.lock();
     }
     waiting_list_.erase(parent_id);
   }
@@ -275,7 +282,7 @@ class Tracer {
  public:
   void MarkSpanAsDone(std::shared_ptr<EventSpan> span) {
     // guard potential access using a lock guard
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+    std::unique_lock<std::mutex> lock(tracer_mutex_);
 
     throw_if_empty(span, "MarkSpanAsDone, span is null", source_loc::current());
     auto context = span->GetContext();
@@ -286,10 +293,12 @@ class Tracer {
       MarkSpanAsExported(span);
       // TODO: fix background!!
       assert(not span->HasParent() or exported_spans_.contains(span->GetParentId()));
-      to_export_queue_.Push(span);
-      //exporter_.ExportSpan(span);
-      //RunExportJobInBackground(span);
+//      to_export_queue_->Push(span);
+      lock.unlock();
+      exporter_->ExportSpan(span);
+//      RunExportJobInBackground(span);
       ExportWaitingForParentVec(span);
+      lock.lock();
 
       auto trace = GetTrace(trace_id);
       if (nullptr != trace and SafeToDeleteTrace(trace_id)) {
@@ -309,7 +318,7 @@ class Tracer {
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
 
     // guard potential access using a lock guard
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     auto new_trace_id = parent_context->GetTraceId();
     auto old_context = span->GetContext();
@@ -352,7 +361,7 @@ class Tracer {
     const uint64_t parent_starting_ts = parent_span->GetStartingTs();
 
     // guard potential access using a lock guard
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     std::shared_ptr<SpanType> new_span;
     new_span = StartSpanByParentInternal<SpanType, Args...>(
@@ -373,7 +382,7 @@ class Tracer {
                    source_loc::current());
 
     // guard potential access using a lock guard
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();
@@ -391,7 +400,7 @@ class Tracer {
   std::shared_ptr<SpanType> StartSpan(std::shared_ptr<Event> starting_event,
                                       Args &&... args) {
     // guard potential access using a lock guard
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     throw_if_empty(starting_event, "StartSpan(...) starting_event is null",
                    source_loc::current());
@@ -407,7 +416,7 @@ class Tracer {
                                  const std::shared_ptr<ContextType> &parent_context) {
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
     // guard potential access using a lock guard
-    const std::lock_guard<std::recursive_mutex> lock(tracer_mutex_);
+    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();
@@ -446,39 +455,35 @@ class Tracer {
   }
 
   explicit Tracer(TraceEnvironment &trace_environment,
-                  simbricks::trace::SpanExporter &exporter)
-      : trace_environment_(trace_environment), exporter_(exporter) {
+                  std::shared_ptr<simbricks::trace::SpanExporter> exporter)
+      : trace_environment_(trace_environment), exporter_(std::move(exporter)) {
 
-    auto thread_executor = trace_environment_.GetThreadExecutor();
-    for (size_t index = 0; index < kAmountExporterThreads; index++) {
-      exporter_threads_[index] = thread_executor->submit([&]() -> concurrencpp::result<void> {
-        std::optional<std::shared_ptr<EventSpan>> opt;
-        std::shared_ptr<EventSpan> span_to_export;
-        for (opt = to_export_queue_.Pop(); opt.has_value(); opt = to_export_queue_.Pop()) {
-          span_to_export = std::move(opt.value());
-          assert(span_to_export);
-          exporter_.ExportSpan(span_to_export);
-        }
-        co_return;
-      });
-    }
+    throw_if_empty(exporter_, TraceException::kSpanExporterNull, source_loc::current());
+//    to_export_queue_ =
+//        create_shared<NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>>>(TraceException::kChannelIsNull);
+//
+//    auto export_task = [poll_chan = to_export_queue_, exp = exporter_]() -> void {
+//      std::optional<std::shared_ptr<EventSpan>> opt;
+//      std::shared_ptr<EventSpan> span_to_export;
+//      for (opt = poll_chan->Pop(); opt.has_value(); opt = poll_chan->Pop()) {
+//        span_to_export = std::move(*opt);
+//        assert(span_to_export);
+//        exp->ExportSpan(span_to_export);
+//      }
+//      return;
+//    };
+//    exporter_thread_ = create_unique<std::jthread>("could not create exporter thread", export_task);
   };
 
   void FinishExport() {
-    try {
-      for (auto &task : exporter_threads_) {
-        task.get().get();
-      }
-    } catch (std::exception &err) {
-      spdlog::error("error within exporter thread: {}", err.what());
-    }
-    finished_export_ = true;
+//    to_export_queue_->CloseChannel();
+//    exporter_thread_->join();
+    exporter_->ForceFlush();
+//    throw_on_false(to_export_queue_->Empty(), "export queue not empty", source_loc::current());
   }
 
   ~Tracer() {
-    if (not finished_export_) {
-      FinishExport();
-    }
+    FinishExport();
   };
 };
 

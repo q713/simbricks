@@ -33,19 +33,16 @@
 
 // specialization of corobelt methods
 inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
-                                          std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                          std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Producer<std::shared_ptr<Event>>> producer,
                                           std::shared_ptr<CoroBoundedChannel<std::shared_ptr<Event>>> tar_chan) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
   throw_if_empty(tar_chan, TraceException::kChannelIsNull, source_loc::current());
   throw_if_empty(producer, TraceException::kProducerIsNull, source_loc::current());
 
-  while (*producer) {
-    std::optional<std::shared_ptr<Event>> value = co_await producer->produce(tpe);
-    if (not value.has_value()) {
-      break;
-    }
-
+  std::optional<std::shared_ptr<Event>> value;
+  for (value = co_await producer->produce(tpe); value.has_value();
+       value = co_await producer->produce(tpe)) {
     const bool could_push = co_await tar_chan->Push(tpe, std::move(*value));
     throw_on(not could_push,
              "unable to push next event to target channel",
@@ -56,7 +53,7 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
 }
 
 inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
-                                          std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                          std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Consumer<std::shared_ptr<Event>>> consumer,
                                           std::shared_ptr<CoroBoundedChannel<std::shared_ptr<Event>>> src_chan) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
@@ -74,7 +71,7 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
 }
 
 inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
-                                         std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                         std::shared_ptr<concurrencpp::executor> tpe,
                                          std::shared_ptr<Handler<std::shared_ptr<Event>>> handler,
                                          std::shared_ptr<CoroBoundedChannel<std::shared_ptr<Event>>> src_chan,
                                          std::shared_ptr<CoroBoundedChannel<std::shared_ptr<Event>>> tar_chan) {
@@ -101,7 +98,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
 }
 
 template<>
-inline concurrencpp::result<void> RunPipelineImpl<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline concurrencpp::result<void> RunPipelineImpl<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::executor> tpe,
                                                                           std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
   throw_if_empty(pipeline, TraceException::kPipelineNull, source_loc::current());
@@ -141,7 +138,7 @@ inline concurrencpp::result<void> RunPipelineImpl<std::shared_ptr<Event>>(std::s
 }
 
 template<>
-inline void RunPipeline<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline void RunPipeline<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::executor> tpe,
                                                 std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline) {
   spdlog::info("start a pipeline");
   RunPipelineImpl<std::shared_ptr<Event>>(std::move(tpe), std::move(pipeline)).get();
@@ -150,14 +147,14 @@ inline void RunPipeline<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::th
 
 template<>
 inline concurrencpp::result<void> RunPipelineParallelImpl<std::shared_ptr<Event>>(concurrencpp::executor_tag,
-                                                                                  std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+                                                                                  std::shared_ptr<concurrencpp::executor> tpe,
                                                                                   std::shared_ptr<Pipeline<std::shared_ptr<
                                                                                       Event>>> pipeline) {
   co_await RunPipelineImpl<std::shared_ptr<Event>>(tpe, pipeline);
 }
 
 template<>
-inline concurrencpp::result<void> RunPipelinesImpl<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline concurrencpp::result<void> RunPipelinesImpl<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::executor> tpe,
                                                                            std::shared_ptr<std::vector<std::shared_ptr<
                                                                                Pipeline<std::shared_ptr<Event>>>>> pipelines) {
   throw_if_empty(tpe, TraceException::kResumeExecutorNull, source_loc::current());
@@ -180,7 +177,7 @@ inline concurrencpp::result<void> RunPipelinesImpl<std::shared_ptr<Event>>(std::
 }
 
 template<>
-inline void RunPipelines<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::thread_pool_executor> tpe,
+inline void RunPipelines<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::executor> tpe,
                                                  std::shared_ptr<std::vector<std::shared_ptr<Pipeline<std::shared_ptr<
                                                      Event>>>>> pipelines) {
   spdlog::info("start a pipeline");

@@ -30,150 +30,6 @@
 #include "sync/corobelt.h"
 #include "util/exception.h"
 
-struct int_prod : public producer<int> {
-  int start = 0;
-
-  int_prod(int s) : producer<int>(), start(s) {
-  }
-
-  concurrencpp::result<void> produce(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<int>> tar_chan) override {
-    throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull,
-                                           source_loc::current());
-    throw_if_empty<CoroChannel<int>>(tar_chan, TraceException::kChannelIsNull,
-                                     source_loc::current());
-
-    for (int i = start; i < 3 + start; i++) {
-      bool could_write = co_await tar_chan->Push(resume_executor, i);
-      if (not could_write) {
-        break;
-      }
-    }
-
-    co_return;
-  };
-};
-
-struct int_cons : public consumer<int> {
-
-  const std::string prefix_;
-  std::stringstream &ss_;
-
-  int_cons(const std::string prefix, std::stringstream &ss) : consumer<int>(), prefix_(prefix), ss_(ss) {}
-
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<int>> src_chan) override {
-    throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull,
-                                           source_loc::current());
-    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull,
-                                     source_loc::current());
-
-    auto int_opt = co_await src_chan->Pop(resume_executor);
-
-    while (int_opt.has_value()) {
-      auto val = int_opt.value();
-      int_opt = co_await src_chan->Pop(resume_executor);
-      ss_ << prefix_ << "-consumed: " << val << '\n';
-    }
-
-    co_return;
-  };
-};
-
-struct int_adder : public cpipe<int> {
-  concurrencpp::result<void> process(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<int>> src_chan,
-      std::shared_ptr<CoroChannel<int>> tar_chan) override {
-    throw_if_empty<concurrencpp::executor>(resume_executor,
-                                           TraceException::kResumeExecutorNull,
-                                           source_loc::current());
-    throw_if_empty<CoroChannel<int>>(tar_chan, TraceException::kChannelIsNull,
-                                     source_loc::current());
-    throw_if_empty<CoroChannel<int>>(src_chan, TraceException::kChannelIsNull,
-                                     source_loc::current());
-
-    auto int_opt = co_await src_chan->Pop(resume_executor);
-
-    while (int_opt.has_value()) {
-      auto val = int_opt.value();
-      val += 10;
-      bool could_write = co_await tar_chan->Push(resume_executor, std::move(val));
-      if (not could_write) {
-        break;
-      }
-      int_opt = co_await src_chan->Pop(resume_executor);
-    }
-
-    co_return;
-  }
-};
-
-TEST_CASE("Test pipeline wrapper construct", "[run_pipeline]") {
-  auto concurren_options = concurrencpp::runtime_options();
-  concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 3;
-  const concurrencpp::runtime runtime{concurren_options};
-  const auto thread_pool_executor = runtime.thread_pool_executor();
-
-  auto prod_a = std::make_shared<int_prod>(0);
-  auto prod_b = std::make_shared<int_prod>(100);
-
-  const size_t amount_adder = 30;
-  std::vector<std::shared_ptr<cpipe<int>>> adders_a{amount_adder};
-  std::vector<std::shared_ptr<cpipe<int>>> adders_b{amount_adder};
-  for (size_t index = 0; index < amount_adder; index++) {
-    adders_a[index] = std::make_shared<int_adder>();
-    adders_b[index] = std::make_shared<int_adder>();
-  }
-
-  std::stringstream ss_a;
-  std::stringstream ss_b;
-  auto cons_a = std::make_shared<int_cons>("a", ss_a);
-  auto cons_b = std::make_shared<int_cons>("b", ss_b);
-
-  pipeline<int> simple_a{prod_a, adders_a, cons_a};
-  pipeline<int> simple_b{prod_b, adders_b, cons_b};
-
-  std::vector<pipeline<int>> pipelines{simple_a, simple_b};
-
-  SECTION("simple pipeline without pipes") {
-    REQUIRE_NOTHROW(run_pipeline<int>(thread_pool_executor, prod_a, cons_a));
-
-    REQUIRE(ss_a.str() == "a-consumed: 0\na-consumed: 1\na-consumed: 2\n");
-  }
-
-  SECTION("simple pipeline with pipes") {
-    REQUIRE_NOTHROW(run_pipeline<int>(thread_pool_executor, prod_a, adders_a, cons_a));
-
-    REQUIRE(ss_a.str() == "a-consumed: 300\na-consumed: 301\na-consumed: 302\n");
-  }
-
-  SECTION("simple pipeline with wrapper") {
-    REQUIRE_NOTHROW(run_pipeline<int>(thread_pool_executor, simple_a));
-
-    REQUIRE(ss_a.str() == "a-consumed: 300\na-consumed: 301\na-consumed: 302\n");
-  }
-
-  SECTION("multiple pipelines") {
-    REQUIRE_NOTHROW(run_pipelines<int>(thread_pool_executor, pipelines));
-
-    REQUIRE(ss_a.str() == "a-consumed: 300\na-consumed: 301\na-consumed: 302\n");
-    REQUIRE(ss_b.str() == "b-consumed: 400\nb-consumed: 401\nb-consumed: 402\n");
-  }
-
-  SECTION("multiple pipelines - parallel") {
-    REQUIRE_NOTHROW(run_pipelines_parallel<int>(thread_pool_executor, pipelines));
-
-    REQUIRE(ss_a.str() == "a-consumed: 300\na-consumed: 301\na-consumed: 302\n");
-    REQUIRE(ss_b.str() == "b-consumed: 400\nb-consumed: 401\nb-consumed: 402\n");
-  }
-}
-
 class ProducerInt : public Producer<int> {
   int start = 0;
   int end = 1;
@@ -182,12 +38,18 @@ class ProducerInt : public Producer<int> {
   ProducerInt(int s, int e) : Producer<int>(), start(s), end(e) {
   }
 
-  explicit operator bool() noexcept override {
-    return start < end;
-  }
-
   concurrencpp::result<std::optional<int>> produce(std::shared_ptr<concurrencpp::executor> executor) override {
+    if (start >= end) {
+      co_return std::nullopt;
+    }
+
     int res = start;
+    for (int i = 0; i < 100'000; i++) {
+      res += 1;
+    }
+    for (int i = 0; i < 100'000; i++) {
+      res -= 1;
+    }
     start++;
     co_return res;
   }
@@ -198,6 +60,12 @@ class AdderInt : public Handler<int> {
   explicit AdderInt() : Handler<int>() {}
 
   concurrencpp::result<bool> handel(std::shared_ptr<concurrencpp::executor> executor, int &value) override {
+    for (int i = 0; i < 100'000; i++) {
+      value += 1;
+    }
+    for (int i = 0; i < 100'000; i++) {
+      value -= 1;
+    }
     value += 1;
     co_return true;
   }
@@ -213,6 +81,30 @@ class PrinterInt : public Consumer<int> {
   concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, int value) override {
     out_ << "consumed: " << value << '\n';
     co_return;
+  }
+
+};
+
+class IntSum : public Consumer<int> {
+  uint64_t sum_ = 0;
+
+ public:
+
+  explicit IntSum() : Consumer<int>() {}
+
+  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, int value) override {
+    for (int i = 0; i < 100'000; i++) {
+      value += 1;
+    }
+    for (int i = 0; i < 100'000; i++) {
+      value -= 1;
+    }
+    sum_ += value;
+    co_return;
+  }
+
+  uint64_t GetSum() const {
+    return sum_;
   }
 
 };
@@ -237,16 +129,12 @@ std::string CreateExpectation(int start, int end) {
 TEST_CASE("Test NEW pipeline wrapper construct", "[run_pipeline]") {
   auto concurren_options = concurrencpp::runtime_options();
   concurren_options.max_background_threads = 0;
-  concurren_options.max_cpu_threads = 3;
+  concurren_options.max_cpu_threads = 5;
   const concurrencpp::runtime runtime{concurren_options};
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
   std::stringstream ss_a;
   std::stringstream ss_b;
-  //auto simple_a = CreatePipeline(0, 3, 30, ss_a);
-  //auto simple_b = CreatePipeline(100, 3, 30, ss_b);
-
-  //std::vector<Pipeline<int>> pipelines{simple_a, simple_b};
 
   SECTION("simple pipeline with handler") {
     CREATE_PIPELINE(simple_a, 0, 3, 30, ss_a);
@@ -294,5 +182,17 @@ TEST_CASE("Test NEW pipeline wrapper construct", "[run_pipeline]") {
     REQUIRE(ss_d.str() == CreateExpectation(90, 93));
     REQUIRE(ss_e.str() == CreateExpectation(190, 193));
   }
+
+//  SECTION("Very long Pipeline") {
+//    auto prod = std::make_shared<ProducerInt>(0, 100'000'000);
+//    auto adders = std::make_shared<std::vector<std::shared_ptr<Handler<int>>>>(1);
+//    (*adders)[0] = std::make_shared<AdderInt>();
+//    auto cons = std::make_shared<IntSum>();
+//    auto pipeline = std::make_shared<Pipeline<int>>(prod, adders, cons);
+//
+//    REQUIRE_NOTHROW(RunPipeline<int>(thread_pool_executor, pipeline));
+//
+//    REQUIRE(cons->GetSum() == 0);
+//  }
 }
 

@@ -25,7 +25,7 @@
 #include "analytics/span.h"
 
 void EventSpan::Display(std::ostream &out) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
   out << "id: " << std::to_string(id_);
   out << ", source_id: " << std::to_string(source_id_);
   out << ", kind: " << type_;
@@ -38,7 +38,7 @@ void EventSpan::Display(std::ostream &out) {
 }
 
 uint64_t EventSpan::GetStartingTs() {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (events_.empty()) {
     return 0xFFFFFFFFFFFFFFFF;
@@ -52,7 +52,7 @@ uint64_t EventSpan::GetStartingTs() {
 }
 
 uint64_t EventSpan::GetCompletionTs() {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (events_.empty() or IsPending()) {
     return 0xFFFFFFFFFFFFFFFF;
@@ -66,7 +66,7 @@ uint64_t EventSpan::GetCompletionTs() {
 }
 
 bool EventSpan::SetContext(const std::shared_ptr<TraceContext> &traceContext, bool override_existing) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not override_existing and trace_context_) {
     return false;
@@ -86,7 +86,7 @@ bool EventSpan::SetContext(const std::shared_ptr<TraceContext> &traceContext, bo
 }
 
 uint64_t EventSpan::GetParentId() {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
   if (trace_context_ == nullptr) {
     return 0; // invalid id
   }
@@ -121,7 +121,7 @@ bool EventSpan::IsPotentialAdd(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool HostCallSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     std::cout << "is not a potential add" << '\n';
@@ -161,7 +161,7 @@ bool HostCallSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool HostIntSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -189,7 +189,7 @@ bool HostIntSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool HostDmaSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -232,7 +232,7 @@ bool HostDmaSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool HostMmioSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -320,7 +320,7 @@ bool HostMmioSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool HostMsixSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -354,7 +354,7 @@ bool HostMsixSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool HostPciSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -388,7 +388,7 @@ bool HostPciSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool NicMsixSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -410,7 +410,7 @@ bool NicMsixSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool NicMmioSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr) or action_) {
     return false;
@@ -431,7 +431,7 @@ bool NicMmioSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool NicDmaSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;
@@ -486,7 +486,7 @@ bool NicDmaSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
 }
 
 bool NicEthSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr) or tx_rx_) {
     return false;
@@ -649,7 +649,7 @@ bool NetDeviceSpan::HandelDrop(const std::shared_ptr<NetworkEvent> &event_ptr) {
 }
 
 bool NetDeviceSpan::AddToSpan(const std::shared_ptr<Event> &event_ptr) {
-  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//  const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
   if (not IsPotentialAdd(event_ptr)) {
     return false;

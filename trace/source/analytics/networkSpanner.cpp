@@ -42,7 +42,7 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   //       ---> filter out spans and events that end up in devices we are not interested in!
   if (network_event->InterestingFlag() and node_device_filter_.IsNotInterestingNodeDevice(network_event)) {
     spdlog::debug("NetworkSpanner::HandelNetworkEvent filtered interesting event because of node device: {}",
-                 *network_event);
+                  *network_event);
     co_return true;
   }
 
@@ -78,14 +78,14 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
 
     assert(current_device_span->IsComplete());
     last_finished_device_span_ = current_device_span;
-    tracer_.MarkSpanAsDone(current_device_span);
+    co_await tracer_.MarkSpanAsDone(resume_executor, current_device_span);
     co_return true;
   }
 
   // this can happen due to the interestingness (ARP) issues...
   if (not IsType(network_event, EventType::kNetworkEnqueueT)) {
     spdlog::debug("NetworkSpanner::HandelNetworkEvent filtered NOT interesting event type {}",
-                 *network_event);
+                  *network_event);
     co_return false;
   }
 
@@ -97,9 +97,9 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
         and IsDeviceType(network_event, NetworkEvent::NetworkDeviceType::kCosimNetDevice)) {
 
       //std::cout << "NetworkSpanner::HandelNetworkEvent: started new trace by network event, arp?!" << std::endl;
-      auto current_device_span = tracer_.StartSpan<NetDeviceSpan>(network_event,
-                                                                  network_event->GetParserIdent(),
-                                                                  name_);
+      auto current_device_span = co_await tracer_.StartSpan<NetDeviceSpan>(resume_executor, network_event,
+                                                                           network_event->GetParserIdent(),
+                                                                           name_);
       throw_if_empty(current_device_span, TraceException::kSpanIsNull, source_loc::current());
       current_active_device_spans_.push_back(current_device_span);
       co_return true;
@@ -135,10 +135,11 @@ concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_p
   }
   assert(context_to_connect_with);
 
-  auto cur_device_span = tracer_.StartSpanByParentPassOnContext<NetDeviceSpan>(context_to_connect_with,
-                                                                               network_event,
-                                                                               network_event->GetParserIdent(),
-                                                                               name_);
+  auto cur_device_span =
+      co_await tracer_.StartSpanByParentPassOnContext<NetDeviceSpan>(resume_executor, context_to_connect_with,
+                                                                     network_event,
+                                                                     network_event->GetParserIdent(),
+                                                                     name_);
   throw_if_empty(cur_device_span, TraceException::kSpanIsNull, source_loc::current());
   current_active_device_spans_.push_back(cur_device_span);
   co_return true;

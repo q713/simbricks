@@ -60,8 +60,6 @@ namespace simbricks::trace {
 class SpanExporter {
 
  protected:
-  std::mutex exporter_mutex_;
-
   TraceEnvironment &trace_environment_;
 
  public:
@@ -124,8 +122,6 @@ class OtlpSpanExporter : public SpanExporter {
 
   void InsertNewContext(uint64_t span_id,
                         context_t &context) {
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "invalid id", source_loc::current());
     //const bool suc = context_map_.Insert(span_id, context);
@@ -136,8 +132,6 @@ class OtlpSpanExporter : public SpanExporter {
 
   opentelemetry::trace::SpanContext
   GetContext(uint64_t span_id) {
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     throw_on_false(TraceEnvironment::IsValidId(span_id),
                    "GetContext context_to_get is null", source_loc::current());
     //auto con_opt = context_map_.Find(span_id);
@@ -155,8 +149,6 @@ class OtlpSpanExporter : public SpanExporter {
     throw_if_empty(old_span, "InsertNewSpan old span is null", source_loc::current());
     throw_on(not new_span, "InsertNewSpan new_span is null", source_loc::current());
 
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     const uint64_t span_id = old_span->GetId();
     auto iter = span_map_.insert({span_id, new_span});
     throw_on_false(iter.second, "InsertNewSpan could not insert into span map",
@@ -164,8 +156,6 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void RemoveSpan(const std::shared_ptr<EventSpan> &old_span) {
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     const size_t erased = span_map_.erase(old_span->GetId());
     throw_on(erased != 1, "RemoveSpan did not remove a single span", source_loc::current());
   }
@@ -214,8 +204,6 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   tracer_t GetTracerLazy(std::string &service_name) {
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     auto iter = tracer_map_.find(service_name);
     if (iter != tracer_map_.end()) {
       return iter->second;
@@ -229,8 +217,6 @@ class OtlpSpanExporter : public SpanExporter {
   span_t GetSpan(std::shared_ptr<EventSpan> &span_to_get) {
     throw_if_empty(span_to_get, "GetSpan span_to_get is null", source_loc::current());
 
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     const uint64_t span_id = span_to_get->GetId();
     auto span = span_map_.find(span_id)->second;
     throw_on(not span, "InsertNewSpan span is null", source_loc::current());
@@ -238,16 +224,12 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   opentelemetry::common::SteadyTimestamp ToSteadyNanoseconds(uint64_t timestamp_pico) {
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     const std::chrono::nanoseconds nano_sec(time_offset_nanosec_ + timestamp_pico / kPicoToNanoDenominator);
     const ts_steady time_point(nano_sec);
     return opentelemetry::common::SteadyTimestamp(time_point);
   }
 
   opentelemetry::common::SystemTimestamp ToSystemNanoseconds(uint64_t timestamp_pico) {
-    std::lock_guard<std::mutex> guard(exporter_mutex_);
-
     const std::chrono::nanoseconds nano_sec(time_offset_nanosec_ + timestamp_pico / kPicoToNanoDenominator);
     const ts_system time_point(nano_sec);
     return opentelemetry::common::SystemTimestamp(time_point);
@@ -819,7 +801,6 @@ class OtlpSpanExporter : public SpanExporter {
   }
 
   void ForceFlush() override {
-    const std::lock_guard<std::mutex> guard(exporter_mutex_);
     for (auto &str_tracer : tracer_map_) {
       str_tracer.second->ForceFlush(std::chrono::seconds(60));
     }

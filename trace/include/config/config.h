@@ -246,126 +246,124 @@ class TraceEnvConfig {
     return trace_config;
   }
 
-  inline IndicatorContainer::const_iterator BeginFuncIndicator() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginFuncIndicator() const {
     return linux_net_func_indicator_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndFuncIndicator() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndFuncIndicator() const {
     return linux_net_func_indicator_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginDriverFunc() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginDriverFunc() const {
     return driver_func_indicator_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndDriverFunc() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndDriverFunc() const {
     return driver_func_indicator_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginKernelTx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginKernelTx() const {
     return kernel_tx_indicator_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndKernelTx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndKernelTx() const {
     return kernel_tx_indicator_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginKernelRx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginKernelRx() const {
     return kernel_rx_indicator_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndKernelRx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndKernelRx() const {
     return kernel_rx_indicator_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginPciWrite() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginPciWrite() const {
     return pci_write_indicators_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndPciWrite() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndPciWrite() const {
     return pci_write_indicators_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginDriverTx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginDriverTx() const {
     return driver_tx_indicator_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndDriverTx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndDriverTx() const {
     return driver_tx_indicator_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginDriverRx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginDriverRx() const {
     return driver_rx_indicator_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndDriverRx() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndDriverRx() const {
     return driver_rx_indicator_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginSysEntry() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginSysEntry() const {
     return sys_entry_.cbegin();
   }
 
-  inline IndicatorContainer::const_iterator EndSysEntry() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndSysEntry() const {
     return sys_entry_.cend();
   }
 
-  inline IndicatorContainer::const_iterator BeginBlacklistFuncIndicator() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator BeginBlacklistFuncIndicator() const {
     return blacklist_func_indicator_.begin();
   }
 
-  inline IndicatorContainer::const_iterator EndBlacklistFuncIndicator() const {
+  [[nodiscard]] inline IndicatorContainer::const_iterator EndBlacklistFuncIndicator() const {
     return blacklist_func_indicator_.cend();
   }
 
-  inline TypeContainer::const_iterator BeginTypesToFilter() const {
+  [[nodiscard]] inline TypeContainer::const_iterator BeginTypesToFilter() const {
     return types_to_filter_.cbegin();
   }
 
-  inline TypeContainer::const_iterator EndTypesToFilter() const {
+  [[nodiscard]] inline TypeContainer::const_iterator EndTypesToFilter() const {
     return types_to_filter_.cend();
   }
 
-  inline SymTableContainer::const_iterator BeginSymbolTables() const {
+  [[nodiscard]] inline SymTableContainer::const_iterator BeginSymbolTables() const {
     return symbol_tables_.cbegin();
   }
 
-  inline SymTableContainer::const_iterator EndSymbolTables() const {
+  [[nodiscard]] inline SymTableContainer::const_iterator EndSymbolTables() const {
     return symbol_tables_.cend();
   }
 
-  inline const std::string &GetJaegerUrl() const {
+  [[nodiscard]] inline const std::string &GetJaegerUrl() const {
     return jaeger_url_;
   }
 
-  inline size_t GetMaxBackgroundThreads() const {
+  [[nodiscard]] inline size_t GetMaxBackgroundThreads() const {
     return max_background_threads_;
   }
 
-  inline size_t GetMaxCpuThreads() const {
+  [[nodiscard]] inline size_t GetMaxCpuThreads() const {
     return max_cpu_threads_;
   }
 
-  inline size_t GetLineBufferSize() const {
+  [[nodiscard]] inline size_t GetLineBufferSize() const {
     return line_buffer_size_;
   }
 
-  inline size_t GetEventBufferSize() const {
+  [[nodiscard]] inline size_t GetEventBufferSize() const {
     return event_buffer_size_;
   }
 
-  inline spdlog::level::level_enum GetLogLevel() const {
+  [[nodiscard]] inline spdlog::level::level_enum GetLogLevel() const {
     return log_level_;
   };
 
-  concurrencpp::runtime_options GetRuntimeOptions() const {
+  [[nodiscard]] concurrencpp::runtime_options GetRuntimeOptions() const {
     auto concurren_options = concurrencpp::runtime_options();
     concurren_options.max_cpu_threads = GetMaxCpuThreads();
     concurren_options.max_background_threads = GetMaxBackgroundThreads();
-    //concurren_options.max_background_executor_waiting_time =
-    //    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(600));
-    //concurren_options.max_thread_pool_executor_waiting_time =
-    //    std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::seconds(600));
+//    concurren_options.max_background_executor_waiting_time = std::chrono::milliseconds(6);
+//    concurren_options.max_thread_pool_executor_waiting_time = std::chrono::milliseconds(6);
     return concurren_options;
   }
 

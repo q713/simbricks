@@ -99,7 +99,7 @@ class EventSpan {
   std::shared_ptr<TraceContext> trace_context_ = nullptr;
   std::string &service_name_;
 
-  std::recursive_mutex span_mutex_;
+//  std::recursive_mutex span_mutex_;
 
   inline static const char *tc_null_ = "try setting std::shared_ptr<TraceContext> which is null";
 
@@ -107,40 +107,40 @@ class EventSpan {
   virtual void Display(std::ostream &out);
 
   inline std::string &GetServiceName() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return service_name_;
   }
 
   inline void SetOriginal(const std::shared_ptr<EventSpan> &original) {
     throw_if_empty(original, "EventSpan::SetOriginal: original is empty", source_loc::current());
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     original_ = original;
   }
 
   inline bool IsCopy() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return original_ != nullptr;
   }
 
   inline uint64_t GetOriginalId() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     throw_if_empty(original_, "EventSpan::GetOriginalId: span is not a copy",
                    source_loc::current());
     return original_->GetId();
   }
 
   inline size_t GetAmountEvents() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return events_.size();
   }
 
   inline bool HasEvents() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return GetAmountEvents() > 0;
   }
 
   std::shared_ptr<Event> GetAt(size_t index) {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     if (index >= events_.size()) {
       return nullptr;
     }
@@ -148,7 +148,7 @@ class EventSpan {
   }
 
   inline uint64_t GetId() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return id_;
   }
 
@@ -160,42 +160,42 @@ class EventSpan {
   }
 
   inline span_type GetType() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return type_;
   }
 
   inline uint64_t GetSourceId() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return source_id_;
   }
 
   inline std::shared_ptr<TraceContext> GetContext() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return trace_context_;
   }
 
   virtual void MarkAsDone() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     is_pending_ = false;
   }
 
   inline bool IsPending() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_pending_;
   }
 
   inline bool IsComplete() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return not IsPending();
   }
 
   inline void MarkAsRelevant() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     is_relevant_ = true;
   }
 
   inline void MarkAsNonRelevant() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     is_relevant_ = false;
   }
 
@@ -206,7 +206,7 @@ class EventSpan {
   bool SetContext(const std::shared_ptr<TraceContext> &traceContext, bool override_existing);
 
   bool HasParent() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return trace_context_ != nullptr and trace_context_->HasParent();
   }
 
@@ -220,7 +220,7 @@ class EventSpan {
   }
 
   uint64_t GetTraceId() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     if (trace_context_ == nullptr) {
       return 0; // invalid id
     }
@@ -302,42 +302,42 @@ class HostCallSpan : public EventSpan {
   ~HostCallSpan() override = default;
 
   bool DoesKernelTransmit() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return kernel_transmit_;
   }
 
   bool DoesDriverTransmit() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return driver_transmit_;
   }
 
   bool DoesKernelReceive() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return kernel_receive_;
   }
 
   bool DoesDriverReceive() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return driver_receive_;
   }
 
   bool IsOverallTx() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return kernel_transmit_ and driver_transmit_;
   }
 
   bool IsOverallRx() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return kernel_receive_ and driver_receive_;
   }
 
   bool IsFragmented() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_fragmented_;
   }
 
   void MarkAsDone() override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     is_fragmented_ = is_fragmented_ or call_span_entry_ == nullptr or syscall_return_ == nullptr;
     is_pending_ = false;
   }
@@ -394,7 +394,7 @@ class HostDmaSpan : public EventSpan {
   ~HostDmaSpan() override = default;
 
   bool IsRead() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_read_;
   }
 
@@ -431,17 +431,17 @@ class HostMmioSpan : public EventSpan {
   ~HostMmioSpan() override = default;
 
   inline bool IsRead() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_read_;
   }
 
   inline int GetBarNumber() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return bar_number_;
   }
 
   inline bool IsPosted() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_posted_;
   }
 
@@ -495,12 +495,12 @@ class HostPciSpan : public EventSpan {
   ~HostPciSpan() override = default;
 
   inline bool IsRead() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_read_;
   }
 
   inline bool IsWrite() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return not IsRead();
   }
 
@@ -553,12 +553,12 @@ class NicMmioSpan : public EventSpan {
   ~NicMmioSpan() override = default;
 
   bool IsRead() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_read_;
   }
 
   bool IsWrite() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return not IsRead();
   }
 
@@ -592,7 +592,7 @@ class NicDmaSpan : public EventSpan {
   ~NicDmaSpan() override = default;
 
   bool IsRead() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_read_;
   }
 
@@ -622,12 +622,12 @@ class NicEthSpan : public EventSpan {
   ~NicEthSpan() override = default;
 
   inline bool IsTransmit() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_send_;
   }
 
   inline bool IsReceive() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return not IsTransmit();
   }
 
@@ -680,53 +680,53 @@ class NetDeviceSpan : public EventSpan {
   ~NetDeviceSpan() override = default;
 
   inline bool IsArp() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return is_arp_;
   }
 
   inline bool HasIpsSet() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return ips_set_;
   }
 
   inline bool ContainsBoundaryType(NetworkEvent::EventBoundaryType boundary_type) {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return boundary_types_.contains(boundary_type);
   }
 
   inline NetworkEvent::Ipv4 GetSrcIp() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return src_;
   }
 
   inline NetworkEvent::Ipv4 GetDstIp() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return dst_;
   }
 
   inline bool InterestingFlag() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return interesting_flag_;
   }
 
   inline bool IsDrop() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return drop_ != nullptr;
   }
 
   inline int GetNode() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return node_;
   }
 
   inline int GetDevice() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return device_;
   }
 
   inline std::set<NetworkEvent::EventBoundaryType>
   GetBoundaryTypes() {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
     return boundary_types_;
   }
 
@@ -752,7 +752,7 @@ class GenericSingleSpan : public EventSpan {
   }
 
   bool AddToSpan(const std::shared_ptr<Event> &event_ptr) override {
-    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
+//    const std::lock_guard<std::recursive_mutex> guard(span_mutex_);
 
     if (not IsPotentialAdd(event_ptr) or event_p_) {
       return false;

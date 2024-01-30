@@ -48,15 +48,15 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
     co_return false;
   }
 
-  auto mmio_span = tracer_.StartSpanByParentPassOnContext<NicMmioSpan>(
-      con, event_ptr, event_ptr->GetParserIdent(), name_);
+  auto mmio_span = co_await tracer_.StartSpanByParentPassOnContext<NicMmioSpan>(
+      resume_executor, con, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not mmio_span) {
     std::cerr << "could not register mmio_span" << '\n';
     co_return false;
   }
 
   assert(mmio_span->IsComplete() and "mmio span is not complete");
-  tracer_.MarkSpanAsDone(mmio_span);
+  co_await tracer_.MarkSpanAsDone(resume_executor, mmio_span);
   if (mmio_span->IsWrite()) {
     last_causing_ = mmio_span;
   }
@@ -72,7 +72,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
       iterate_add_erase<NicDmaSpan>(pending_nic_dma_spans_, event_ptr);
   if (pending_dma) {
     if (pending_dma->IsComplete()) {
-      tracer_.MarkSpanAsDone(pending_dma);
+      co_await tracer_.MarkSpanAsDone(resume_executor, pending_dma);
     } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
       spdlog::info("{} nic try push dma: {}", name_, *event_ptr);
@@ -96,8 +96,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
 
   // TODO: maybe we need to write at this point into the queue
   throw_if_empty(last_causing_, TraceException::kSpanIsNull, source_loc::current());
-  pending_dma = tracer_.StartSpanByParent<NicDmaSpan>(
-      last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
+  pending_dma = co_await tracer_.StartSpanByParent<NicDmaSpan>(
+      resume_executor, last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not pending_dma) {
     spdlog::warn("could not register new pending dma action");
     co_return false;
@@ -118,8 +118,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     parent = last_causing_;
 
     throw_if_empty(parent, TraceException::kSpanIsNull, source_loc::current());
-    eth_span = tracer_.StartSpanByParent<NicEthSpan>(
-        parent, event_ptr, event_ptr->GetParserIdent(), name_);
+    eth_span = co_await tracer_.StartSpanByParent<NicEthSpan>(
+        resume_executor, parent, event_ptr, event_ptr->GetParserIdent(), name_);
 
     spdlog::info("{} NicSpanner::HandelTxrx: trying to push tx context to other side - {}",
                  name_, *event_ptr);
@@ -138,8 +138,8 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
     auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(con, expectation::kRx),
              "nic_spanner: received non kRx context", source_loc::current());
-    eth_span = tracer_.StartSpanByParentPassOnContext<NicEthSpan>(
-        con, event_ptr, event_ptr->GetParserIdent(), name_);
+    eth_span = co_await tracer_.StartSpanByParentPassOnContext<NicEthSpan>(
+        resume_executor, con, event_ptr, event_ptr->GetParserIdent(), name_);
     last_causing_ = eth_span;
 
     spdlog::info("{} nic tryna push receive update.", name_);
@@ -158,7 +158,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
   assert(eth_span and "NicSpanner::HandelTxrx: eth_span is null");
   assert(eth_span->IsComplete() and "eth span is not complete");
 
-  tracer_.MarkSpanAsDone(eth_span);
+  co_await tracer_.MarkSpanAsDone(resume_executor, eth_span);
   co_return true;
 }
 
@@ -168,15 +168,15 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
   assert(event_ptr and "event_ptr is null");
 
   throw_if_empty(last_causing_, TraceException::kSpanIsNull, source_loc::current());
-  auto msix_span = tracer_.StartSpanByParent<NicMsixSpan>(
-      last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
+  auto msix_span = co_await tracer_.StartSpanByParent<NicMsixSpan>(
+      resume_executor, last_causing_, event_ptr, event_ptr->GetParserIdent(), name_);
   if (not msix_span) {
     std::cerr << "could not register msix span" << '\n';
     co_return false;
   }
 
   assert(msix_span->IsComplete() and "msix span is not complete");
-  tracer_.MarkSpanAsDone(msix_span);
+  co_await tracer_.MarkSpanAsDone(resume_executor, msix_span);
 
   spdlog::info("{} nic try push msix", name_);
   auto context = Context::CreatePassOnContext<expectation::kMsix>(msix_span);

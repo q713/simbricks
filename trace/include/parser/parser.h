@@ -269,9 +269,11 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 //    buffer_filller_ = std::thread([&] { FillBuffer().get(); });
   };
 
-  ~BufferedEventProvider() {
-    buffer_filller_.join();
-  };
+  ~BufferedEventProvider() = default;
+
+//  ~BufferedEventProvider() {
+//    buffer_filller_.join();
+//  };
 
 //  explicit operator bool() noexcept override {
 //    if (not StillBuffered()) {

@@ -30,7 +30,6 @@
 #include <unordered_map>
 #include <set>
 #include <utility>
-#include <thread>
 
 #include "sync/corobelt.h"
 #include "sync/channel.h"
@@ -44,7 +43,8 @@
 #include "util/exception.h"
 
 class Tracer {
-  std::mutex tracer_mutex_;
+  // std::mutex tracer_mutex_;
+  concurrencpp::async_lock async_lock_;
 
   TraceEnvironment &trace_environment_;
 
@@ -57,14 +57,6 @@ class Tracer {
   std::unordered_map<uint64_t, std::vector<std::shared_ptr<EventSpan>>> waiting_list_;
 
   std::shared_ptr<simbricks::trace::SpanExporter> exporter_;
-//  using ExportTastT = const std::function<concurrencpp::null_result()>;
-//  std::shared_ptr<NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>>> to_export_queue_;
-//  static constexpr size_t kAmountExporterThreads = 1;
-//   TODO: currently we can only use a single thread as we need to be sure that an otlp spans parent already exists when
-//         trying to export it. When using multiple threads we could not guarantee that an as a result we would trigger
-//         an exception which is correct in this case. When however making correct use of the exporter interface by harnessing
-//         the start and end span methods not alongside we could make use of multiple threads!
-//  std::unique_ptr<std::jthread> exporter_thread_;
 
   void InsertExportedSpan(uint64_t span_id) {
     throw_on_false(TraceEnvironment::IsValidId(span_id),
@@ -182,32 +174,20 @@ class Tracer {
     }
   }
 
-//  void RunExportJobInBackground(const std::shared_ptr<EventSpan> &span_to_export) {
-//    // NOTE: lock must be held when calling this method
-//    assert(span_to_export);
-//
-//    ExportTastT export_task = [this, must_go = span_to_export]() -> concurrencpp::null_result {
-//      try {
-//        exporter_.ExportSpan(must_go);
-//      } catch (std::runtime_error &err) {
-//        spdlog::error("error while trying to export a trace: {}", err.what());
-//      }
-//      co_return;
-//    };
-//
-//    auto executor = trace_environment_.GetBackgroundPoolExecutor();
-//    executor->post(export_task);
-//  }
+  concurrencpp::result<void>
+  ExportWaitingForParentVec(std::shared_ptr<concurrencpp::executor> executor,
+                            std::shared_ptr<EventSpan> parent) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
 
-  void ExportWaitingForParentVec(std::shared_ptr<EventSpan> &parent) {
     // NOTE: lock MUST NOT be held when calling this method
-    std::unique_lock<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
+//    std::unique_lock<std::mutex> lock(tracer_mutex_);
 
     assert(parent and "span is null");
     const uint64_t parent_id = parent->GetId();
     auto iter = waiting_list_.find(parent_id);
     if (iter == waiting_list_.end()) {
-      return;
+      co_return;
     }
     auto waiters = iter->second;
     for (auto &waiter : waiters) {
@@ -216,13 +196,12 @@ class Tracer {
                      source_loc::current());
       MarkSpanAsExported(waiter);
       assert(not waiter->HasParent() or exported_spans_.contains(waiter->GetParentId()));
-      // TODO: fix background!!
-//      to_export_queue_->Push(waiter);
-      lock.unlock();
+      guard.unlock();
+//      lock.unlock();
       exporter_->ExportSpan(waiter);
-//      RunExportJobInBackground(waiter);
-      ExportWaitingForParentVec(waiter);
-      lock.lock();
+      ExportWaitingForParentVec(executor, waiter);
+      co_await guard.lock(executor);
+//      lock.lock();
     }
     waiting_list_.erase(parent_id);
   }
@@ -280,9 +259,13 @@ class Tracer {
   }
 
  public:
-  void MarkSpanAsDone(std::shared_ptr<EventSpan> span) {
+  concurrencpp::result<void>
+  MarkSpanAsDone(std::shared_ptr<concurrencpp::executor> executor, std::shared_ptr<EventSpan> span) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
+
     // guard potential access using a lock guard
-    std::unique_lock<std::mutex> lock(tracer_mutex_);
+//    std::unique_lock<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
 
     throw_if_empty(span, "MarkSpanAsDone, span is null", source_loc::current());
     auto context = span->GetContext();
@@ -293,32 +276,37 @@ class Tracer {
       MarkSpanAsExported(span);
       // TODO: fix background!!
       assert(not span->HasParent() or exported_spans_.contains(span->GetParentId()));
-//      to_export_queue_->Push(span);
-      lock.unlock();
+
+      guard.unlock();
+//      lock.unlock();
       exporter_->ExportSpan(span);
-//      RunExportJobInBackground(span);
-      ExportWaitingForParentVec(span);
-      lock.lock();
+      co_await ExportWaitingForParentVec(executor, span);
+      co_await guard.lock(executor);
+//      lock.lock();
 
       auto trace = GetTrace(trace_id);
       if (nullptr != trace and SafeToDeleteTrace(trace_id)) {
         RemoveTrace(trace_id);
       }
 
-      return;
+      co_return;
     }
 
     assert(span->HasParent());
     MarkSpanAsWaitingForParent(span);
   }
 
-  void AddParentLazily(const std::shared_ptr<EventSpan> &span,
-                       const std::shared_ptr<Context> &parent_context) {
+  concurrencpp::result<void>
+  AddParentLazily(std::shared_ptr<concurrencpp::executor> executor,
+                  const std::shared_ptr<EventSpan> &span,
+                  const std::shared_ptr<Context> &parent_context) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     throw_if_empty(span, TraceException::kSpanIsNull, source_loc::current());
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
 
     // guard potential access using a lock guard
-    const std::lock_guard<std::mutex> lock(tracer_mutex_);
+//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
 
     auto new_trace_id = parent_context->GetTraceId();
     auto old_context = span->GetContext();
@@ -349,10 +337,13 @@ class Tracer {
 
   // will create and add a new span to a trace using the context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParent(
+  concurrencpp::result<std::shared_ptr<SpanType>>
+  StartSpanByParent(
+      std::shared_ptr<concurrencpp::executor> executor,
       std::shared_ptr<EventSpan> parent_span,
       std::shared_ptr<Event> starting_event,
       Args &&... args) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     throw_if_empty(starting_event, TraceException::kEventIsNull, source_loc::current());
     throw_if_empty(parent_span, TraceException::kSpanIsNull, source_loc::current());
 
@@ -361,28 +352,33 @@ class Tracer {
     const uint64_t parent_starting_ts = parent_span->GetStartingTs();
 
     // guard potential access using a lock guard
-    const std::lock_guard<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
+//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     std::shared_ptr<SpanType> new_span;
     new_span = StartSpanByParentInternal<SpanType, Args...>(
         trace_id, parent_id, parent_starting_ts, starting_event, std::forward<Args>(args)...);
 
     assert(new_span);
-    return new_span;
+    co_return new_span;
   }
 
   // will create and add a new span to a trace using the context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParentPassOnContext(const std::shared_ptr<Context> &parent_context,
-                                                           std::shared_ptr<Event> starting_event,
-                                                           Args &&... args) {
+  concurrencpp::result<std::shared_ptr<SpanType>>
+  StartSpanByParentPassOnContext(std::shared_ptr<concurrencpp::executor> executor,
+                                 const std::shared_ptr<Context> &parent_context,
+                                 std::shared_ptr<Event> starting_event,
+                                 Args &&... args) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
     throw_if_empty(starting_event, TraceException::kEventIsNull, source_loc::current());
     throw_on_false(parent_context->HasParent(), "Context has no parent",
                    source_loc::current());
 
     // guard potential access using a lock guard
-    const std::lock_guard<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
+//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();
@@ -392,31 +388,40 @@ class Tracer {
         trace_id, parent_id, parent_starting_ts, starting_event, std::forward<Args>(args)...);
 
     assert(new_span);
-    return new_span;
+    co_return new_span;
   }
 
   // will start and create a new trace creating a new context
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpan(std::shared_ptr<Event> starting_event,
-                                      Args &&... args) {
+  concurrencpp::result<std::shared_ptr<SpanType>>
+  StartSpan(std::shared_ptr<concurrencpp::executor> executor,
+            std::shared_ptr<Event> starting_event,
+            Args &&... args) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
+
     // guard potential access using a lock guard
-    const std::lock_guard<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
+//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     throw_if_empty(starting_event, "StartSpan(...) starting_event is null",
                    source_loc::current());
     std::shared_ptr<SpanType> new_span = nullptr;
     new_span = StartSpanInternal<SpanType, Args...>(starting_event, std::forward<Args>(args)...);
     assert(new_span);
-    return new_span;
+    co_return new_span;
   }
 
   template<class ContextType>
   requires ContextInterface<ContextType>
-  void StartSpanSetParentContext(std::shared_ptr<EventSpan> &span_to_register,
-                                 const std::shared_ptr<ContextType> &parent_context) {
+  concurrencpp::result<void>
+  StartSpanSetParentContext(std::shared_ptr<concurrencpp::executor> executor,
+                            std::shared_ptr<EventSpan> &span_to_register,
+                            const std::shared_ptr<ContextType> &parent_context) {
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
     // guard potential access using a lock guard
-    const std::lock_guard<std::mutex> lock(tracer_mutex_);
+    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
+//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();
@@ -434,7 +439,7 @@ class Tracer {
   template<class SpanType, class... Args>
   std::shared_ptr<SpanType> StartOrphanSpan(std::shared_ptr<Event> starting_event, Args &&... args) {
     // NOTE: As we create an orphan, we do not make any bookkeeping, as a result we
-    //       don't need to take ownership of the lock!
+    //       don't need to take ownership of the lock!!!!!!
     throw_if_empty(starting_event, "StartOrphanSpan(...) starting_event is null",
                    source_loc::current());
 
@@ -459,27 +464,10 @@ class Tracer {
       : trace_environment_(trace_environment), exporter_(std::move(exporter)) {
 
     throw_if_empty(exporter_, TraceException::kSpanExporterNull, source_loc::current());
-//    to_export_queue_ =
-//        create_shared<NonCoroUnBufferedChannel<std::shared_ptr<EventSpan>>>(TraceException::kChannelIsNull);
-//
-//    auto export_task = [poll_chan = to_export_queue_, exp = exporter_]() -> void {
-//      std::optional<std::shared_ptr<EventSpan>> opt;
-//      std::shared_ptr<EventSpan> span_to_export;
-//      for (opt = poll_chan->Pop(); opt.has_value(); opt = poll_chan->Pop()) {
-//        span_to_export = std::move(*opt);
-//        assert(span_to_export);
-//        exp->ExportSpan(span_to_export);
-//      }
-//      return;
-//    };
-//    exporter_thread_ = create_unique<std::jthread>("could not create exporter thread", export_task);
   };
 
   void FinishExport() {
-//    to_export_queue_->CloseChannel();
-//    exporter_thread_->join();
     exporter_->ForceFlush();
-//    throw_on_false(to_export_queue_->Empty(), "export queue not empty", source_loc::current());
   }
 
   ~Tracer() {

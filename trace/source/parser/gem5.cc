@@ -43,7 +43,7 @@ std::shared_ptr<Event> Gem5Parser::ParseGlobalEvent(LineHandler &line_handler, u
   return nullptr;
 }
 
-std::shared_ptr<Event>
+concurrencpp::result<std::shared_ptr<Event>>
 Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp) {
   // 1473191502750: system.switch_cpus: A0 T0 : 0xffffffff81001bc0    :
   // verw_Mw_or_Rv (unimplemented) : No_OpClass :system.switch_cpus:
@@ -55,7 +55,7 @@ Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp)
       !line_handler.ParseUintTrim(16, addr)) {
     spdlog::debug("{}: could not parse address from line '{}'", GetName(),
                   line_handler.GetRawLine());
-    return nullptr;
+    co_return nullptr;
   }
 
   line_handler.TrimL();
@@ -65,13 +65,13 @@ Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp)
     if (line_handler.ConsumeAndTrimString("NOP") ||
         line_handler.ConsumeAndTrimString("MFENCE") ||
         line_handler.ConsumeAndTrimString("LFENCE")) {
-      return nullptr;
+      co_return nullptr;
     }
   }
 
   if (line_handler.ConsumeAndTrimChar('.')) {
-    return std::make_shared<HostInstr>(timestamp, GetIdent(), GetName(),
-                                       addr);
+    co_return std::make_shared<HostInstr>(timestamp, GetIdent(), GetName(),
+                                          addr);
   }
   // in case the given instruction is a call we expect to be able to
   // translate the address to a symbol name
@@ -80,12 +80,12 @@ Gem5Parser::ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp)
   const std::string *comp = sym_comp.second;
 
   if (not comp or not sym_s) {
-    return nullptr;
+    co_return nullptr;
   }
 
-  return std::make_shared<HostCall>(timestamp, GetIdent(), GetName(),
-                                    addr,
-                                    sym_s, comp);
+  co_return std::make_shared<HostCall>(timestamp, GetIdent(), GetName(),
+                                       addr,
+                                       sym_s, comp);
 }
 
 std::shared_ptr<Event>
@@ -286,7 +286,7 @@ std::shared_ptr<Event> Gem5Parser::ParseSimbricksEvent(LineHandler &line_handler
   return nullptr;
 }
 
-concurrencpp::lazy_result<std::shared_ptr<Event>>
+concurrencpp::result<std::shared_ptr<Event>>
 Gem5Parser::ParseEvent(LineHandler &line_handler) {
   if (line_handler.IsEmpty()) {
     co_return nullptr;
@@ -317,7 +317,7 @@ Gem5Parser::ParseEvent(LineHandler &line_handler) {
     // got event
   } else if (line_handler.ConsumeAndTrimString("system.switch_cpus:") &&
       component_table_.filter("system.switch_cpus")) {
-    event_ptr = ParseSystemSwitchCpus(line_handler, timestamp);
+    event_ptr = co_await ParseSystemSwitchCpus(line_handler, timestamp);
     if (!event_ptr) {
       spdlog::debug("{}: could not parse system.switch_cpus event from line '{}'",
                     GetName(), line_handler.GetRawLine());

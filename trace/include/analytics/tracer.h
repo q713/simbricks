@@ -122,18 +122,20 @@ class Tracer {
                    TraceException::kInvalidId, source_loc::current());
     throw_on_false(TraceEnvironment::IsValidId(parent_id),
                    TraceException::kInvalidId, source_loc::current());
+    const uint64_t context_id = trace_environment_.GetNextTraceContextId();
     auto trace_context = create_shared<TraceContext>(
         "RegisterCreateContext couldnt create context",
-        trace_id, trace_environment_.GetNextTraceContextId(), parent_id, parent_starting_ts);
+        trace_id, context_id, parent_id, parent_starting_ts);
     return trace_context;
   }
 
   std::shared_ptr<TraceContext>
   RegisterCreateContext(uint64_t trace_id) {
     // NOTE: lock must be held when calling this method
+    const uint64_t context_id = trace_environment_.GetNextTraceContextId();
     auto trace_context = create_shared<TraceContext>(
         "RegisterCreateContext couldnt create context",
-        trace_id, trace_environment_.GetNextTraceContextId());
+        trace_id, context_id);
     return trace_context;
   }
 
@@ -207,11 +209,12 @@ class Tracer {
   }
 
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanByParentInternal(uint64_t trace_id,
-                                                      uint64_t parent_id,
-                                                      uint64_t parent_starting_ts,
-                                                      std::shared_ptr<Event> starting_event,
-                                                      Args &&... args) {
+  std::shared_ptr<SpanType>
+  StartSpanByParentInternal(uint64_t trace_id,
+                            uint64_t parent_id,
+                            uint64_t parent_starting_ts,
+                            std::shared_ptr<Event> starting_event,
+                            Args &&... args) {
     // NOTE: lock must be held when calling this method
     assert(starting_event);
     throw_on_false(TraceEnvironment::IsValidId(trace_id), "invalid id",
@@ -236,8 +239,8 @@ class Tracer {
   }
 
   template<class SpanType, class... Args>
-  std::shared_ptr<SpanType> StartSpanInternal(std::shared_ptr<Event> starting_event,
-                                              Args &&... args) {
+  std::shared_ptr<SpanType>
+  StartSpanInternal(std::shared_ptr<Event> starting_event, Args &&... args) {
     // NOTE: lock must be held when calling this method
     assert(starting_event);
 

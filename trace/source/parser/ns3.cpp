@@ -116,7 +116,7 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
   }
 }
 
-concurrencpp::lazy_result<std::shared_ptr<Event>>
+concurrencpp::result<std::shared_ptr<Event>>
 NS3Parser::ParseEvent(LineHandler &line_handler) {
   if (line_handler.IsEmpty()) {
     co_return nullptr;

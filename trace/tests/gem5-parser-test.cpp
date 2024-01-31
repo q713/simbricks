@@ -87,7 +87,7 @@ TEST_CASE("Test gem5 parser produces expected event stream", "[Gem5Parser]") {
     REQUIRE_NOTHROW(bh_p = reader_buffer.NextHandler());
     REQUIRE(bh_p.first);
     LineHandler &line_handler = *bh_p.second;
-    parsed_event = gem5->ParseEvent(line_handler).run().get();
+    parsed_event = gem5->ParseEvent(line_handler).get();
     REQUIRE(parsed_event);
     REQUIRE(parsed_event->Equal(*match));
   }

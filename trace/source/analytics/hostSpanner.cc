@@ -28,7 +28,7 @@
 #include "util/exception.h"
 #include "events/printer.h"
 
-concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
+concurrencpp::result<void> HostSpanner::FinishPendingSpan(
     std::shared_ptr<concurrencpp::executor> resume_executor) {
   if (not pending_host_call_span_) {
     co_return;
@@ -78,7 +78,7 @@ concurrencpp::lazy_result<void> HostSpanner::FinishPendingSpan(
   co_return;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::CreateTraceStartingSpan(
+concurrencpp::result<bool> HostSpanner::CreateTraceStartingSpan(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &starting_event, bool fragmented) {
   co_await FinishPendingSpan(resume_executor);
@@ -93,7 +93,7 @@ concurrencpp::lazy_result<bool> HostSpanner::CreateTraceStartingSpan(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
+concurrencpp::result<bool> HostSpanner::HandelCall(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -126,7 +126,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelCall(
   co_return false;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
+concurrencpp::result<bool> HostSpanner::HandelMmio(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -175,7 +175,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMmio(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
+concurrencpp::result<bool> HostSpanner::HandelPci(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -211,7 +211,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelPci(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
+concurrencpp::result<bool> HostSpanner::HandelDma(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -265,7 +265,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelDma(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
+concurrencpp::result<bool> HostSpanner::HandelMsix(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -291,7 +291,7 @@ concurrencpp::lazy_result<bool> HostSpanner::HandelMsix(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> HostSpanner::HandelInt(
+concurrencpp::result<bool> HostSpanner::HandelInt(
     [[maybe_unused]] std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");

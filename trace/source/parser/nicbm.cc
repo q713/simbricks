@@ -192,7 +192,7 @@ bool NicBmParser::ParseOpAddrLenPending(LineHandler &line_handler, uint64_t &op,
   return true;
 }
 
-concurrencpp::lazy_result<std::shared_ptr<Event>>
+concurrencpp::result<std::shared_ptr<Event>>
 NicBmParser::ParseEvent(LineHandler &line_handler) {
   if (line_handler.IsEmpty()) {
     spdlog::debug("{}: could not create reader", GetName());

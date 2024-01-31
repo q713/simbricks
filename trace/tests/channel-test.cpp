@@ -37,58 +37,58 @@ TEST_CASE("Test BoundedChannel", "[BoundedChannel]") {
   CoroBoundedChannel<int, capacity> channel_to_test;
 
   SECTION("can push into channel") {
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).run().get());
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 2).run().get());
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 3).run().get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 2).get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 3).get());
 
-    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 4).run().get());
+    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 4).get());
   }
 
   SECTION("channel does not change order") {
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).run().get());
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 2).run().get());
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 3).run().get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 2).get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 3).get());
 
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 1);
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 2);
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 3);
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 1);
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 2);
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 3);
   }
 
   SECTION("cannot pull from empty channel") {
-    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).run().get());
+    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).get());
   }
 
   SECTION("can read from and not write to closed channel") {
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).run().get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).get());
 
     channel_to_test.CloseChannel(thread_pool_executor).get();
 
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 1);
-    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 2).run().get());
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 1);
+    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 2).get());
   }
 
   SECTION("cannot read from or write to poisened channel") {
     channel_to_test.PoisenChannel(thread_pool_executor).get();
 
-    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).run().get().has_value());
-    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 2).run().get());
+    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).get().has_value());
+    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 2).get());
   }
 
   SECTION("fill channel, read, fill again, read") {
     for (size_t i = 0; i < capacity; i++) {
-      REQUIRE(channel_to_test.Push(thread_pool_executor, i).run().get());
+      REQUIRE(channel_to_test.Push(thread_pool_executor, i).get());
     }
 
     for (size_t i = 0; i < capacity; i++) {
-      REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(capacity + 1) == i);
+      REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(capacity + 1) == i);
     }
 
     for (size_t i = 0; i < capacity; i++) {
-      REQUIRE(channel_to_test.Push(thread_pool_executor, i).run().get());
+      REQUIRE(channel_to_test.Push(thread_pool_executor, i).get());
     }
 
     for (size_t i = 0; i < capacity; i++) {
-      REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(capacity + 1) == i);
+      REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(capacity + 1) == i);
     }
   }
 }
@@ -104,45 +104,45 @@ TEST_CASE("Test UnBoundedChannel", "[UnBoundedChannel]") {
   CoroUnBoundedChannel<int> channel_to_test;
 
   SECTION("channel does not change order and size is correct") {
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).run().get());
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 2).run().get());
-    REQUIRE(channel_to_test.Push(thread_pool_executor, 3).run().get());
-    REQUIRE(channel_to_test.GetSize(thread_pool_executor).run().get() == 3);
-    REQUIRE_FALSE(channel_to_test.Empty(thread_pool_executor).run().get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 1).get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 2).get());
+    REQUIRE(channel_to_test.Push(thread_pool_executor, 3).get());
+    REQUIRE(channel_to_test.GetSize(thread_pool_executor).get() == 3);
+    REQUIRE_FALSE(channel_to_test.Empty(thread_pool_executor).get());
 
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 1);
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 2);
-    REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(-1) == 3);
-    REQUIRE(channel_to_test.GetSize(thread_pool_executor).run().get() == 0);
-    REQUIRE(channel_to_test.Empty(thread_pool_executor).run().get());
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 1);
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 2);
+    REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(-1) == 3);
+    REQUIRE(channel_to_test.GetSize(thread_pool_executor).get() == 0);
+    REQUIRE(channel_to_test.Empty(thread_pool_executor).get());
   }
 
   SECTION("cannot pull from empty channel") {
-    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).run().get());
+    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).get());
   }
 
   SECTION("cannot read from or write to poisened channel") {
     channel_to_test.PoisenChannel(thread_pool_executor).get();
 
-    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).run().get().has_value());
-    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 2).run().get());
+    REQUIRE_FALSE(channel_to_test.TryPop(thread_pool_executor).get().has_value());
+    REQUIRE_FALSE(channel_to_test.TryPush(thread_pool_executor, 2).get());
   }
 
   SECTION("fill channel, read, fill again, read") {
     for (size_t i = 0; i < to_test_size; i++) {
-      REQUIRE(channel_to_test.Push(thread_pool_executor, i).run().get());
+      REQUIRE(channel_to_test.Push(thread_pool_executor, i).get());
     }
 
     for (size_t i = 0; i < to_test_size; i++) {
-      REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(to_test_size + 1) == i);
+      REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(to_test_size + 1) == i);
     }
 
     for (size_t i = 0; i < to_test_size; i++) {
-      REQUIRE(channel_to_test.Push(thread_pool_executor, i).run().get());
+      REQUIRE(channel_to_test.Push(thread_pool_executor, i).get());
     }
 
     for (size_t i = 0; i < to_test_size; i++) {
-      REQUIRE(channel_to_test.Pop(thread_pool_executor).run().get().value_or(to_test_size + 1) == i);
+      REQUIRE(channel_to_test.Pop(thread_pool_executor).get().value_or(to_test_size + 1) == i);
     }
   }
 }

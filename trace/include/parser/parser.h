@@ -83,7 +83,7 @@ class LogParser {
     return name_;
   }
 
-  virtual concurrencpp::lazy_result<std::shared_ptr<Event>>
+  virtual concurrencpp::result<std::shared_ptr<Event>>
   ParseEvent(LineHandler &line_handler) = 0;
 };
 
@@ -93,16 +93,20 @@ class Gem5Parser : public LogParser {
  protected:
   std::shared_ptr<Event> ParseGlobalEvent(LineHandler &line_handler, uint64_t timestamp);
 
-  std::shared_ptr<Event> ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp);
+  concurrencpp::result<std::shared_ptr<Event>>
+  ParseSystemSwitchCpus(LineHandler &line_handler, uint64_t timestamp);
 
-  std::shared_ptr<Event> ParseSystemPcPciHost(LineHandler &line_handler, uint64_t timestamp);
+  std::shared_ptr<Event>
+  ParseSystemPcPciHost(LineHandler &line_handler, uint64_t timestamp);
 
   std::shared_ptr<Event>
   ParseSystemPcPciHostInterface(LineHandler &line_handler, uint64_t timestamp);
 
-  std::shared_ptr<Event> ParseSystemPcSimbricks(LineHandler &line_handler, uint64_t timestamp);
+  std::shared_ptr<Event>
+  ParseSystemPcSimbricks(LineHandler &line_handler, uint64_t timestamp);
 
-  std::shared_ptr<Event> ParseSimbricksEvent(LineHandler &line_handler, uint64_t timestamp);
+  std::shared_ptr<Event>
+  ParseSimbricksEvent(LineHandler &line_handler, uint64_t timestamp);
 
  public:
   explicit Gem5Parser(TraceEnvironment &trace_environment,
@@ -112,7 +116,7 @@ class Gem5Parser : public LogParser {
         component_table_(component_table) {
   }
 
-  concurrencpp::lazy_result<std::shared_ptr<Event>>
+  concurrencpp::result<std::shared_ptr<Event>>
   ParseEvent(LineHandler &line_handler) override;
 };
 
@@ -132,7 +136,7 @@ class NicBmParser : public LogParser {
                        const std::string name)
       : LogParser(trace_environment, name) {}
 
-  concurrencpp::lazy_result<std::shared_ptr<Event>>
+  concurrencpp::result<std::shared_ptr<Event>>
   ParseEvent(LineHandler &line_handler) override;
 };
 
@@ -150,7 +154,7 @@ class NS3Parser : public LogParser {
                      const std::string name)
       : LogParser(trace_environment, name) {}
 
-  concurrencpp::lazy_result<std::shared_ptr<Event>>
+  concurrencpp::result<std::shared_ptr<Event>>
   ParseEvent(LineHandler &line_handler) override;
 };
 
@@ -263,8 +267,8 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
         log_parser_(log_parser),
         timer_(timer_),
         event_buffer_size_(event_buffer_size),
-        background_exec_(trace_environment_.GetBackgroundPoolExecutor()),
-        normal_exec_(trace_environment_.GetPoolExecutor()) {
+        background_exec_(trace_environment_.GetBackgroundPoolExecutor().get()),
+        normal_exec_(trace_environment_.GetPoolExecutor().get()) {
     event_buffer_.reserve(event_buffer_size);
 //    buffer_filller_ = std::thread([&] { FillBuffer().get(); });
   };

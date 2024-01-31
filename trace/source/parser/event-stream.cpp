@@ -147,7 +147,7 @@ std::shared_ptr<NetworkEvent> EventStreamParser::ParseNetworkEvent(LineHandler &
   }
 }
 
-concurrencpp::lazy_result<std::shared_ptr<Event>>
+concurrencpp::result<std::shared_ptr<Event>>
 EventStreamParser::ParseEvent(LineHandler &line_handler) {
   line_handler.TrimL();
   std::function<bool(unsigned char)> pred = [](unsigned char c) {
@@ -166,7 +166,8 @@ EventStreamParser::ParseEvent(LineHandler &line_handler) {
     spdlog::info("could not parse timestamp or source: {}", line_handler.GetRawLine());
     co_return nullptr;
   }
-  const std::string &parser_name = *(trace_environment_.InternalizeAdditional(p_name));
+  const std::string *singleton = trace_environment_.InternalizeAdditional(p_name);
+  const std::string &parser_name = *(singleton);
 
   std::shared_ptr<Event> event = nullptr;
   uint64_t pc = 0, id = 0, addr = 0, vec = 0, dev = 0, func = 0,

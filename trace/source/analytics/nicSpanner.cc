@@ -32,7 +32,7 @@
 #include "util/exception.h"
 #include "events/printer.h"
 
-concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
+concurrencpp::result<bool> NicSpanner::HandelMmio(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -63,7 +63,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelMmio(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
+concurrencpp::result<bool> NicSpanner::HandelDma(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -107,7 +107,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelDma(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
+concurrencpp::result<bool> NicSpanner::HandelTxrx(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
@@ -162,7 +162,7 @@ concurrencpp::lazy_result<bool> NicSpanner::HandelTxrx(
   co_return true;
 }
 
-concurrencpp::lazy_result<bool> NicSpanner::HandelMsix(
+concurrencpp::result<bool> NicSpanner::HandelMsix(
     std::shared_ptr<concurrencpp::executor> resume_executor,
     std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");

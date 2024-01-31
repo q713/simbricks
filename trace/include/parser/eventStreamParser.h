@@ -74,7 +74,7 @@ class EventStreamParser : public LogParser {
   explicit EventStreamParser(TraceEnvironment &trace_environment, std::string name)
       : LogParser(trace_environment, name) {}
 
-  concurrencpp::lazy_result<std::shared_ptr<Event>>
+  concurrencpp::result<std::shared_ptr<Event>>
   ParseEvent(LineHandler &line_handler) override;
 
 };

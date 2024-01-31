@@ -27,8 +27,8 @@
 #include "analytics/spanner.h"
 #include "events/printer.h"
 
-concurrencpp::lazy_result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<concurrencpp::executor> resume_executor,
-                                                                   std::shared_ptr<Event> &event_ptr) {
+concurrencpp::result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<concurrencpp::executor> resume_executor,
+                                                              std::shared_ptr<Event> &event_ptr) {
   assert(event_ptr and "event_ptr is null");
 
   if (not IsAnyType(event_ptr, std::vector<EventType>{

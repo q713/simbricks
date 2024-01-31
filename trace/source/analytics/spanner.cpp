@@ -43,5 +43,6 @@ concurrencpp::result<void> Spanner::consume(std::shared_ptr<concurrencpp::execut
     spdlog::debug("found event that could not be added to a pack: {}", *value);
   }
 
+  spdlog::debug("{} handled event {}", name_, *value);
   co_return;
 }

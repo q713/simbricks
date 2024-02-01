@@ -530,7 +530,7 @@ class CoroChannelSink : public CoroChannel<ValueType> {
   }
 };
 
-template<typename ValueType, size_t Capacity = 1> requires SizeLagerZero<Capacity>
+template<typename ValueType, size_t Capacity = 10000> requires SizeLagerZero<Capacity>
 class CoroBoundedChannel : public CoroChannel<ValueType> {
 
  private:

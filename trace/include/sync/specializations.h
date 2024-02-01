@@ -60,15 +60,6 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
 
   co_await tar_chan->CloseChannel(tpe);
 
-//  for (value = co_await producer->produce(tpe); value.has_value();
-//       value = co_await producer->produce(tpe)) {
-//    spdlog::trace("producer push on next event");
-//    const bool could_push = co_await tar_chan->Push(tpe, std::move(*value));
-//    throw_on(not could_push,
-//             "unable to push next event to target channel",
-//             source_loc::current());
-//  }
-
   co_return;
 }
 
@@ -91,7 +82,6 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     std::shared_ptr<Event> value = std::move(*opt_val);
     spdlog::trace("consumer consume next event");
-//    co_await consumer->consume(tpe, std::move(value));
     co_await co_await tpe->submit(task, tpe, consumer, std::move(value));
   }
 
@@ -121,7 +111,6 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
 
     spdlog::trace("handler handel next event");
     const bool pass_on = co_await co_await tpe->submit(task, tpe, handler, value);
-//    const bool pass_on = co_await handler->handel(tpe, value);
 
     if (pass_on) {
       spdlog::trace("handler pass on next event");

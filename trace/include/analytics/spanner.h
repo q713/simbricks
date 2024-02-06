@@ -87,6 +87,7 @@ struct Spanner : public Consumer<std::shared_ptr<Event>> {
     return id_;
   }
 
+ protected:
   template<class St>
   std::shared_ptr<St>
   iterate_add_erase(std::list<std::shared_ptr<St>> &pending,
@@ -104,6 +105,31 @@ struct Spanner : public Consumer<std::shared_ptr<Event>> {
     }
 
     return nullptr;
+  }
+
+  concurrencpp::result<std::shared_ptr<Context>> PopPropagateContext(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> from) const {
+    auto con_opt = co_await from->Pop(resume_executor);
+    const auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
+    throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
+    from->PokeAwaiters();
+    co_return con;
+  }
+
+  template<expectation exp>
+  concurrencpp::result<void> PushPropagateContext(
+      std::shared_ptr<concurrencpp::executor> resume_executor,
+      std::shared_ptr<CoroChannel<std::shared_ptr<Context>>> to,
+      const std::shared_ptr<EventSpan> &parent) const {
+    std::shared_ptr<Context> context = Context::CreatePassOnContext<exp>(parent);
+    throw_if_empty(context, TraceException::kContextIsNull, source_loc::current());
+    const bool could_push = co_await to->Push(resume_executor, context);
+    throw_on_false(could_push,
+                   TraceException::kCouldNotPushToContextQueue,
+                   source_loc::current());
+    to->PokeAwaiters();
+    co_return;
   }
 };
 

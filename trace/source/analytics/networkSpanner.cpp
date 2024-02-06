@@ -58,9 +58,6 @@ concurrencpp::result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<co
         and not current_device_span->IsDrop()) {
 
       // if we have a "to" adapter event we need to push a context to a host
-      auto context = Context::CreatePassOnContext<expectation::kRx>(current_device_span);
-      throw_if_empty(context, TraceException::kContextIsNull, source_loc::current());
-
       throw_on_false(current_device_span->HasIpsSet(), "kToAdapter event has no ip header",
                      source_loc::current());
 
@@ -69,11 +66,8 @@ concurrencpp::result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<co
       auto to_host = to_host_channels_.GetValidChannel(node, device);
 
       spdlog::info("NetworkSpanner::HandelNetworkEvent: try push kToAdapter context event={}", *event_ptr);
-      bool could_push = co_await to_host->Push(resume_executor, context);
+      co_await PushPropagateContext<expectation::kRx>(resume_executor, to_host, current_device_span);
       spdlog::info("NetworkSpanner::HandelNetworkEvent: did push kToAdapter context {}", *event_ptr);
-
-      throw_on_false(could_push, TraceException::kCouldNotPushToContextQueue, source_loc::current());
-
     }
 
     assert(current_device_span->IsComplete());
@@ -121,12 +115,9 @@ concurrencpp::result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<co
     const int node = network_event->GetNode();
     const int device = network_event->GetDevice();
     auto from_host_chan = from_host_channels_.GetValidChannel(node, device);
-    auto con_opt = co_await from_host_chan->Pop(resume_executor);
+    context_to_connect_with = co_await PopPropagateContext(resume_executor, from_host_chan);
     spdlog::info("NetworkSpanner::HandelNetworkEvent: succesfull pop kFromAdapter context");
 
-    context_to_connect_with = OrElseThrow(con_opt, TraceException::kContextIsNull,
-                                          source_loc::current());
-    throw_if_empty(context_to_connect_with, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(context_to_connect_with, expectation::kRx),
              "received non kRx context", source_loc::current());
   } else {

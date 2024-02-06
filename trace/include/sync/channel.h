@@ -474,6 +474,10 @@ class CoroChannel {
     channel_cv_.notify_all();
   }
 
+  void PokeAwaiters() {
+    channel_cv_.notify_all();
+  }
+
   virtual concurrencpp::result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
@@ -530,7 +534,7 @@ class CoroChannelSink : public CoroChannel<ValueType> {
   }
 };
 
-template<typename ValueType, size_t Capacity = 10000> requires SizeLagerZero<Capacity>
+template<typename ValueType, size_t Capacity = 10'000> requires SizeLagerZero<Capacity>
 class CoroBoundedChannel : public CoroChannel<ValueType> {
 
  private:

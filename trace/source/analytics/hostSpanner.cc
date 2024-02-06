@@ -40,13 +40,9 @@ concurrencpp::result<void> HostSpanner::FinishPendingSpan(
   }
 
   spdlog::info("{} host try poll nic receive", name_);
-  auto context_opt = co_await from_nic_receives_queue_->Pop(resume_executor);
+  auto context = co_await PopPropagateContext(resume_executor, from_nic_receives_queue_);
   spdlog::info("{} host polled nic receive", name_);
 
-  auto context = OrElseThrow(
-      context_opt,
-      "HostSpanner::CreateTraceStartingSpan could not receive rx context",
-      source_loc::current());
   co_await tracer_.AddParentLazily(resume_executor, pending_host_call_span_, context);
 
   uint64_t syscall_start = pending_host_call_span_->GetStartingTs();
@@ -57,16 +53,16 @@ concurrencpp::result<void> HostSpanner::FinishPendingSpan(
             syscall_start > context->GetParentStartingTs();
       };
 
-  while (context_opt) {
-    spdlog::info("{} host try poll on true nic receive", name_);
-    context_opt = co_await from_nic_receives_queue_->TryPopOnTrue(
-        resume_executor, did_arrive_before_receive_syscall);
-    spdlog::info("{} host polled on true nic receive", name_);
-
-    if (not context_opt.has_value()) {
-      break;
-    }
-    context = context_opt.value();
+  std::optional<std::shared_ptr<Context>> context_opt;
+  spdlog::info("{} host try polling copy contexts nic receive", name_);
+  for (
+      context_opt = co_await from_nic_receives_queue_->TryPopOnTrue(resume_executor, did_arrive_before_receive_syscall);
+      context_opt.has_value();
+      context_opt =
+          co_await from_nic_receives_queue_->TryPopOnTrue(resume_executor, did_arrive_before_receive_syscall)) {
+    from_nic_receives_queue_->PokeAwaiters();
+    spdlog::info("{} host polled copy contexts nic receive", name_);
+    context = *context_opt;
 
     auto copy_span = CloneShared(pending_host_call_span_);
     copy_span->SetOriginal(pending_host_call_span_);
@@ -158,11 +154,7 @@ concurrencpp::result<bool> HostSpanner::HandelMmio(
   if (not pci_write_before_ and trace_environment_.IsToDeviceBarNumber(
       pending_mmio_span->GetBarNumber())) {
     spdlog::info("{} host try push mmio", name_);
-    auto context = Context::CreatePassOnContext<expectation::kMmio>(pending_mmio_span);
-    if (not co_await to_nic_queue_->Push(resume_executor, context)) {
-      spdlog::critical("could not push to nic that mmio is expected");
-      // note: we will not return false as the span creation itself id work
-    }
+    co_await PushPropagateContext<expectation::kMmio>(resume_executor, to_nic_queue_, pending_mmio_span);
     spdlog::info("{} host pushed mmio", name_);
   }
 
@@ -238,13 +230,10 @@ concurrencpp::result<bool> HostSpanner::HandelDma(
   // when receiving a dma, we expect to get a context from the nic simulator,
   // hence poll this context blocking!!
   spdlog::info("{} host try poll dma: {}", name_, *event_ptr);
-  auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
-  const auto con = OrElseThrow(con_opt,
-                               TraceException::kContextIsNull, source_loc::current());
-  throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
+  const auto con = co_await PopPropagateContext(resume_executor, from_nic_queue_);
   spdlog::info("{} host polled dma", name_);
 
-  if (not is_expectation(con_opt.value(), expectation::kDma)) {
+  if (not is_expectation(con, expectation::kDma)) {
     spdlog::critical("when polling for dma context, no dma context was fetched");
     co_return false;
   }
@@ -271,9 +260,7 @@ concurrencpp::result<bool> HostSpanner::HandelMsix(
   assert(event_ptr and "event_ptr is null");
 
   spdlog::info("{} host try poll msix", name_);
-  auto con_opt = co_await from_nic_queue_->Pop(resume_executor);
-  const auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
-  throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
+  const auto con = co_await PopPropagateContext(resume_executor, from_nic_queue_);
   spdlog::info("{} host polled msix", name_);
 
   if (not is_expectation(con, expectation::kMsix)) {

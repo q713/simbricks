@@ -76,10 +76,7 @@ concurrencpp::result<bool> NicSpanner::HandelDma(
     } else if (IsType(event_ptr, EventType::kNicDmaExT)) {
       // indicate to host that we expect a dma action
       spdlog::info("{} nic try push dma: {}", name_, *event_ptr);
-      auto context = Context::CreatePassOnContext<expectation::kDma>(pending_dma);
-      throw_on(not co_await to_host_queue_->Push(resume_executor, context),
-               TraceException::kCouldNotPushToContextQueue,
-               source_loc::current());
+      co_await PushPropagateContext<expectation::kDma>(resume_executor, to_host_queue_, pending_dma);
       spdlog::info("{} nic pushed dma", name_);
     }
 
@@ -123,19 +120,15 @@ concurrencpp::result<bool> NicSpanner::HandelTxrx(
 
     spdlog::info("{} NicSpanner::HandelTxrx: trying to push tx context to other side - {}",
                  name_, *event_ptr);
-    auto context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
-    throw_on(not co_await to_network_queue_->Push(resume_executor, context),
-             "HandelTxrx: could not write network context ",
-             source_loc::current());
+    co_await PushPropagateContext<expectation::kRx>(resume_executor, to_network_queue_, eth_span);
     spdlog::info("{} NicSpanner::HandelTxrx: pushed tx context to other side", name_);
 
   } else if (IsType(event_ptr, EventType::kNicRxT)) {
     spdlog::info("{} NicSpanner::HandelTxrx: trying to pull Rx context from other side - {}",
                  name_, *event_ptr);
-    auto con_opt = co_await from_network_queue_->Pop(resume_executor);
+    const auto con = co_await PopPropagateContext(resume_executor, from_network_queue_);
     spdlog::info("{} NicSpanner::HandelTxrx: pulled tx context from other side", name_);
 
-    auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_on(not is_expectation(con, expectation::kRx),
              "nic_spanner: received non kRx context", source_loc::current());
     eth_span = co_await tracer_.StartSpanByParentPassOnContext<NicEthSpan>(
@@ -143,11 +136,7 @@ concurrencpp::result<bool> NicSpanner::HandelTxrx(
     last_causing_ = eth_span;
 
     spdlog::info("{} nic tryna push receive update.", name_);
-    auto receive_context = Context::CreatePassOnContext<expectation::kRx>(eth_span);
-    const bool could_push = co_await to_host_receives_->Push(resume_executor, receive_context);
-    throw_on_false(could_push,
-                   "NicSpanner::HandelTxrx: could not write host receive context ",
-                   source_loc::current());
+    co_await PushPropagateContext<expectation::kRx>(resume_executor, to_host_receives_, eth_span);
     spdlog::info("{} nic pushed receive update.", name_);
 
   } else {
@@ -179,10 +168,7 @@ concurrencpp::result<bool> NicSpanner::HandelMsix(
   co_await tracer_.MarkSpanAsDone(resume_executor, msix_span);
 
   spdlog::info("{} nic try push msix", name_);
-  auto context = Context::CreatePassOnContext<expectation::kMsix>(msix_span);
-  throw_on(not co_await to_host_queue_->Push(resume_executor, context),
-           TraceException::kCouldNotPushToContextQueue,
-           source_loc::current());
+  co_await PushPropagateContext<expectation::kMsix>(resume_executor, to_host_queue_, msix_span);
   spdlog::info("{} nic pushed msix", name_);
 
   co_return true;

@@ -193,9 +193,9 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 
     while (cur_size_ < event_buffer_size_) {
 
-//      std::pair<bool, LineHandler *>
-//          bh_p = co_await background_exec_->submit([&] { return line_handler_buffer.NextHandler(); });
-      std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
+      std::pair<bool, LineHandler *>
+          bh_p = co_await background_exec_->submit([&] { return line_handler_buffer.NextHandler(); });
+//      std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
 
       if (not bh_p.first or not bh_p.second) {
         break;

@@ -110,6 +110,7 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
       break;
     }
     const bool could_push = co_await tar_chan->Push(tpe, *value);
+    tar_chan->PokeAwaiters();
     throw_on(not could_push,
              "unable to push next event to target channel",
              source_loc::current());
@@ -138,6 +139,7 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
   };
 
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
+    src_chan->PokeAwaiters();
     ValueType value = *opt_val;
     spdlog::trace("consumer consume next event");
     co_await co_await tpe->submit(task, tpe, consumer, value);
@@ -168,6 +170,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
   };
 
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
+    src_chan->PokeAwaiters();
     ValueType value = *opt_val;
 
     spdlog::trace("handler handel next event");
@@ -176,6 +179,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
     if (pass_on) {
       spdlog::trace("handler pass on next event");
       const bool could_push = co_await tar_chan->Push(tpe, value);
+      tar_chan->PokeAwaiters();
       throw_on(not could_push,
                "unable to push next event to target channel",
                source_loc::current());

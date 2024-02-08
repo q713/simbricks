@@ -278,7 +278,7 @@ class ReaderBuffer {
       throw_on(file_descriptor == -1, "ReaderBuffer: could not obtain fd", source_loc::current());
       const int suc = fcntl(file_descriptor, F_SETPIPE_SZ, BlockSize);
       if (suc != BlockSize) {
-        spdlog::warn("ReaderBuffer: could not change '{}' size to {}, returned size is {}", file_path, BlockSize, suc);
+        spdlog::warn("ReaderBuffer: could not change '{}' size to {}, returned size is {} {}", file_path, BlockSize, suc, errno);
       } else {
         spdlog::debug("ReaderBuffer: changed size successfully");
       }

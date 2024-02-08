@@ -158,164 +158,83 @@ class NS3Parser : public LogParser {
   ParseEvent(LineHandler &line_handler) override;
 };
 
-template<bool NamedPipe, size_t LineBufferSize> requires SizeLagerZero<LineBufferSize>
+template<bool NamedPipe, size_t LineBufferSizePages = 16> requires SizeLagerZero<LineBufferSizePages>
 class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 
   TraceEnvironment &trace_environment_;
   const std::string name_;
   const std::string log_file_path_;
-  LogParser &log_parser_; // NOTE: only access from within FillBuffer()!!!
-  //ReaderBuffer<LineBufferSize> line_handler_buffer{name_, true};
-  ReaderBuffer<MultiplePagesBytes(15)> line_handler_buffer{name_};
-  std::vector<std::shared_ptr<Event>> event_buffer_;
-  const size_t event_buffer_size_;
-  size_t cur_size_ = 0;
-  size_t cur_line_index_ = 0;
-  //WeakTimer &timer_;
-  Timer &timer_;
+  std::shared_ptr<LogParser> log_parser_; // NOTE: only access from within FillBuffer()!!!
   std::shared_ptr<concurrencpp::executor> background_exec_;
-  std::shared_ptr<concurrencpp::executor> normal_exec_;
-
-  NonCoroBufferedChannel<std::shared_ptr<Event>, 1000000> event_buffer_channel_;
-  std::thread buffer_filller_;
+  concurrencpp::result<void> fill_buffer_task_;
+  bool started_fill_task_ = false;
+  CoroBoundedChannel<std::shared_ptr<Event>, 1'000'000> event_buffer_channel_;
 
   concurrencpp::result<void>
-  ResetFillBuffer() {
+  ResetFillBuffer(const std::string name,
+                  const std::string log_file_path,
+                  std::shared_ptr<LogParser> log_parser,
+                  std::shared_ptr<concurrencpp::executor> executor,
+                  std::shared_ptr<concurrencpp::executor> back) {
+    throw_if_empty(log_parser, "parser is null", source_loc::current());
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
+    throw_if_empty(back, TraceException::kResumeExecutorNull, source_loc::current());
+
+    ReaderBuffer<MultiplePagesBytes(LineBufferSizePages)> line_handler_buffer{name};
+
     if (not line_handler_buffer.IsOpen()) {
-      line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
-      throw_on_false(event_buffer_size_ > 0,
-                     "event buffer have size larger 0",
-                     source_loc::current());
+      line_handler_buffer.OpenFile(log_file_path, NamedPipe);
     }
 
-    cur_line_index_ = 0;
-    cur_size_ = 0;
-
-    while (cur_size_ < event_buffer_size_) {
-
-      std::pair<bool, LineHandler *>
-          bh_p = co_await background_exec_->submit([&] { return line_handler_buffer.NextHandler(); });
-//      std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
-
-      if (not bh_p.first or not bh_p.second) {
-        break;
-      }
+    std::pair<bool, LineHandler *> bh_p;
+    for (bh_p = co_await back->submit([&] { return line_handler_buffer.NextHandler(); });
+         bh_p.first and bh_p.second;
+         bh_p = co_await back->submit([&] { return line_handler_buffer.NextHandler(); })) {
 
       LineHandler &line_handler = *bh_p.second;
 
-      std::shared_ptr<Event> event = co_await log_parser_.ParseEvent(line_handler);
+      std::shared_ptr<Event> event = co_await log_parser_->ParseEvent(line_handler);
       if (event == nullptr) {
         continue;
       }
 
       throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
-      event_buffer_[cur_size_] = std::move(event);
-      ++cur_size_;
+      co_await event_buffer_channel_.Push(executor, std::move(event));
+      event_buffer_channel_.PokeAwaiters();
     }
 
+    co_await event_buffer_channel_.CloseChannel(executor);
     co_return;
   }
-
-//  concurrencpp::result<void> FillBuffer() {
-//    line_handler_buffer.OpenFile(log_file_path_, NamedPipe);
-//    throw_on_false(event_buffer_size_ > 0,
-//                   "event buffer have size larger 0",
-//                   source_loc::current());
-//
-//    while (line_handler_buffer.HasStillLine()) {
-//
-//      std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
-//
-//      if (not bh_p.first or not bh_p.second) {
-//        break;
-//      }
-//
-//      LineHandler &line_handler = *bh_p.second;
-//
-//      std::shared_ptr<Event> event = co_await log_parser_.ParseEvent(line_handler);
-//      if (event == nullptr) {
-//        continue;
-//      }
-//
-//      throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
-//      event_buffer_channel_.Push(std::move(event));
-//    }
-//
-//    event_buffer_channel_.CloseChannel();
-//    co_return;
-//  }
-
-  [[nodiscard]] bool StillBuffered() const {
-    return cur_size_ > 0 and cur_line_index_ < cur_size_;
-  }
-
-//  [[nodiscard]] bool StillBuffered() {
-//    return not event_buffer_channel_.Empty();
-//  }
 
  public:
   explicit BufferedEventProvider(TraceEnvironment &trace_environment,
                                  const std::string name,
                                  const std::string log_file_path,
-                                 LogParser &log_parser,
-      //WeakTimer &timer_)
-                                 Timer &timer_,
-                                 size_t event_buffer_size)
+                                 std::shared_ptr<LogParser> log_parser)
       : Producer<std::shared_ptr<Event>>(),
         trace_environment_(trace_environment),
         name_(name),
         log_file_path_(log_file_path),
-        log_parser_(log_parser),
-        timer_(timer_),
-        event_buffer_size_(event_buffer_size),
-        background_exec_(trace_environment_.GetBackgroundPoolExecutor().get()),
-        normal_exec_(trace_environment_.GetPoolExecutor().get()) {
-    event_buffer_.reserve(event_buffer_size);
-//    buffer_filller_ = std::thread([&] { FillBuffer().get(); });
+        log_parser_(std::move(log_parser)),
+        background_exec_(trace_environment_.GetBackgroundPoolExecutor()) {
   };
 
   ~BufferedEventProvider() = default;
 
-//  ~BufferedEventProvider() {
-//    buffer_filller_.join();
-//  };
-
-//  explicit operator bool() noexcept override {
-//    if (not StillBuffered()) {
-//      event_buffer_channel_.WaitTillValue();
-//    }
-//    return StillBuffered();
-//  };
-
   concurrencpp::result<std::optional<std::shared_ptr<Event>>> produce(std::shared_ptr<concurrencpp::executor> executor) override {
-    if (not StillBuffered()) {
-      spdlog::debug("{} fill buffer", log_file_path_);
-      co_await ResetFillBuffer();
-      spdlog::debug("{} filled buffer", log_file_path_);
-      if (not StillBuffered()) {
-        co_return std::nullopt;
-      }
+    if (not started_fill_task_) {
+      fill_buffer_task_ =
+          co_await executor->submit([&]() {
+            return ResetFillBuffer(name_, log_file_path_, log_parser_, executor, background_exec_);
+          });
+      started_fill_task_ = true;
     }
 
-    size_t next = cur_line_index_;
-    ++cur_line_index_;
-    std::shared_ptr<Event> event = std::move(event_buffer_[next]);
-    throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
+    std::optional<std::shared_ptr<Event>> event = co_await event_buffer_channel_.Pop(executor);
+    event_buffer_channel_.PokeAwaiters();
     co_return event;
   }
-
-//  concurrencpp::result<std::optional<std::shared_ptr<Event>>> produce(std::shared_ptr<concurrencpp::executor> executor) override {
-//    if (not this->operator bool()) {
-//      co_return std::nullopt;
-//    }
-//
-//    auto event_opt = event_buffer_channel_.Pop();
-//    if (not event_opt.has_value()) {
-//      co_return std::nullopt;
-//    }
-//
-//    co_return *event_opt;
-//  }
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

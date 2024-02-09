@@ -30,7 +30,6 @@
 #include "parser/parser.h"
 #include "util/exception.h"
 #include "sync/corobelt.h"
-#include "reader/reader.h"
 #include "util/string_util.h"
 #include "env/traceEnvironment.h"
 

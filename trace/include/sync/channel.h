@@ -132,10 +132,11 @@ class NonCoroChannelSink : public NonCoroChannel<ValueType> {
   }
 };
 
-template<typename ValueType, size_t BufferSize> requires SizeLagerZero<BufferSize>
+template<typename ValueType>
 class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
 
-  std::vector<ValueType> buffer_{BufferSize};
+  const size_t capacity_;
+  std::vector<ValueType> buffer_;
   size_t read_index_ = 0;
   size_t write_index_ = 0;
 
@@ -145,7 +146,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
     assert(write_index_ < BufferSize and "cannot write out of bound");
     assert(write_index_ >= 0 and "cannot write out of bound");
     buffer_[write_index_] = std::move(value);
-    write_index_ = (write_index_ + 1) % BufferSize;
+    write_index_ = (write_index_ + 1) % capacity_;
     ++(this->size_);
   }
 
@@ -155,32 +156,32 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
     assert(read_index_ < BufferSize and "cannot read out of bound");
     assert(read_index_ >= 0 and "cannot read out of bound");
     auto result = std::move(buffer_[read_index_]);
-    read_index_ = (read_index_ + 1) % BufferSize;
+    read_index_ = (read_index_ + 1) % capacity_;
     --(this->size_);
     return std::move(result);
   }
 
  public:
+  explicit NonCoroBufferedChannel(size_t capacity) : NonCoroChannel<ValueType>(), capacity_(capacity) {
+    buffer_.reserve(capacity);
+  };
 
-  NonCoroBufferedChannel() = default;
+  NonCoroBufferedChannel(const NonCoroBufferedChannel<ValueType> &) = delete;
 
-  NonCoroBufferedChannel(const NonCoroBufferedChannel<ValueType, BufferSize> &) = delete;
+  NonCoroBufferedChannel(NonCoroBufferedChannel<ValueType> &&) = delete;
 
-  NonCoroBufferedChannel(NonCoroBufferedChannel<ValueType, BufferSize>
-                         &&) = delete;
+  NonCoroBufferedChannel<ValueType> &operator=(
+      const NonCoroBufferedChannel<ValueType> &) noexcept = delete;
 
-  NonCoroBufferedChannel<ValueType, BufferSize> &operator=(
-      const NonCoroBufferedChannel<ValueType, BufferSize> &) noexcept = delete;
-
-  NonCoroBufferedChannel<ValueType, BufferSize> &operator=(
-      NonCoroBufferedChannel<ValueType, BufferSize> &&) noexcept = delete;
+  NonCoroBufferedChannel<ValueType> &operator=(
+      NonCoroBufferedChannel<ValueType> &&) noexcept = delete;
 
   // returns false if channel is closed or poisened
   bool Push(ValueType value) {
     {
       std::unique_lock lock{this->chan_numtex_};
       this->chan_cond_var_.wait(lock, [this] {
-        return this->closed_ or this->poisened_ or this->size_ < BufferSize;
+        return this->closed_ or this->poisened_ or this->size_ < this->capacity_;
       });
       if (this->closed_ or this->poisened_) {
         lock.unlock();
@@ -201,7 +202,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
   bool TryPush(ValueType value) {
     {
       std::unique_lock lock{this->chan_numtex_};
-      if (this->closed_ or this->poisened_ or this->size_ >= BufferSize) {
+      if (this->closed_ or this->poisened_ or this->size_ >= this->capacity_) {
         return false;
       }
       assert(not this->closed_ and "channel should not be closed here");
@@ -534,11 +535,13 @@ class CoroChannelSink : public CoroChannel<ValueType> {
   }
 };
 
-template<typename ValueType, size_t Capacity = 10'000> requires SizeLagerZero<Capacity>
+// TODO: Make Buffer size no template parameter
+template<typename ValueType>
 class CoroBoundedChannel : public CoroChannel<ValueType> {
 
  private:
-  std::vector<ValueType> buffer_{Capacity};
+  const size_t capacity_;
+  std::vector<ValueType> buffer_;
   size_t read_index_ = 0;
   size_t write_index_ = 0;
 
@@ -548,7 +551,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     assert(write_index_ < Capacity and "cannot write out of bound");
     assert(write_index_ >= 0 and "cannot write out of bound");
     buffer_[write_index_] = std::move(value);
-    write_index_ = (write_index_ + 1) % Capacity;
+    write_index_ = (write_index_ + 1) % capacity_;
     ++(this->size_);
   }
 
@@ -558,23 +561,25 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     assert(read_index_ < Capacity and "cannot read out of bound");
     assert(read_index_ >= 0 and "cannot read out of bound");
     auto result = std::move(buffer_[read_index_]);
-    read_index_ = (read_index_ + 1) % Capacity;
+    read_index_ = (read_index_ + 1) % capacity_;
     --(this->size_);
     return std::move(result);
   }
 
  public:
-  CoroBoundedChannel() : CoroChannel<ValueType>() {};
+  explicit CoroBoundedChannel(size_t capacity = 10'000) : CoroChannel<ValueType>(), capacity_(capacity) {
+    buffer_.reserve(capacity_);
+  };
 
-  CoroBoundedChannel(const CoroBoundedChannel<ValueType, Capacity> &) = delete;
+  CoroBoundedChannel(const CoroBoundedChannel<ValueType> &) = delete;
 
-  CoroBoundedChannel(CoroBoundedChannel<ValueType, Capacity> &&) = delete;
+  CoroBoundedChannel(CoroBoundedChannel<ValueType> &&) = delete;
 
-  CoroBoundedChannel<ValueType, Capacity> &operator=(
-      const CoroBoundedChannel<ValueType, Capacity> &) noexcept = delete;
+  CoroBoundedChannel<ValueType> &operator=(
+      const CoroBoundedChannel<ValueType> &) noexcept = delete;
 
-  CoroBoundedChannel<ValueType, Capacity> &operator=(
-      CoroBoundedChannel<ValueType, Capacity> &&) noexcept = delete;
+  CoroBoundedChannel<ValueType> &operator=(
+      CoroBoundedChannel<ValueType> &&) noexcept = delete;
 
   concurrencpp::result<void> Display(
       std::shared_ptr<concurrencpp::executor> resume_executor,
@@ -585,7 +590,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
         co_await this->channel_lock_.lock(resume_executor);
 
     out << "Channel:" << '\n';
-    out << "capacity=" << Capacity << '\n';
+    out << "capacity=" << capacity_ << '\n';
     out << "size=" << this->size_ << '\n';
     out << "read_index=" << read_index_ << '\n';
     out << "write_index=" << write_index_ << '\n';
@@ -594,7 +599,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     out << "Buffer={" << '\n';
     size_t index = 0;
     while (this->size_ > 0 and index < this->size_) {
-      auto &val = buffer_[read_index_ + index % Capacity];
+      auto &val = buffer_[read_index_ + index % capacity_];
       ++index;
       value_printer(out, val) << '\n';
     }
@@ -612,7 +617,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
       co_await this->channel_cv_.await(resume_executor, guard, [this] {
-        return this->closed_ or this->poisened_ or this->size_ < Capacity;
+        return this->closed_ or this->poisened_ or this->size_ < this->capacity_;
       });
       if (this->closed_ or this->poisened_) {
         guard.unlock();
@@ -639,7 +644,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     {
       concurrencpp::scoped_async_lock guard =
           co_await this->channel_lock_.lock(resume_executor);
-      if (this->closed_ or this->poisened_ or this->size_ >= Capacity) {
+      if (this->closed_ or this->poisened_ or this->size_ >= this->capacity_) {
         guard.unlock();
         this->channel_cv_.notify_all();
         co_return false;

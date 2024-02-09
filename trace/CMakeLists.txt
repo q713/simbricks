@@ -129,7 +129,6 @@ set(TRACE_LIB_HEADER_FILES
         # channel and corobelt template specializations for our use case
         include/sync/specializations.h
         # reader
-        include/reader/reader.h
         include/reader/cReader.h
         # parser
         include/parser/parser.h
@@ -160,7 +159,6 @@ set(TRACE_LIB_HEADER_FILES
         )
 set(TRACE_LIB_SOURCE_FILES
         # reader
-        source/reader/reader.cc
         source/reader/cReader.cpp
         # parser
         source/parser/parser.cc

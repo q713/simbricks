@@ -118,7 +118,6 @@ class LineHandler {
 };
 
 template<size_t BlockSize = 4 * 1024> requires SizeLagerZero<BlockSize>
-//class CFileLineBufferReader {
 class ReaderBuffer {
 
   const std::string name_;
@@ -131,7 +130,6 @@ class ReaderBuffer {
   size_t size_ = 0;
   size_t next_line_end_ = 0;
   int reached_eof_ = 2;
-  //CLineHandler line_handler_{buffer_, 0};
   LineHandler line_handler_{buffer_, 0};
 
   [[nodiscard]] bool IsStreamStillGood() {
@@ -212,12 +210,10 @@ class ReaderBuffer {
   }
 
  public:
-  //explicit CFileLineBufferReader(std::string name)
   explicit ReaderBuffer(std::string name)
       : name_(std::move(name)) {
   }
 
-  //~CFileLineBufferReader() {
   ~ReaderBuffer() {
     Close();
   }
@@ -246,7 +242,6 @@ class ReaderBuffer {
     return HasStillLineEnd();
   }
 
-  //std::pair<bool, CLineHandler *> NextHandler() {
   std::pair<bool, LineHandler *> NextHandler() {
     if (not HasStillLine()) {
       return {false, nullptr};

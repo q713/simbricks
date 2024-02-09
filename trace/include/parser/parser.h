@@ -37,7 +37,6 @@
 #include "util/componenttable.h"
 #include "sync/corobelt.h"
 #include "events/events.h"
-#include "reader/reader.h"
 #include "reader/cReader.h"
 #include "env/traceEnvironment.h"
 #include "analytics/timer.h"
@@ -168,7 +167,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
   std::shared_ptr<concurrencpp::executor> background_exec_;
   concurrencpp::result<void> fill_buffer_task_;
   bool started_fill_task_ = false;
-  CoroBoundedChannel<std::shared_ptr<Event>, 1'000'000> event_buffer_channel_;
+  CoroBoundedChannel<std::shared_ptr<Event>> event_buffer_channel_;
 
   concurrencpp::result<void>
   ResetFillBuffer(const std::string name,
@@ -211,14 +210,15 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
   explicit BufferedEventProvider(TraceEnvironment &trace_environment,
                                  const std::string name,
                                  const std::string log_file_path,
-                                 std::shared_ptr<LogParser> log_parser)
+                                 std::shared_ptr<LogParser> log_parser,
+                                 size_t event_buffer_size = 10'000)
       : Producer<std::shared_ptr<Event>>(),
         trace_environment_(trace_environment),
         name_(name),
         log_file_path_(log_file_path),
         log_parser_(std::move(log_parser)),
-        background_exec_(trace_environment_.GetBackgroundPoolExecutor()) {
-  };
+        background_exec_(trace_environment_.GetBackgroundPoolExecutor()),
+        event_buffer_channel_(event_buffer_size) {};
 
   ~BufferedEventProvider() = default;
 

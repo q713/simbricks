@@ -25,7 +25,6 @@
 #include <catch2/catch_all.hpp>
 
 #include "sync/corobelt.h"
-#include "reader/reader.h"
 #include "reader/cReader.h"
 
 #if 0

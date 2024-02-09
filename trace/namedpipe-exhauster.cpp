@@ -25,10 +25,10 @@
 #include <iostream>
 
 #include "concurrencpp/concurrencpp.h"
-#include "reader/reader.h"
 #include "reader/cReader.h"
 #include "spdlog/spdlog.h"
 #include "util/cxxopts.hpp"
+#include "util/utils.h"
 
 using ExhaustFuncT = std::function<concurrencpp::result<void>()>;
 using ExecutorT = std::shared_ptr<concurrencpp::thread_pool_executor>;

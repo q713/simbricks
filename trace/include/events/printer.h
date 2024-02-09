@@ -49,8 +49,9 @@ class EventPrinter : public Consumer<std::shared_ptr<Event>>,
 
   inline void print(const std::shared_ptr<Event> &event) {
     throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
-    out_ << *event << '\n';
-    out_.flush();
+//    out_ << *event << '\n';
+//    out_.flush();
+  std::cout << *event << '\n';
   }
 
  public:

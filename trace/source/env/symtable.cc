@@ -26,7 +26,6 @@
 #include <utility>
 
 #include "env/symtable.h"
-#include "reader/reader.h"
 
 //#define SYMS_DEBUG_ 1
 #ifdef SYMS_DEBUG_

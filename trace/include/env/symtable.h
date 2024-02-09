@@ -35,7 +35,6 @@
 
 #include "util/log.h"
 #include "util/utils.h"
-#include "reader/reader.h"
 #include "reader/cReader.h"
 #include "env/stringInternalizer.h"
 

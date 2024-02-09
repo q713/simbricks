@@ -34,7 +34,7 @@ TEST_CASE("Test BoundedChannel", "[BoundedChannel]") {
   const auto thread_pool_executor = runtime.thread_pool_executor();
 
   const size_t capacity = 3;
-  CoroBoundedChannel<int, capacity> channel_to_test;
+  CoroBoundedChannel<int> channel_to_test{capacity};
 
   SECTION("can push into channel") {
     REQUIRE(channel_to_test.Push(thread_pool_executor, 1).get());

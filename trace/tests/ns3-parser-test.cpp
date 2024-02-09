@@ -28,7 +28,6 @@
 
 #include "test-util.h"
 #include "util/componenttable.h"
-#include "reader/reader.h"
 #include "parser/parser.h"
 #include "util/factory.h"
 #include "events/events.h"

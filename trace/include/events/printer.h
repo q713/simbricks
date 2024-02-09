@@ -49,34 +49,6 @@ class EventPrinter : public Consumer<std::shared_ptr<Event>>,
 
   inline void print(const std::shared_ptr<Event> &event) {
     throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
-//    out_ << *event << '\n';
-//    out_.flush();
-  std::cout << *event << '\n';
-  }
-
- public:
-
-  explicit EventPrinter(std::ostream &out) : out_(out) {
-  }
-
-  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor, std::shared_ptr<Event> value) override {
-    print(value);
-    co_return;
-  }
-
-  concurrencpp::result<bool> handel(std::shared_ptr<concurrencpp::executor> executor, std::shared_ptr<Event> &value) override {
-    print(value);
-    co_return true;
-  };
-};
-
-#if 0
-class EventPrinter : public consumer<std::shared_ptr<Event>>,
-                     public cpipe<std::shared_ptr<Event>> {
-  std::ostream &out_;
-
-  inline void print(const std::shared_ptr<Event> &event) {
-    throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
     out_ << *event << '\n';
     out_.flush();
   }
@@ -86,46 +58,17 @@ class EventPrinter : public consumer<std::shared_ptr<Event>>,
   explicit EventPrinter(std::ostream &out) : out_(out) {
   }
 
-  concurrencpp::result<void> consume(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan
-  ) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
-    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
-
-    std::optional<std::shared_ptr<Event>> msg;
-    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->Pop(resume_executor)) {
-      const std::shared_ptr<Event> &event = msg.value();
-      print(event);
-    }
-
+  concurrencpp::result<void> consume(std::shared_ptr<concurrencpp::executor> executor,
+                                     std::shared_ptr<Event> value) override {
+    print(value);
     co_return;
   }
 
-  concurrencpp::result<void> process(
-      std::shared_ptr<concurrencpp::executor> resume_executor,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> src_chan,
-      std::shared_ptr<CoroChannel<std::shared_ptr<Event>>> tar_chan
-  ) override {
-    throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
-    throw_if_empty(src_chan, TraceException::kChannelIsNull, source_loc::current());
-    throw_if_empty(tar_chan, TraceException::kChannelIsNull, source_loc::current());
-
-    std::optional<std::shared_ptr<Event>> msg;
-    for (msg = co_await src_chan->Pop(resume_executor); msg.has_value();
-         msg = co_await src_chan->Pop(resume_executor)) {
-      std::shared_ptr<Event> event = msg.value();
-      print(event);
-      const bool was_pushed = co_await tar_chan->Push(resume_executor, event);
-      throw_on(not was_pushed,
-               "EventPrinter::process: Could not push to target channel",
-               source_loc::current());
-    }
-
-    co_await tar_chan->CloseChannel(resume_executor);
-    co_return;
-  }
+  concurrencpp::result<bool> handel(std::shared_ptr<concurrencpp::executor> executor,
+                                    std::shared_ptr<Event> &value) override {
+    print(value);
+    co_return true;
+  };
 };
-#endif
+
 #endif // SIMBRICKS_TRACE_EVENTS_PRINTER_H_

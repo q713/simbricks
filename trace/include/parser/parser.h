@@ -41,6 +41,7 @@
 #include "env/traceEnvironment.h"
 #include "analytics/timer.h"
 #include "util/utils.h"
+#include "events/printer.h"
 
 bool ParseMacAddress(LineHandler &line_handler, NetworkEvent::MacAddress &addr);
 
@@ -196,6 +197,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
       if (event == nullptr) {
         continue;
       }
+      spdlog::trace("{} parsed another event: {}", name, *event);
 
       throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
       co_await event_buffer_channel_.Push(executor, std::move(event));
@@ -210,15 +212,14 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
   explicit BufferedEventProvider(TraceEnvironment &trace_environment,
                                  const std::string name,
                                  const std::string log_file_path,
-                                 std::shared_ptr<LogParser> log_parser,
-                                 size_t event_buffer_size = 10'000)
+                                 std::shared_ptr<LogParser> log_parser)
       : Producer<std::shared_ptr<Event>>(),
         trace_environment_(trace_environment),
         name_(name),
         log_file_path_(log_file_path),
         log_parser_(std::move(log_parser)),
         background_exec_(trace_environment_.GetBackgroundPoolExecutor()),
-        event_buffer_channel_(event_buffer_size) {};
+        event_buffer_channel_(trace_environment_.GetConfig().GetEventBufferSize()) {};
 
   ~BufferedEventProvider() = default;
 

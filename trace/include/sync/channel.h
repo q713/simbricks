@@ -142,8 +142,8 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
 
   // NOTE: the lock must be held when calling this method
   void perform_write(ValueType value) {
-    assert(this->size_ < BufferSize and "the channel should not be full here");
-    assert(write_index_ < BufferSize and "cannot write out of bound");
+    assert(this->size_ < capacity_ and "the channel should not be full here");
+    assert(write_index_ < capacity_ and "cannot write out of bound");
     assert(write_index_ >= 0 and "cannot write out of bound");
     buffer_[write_index_] = std::move(value);
     write_index_ = (write_index_ + 1) % capacity_;
@@ -153,7 +153,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
   // NOTE: the lock must be held when calling this method
   ValueType perform_read() {
     assert(this->size_ > 0 and "the channel should not be empty here");
-    assert(read_index_ < BufferSize and "cannot read out of bound");
+    assert(read_index_ < capacity_ and "cannot read out of bound");
     assert(read_index_ >= 0 and "cannot read out of bound");
     auto result = std::move(buffer_[read_index_]);
     read_index_ = (read_index_ + 1) % capacity_;
@@ -271,7 +271,7 @@ class NonCoroBufferedChannel : public NonCoroChannel<ValueType> {
       this->chan_cond_var_.notify_all();
       return std::nullopt;
     }
-    assert(read_index_ < BufferSize and "cannot read out of bound");
+    assert(read_index_ < capacity_ and "cannot read out of bound");
     assert(read_index_ >= 0 and "cannot read out of bound");
     ValueType &value = buffer_[read_index_];
     if (not predicate(value)) {
@@ -547,8 +547,8 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
 
   // NOTE: the lock must be held when calling this method
   void perform_write(ValueType value) {
-    assert(this->size_ < Capacity and "the channel should not be full here");
-    assert(write_index_ < Capacity and "cannot write out of bound");
+    assert(this->size_ < capacity_ and "the channel should not be full here");
+    assert(write_index_ < capacity_ and "cannot write out of bound");
     assert(write_index_ >= 0 and "cannot write out of bound");
     buffer_[write_index_] = std::move(value);
     write_index_ = (write_index_ + 1) % capacity_;
@@ -558,7 +558,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   // NOTE: the lock must be held when calling this method
   ValueType perform_read() {
     assert(this->size_ > 0 and "the channel should not be empty here");
-    assert(read_index_ < Capacity and "cannot read out of bound");
+    assert(read_index_ < capacity_ and "cannot read out of bound");
     assert(read_index_ >= 0 and "cannot read out of bound");
     auto result = std::move(buffer_[read_index_]);
     read_index_ = (read_index_ + 1) % capacity_;
@@ -736,7 +736,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
       co_return std::nullopt;
     }
 
-    assert(read_index_ < Capacity and "cannot read out of bound");
+    assert(read_index_ < capacity_ and "cannot read out of bound");
     assert(read_index_ >= 0 and "cannot read out of bound");
     ValueType &value = buffer_[read_index_];
     if (not predicate(value)) {

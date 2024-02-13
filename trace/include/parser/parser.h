@@ -193,8 +193,10 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
 
       LineHandler &line_handler = *bh_p.second;
 
+      spdlog::trace("{} found another line: '{}'", name, line_handler.GetRawLine());
       std::shared_ptr<Event> event = co_await log_parser_->ParseEvent(line_handler);
       if (event == nullptr) {
+        spdlog::trace("{} was unable to parse event", name);
         continue;
       }
       spdlog::trace("{} parsed another event: {}", name, *event);

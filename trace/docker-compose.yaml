@@ -84,7 +84,9 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.trace
-    container_name: trace
+    image:
+      columbo-image
+    container_name: columbo-trace
     command:
       - /bin/bash
       - -c

@@ -56,8 +56,8 @@ std::shared_ptr<Event> NS3Parser::ParseNetDevice(LineHandler &line_handler,
   std::optional<NetworkEvent::Ipv4Header> ip_header;
   ip_header = TryParseIpHeader(line_handler);
 
-  size_t payload_size;
-  if (not line_handler.ConsumeAndTrimTillString("Payload (size=") or not line_handler.ParseUintTrim(10, payload_size)) {
+  size_t payload_size = 0;
+  if (line_handler.ConsumeAndTrimTillString("Payload (size=") and not line_handler.ParseUintTrim(10, payload_size)) {
     return nullptr;
   }
 

@@ -528,7 +528,7 @@ int main(int argc, char *argv[]) {
         create_shared<std::vector<std::shared_ptr<Handler<std::shared_ptr<Event>>>>>("vector null");
     handler_ns3_pipeline->emplace_back(timestamp_filter_ns3);
     handler_ns3_pipeline->emplace_back(event_filter_ns3);
-    handler_ns3_pipeline->emplace_back(ns3_event_filter);
+//    handler_ns3_pipeline->emplace_back(ns3_event_filter);
     handler_ns3_pipeline->emplace_back(printer_ns3);
     auto ns3_pipeline = create_shared<Pipeline<std::shared_ptr<Event>>>(
         TraceException::kPipelineNull,

@@ -175,3 +175,23 @@ TEST_CASE("Test ns3 parser produces expected event stream", "[NS3Parser]") {
   REQUIRE_FALSE(bh_p.first);
   REQUIRE(bh_p.second == nullptr);
 }
+
+TEST_CASE("test non specified Payload (size=", "[test-no-payload]") {
+
+  const TraceEnvConfig trace_env_config = TraceEnvConfig::CreateFromYaml("tests/trace-env-config.yaml");
+  TraceEnvironment trace_environment{trace_env_config};
+  NS3Parser ns3_parser{trace_environment,"test parser"};
+
+  std::vector<std::string> test_lines{
+    "+  1001000000000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/1/$ns3::SimpleNetDevice/TxQueue/Enqueue Packet-Uid=2 Intersting=false ns3::EthernetHeader( length/type=0x9, source=00:01:00:00:00:00, destination=00:01:08:00:06:04) ns3::ArpHeader(request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6) ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6)",
+    "-  1001000000000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/1/$ns3::SimpleNetDevice/TxQueue/Dequeue Packet-Uid=2 Intersting=false ns3::EthernetHeader( length/type=0x9, source=00:01:00:00:00:00, destination=00:01:08:00:06:04) ns3::ArpHeader(request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6) ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6)",
+    "+  1001000000000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/RxPacketFromNetwork Packet-Uid=2 Intersting=false ns3::EthernetHeader( length/type=0x9, source=00:01:00:00:00:00, destination=00:01:08:00:06:04) ns3::ArpHeader(request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6) ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6)",
+    "-  1001000000000 /$ns3::NodeListPriv/NodeList/0/$ns3::Node/DeviceList/2/$ns3::CosimNetDevice/TxPacketToAdapter Packet-Uid=2 Intersting=false ns3::EthernetHeader ( length/type=0x806, source=00:00:00:00:00:09, destination=ff:ff:ff:ff:ff:ff) ns3::ArpHeader (request source mac: 00-06-00:00:00:00:00:09 source ipv4: 192.168.64.4 dest ipv4: 192.168.64.6)"
+  };
+
+  for (auto &str : test_lines) {
+    LineHandler line_handler(str.data(), str.size());
+    auto event = ns3_parser.ParseEvent(line_handler).get();
+    REQUIRE(event != nullptr);
+  }
+}

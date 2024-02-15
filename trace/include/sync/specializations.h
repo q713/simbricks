@@ -31,6 +31,13 @@
 #ifndef SIMBRICKS_TRACE_CORO_SYNC_SPECIALIZATIONS_H_
 #define SIMBRICKS_TRACE_CORO_SYNC_SPECIALIZATIONS_H_
 
+inline concurrencpp::result<std::optional<std::shared_ptr<Event>>>
+ProduceTask(concurrencpp::executor_tag,
+            std::shared_ptr<concurrencpp::executor> tpe,
+            std::shared_ptr<Producer<std::shared_ptr<Event>>> prod) {
+  co_return co_await prod->produce(tpe);
+}
+
 // specialization of corobelt methods
 inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
                                           std::shared_ptr<concurrencpp::executor> tpe,
@@ -41,14 +48,8 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
   throw_if_empty(producer, TraceException::kProducerIsNull, source_loc::current());
 
   std::optional<std::shared_ptr<Event>> value;
-  auto task = [](std::shared_ptr<concurrencpp::executor> tpe,
-                 std::shared_ptr<Producer<std::shared_ptr<Event>>> prod)
-      -> concurrencpp::result<std::optional<std::shared_ptr<Event>>> {
-    co_return co_await prod->produce(tpe);
-  };
-
   do {
-    value = co_await co_await tpe->submit(task, tpe, producer);
+    value = co_await ProduceTask({}, tpe, producer);
     if (not value.has_value()) {
       break;
     }
@@ -64,6 +65,14 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
   co_return;
 }
 
+inline concurrencpp::result<void> ConsumeTask(concurrencpp::executor_tag,
+                                              std::shared_ptr<concurrencpp::executor> tpe,
+                                              std::shared_ptr<Consumer<std::shared_ptr<Event>>> cons,
+                                              std::shared_ptr<Event> val) {
+  co_await cons->consume(tpe, std::move(val));
+  co_return;
+}
+
 inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
                                           std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Consumer<std::shared_ptr<Event>>> consumer,
@@ -73,21 +82,22 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
   throw_if_empty(consumer, TraceException::kConsumerIsNull, source_loc::current());
 
   std::optional<std::shared_ptr<Event>> opt_val;
-  auto task = [](std::shared_ptr<concurrencpp::executor> tpe,
-                 std::shared_ptr<Consumer<std::shared_ptr<Event>>> cons,
-                 std::shared_ptr<Event> val)
-      -> concurrencpp::result<void> {
-    co_return co_await cons->consume(tpe, std::move(val));
-  };
-
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     src_chan->PokeAwaiters();
     std::shared_ptr<Event> value = std::move(*opt_val);
     spdlog::trace("consumer consume next event");
-    co_await co_await tpe->submit(task, tpe, consumer, std::move(value));
+    co_await ConsumeTask({}, tpe, consumer, std::move(value));
   }
 
   co_return;
+}
+
+inline concurrencpp::result<bool> HandelTask(concurrencpp::executor_tag,
+                                             std::shared_ptr<concurrencpp::executor> tpe,
+                                             std::shared_ptr<Handler<std::shared_ptr<Event>>> hand,
+                                             std::shared_ptr<Event> value) {
+  const bool res = co_await hand->handel(tpe, value);
+  co_return res;
 }
 
 inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
@@ -101,19 +111,12 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
   throw_if_empty(handler, TraceException::kHandlerIsNull, source_loc::current());
 
   std::optional<std::shared_ptr<Event>> opt_val;
-  auto task = [](std::shared_ptr<concurrencpp::executor> tpe,
-                 std::shared_ptr<Handler<std::shared_ptr<Event>>> hand,
-                 std::shared_ptr<Event> value)
-      -> concurrencpp::result<bool> {
-    co_return co_await hand->handel(tpe, value);
-  };
-
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     src_chan->PokeAwaiters();
     std::shared_ptr<Event> value = std::move(*opt_val);
 
     spdlog::trace("handler handel next event");
-    const bool pass_on = co_await co_await tpe->submit(task, tpe, handler, value);
+    const bool pass_on = co_await HandelTask({}, tpe, handler, value);
 
     if (pass_on) {
       spdlog::trace("handler pass on next event");

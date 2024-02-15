@@ -535,7 +535,6 @@ class CoroChannelSink : public CoroChannel<ValueType> {
   }
 };
 
-// TODO: Make Buffer size no template parameter
 template<typename ValueType>
 class CoroBoundedChannel : public CoroChannel<ValueType> {
 
@@ -567,7 +566,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   }
 
  public:
-  explicit CoroBoundedChannel(size_t capacity = 10'000) : CoroChannel<ValueType>(), capacity_(capacity) {
+  explicit CoroBoundedChannel(size_t capacity = 1) : CoroChannel<ValueType>(), capacity_(capacity) {
     buffer_.reserve(capacity_);
   };
 

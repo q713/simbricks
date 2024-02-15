@@ -89,6 +89,14 @@ class Pipeline {
 };
 
 template<typename ValueType>
+inline concurrencpp::result<std::optional<ValueType>>
+ProduceTask(concurrencpp::executor_tag,
+            std::shared_ptr<concurrencpp::executor> tpe,
+            std::shared_ptr<Producer<ValueType>> prod) {
+  co_return co_await prod->produce(tpe);
+}
+
+template<typename ValueType>
 inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
                                           std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Producer<ValueType>> producer,
@@ -98,14 +106,8 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
   throw_if_empty(producer, TraceException::kProducerIsNull, source_loc::current());
 
   std::optional<ValueType> value;
-  auto task = [](std::shared_ptr<concurrencpp::executor> tpe,
-                 std::shared_ptr<Producer<ValueType>> prod)
-      -> concurrencpp::result<std::optional<ValueType>> {
-    co_return co_await prod->produce(tpe);
-  };
-
   do {
-    value = co_await co_await tpe->submit(task, tpe, producer);
+    value = co_await ProduceTask<ValueType>({}, tpe, producer);
     if (not value.has_value()) {
       break;
     }
@@ -122,6 +124,15 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
 }
 
 template<typename ValueType>
+inline concurrencpp::result<void> ConsumeTask(concurrencpp::executor_tag,
+                                              std::shared_ptr<concurrencpp::executor> tpe,
+                                              std::shared_ptr<Consumer<ValueType>> cons,
+                                              ValueType val) {
+  co_await cons->consume(tpe, val);
+  co_return;
+}
+
+template<typename ValueType>
 inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
                                           std::shared_ptr<concurrencpp::executor> tpe,
                                           std::shared_ptr<Consumer<ValueType>> consumer,
@@ -131,23 +142,23 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
   throw_if_empty(consumer, TraceException::kConsumerIsNull, source_loc::current());
 
   std::optional<ValueType> opt_val;
-  auto task = [](std::shared_ptr<concurrencpp::executor> tpe,
-                 std::shared_ptr<Consumer<ValueType>> cons,
-                 ValueType val)
-      -> concurrencpp::result<void> {
-    co_return co_await cons->consume(tpe, std::move(val));
-  };
-
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     src_chan->PokeAwaiters();
     ValueType value = *opt_val;
     spdlog::trace("consumer consume next event");
-    co_await co_await tpe->submit(task, tpe, consumer, value);
+    co_await ConsumeTask<ValueType>({}, tpe, consumer, value);
   }
 
   co_return;
+}
 
-  co_return;
+template<typename ValueType>
+inline concurrencpp::result<bool> HandelTask(concurrencpp::executor_tag,
+                                             std::shared_ptr<concurrencpp::executor> tpe,
+                                             std::shared_ptr<Handler<ValueType>> hand,
+                                             ValueType &value) {
+  const bool res = co_await hand->handel(tpe, value);
+  co_return res;
 }
 
 template<typename ValueType>
@@ -162,19 +173,12 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
   throw_if_empty(handler, TraceException::kHandlerIsNull, source_loc::current());
 
   std::optional<ValueType> opt_val;
-  auto task = [](std::shared_ptr<concurrencpp::executor> tpe,
-                 std::shared_ptr<Handler<ValueType>> hand,
-                 ValueType *value)
-      -> concurrencpp::result<bool> {
-    co_return co_await hand->handel(tpe, *value);
-  };
-
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
     src_chan->PokeAwaiters();
     ValueType value = *opt_val;
 
     spdlog::trace("handler handel next event");
-    const bool pass_on = co_await co_await tpe->submit(task, tpe, handler, &value);
+    const bool pass_on = co_await HandelTask<ValueType>({}, tpe, handler, value);
 
     if (pass_on) {
       spdlog::trace("handler pass on next event");

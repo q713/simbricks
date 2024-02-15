@@ -40,6 +40,14 @@ else()
     add_compile_options(-O3)
 endif()
 
+option(NATIVE "set -march=native compiler flag for generating processor family specific code for better performance" OFF)
+if(NATIVE)
+    message(STATUS "ENABLED -march=native")
+    add_compile_options(-march=native)
+else()
+    message(STATUS "DISABLED -march=native")
+endif()
+
 #######################################
 # Required C standard
 #######################################

@@ -508,7 +508,7 @@ int main(int argc, char *argv[]) {
     auto timestamp_filter_ns3 = create_shared<EventTimestampFilter>(TraceException::kActorIsNull,
                                                                     trace_environment,
                                                                     timestamp_bounds);
-    auto ns3_parser = create_shared<NS3Parser>("parser null", trace_environment, "NicbmClientParser");
+    auto ns3_parser = create_shared<NS3Parser>("parser null", trace_environment, "NS3Parser");
     auto ns3_buf_pro = create_shared<BufferedEventProvider<kNamedPipes, kLineBufferSizePages>>(
         TraceException::kBufferedEventProviderIsNull,
         trace_environment,

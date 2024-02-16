@@ -60,7 +60,7 @@ concurrencpp::result<void> HostSpanner::FinishPendingSpan(
       context_opt.has_value();
       context_opt =
           co_await from_nic_receives_queue_->TryPopOnTrue(resume_executor, did_arrive_before_receive_syscall)) {
-    from_nic_receives_queue_->PokeAwaiters();
+//    from_nic_receives_queue_->PokeAwaiters();
     spdlog::info("{} host polled copy contexts nic receive", name_);
     context = *context_opt;
 

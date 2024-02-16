@@ -87,6 +87,7 @@ class TraceEnvironment {
   using ThreadExecutor = concurrencpp::thread_executor;
   using PoolExecutorPtr = std::shared_ptr<PoolExecutor>;
   using ThreadExecutorPtr = std::shared_ptr<ThreadExecutor>;
+  using WorkerThreadExecutorPtr = std::shared_ptr<concurrencpp::worker_thread_executor>;
 
   const std::string *GetCallFunc(const std::shared_ptr<Event> &event_ptr);
 
@@ -119,6 +120,13 @@ class TraceEnvironment {
   ThreadExecutorPtr GetThreadExecutor() {
     const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
     auto executor = runtime_.thread_executor();
+    throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
+    return executor;
+  }
+
+  WorkerThreadExecutorPtr GetWorkerThreadExecutor() {
+    const std::shared_lock reader_lock(trace_env_reader_writer_mutex_);
+    auto executor = runtime_.make_worker_thread_executor();
     throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
     return executor;
   }

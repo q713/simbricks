@@ -113,7 +113,7 @@ struct Spanner : public Consumer<std::shared_ptr<Event>> {
     auto con_opt = co_await from->Pop(resume_executor);
     const auto con = OrElseThrow(con_opt, TraceException::kContextIsNull, source_loc::current());
     throw_if_empty(con, TraceException::kContextIsNull, source_loc::current());
-    from->PokeAwaiters();
+//    from->PokeAwaiters();
     co_return con;
   }
 
@@ -128,7 +128,7 @@ struct Spanner : public Consumer<std::shared_ptr<Event>> {
     throw_on_false(could_push,
                    TraceException::kCouldNotPushToContextQueue,
                    source_loc::current());
-    to->PokeAwaiters();
+//    to->PokeAwaiters();
     co_return;
   }
 };

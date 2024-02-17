@@ -479,29 +479,29 @@ class CoroChannel {
     channel_cv_.notify_all();
   }
 
-  virtual concurrencpp::result<bool> Push(
+  virtual concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
     co_return false;
   };
 
-  virtual concurrencpp::result<bool> TryPush(
+  virtual concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
     co_return false;
   }
 
-  virtual concurrencpp::result<std::optional<ValueType>> Pop(
+  virtual concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     co_return std::nullopt;
   }
 
-  virtual concurrencpp::result<std::optional<ValueType>> TryPop(
+  virtual concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) {
     co_return std::nullopt;
   }
 
-  virtual concurrencpp::result<std::optional<ValueType>> TryPopOnTrue(
+  virtual concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::function<bool(ValueType &)> &predicate) {
     co_return std::nullopt;
@@ -522,13 +522,13 @@ class CoroChannelSink : public CoroChannel<ValueType> {
 
   CoroChannelSink<ValueType> &operator=(CoroChannelSink<ValueType> &&) noexcept = delete;
 
-  concurrencpp::result<bool> Push(
+  concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
     co_return true;
   };
 
-  concurrencpp::result<bool> TryPush(
+  concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) {
     co_return true;
@@ -606,7 +606,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   }
 
   // returns false if channel is closed or poisoned
-  concurrencpp::result<bool> Push(
+  concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -634,7 +634,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::result<bool> TryPush(
+  concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -660,7 +660,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   }
 
   // returns empty optional in case channel is poisened or empty
-  concurrencpp::result<std::optional<ValueType>> Pop(
+  concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            TraceException::kResumeExecutorNull,
@@ -694,7 +694,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     co_return result;
   }
 
-  concurrencpp::result<std::optional<ValueType>> TryPop(
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
 
@@ -721,7 +721,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
     co_return result;
   }
 
-  concurrencpp::result<std::optional<ValueType>> TryPopOnTrue(
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::function<bool(ValueType &)> &predicate) override {
     throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
@@ -788,7 +788,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::result<bool> Push(
+  concurrencpp::lazy_result<bool> Push(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -814,7 +814,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
   }
 
   // returns false if channel is closed or poisened
-  concurrencpp::result<bool> TryPush(
+  concurrencpp::lazy_result<bool> TryPush(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       ValueType value) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
@@ -825,7 +825,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
   }
 
   // returns empty optional in case channel is poisened or empty
-  concurrencpp::result<std::optional<ValueType>> Pop(
+  concurrencpp::lazy_result<std::optional<ValueType>> Pop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty<concurrencpp::executor>(resume_executor,
                                            TraceException::kResumeExecutorNull,
@@ -861,7 +861,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
     co_return result;
   }
 
-  concurrencpp::result<std::optional<ValueType>> TryPop(
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPop(
       std::shared_ptr<concurrencpp::executor> resume_executor) override {
     throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());
 
@@ -884,7 +884,7 @@ class CoroUnBoundedChannel : public CoroChannel<ValueType> {
     co_return result;
   }
 
-  concurrencpp::result<std::optional<ValueType>> TryPopOnTrue(
+  concurrencpp::lazy_result<std::optional<ValueType>> TryPopOnTrue(
       std::shared_ptr<concurrencpp::executor> resume_executor,
       std::function<bool(ValueType &)> &predicate) override {
     throw_if_empty(resume_executor, TraceException::kResumeExecutorNull, source_loc::current());

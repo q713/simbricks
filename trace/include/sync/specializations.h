@@ -27,6 +27,7 @@
 #include "channel.h"
 #include "corobelt.h"
 #include "events/events.h"
+#include "env/traceEnvironment.h"
 
 #ifndef SIMBRICKS_TRACE_CORO_SYNC_SPECIALIZATIONS_H_
 #define SIMBRICKS_TRACE_CORO_SYNC_SPECIALIZATIONS_H_
@@ -212,12 +213,42 @@ inline concurrencpp::result<void> RunPipelinesImpl<std::shared_ptr<Event>>(std::
   co_return;
 }
 
+inline concurrencpp::result<void> RunPipelinesImpl(TraceEnvironment &trace_env,
+                                                   std::shared_ptr<std::vector<std::shared_ptr<
+                                                       Pipeline<std::shared_ptr<Event>>>>> pipelines) {
+  throw_if_empty(pipelines, "vector is null", source_loc::current());
+
+  std::vector<concurrencpp::result<void>> tasks(pipelines->size());
+  for (int index = 0; index < pipelines->size(); index++) {
+    std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline = (*pipelines)[index];
+    throw_if_empty(pipeline, TraceException::kPipelineNull, source_loc::current());
+
+    tasks[index] = RunPipelineParallelImpl<std::shared_ptr<Event>>({}, trace_env.GetWorkerThreadExecutor(), pipeline);
+  }
+
+  // wait for all tasks to finish
+  auto waiter_pool = trace_env.GetThreadExecutor();
+  auto all_done = co_await concurrencpp::when_all(waiter_pool, tasks.begin(), tasks.end());
+  for (auto &done : all_done) {
+    co_await done;
+  }
+  co_return;
+}
+
 template<>
 inline void RunPipelines<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::executor> tpe,
                                                  std::shared_ptr<std::vector<std::shared_ptr<Pipeline<std::shared_ptr<
                                                      Event>>>>> pipelines) {
   spdlog::info("start a pipeline");
   RunPipelinesImpl<std::shared_ptr<Event>>(std::move(tpe), std::move(pipelines)).get();
+  spdlog::info("finished a pipeline");
+}
+
+inline void RunPipelines(TraceEnvironment &trace_env,
+                         std::shared_ptr<std::vector<std::shared_ptr<Pipeline<std::shared_ptr<
+                             Event>>>>> pipelines) {
+  spdlog::info("start a pipeline");
+  RunPipelinesImpl(trace_env, std::move(pipelines)).get();
   spdlog::info("finished a pipeline");
 }
 

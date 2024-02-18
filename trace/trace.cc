@@ -330,7 +330,9 @@ int main(int argc, char *argv[]) {
       pipelines->emplace_back(pl_n_s);
       pipelines->emplace_back(pipeline_def_ns3);
       spdlog::info("START TRACING PIPELINE FROM PREPROCESSED EVENT STREAM");
-      RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
+//      RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
+      RunPipelines(trace_environment, pipelines);
+//      RunPipelines<std::shared_ptr<Event>>(trace_environment.GetThreadExecutor(), pipelines);
       spdlog::info("FINISHED PIPELINE");
       exit(EXIT_SUCCESS);
     }
@@ -544,7 +546,9 @@ int main(int argc, char *argv[]) {
     pipelines->emplace_back(server_nic_pipeline);
     pipelines->emplace_back(ns3_pipeline);
     spdlog::info("START TRACING PIPELINE FROM RAW SIMULATOR OUTPUT");
-    RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
+//    RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
+    RunPipelines(trace_environment, pipelines);
+//    RunPipelines<std::shared_ptr<Event>>(trace_environment.GetThreadExecutor(), pipelines);
     tracer.FinishExport();
     spdlog::info("FINISHED PIPELINE");
 

@@ -174,6 +174,45 @@ inline concurrencpp::result<void> RunPipelineImpl<std::shared_ptr<Event>>(std::s
   co_return;
 }
 
+inline concurrencpp::result<void> RunPipelineImpl(TraceEnvironment &trace_env,
+                                                  std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline) {
+  throw_if_empty(pipeline, TraceException::kPipelineNull, source_loc::current());
+
+  const size_t amount_channels = pipeline->handler_->size() + 1;
+  std::vector<std::shared_ptr<CoroBoundedChannel<std::shared_ptr<Event>>>> channels{amount_channels};
+  std::vector<concurrencpp::result<void>> tasks{amount_channels + 1};
+
+  // start producer
+  channels[0] = create_shared<CoroBoundedChannel<std::shared_ptr<Event>>>(TraceException::kChannelIsNull);
+  throw_if_empty(pipeline->prod_, TraceException::kProducerIsNull, source_loc::current());
+  tasks[0] = Produce({}, trace_env.GetWorkerThreadExecutor(), pipeline->prod_, channels[0]);
+  // start handler
+  for (int index = 0; index < pipeline->handler_->size(); index++) {
+    auto &handl = *(pipeline->handler_);
+    auto &handler = handl[index];
+    throw_if_empty(handler, TraceException::kHandlerIsNull, source_loc::current());
+
+    channels[index + 1] = create_shared<CoroBoundedChannel<std::shared_ptr<Event>>>(TraceException::kChannelIsNull);
+
+    tasks[index + 1] = Handel({}, trace_env.GetWorkerThreadExecutor(), handler, channels[index], channels[index + 1]);
+  }
+  // start consumer
+  throw_if_empty(pipeline->cons_, TraceException::kConsumerIsNull, source_loc::current());
+  tasks[amount_channels] =
+      Consume({}, trace_env.GetWorkerThreadExecutor(), pipeline->cons_, channels[amount_channels - 1]);
+
+  // wait for all tasks to finish
+  // NOTE: DO NOT USE concurrencpp::when_all(...) here, is
+  // important to wait here in order and to close the channels in order
+  for (int index = 0; index < amount_channels; index++) {
+    co_await tasks[index];
+    co_await channels[index]->CloseChannel(trace_env.GetPoolExecutor());
+  }
+  co_await tasks[amount_channels];
+
+  co_return;
+}
+
 template<>
 inline void RunPipeline<std::shared_ptr<Event>>(std::shared_ptr<concurrencpp::executor> tpe,
                                                 std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline) {
@@ -188,6 +227,13 @@ inline concurrencpp::result<void> RunPipelineParallelImpl<std::shared_ptr<Event>
                                                                                   std::shared_ptr<Pipeline<std::shared_ptr<
                                                                                       Event>>> pipeline) {
   co_await RunPipelineImpl<std::shared_ptr<Event>>(tpe, pipeline);
+}
+
+inline concurrencpp::result<void> RunPipelineParallelImpl(concurrencpp::executor_tag,
+                                                          std::shared_ptr<concurrencpp::executor> tpe,
+                                                          std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline,
+                                                          TraceEnvironment &trace_env) {
+  co_await RunPipelineImpl(trace_env, pipeline);
 }
 
 template<>
@@ -223,7 +269,7 @@ inline concurrencpp::result<void> RunPipelinesImpl(TraceEnvironment &trace_env,
     std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline = (*pipelines)[index];
     throw_if_empty(pipeline, TraceException::kPipelineNull, source_loc::current());
 
-    tasks[index] = RunPipelineParallelImpl<std::shared_ptr<Event>>({}, trace_env.GetWorkerThreadExecutor(), pipeline);
+    tasks[index] = RunPipelineParallelImpl({}, trace_env.GetWorkerThreadExecutor(), pipeline, trace_env);
   }
 
   // wait for all tasks to finish

@@ -23,13 +23,13 @@
 #
 
 MaxBackgroundThreads: 1
-MaxCpuThreads: 5
+MaxCpuThreads: 1
 JaegerUrl: "http://otel_collector:14278/v1/traces"
 #JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
-EventBufferSize: 100000000
-LogLevel: "info"
+EventBufferSize: 1000
+LogLevel: "warning"
 TypesToFilter:
   - "kHostInstrT"
   - "kSimProcInEventT"
@@ -211,3 +211,4 @@ BlacklistFunctions:
   - "rcu_read_unlock_strict"
   - "ext4_get_group_number"
   - "ext4_inode_table"
+  - "kernel_get_mempolicy"

@@ -55,6 +55,9 @@ class LazyTtLMap {
 
     auto iter = map_storage_.find(key);
     if (iter != map_storage_.end()) {
+      assert(map_expiration_times_.contains(key));
+      const uint64_t now = GetNow();
+      map_expiration_times_.find(key)->second = now;
       return iter->second;
     }
     return std::nullopt;
@@ -75,9 +78,13 @@ class LazyTtLMap {
       }
 
       KeyType key = oldest.second;
-      map_storage_.erase(key);
       timer_queue_.pop();
-      std::cout << "TTL Map removed something!" << std::endl;
+      auto iter = map_expiration_times_.find(key);
+      if (iter != map_expiration_times_.end() and iter->second + kTTL_.count() < now) {
+        continue;
+      }
+      map_storage_.erase(key);
+      map_expiration_times_.erase(key);
     }
   }
 
@@ -88,6 +95,7 @@ class LazyTtLMap {
   }
 
   std::unordered_map<KeyType, ValueType> map_storage_;
+  std::unordered_map<KeyType, uint64_t> map_expiration_times_;
   std::queue<std::pair<uint64_t, KeyType>> timer_queue_;
 };
 

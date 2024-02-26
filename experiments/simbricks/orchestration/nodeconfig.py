@@ -646,9 +646,9 @@ echo "server {self.server_ip} iburst " >> /etc/chrony.conf
 echo "makestep 1 -1" >> /etc/chrony.conf
 
 echo "sleep 2" >> query.sh
-echo "for i in {{0..100}}" >> query.sh
+echo "for i in {{0..10}}" >> query.sh
 echo "do" >> query.sh
-echo "    sleep 2" >> query.sh
+echo "    sleep 8" >> query.sh
 echo "    chronyc -n tracking" >> query.sh
 echo "    chronyc -n sources" >> query.sh
 echo "    chronyc -n sourcestats" >> query.sh

@@ -82,7 +82,7 @@ trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 #trace_file_path = f'{named_pipe_folder}/ns3-log-pipe-raw-log.txt'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 mtu_opt = f'--Mtu=1500'
-ns3_hosts_opt = '--NumNs3HostPairs=4'
+ns3_hosts_opt = '--NumNs3HostPairs=2'
 network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
 #network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt}'
 network.eth_latency = eth_latency_ns
@@ -165,7 +165,3 @@ clients[0].node_config.app.is_last = True
 clients[0].wait = True
 
 experiments = [e]
-
-#/local/jakobg/simbricks-fork/sims/external/qemu/build/x86_64-softmmu/qemu-system-x86_64 -machine q35,accel=kvm:tcg -serial mon:stdio -cpu Skylake-Server -display none -nic none -kernel /local/jakobg/simbricks-fork/images/bzImage -drive file=/local/jakobg/tracing-experiments/wrkdir/simple-ntp-exp/1/hdcopy.client.1,if=ide,index=0,media=disk -drive file=/local/jakobg/tracing-experiments/wrkdir/simple-ntp-exp/1/cfg.client.1.tar,if=ide,index=1,media=disk,driver=raw -append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 init=/home/ubuntu/guestinit.sh rw" -m 8192 -smp 1 -device simbricks-pci,socket=/local/jakobg/tracing-experiments/wrkdir/simple-ntp-exp/1/dev.pci.client.1.,sync=off
-#/local/jakobg/simbricks-fork/sims/external/qemu/build/x86_64-softmmu/qemu-system-x86_64 -machine q35,accel=kvm:tcg -serial mon:stdio -cpu Skylake-Server -display none -nic none -kernel /local/jakobg/simbricks-fork/images/bzImage -drive format=raw,file=/local/jakobg/simbricks-fork/images/output-base/base-client.raw -append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 init=/sbin/init rw" -m 8192 -smp 1
-#/local/jakobg/simbricks-fork/sims/external/qemu/build/x86_64-softmmu/qemu-system-x86_64 -machine q35,accel=kvm:tcg -serial mon:stdio -cpu Skylake-Server -display none -nic none -kernel /local/jakobg/simbricks-fork/images/bzImage -drive file=/local/jakobg/simbricks-fork/images/output-base/base-client.raw,if=ide,index=1,media=disk,driver=raw -append "earlyprintk=ttyS0 console=ttyS0 root=/dev/sda1 init=/sbin/init rw" -m 8192 -smp 1

@@ -136,14 +136,14 @@ int main(int argc, char *argv[]) {
 
   spdlog::set_level(trace_env_config.GetLogLevel());
 
-//  auto exporter = create_shared<simbricks::trace::OtlpSpanExporter>(
-//      TraceException::kSpanExporterNull,
-//      trace_environment,
-//      trace_env_config.GetJaegerUrl(),
-//      false,
-//      "trace");
-  auto exporter = create_shared<simbricks::trace::NoOpExporter>(
-      TraceException::kSpanExporterNull, trace_environment);
+  auto exporter = create_shared<simbricks::trace::OtlpSpanExporter>(
+      TraceException::kSpanExporterNull,
+      trace_environment,
+      trace_env_config.GetJaegerUrl(),
+      false,
+      "trace");
+  // auto exporter = create_shared<simbricks::trace::NoOpExporter>(
+  //     TraceException::kSpanExporterNull, trace_environment);
 
   Tracer tracer{trace_environment, std::move(exporter)};
 

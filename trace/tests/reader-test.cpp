@@ -187,7 +187,7 @@ TEST_CASE("Test Reader-Handler", "[ReaderBuffer-LineHandler]") {
 #endif
 
 TEST_CASE("Test CLineReader", "[CLineReader]") {
-
+  spdlog::set_level(spdlog::level::trace);
   auto concurren_options = concurrencpp::runtime_options();
   concurren_options.max_background_threads = 1;
   concurren_options.max_cpu_threads = 1;

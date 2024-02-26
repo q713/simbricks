@@ -200,7 +200,7 @@ ResetFillBufferTask(//concurrencpp::executor_tag,
     throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
 //    event_buffer_channel->PokeAwaiters();
     co_await event_buffer_channel->Push(executor, std::move(event));
-//    event_buffer_channel->PokeAwaiters();
+    event_buffer_channel->PokeAwaiters();
   }
 
   co_await event_buffer_channel->CloseChannel(executor);
@@ -218,6 +218,7 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
   concurrencpp::result<void> fill_buffer_task_;
   bool started_fill_task_ = false;
   std::shared_ptr<CoroBoundedChannel<std::shared_ptr<Event>>> event_buffer_channel_;
+  ReaderBuffer<MultiplePagesBytes(LineBufferSizePages)> line_handler_buffer_;
 
  public:
   explicit BufferedEventProvider(TraceEnvironment &trace_environment,
@@ -229,7 +230,8 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
         name_(name),
         log_file_path_(log_file_path),
         log_parser_(std::move(log_parser)),
-        background_exec_(trace_environment_.GetBackgroundPoolExecutor()) {
+        background_exec_(trace_environment_.GetBackgroundPoolExecutor()),
+        line_handler_buffer_(name) {
     event_buffer_channel_ = create_shared<CoroBoundedChannel<std::shared_ptr<Event>>>(
         TraceException::kChannelIsNull,
         trace_environment_.GetConfig().GetEventBufferSize());
@@ -252,9 +254,37 @@ class BufferedEventProvider : public Producer<std::shared_ptr<Event>> {
     }
 
     std::optional<std::shared_ptr<Event>> event = co_await event_buffer_channel_->Pop(executor);
-//    event_buffer_channel_->PokeAwaiters();
+    event_buffer_channel_->PokeAwaiters();
     co_return event;
   }
+
+//  concurrencpp::result<std::optional<std::shared_ptr<Event>>>
+//  produce(std::shared_ptr<concurrencpp::executor> executor) override {
+//
+//    if (not line_handler_buffer_.IsOpen()) {
+//      line_handler_buffer_.OpenFile(log_file_path_, NamedPipe);
+//    }
+//
+//    std::pair<bool, LineHandler *> bh_p;
+//    for (bh_p = line_handler_buffer_.NextHandler();
+//         bh_p.first and bh_p.second;
+//         bh_p = line_handler_buffer_.NextHandler()) {
+//
+//      LineHandler &line_handler = *bh_p.second;
+//      spdlog::trace("{} found another line: '{}'", name_, line_handler.GetRawLine());
+//      std::shared_ptr<Event> event = co_await log_parser_->ParseEvent(line_handler);
+//      if (event == nullptr) {
+//        spdlog::trace("{} was unable to parse event", name_);
+//        continue;
+//      }
+//      spdlog::trace("{} parsed another event: {}", name_, *event);
+//
+//      throw_if_empty(event, TraceException::kEventIsNull, source_loc::current());
+//      co_return event;
+//    }
+//
+//    co_return std::nullopt;
+//  }
 };
 
 #endif  // SIMBRICKS_TRACE_PARSER_H_

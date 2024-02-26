@@ -30,21 +30,18 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <cstdio>
 #include <utility>
 #include <fcntl.h>
 
 #ifndef SIMBRICKS_TRACE_CREADER_H_
 #define SIMBRICKS_TRACE_CREADER_H_
 
-//class CLineHandler {
 class LineHandler {
   char *buf_;
   size_t size_;
   size_t cur_reading_pos_ = 0;
 
  public:
-  //explicit CLineHandler(char *buf, size_t size) : buf_(buf), size_(size) {
   explicit LineHandler(char *buf, size_t size) : buf_(buf), size_(size) {
     Reset(buf, size_);
   };
@@ -132,10 +129,19 @@ class ReaderBuffer {
   int reached_eof_ = 2;
   LineHandler line_handler_{buffer_, 0};
 
-  [[nodiscard]] bool IsStreamStillGood() {
+  [[nodiscard]] inline bool IsStreamStillGood() const {
     int file_descriptor = open(cur_file_path_.c_str(), O_RDONLY | O_NONBLOCK);
     close(file_descriptor);
     return file_descriptor != -1;
+  }
+
+  [[nodiscard]] inline int GetValidFileDescriptorCurFile() const {
+    int fd = fileno(file_);
+    if (fd == -1) {
+      spdlog::warn("{}: invalid file descriptor from file handel, errno={}", name_, errno);
+      throw_just(source_loc::current(), "invalid file descriptor from file handel");
+    }
+    return fd;
   }
 
   void NextBlock() {
@@ -148,19 +154,48 @@ class ReaderBuffer {
       memmove(buffer_, buffer_ + cur_reading_pos_, size_ - cur_reading_pos_);
     }
 
-    size_t next_start = size_ - cur_reading_pos_;
-    size_t amount_to_read = BlockSize - next_start;
-    assert(next_start + amount_to_read <= BlockSize);
+    size_ = size_ - cur_reading_pos_;
+    size_t amount_to_read = BlockSize - size_;
+    assert(size_ + amount_to_read <= BlockSize);
 
-    size_t actually_read = std::fread(buffer_ + next_start, sizeof(buffer_[0]), amount_to_read, file_);
-    throw_on((actually_read == 0 and not std::feof(file_)) or std::ferror(file_),
-             "error reading next block",
-             source_loc::current());
+    spdlog::trace("{}: try to read the next block from file {}", name_, cur_file_path_);
 
-    size_ = next_start + actually_read;
-    assert(size_ <= BlockSize);
+    int fd = GetValidFileDescriptorCurFile();
+    int64_t actually_read;
+    int64_t write_offset;
+    do {
+      write_offset = size_;
+      spdlog::trace("{} try reading block of size {}", name_, amount_to_read);
+      actually_read = read(fd, buffer_ + write_offset, amount_to_read);
+      spdlog::trace("{} read block of size {}", name_, amount_to_read);
+      if (actually_read < 0) {
+        spdlog::warn("{}: reading returned with an error, errno={}", name_, errno);
+        throw_just(source_loc::current(), "file/pipe reading error occured");
+      }
+      size_ += actually_read;
+      amount_to_read -= actually_read;
+      cur_reading_pos_ = 0;
+      next_line_end_ = 0;
+    } while (FindLineEnd(0, size_) < 0 and amount_to_read > 0 and actually_read > 0);
+
+    spdlog::trace("{}: read the next block", name_);
     cur_reading_pos_ = 0;
     next_line_end_ = 0;
+    assert(size_ <= BlockSize);
+  }
+
+  int64_t FindLineEnd(int64_t start, size_t end) {
+    throw_on(start < 0, "invalid find end start", source_loc::current());
+    for (; start < end; start++) {
+      if (buffer_[start] == kLineEnd) {
+        if (start == cur_reading_pos_) {
+          ++cur_reading_pos_;
+          continue;
+        }
+        return start;
+      }
+    }
+    return -1;
   }
 
   void CalculateNextLineEnd() {
@@ -168,25 +203,14 @@ class ReaderBuffer {
       return;
     }
 
-    bool found_end = false;
-    size_t tmp = cur_reading_pos_;
-    for (; tmp < size_; tmp++) {
-      if (buffer_[tmp] == kLineEnd) {
-        if (tmp == cur_reading_pos_) {
-          ++cur_reading_pos_;
-          continue;
-        }
-        found_end = true;
-        break;
-      }
-    }
-
-    if (found_end) {
+    int64_t tmp = FindLineEnd(cur_reading_pos_, size_);
+    if (tmp > 0) {
       next_line_end_ = tmp;
     } else {
       if (std::feof(file_)) {
         next_line_end_ = size_;
         ++reached_eof_;
+        spdlog::trace("{} found feof", name_);
         return;
       }
       next_line_end_ = 0;
@@ -202,7 +226,7 @@ class ReaderBuffer {
         and cur_reading_pos_ < next_line_end_;
   }
 
-  void Close() {
+  inline void Close() {
     if (file_) {
       fclose(file_);
       file_ = nullptr;
@@ -218,7 +242,7 @@ class ReaderBuffer {
     Close();
   }
 
-  [[nodiscard]] bool IsOpen() {
+  [[nodiscard]] inline bool IsOpen() const {
     return file_ != nullptr and IsStreamStillGood();
   }
 
@@ -234,16 +258,17 @@ class ReaderBuffer {
       return true;
     }
     if (not IsStreamStillGood()) {
+      spdlog::trace("{}: input stream is no longer good!", name_);
       return false;
     }
     NextBlock();
-    next_line_end_ = 0;
 
     return HasStillLineEnd();
   }
 
   std::pair<bool, LineHandler *> NextHandler() {
     if (not HasStillLine()) {
+      spdlog::trace("{}: no line is left", name_);
       return {false, nullptr};
     }
 
@@ -269,11 +294,14 @@ class ReaderBuffer {
     reached_eof_ = 0;
 
     if (is_named_pipe) {
-      const int file_descriptor = fileno(file_);
-      throw_on(file_descriptor == -1, "ReaderBuffer: could not obtain fd", source_loc::current());
+      const int file_descriptor = GetValidFileDescriptorCurFile();
       const int suc = fcntl(file_descriptor, F_SETPIPE_SZ, BlockSize);
       if (suc != BlockSize) {
-        spdlog::warn("ReaderBuffer: could not change '{}' size to {}, returned size is {} {}", file_path, BlockSize, suc, errno);
+        spdlog::warn("ReaderBuffer: could not change '{}' size to {}, returned size is {} {}",
+                     file_path,
+                     BlockSize,
+                     suc,
+                     errno);
       } else {
         spdlog::debug("ReaderBuffer: changed size successfully");
       }

@@ -55,7 +55,7 @@ inline concurrencpp::result<void> Produce(concurrencpp::executor_tag,
       break;
     }
     const bool could_push = co_await tar_chan->Push(tpe, std::move(*value));
-//    tar_chan->PokeAwaiters();
+    tar_chan->PokeAwaiters();
     throw_on(not could_push,
              "unable to push next event to target channel",
              source_loc::current());
@@ -84,7 +84,7 @@ inline concurrencpp::result<void> Consume(concurrencpp::executor_tag,
 
   std::optional<std::shared_ptr<Event>> opt_val;
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
-//    src_chan->PokeAwaiters();
+    src_chan->PokeAwaiters();
     std::shared_ptr<Event> value = std::move(*opt_val);
     spdlog::trace("consumer consume next event");
     co_await ConsumeTask({}, tpe, consumer, std::move(value));
@@ -113,7 +113,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
 
   std::optional<std::shared_ptr<Event>> opt_val;
   for (opt_val = co_await src_chan->Pop(tpe); opt_val.has_value(); opt_val = co_await src_chan->Pop(tpe)) {
-//    src_chan->PokeAwaiters();
+    src_chan->PokeAwaiters();
     std::shared_ptr<Event> value = std::move(*opt_val);
 
     spdlog::trace("handler handel next event");
@@ -122,7 +122,7 @@ inline concurrencpp::result<void> Handel(concurrencpp::executor_tag,
     if (pass_on) {
       spdlog::trace("handler pass on next event");
       const bool could_push = co_await tar_chan->Push(tpe, std::move(value));
-//      tar_chan->PokeAwaiters();
+      tar_chan->PokeAwaiters();
       throw_on(not could_push,
                "unable to push next event to target channel",
                source_loc::current());
@@ -174,7 +174,8 @@ inline concurrencpp::result<void> RunPipelineImpl<std::shared_ptr<Event>>(std::s
   co_return;
 }
 
-inline concurrencpp::result<void> RunPipelineImpl(TraceEnvironment &trace_env,
+inline concurrencpp::result<void> RunPipelineImpl(std::shared_ptr<concurrencpp::executor> executor,
+                                                  TraceEnvironment &trace_env,
                                                   std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline) {
   throw_if_empty(pipeline, TraceException::kPipelineNull, source_loc::current());
 
@@ -206,7 +207,7 @@ inline concurrencpp::result<void> RunPipelineImpl(TraceEnvironment &trace_env,
   // important to wait here in order and to close the channels in order
   for (int index = 0; index < amount_channels; index++) {
     co_await tasks[index];
-    co_await channels[index]->CloseChannel(trace_env.GetPoolExecutor());
+    co_await channels[index]->CloseChannel(executor);
   }
   co_await tasks[amount_channels];
 
@@ -233,7 +234,7 @@ inline concurrencpp::result<void> RunPipelineParallelImpl(concurrencpp::executor
                                                           std::shared_ptr<concurrencpp::executor> tpe,
                                                           std::shared_ptr<Pipeline<std::shared_ptr<Event>>> pipeline,
                                                           TraceEnvironment &trace_env) {
-  co_await RunPipelineImpl(trace_env, pipeline);
+  co_await RunPipelineImpl(tpe, trace_env, pipeline);
 }
 
 template<>
@@ -273,7 +274,7 @@ inline concurrencpp::result<void> RunPipelinesImpl(TraceEnvironment &trace_env,
   }
 
   // wait for all tasks to finish
-  auto waiter_pool = trace_env.GetThreadExecutor();
+  auto waiter_pool = trace_env.GetWorkerThreadExecutor();
   auto all_done = co_await concurrencpp::when_all(waiter_pool, tasks.begin(), tasks.end());
   for (auto &done : all_done) {
     co_await done;

@@ -270,4 +270,3 @@ bool LineHandler::ParseBoolFromInt(bool &target) {
   target = value != 0;
   return true;
 }
-

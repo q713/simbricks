@@ -26,9 +26,12 @@
 #include <iostream>
 #include <memory>
 #include <queue>
+#include <charconv>
+#include <sys/stat.h>
 
 #include "sync/corobelt.h"
 #include "util/exception.h"
+#include "reader/cReader.h"
 
 class ProducerInt : public Producer<int> {
   int start = 0;
@@ -52,6 +55,32 @@ class ProducerInt : public Producer<int> {
     }
     start++;
     co_return res;
+  }
+};
+
+class IntProducerParser : public Producer<int> {
+  const std::string filepath_;
+  ReaderBuffer<MultiplePagesBytes(16)> line_handler_buffer{"test reader buffer"};
+
+ public:
+  explicit IntProducerParser(const std::string &filepath) : Producer<int>(), filepath_(filepath) {}
+
+  concurrencpp::result<std::optional<int>> produce(std::shared_ptr<concurrencpp::executor> executor) override {
+    if (not line_handler_buffer.IsOpen()) {
+      line_handler_buffer.OpenFile(filepath_, true);
+    }
+
+    std::pair<bool, LineHandler *> bh_p = line_handler_buffer.NextHandler();
+    if (bh_p.first) {
+      assert(bh_p.second != nullptr);
+      int result = 0;
+      bool res = bh_p.second->ParseInt(result);
+      if (res) {
+        co_return result;
+      }
+    }
+
+    co_return std::nullopt;
   }
 };
 
@@ -194,5 +223,43 @@ TEST_CASE("Test NEW pipeline wrapper construct", "[run_pipeline]") {
 //
 //    REQUIRE(cons->GetSum() == 0);
 //  }
+}
+
+TEST_CASE("test named pipe reading alongside pipeline", "[named-pipe]") {
+  auto concurren_options = concurrencpp::runtime_options();
+  concurren_options.max_background_threads = 0;
+  concurren_options.max_cpu_threads = 5;
+  const concurrencpp::runtime runtime{concurren_options};
+  const auto thread_pool_executor = runtime.thread_pool_executor();
+  spdlog::set_level(spdlog::level::debug);
+
+  const size_t amount = 1'000;
+  const size_t amount_adder = 100;
+  const std::string named_pipe_file = "/tmp/named_pipe";
+
+  mkfifo(named_pipe_file.data(), 0666);
+
+  std::function<void()> fillNamedPipe = [&]() {
+    sleep(15);
+    std::ofstream to{named_pipe_file};
+    for (size_t i = 0; i < amount; i++) {
+      to << i << std::endl;
+    }
+    return;
+  };
+
+  auto prod = std::make_shared<IntProducerParser>(named_pipe_file);
+  auto adders = std::make_shared<std::vector<std::shared_ptr<Handler<int>>>>(amount_adder);
+  for (size_t index = 0; index < amount_adder; index++) {
+    (*adders)[index] = std::make_shared<AdderInt>();
+  }
+  auto cons = std::make_shared<PrinterInt>(std::cout);
+  auto pipeline = std::make_shared<Pipeline<int>>(prod, adders, cons);
+
+  std::thread fill_buffer_job(fillNamedPipe);
+//  sleep(15);
+
+  RunPipeline<int>(thread_pool_executor, pipeline);
+  fill_buffer_job.join();
 }
 

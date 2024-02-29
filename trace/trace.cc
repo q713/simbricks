@@ -142,8 +142,8 @@ int main(int argc, char *argv[]) {
       trace_env_config.GetJaegerUrl(),
       false,
       "trace");
-  // auto exporter = create_shared<simbricks::trace::NoOpExporter>(
-  //     TraceException::kSpanExporterNull, trace_environment);
+//   auto exporter = create_shared<simbricks::trace::NoOpExporter>(
+//       TraceException::kSpanExporterNull, trace_environment);
 
   Tracer tracer{trace_environment, std::move(exporter)};
 
@@ -546,8 +546,8 @@ int main(int argc, char *argv[]) {
     pipelines->emplace_back(server_nic_pipeline);
     pipelines->emplace_back(ns3_pipeline);
     spdlog::info("START TRACING PIPELINE FROM RAW SIMULATOR OUTPUT");
-//    RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
-    RunPipelines(trace_environment, pipelines);
+    RunPipelines<std::shared_ptr<Event>>(trace_environment.GetPoolExecutor(), pipelines);
+//    RunPipelines(trace_environment, pipelines);
 //    RunPipelines<std::shared_ptr<Event>>(trace_environment.GetThreadExecutor(), pipelines);
     tracer.FinishExport();
     spdlog::info("FINISHED PIPELINE");

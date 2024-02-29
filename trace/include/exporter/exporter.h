@@ -166,9 +166,9 @@ class OtlpSpanExporter : public SpanExporter {
     // create exporter
     opentelemetry::exporter::otlp::OtlpHttpExporterOptions opts;
     opts.url = url_;
-    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
-        opts);
-//    auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
+//    auto exporter = opentelemetry::exporter::otlp::OtlpHttpExporterFactory::Create(
+//        opts);
+    auto exporter = opentelemetry::exporter::trace::OStreamSpanExporterFactory::Create();
     throw_if_empty(exporter, TraceException::kSpanExporterNull, source_loc::current());
 
     // create span processor

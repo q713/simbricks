@@ -110,9 +110,12 @@ services:
       - /bin/bash
       - -c
       - |
+        objdump --syms images/vmlinux > /usr/src/data-folder/vmlinux-image-syms.dump
+        objdump --syms images/kernel/linux-5.15.93/drivers/net/ethernet/intel/i40e/i40e.ko > /usr/src/data-folder/i40e-image-syms.dump
         make convert-images-raw 
         time python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/simple_ntp_exp.py
-        #time python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/trace-dumbbell.py
+
+      # time python3 experiments/run.py --verbose --force --cpdir /usr/src/data-folder --workdir /usr/src/data-folder --repo /simbricks --outdir /usr/src/data-folder experiments/pyexps/trace-dumbbell.py
     volumes:
       - /local/jakobg/tracing-experiments/wrkdir:/usr/src/data-folder
       - /dev/kvm:/dev/kvm

@@ -82,8 +82,9 @@ trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 #trace_file_path = f'{named_pipe_folder}/ns3-log-pipe-raw-log.txt'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 mtu_opt = f'--Mtu=1500'
-ns3_hosts_opt = '--NumNs3HostPairs=2'
-network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
+ns3_hosts_opt = '--NumNs3HostPairs=0'
+ns3_jitter_opt = '--EnableJitter'
+network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt} {ns3_jitter_opt}'
 #network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt}'
 network.eth_latency = eth_latency_ns
 network.sync_mode = synchronized

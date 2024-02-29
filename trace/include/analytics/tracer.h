@@ -181,9 +181,7 @@ class Tracer {
                             std::shared_ptr<EventSpan> parent) {
     throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
 
-    // NOTE: lock MUST NOT be held when calling this method
-    concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
-//    std::unique_lock<std::mutex> lock(tracer_mutex_);
+    // NOTE: lock MUST be held when calling this method
 
     assert(parent and "span is null");
     const uint64_t parent_id = parent->GetId();
@@ -198,12 +196,10 @@ class Tracer {
                      source_loc::current());
       MarkSpanAsExported(waiter);
       assert(not waiter->HasParent() or exported_spans_.contains(waiter->GetParentId()));
-      guard.unlock();
-//      lock.unlock();
+
       exporter_->ExportSpan(waiter);
       ExportWaitingForParentVec(executor, waiter);
-      co_await guard.lock(executor);
-//      lock.lock();
+
     }
     waiting_list_.erase(parent_id);
   }
@@ -222,7 +218,6 @@ class Tracer {
     throw_on_false(TraceEnvironment::IsValidId(parent_id), "invalid id",
                    source_loc::current());
 
-    //auto parent_context = parent_span->GetContext();
     auto trace_context = RegisterCreateContextParent(trace_id, parent_id, parent_starting_ts);
 
     auto new_span = create_shared<SpanType>(
@@ -267,7 +262,6 @@ class Tracer {
     throw_if_empty(executor, TraceException::kResumeExecutorNull, source_loc::current());
 
     // guard potential access using a lock guard
-//    std::unique_lock<std::mutex> lock(tracer_mutex_);
     concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
 
     throw_if_empty(span, "MarkSpanAsDone, span is null", source_loc::current());
@@ -277,15 +271,10 @@ class Tracer {
 
     if (WasParentExported(span)) {
       MarkSpanAsExported(span);
-      // TODO: fix background!!
       assert(not span->HasParent() or exported_spans_.contains(span->GetParentId()));
 
-      guard.unlock();
-//      lock.unlock();
       exporter_->ExportSpan(span);
       co_await ExportWaitingForParentVec(executor, span);
-      co_await guard.lock(executor);
-//      lock.lock();
 
       auto trace = GetTrace(trace_id);
       if (nullptr != trace and SafeToDeleteTrace(trace_id)) {
@@ -308,7 +297,6 @@ class Tracer {
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
 
     // guard potential access using a lock guard
-//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
     concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
 
     auto new_trace_id = parent_context->GetTraceId();
@@ -356,7 +344,6 @@ class Tracer {
 
     // guard potential access using a lock guard
     concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
-//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     std::shared_ptr<SpanType> new_span;
     new_span = StartSpanByParentInternal<SpanType, Args...>(
@@ -381,7 +368,6 @@ class Tracer {
 
     // guard potential access using a lock guard
     concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
-//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();
@@ -404,7 +390,6 @@ class Tracer {
 
     // guard potential access using a lock guard
     concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
-//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     throw_if_empty(starting_event, "StartSpan(...) starting_event is null",
                    source_loc::current());
@@ -424,7 +409,6 @@ class Tracer {
     throw_if_empty(parent_context, TraceException::kContextIsNull, source_loc::current());
     // guard potential access using a lock guard
     concurrencpp::scoped_async_lock guard = co_await async_lock_.lock(executor);
-//    const std::lock_guard<std::mutex> lock(tracer_mutex_);
 
     const uint64_t trace_id = parent_context->GetTraceId();
     const uint64_t parent_id = parent_context->GetParentId();

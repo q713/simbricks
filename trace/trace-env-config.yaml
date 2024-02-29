@@ -23,13 +23,13 @@
 #
 
 MaxBackgroundThreads: 1
-MaxCpuThreads: 1
+MaxCpuThreads: 5
 JaegerUrl: "http://otel_collector:14278/v1/traces"
 #JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
 EventBufferSize: 1000
-LogLevel: "warning"
+LogLevel: "info"
 TypesToFilter:
   - "kHostInstrT"
   - "kSimProcInEventT"
@@ -44,24 +44,26 @@ TypesToFilter:
 SymbolTables:
   - Identifier: "Linuxvm-Symbols"
     #Path: "/config/dir/linux_dumps/vmlinux-image-syms.dump"
+    #Path: "/usr/src/data-folder/vmlinux-image-syms.dump"
     Path: "linux_dumps/vmlinux-image-syms.dump"
     AddressOffset: 0
     Type: kSyms
-  #- Identifier: "Homer-Module-Symbols"
-  #  Path: "/config/dir/linux_dumps/homa-mod.dump"
-  #  AddressOffset: 18446744072099278848 # FFFFFFFFA0053000
-  #  Type: kSyms
-  #- Identifier: "Homer-Linux-Symbols"
-  #  Path: "/config/dir/linux_dumps/vmlinux-image-homer-syms.dump"
-  #  AddressOffset: 0
-  #  Type: kSyms
-  #- Identifier: "Homer-Nicdriver-Symbols"
-  #  Path: "/config/dir/linux_dumps/i40e-homa.dump"
-  #  #Path: "linux_dumps/i40e-image-syms.dump"
-  #  AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
-  #  Type: kSyms
+      #- Identifier: "Homer-Module-Symbols"
+      #  Path: "/config/dir/linux_dumps/homa-mod.dump"
+      #  AddressOffset: 18446744072099278848 # FFFFFFFFA0053000
+      #  Type: kSyms
+      #- Identifier: "Homer-Linux-Symbols"
+      #  Path: "/config/dir/linux_dumps/vmlinux-image-homer-syms.dump"
+      #  AddressOffset: 0
+      #  Type: kSyms
+      #- Identifier: "Homer-Nicdriver-Symbols"
+      #  Path: "/config/dir/linux_dumps/i40e-homa.dump"
+      #  #Path: "linux_dumps/i40e-image-syms.dump"
+      #  AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
+      #  Type: kSyms
   - Identifier: "Nicdriver-Symbols"
     #Path: "/config/dir/linux_dumps/i40e-image-syms.dump"
+    #Path: "/usr/src/data-folder/i40e-image-syms.dump"
     Path: "linux_dumps/i40e-image-syms.dump"
     AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
     Type: kSyms

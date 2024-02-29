@@ -54,7 +54,7 @@ connectors:
 
 processors:
   tail_sampling:
-    decision_wait: 120s
+    decision_wait: 360s
     policies: [
       {
         name: is-receive-span,

@@ -10,3 +10,6 @@
 [submodule "sims/external/femu"]
 	path = sims/external/femu
 	url = https://github.com/simbricks/femu.git
+[submodule "sims/external/corundum"]
+	path = sims/external/corundum
+	url = https://github.com/simbricks/corundum.git

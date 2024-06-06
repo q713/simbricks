@@ -13,3 +13,6 @@
 [submodule "sims/external/bmv2"]
 	path = sims/external/bmv2
 	url = https://github.com/simbricks/bmv2.git
+[submodule "sims/external/corundum"]
+	path = sims/external/corundum
+	url = https://github.com/simbricks/corundum.git

@@ -31,10 +31,13 @@ EXTERNAL_SIMS_DIR := $(d)
 $(eval $(call subdir,simics))
 $(eval $(call subdir,corundum))
 
-external: $(d)gem5/ready $(d)qemu/ready $(d)ns-3/ready $(d)femu/ready $(d)bmv2/ready
+TO_BUILD := $(d)gem5/ready $(d)qemu/ready $(d)ns-3/ready $(d)femu/ready $(d)bmv2/ready
+ifeq ($(ENABLE_VERILATOR),y)
+TO_BUILD += $(d)corundum/ready
+endif
+
+external: $(TO_BUILD)
 .PHONY: external gem5-clean qemu-clean ns-3-clean femu-clean bmv2-clean
-
-
 
 $(d)gem5:
 	git clone https://github.com/simbricks/gem5.git $@

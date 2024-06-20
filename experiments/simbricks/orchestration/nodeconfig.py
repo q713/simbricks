@@ -225,7 +225,7 @@ class CorundumLinuxNode(LinuxNode):
 
     # pylint: disable=consider-using-with
     def config_files(self) -> tp.Dict[str, tp.IO]:
-        m = {'mqnic.ko': open('../images/mqnic/mqnic.ko', 'rb')}
+        m = {'mqnic.ko': open('sims/external/corundum/modules/mqnic/mqnic.ko', 'rb')}
         return {**m, **super().config_files()}
 
 

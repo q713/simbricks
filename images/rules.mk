@@ -48,7 +48,8 @@ kernel_dir := $(kernel_pardir)/linux-$(KERNEL_VERSION)
 kernel_config := $(kernel_pardir)/config-$(KERNEL_VERSION)
 kheader_dir := $(d)kernel/kheaders
 kheader_tar := $(d)kheaders.tar.bz2
-mqnic_dir := $(d)mqnic
+# NOTE: corundum submodule required
+mqnic_dir := $(base_dir)sims/external/corundum/modules/mqnic
 mqnic_mod := $(mqnic_dir)/mqnic.ko
 farmem_dir := $(d)farmem
 farmem_mod := $(farmem_dir)/farmem.ko

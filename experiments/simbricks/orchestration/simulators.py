@@ -723,9 +723,10 @@ class CorundumVerilatorNIC(NICSim):
         return 512
 
     def run_cmd(self, env: ExpEnv) -> str:
-        return self.basic_run_cmd(
-            env, '/corundum/corundum_verilator', str(self.clock_freq)
-        )
+        extra = str(self.clock_freq)
+        cmd = f'{env.repodir}/sims/external/corundum/corundum_simbricks_adapter {self.basic_args(env, extra)}'
+        print(cmd)
+        return cmd
 
 
 class CorundumBMNIC(NICSim):

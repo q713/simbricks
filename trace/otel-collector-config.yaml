@@ -38,6 +38,9 @@ exporters:
   #    enabled: true
 
   debug:
+    verbosity: basic
+    sampling_initial: 0
+    sampling_thereafter: 0
 
   otlp:
     endpoint: "jaeger:4317" #gRPC
@@ -45,12 +48,12 @@ exporters:
     tls:
       insecure: true
 
-connectors:
-  spanmetrics:
-    histogram:
-      explicit:
-        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
-  #  namespace: span_metrics
+#connectors:
+#  spanmetrics:
+#    histogram:
+#      explicit:
+#        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+#  #  namespace: span_metrics
 
 processors:
   tail_sampling:
@@ -83,7 +86,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [tail_sampling]
-      exporters: [spanmetrics, otlp]
-    metrics/spanmetrics:
-      receivers: [spanmetrics]
-      exporters: [prometheus]
+      exporters: [debug] # [spanmetrics, otlp]
+    #metrics/spanmetrics:
+    #  receivers: [spanmetrics]
+    #  exporters: [debug] # [prometheus]

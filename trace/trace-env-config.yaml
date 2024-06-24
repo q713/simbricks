@@ -23,13 +23,13 @@
 #
 
 MaxBackgroundThreads: 1
-MaxCpuThreads: 5
+MaxCpuThreads: 7
 JaegerUrl: "http://otel_collector:14278/v1/traces"
 #JaegerUrl: "http://jaeger:4318/v1/traces"
 #JaegerUrl: "http://localhost:4318/v1/traces"
 LineBufferSize: 1
 EventBufferSize: 1000
-LogLevel: "info"
+LogLevel: "warning"
 TypesToFilter:
   - "kHostInstrT"
   - "kSimProcInEventT"
@@ -44,8 +44,8 @@ TypesToFilter:
 SymbolTables:
   - Identifier: "Linuxvm-Symbols"
     #Path: "/config/dir/linux_dumps/vmlinux-image-syms.dump"
-    #Path: "/usr/src/data-folder/vmlinux-image-syms.dump"
-    Path: "linux_dumps/vmlinux-image-syms.dump"
+    Path: "/usr/src/data-folder/vmlinux-image-syms.dump"
+    #Path: "linux_dumps/vmlinux-image-syms.dump"
     AddressOffset: 0
     Type: kSyms
       #- Identifier: "Homer-Module-Symbols"
@@ -63,8 +63,8 @@ SymbolTables:
       #  Type: kSyms
   - Identifier: "Nicdriver-Symbols"
     #Path: "/config/dir/linux_dumps/i40e-image-syms.dump"
-    #Path: "/usr/src/data-folder/i40e-image-syms.dump"
-    Path: "linux_dumps/i40e-image-syms.dump"
+    Path: "/usr/src/data-folder/i40e-image-syms.dump"
+    #Path: "linux_dumps/i40e-image-syms.dump"
     AddressOffset: 18446744072098938880 #0xffffffffa0000000ULL
     Type: kSyms
 LinuxFuncIndicator:
@@ -139,7 +139,11 @@ SysEntryIndicator:
   - "entry_SYSCALL_64"
   - "error_entry"
   - "entry_SYSCALL_64_safe_stack"
+  - "syscall_enter_from_user_mode"
+  - "do_syscall_64"
+  - "entry_SYSCALL_64_after_hwframe"
 BlacklistFunctions:
+  - "asm_sysvec_apic_timer_interrupt"
   - "match_strlcpy"
   - "__const_udelay"
   - "static_key_disable"

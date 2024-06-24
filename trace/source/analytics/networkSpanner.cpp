@@ -58,8 +58,8 @@ concurrencpp::result<bool> NetworkSpanner::HandelNetworkEvent(std::shared_ptr<co
         and not current_device_span->IsDrop()) {
 
       // if we have a "to" adapter event we need to push a context to a host
-      throw_on_false(current_device_span->HasIpsSet(), "kToAdapter event has no ip header",
-                     source_loc::current());
+      // throw_on_false(current_device_span->HasIpsSet(), "kToAdapter event has no ip header",
+      //                source_loc::current());
 
       const int node = current_device_span->GetNode();
       const int device = current_device_span->GetDevice();

@@ -566,7 +566,7 @@ class CoroBoundedChannel : public CoroChannel<ValueType> {
   }
 
  public:
-  explicit CoroBoundedChannel(size_t capacity = 1) : CoroChannel<ValueType>(), capacity_(capacity) {
+  explicit CoroBoundedChannel(size_t capacity = 1000) : CoroChannel<ValueType>(), capacity_(capacity) {
     buffer_.reserve(capacity_);
   };
 

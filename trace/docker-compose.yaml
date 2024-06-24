@@ -31,7 +31,7 @@ services:
     image: jaegertracing/all-in-one:1.51
     volumes:
       - /local/jakobg/simbricks-fork/trace:/config/dir
-    command: --query.ui-config /config/dir/jaeger-ui.json
+    command: --query.ui-config /config/dir/jaeger-ui.json --memory.max-traces 1500
     environment:
       - METRICS_STORAGE_TYPE=prometheus
       - PROMETHEUS_SERVER_URL=http://prometheus:9090
@@ -78,6 +78,22 @@ services:
       - prometheus
       - jaeger
 
+  # this is just for generating symbol tables not for actually running simbricks
+  simbricks:
+    networks:
+      tracing:
+    image: simbricks/simbricks-gem5opt:jakob
+    container_name: simbricks-test-opt
+    command:
+      - /bin/bash
+      - -c
+      - |
+        objdump --syms images/vmlinux > /usr/src/data-folder/vmlinux-image-syms.dump
+        objdump --syms images/kernel/linux-5.15.93/drivers/net/ethernet/intel/i40e/i40e.ko > /usr/src/data-folder/i40e-image-syms.dump
+
+    volumes:
+      - /local/jakobg/tracing-experiments/simple_netperf_event_logs:/usr/src/data-folder
+
   trace:
     networks:
       - tracing
@@ -90,11 +106,13 @@ services:
     command:
       - /bin/bash
       - -c
-      - time build-docker/trace --trace-env-config /config/dir/trace-env-config.yaml --gem5-server-event-stream /usr/src/data-folder/gem5-server-events.txt --gem5-client-event-stream /usr/src/data-folder/gem5-client-events.txt --nicbm-server-event-stream /usr/src/data-folder/nicbm-server-events.txt --nicbm-client-event-stream /usr/src/data-folder/nicbm-client-events.txt --ns3-event-stream /usr/src/data-folder/ns3-events.txt
+      - | 
+        sleep 5
+        time build-docker/trace --trace-env-config /config/dir/trace-env-config.yaml --gem5-server-event-stream /usr/src/data-folder/gem5-server-events.txt --gem5-client-event-stream /usr/src/data-folder/gem5-client-events.txt --nicbm-server-event-stream /usr/src/data-folder/nicbm-server-events.txt --nicbm-client-event-stream /usr/src/data-folder/nicbm-client-events.txt --ns3-event-stream /usr/src/data-folder/ns3-events.txt
     volumes:
       #- /local/jakobg/tracing-experiments/wrkdir:/usr/src/data-folder
       #- /local/jakobg/tracing-experiments/netperf-experiment-two-hosts:/usr/src/data-folder
-      - /local/jakobg/tracing-experiments/chrony-experiment-mixed-fidel:/usr/src/data-folder
+      - /local/jakobg/tracing-experiments/simple_netperf_event_logs:/usr/src/data-folder
       - /local/jakobg/simbricks-fork/trace:/config/dir
     depends_on:
       - otel_collector

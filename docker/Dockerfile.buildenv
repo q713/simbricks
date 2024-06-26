@@ -49,7 +49,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /tmp/requirements.txt
 COPY verilator.patch /tmp/
 RUN cd /tmp \
- && git clone -b v5.024 https://github.com/verilator/verilator \
+ && git clone -b v5.026 https://github.com/verilator/verilator \
  && cd verilator \
  && patch -p1 < /tmp/verilator.patch \
  && autoupdate \

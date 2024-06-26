@@ -60,6 +60,10 @@ class ManagerBuffer {
     return read_offset_ >= packet_len_;
   }
 
+  [[nodiscard]] bool empty() const noexcept {
+    return packet_len_ == 0;
+  }
+
   uint8_t read() noexcept {
     if (done()) {
       sim_log::LogError(
@@ -104,8 +108,9 @@ class SubordinateBuffer {
     ++packet_len_;
   }
 
-  void assign(uint8_t *data) noexcept {
+  void assign(uint8_t *data, size_t *len) noexcept {
     std::copy(packet_buf_.data(), packet_buf_.data() + packet_len_, data);
+    *len = packet_len_;
     packet_len_ = 0;
     done_ = false;
   }
@@ -193,13 +198,19 @@ class AXISManager {
   }
 
   bool data_transfer_can_happen() const {
-    return tvalid_ and tready_;
+    return tready_;
   }
 
   void setIndex(uint8_t *const bitmap, size_t index) const {
     const size_t byte_index = index / 8;
     const size_t bit_index = index % 8;
     bitmap[byte_index] = bitmap[byte_index] | (1 << bit_index);
+  }
+
+  void reset(uint8_t *bitmap, size_t size) {
+    for (size_t index = 0; index < size; index++) {
+      bitmap[index] = 0;
+    }
   }
 
  public:
@@ -226,11 +237,13 @@ class AXISManager {
   }
 
   [[nodiscard]] bool full() const noexcept {
+    std::cout << "cur_size_=" << cur_size_ << ", AmountSlots=" << AmountSlots
+              << std::endl;
     return cur_size_ >= AmountSlots;
   }
 
   [[nodiscard]] bool empty() const noexcept {
-    return cur_size_ > 0;
+    return cur_size_ == 0;
   }
 
   /**
@@ -239,6 +252,10 @@ class AXISManager {
    * receives a packet. This can e.g. happen if a NIC receives a network packet.
    */
   void read(const uint8_t *data, size_t len) noexcept {
+#ifdef AXIS_DEBUG
+    sim_log::LogInfo("AXISManager read\n");
+#endif
+
     if (data == nullptr or len == 0) {
       sim_log::LogError(
           "simbricks::core::AXISManager::read no packet data given\n");
@@ -258,15 +275,21 @@ class AXISManager {
   }
 
   void step() noexcept {
-    if (empty()) {
+#ifdef AXIS_DEBUG
+    // sim_log::LogInfo("AXISManager step\n");
+#endif
+
+    if (empty() or buffer_ring_[read_index_].empty()) {
+      // std::cout << "no data to send" << std::endl;
       // no data to send
       tvalid_ = 0;
       tlast_ = 0;
       return;
     }
 
+    // TODO: no need to wait for tready here in principle
     if (not buffer_ring_[read_index_].done() and
-        not data_transfer_can_happen()) {
+        not tready_) {
       // no ready signal available
       return;
     }
@@ -280,6 +303,7 @@ class AXISManager {
     }
 
     // put out more packet data
+    reset(tkeep_, kKeepWidth);
     auto &buffer = buffer_ring_[read_index_];
     for (size_t index = 0; index < DataWidthBytes and not buffer.done();
          index++) {
@@ -396,7 +420,15 @@ class AXISSubordinate {
   {
   }
 
+  bool is_packet_done() const {
+    return packet_buf_.done();
+  }
+
   void step() noexcept {
+#ifdef AXIS_DEBUG
+    // sim_log::LogInfo("AXISSubordinate step\n");
+#endif
+
     tready_ = 1;
     if (not data_transfer_can_happen()) {
       return;
@@ -426,14 +458,18 @@ class AXISSubordinate {
    * adapter,this method shall be called to copy the packet data into the
    * SimBricks message buffer.
    */
-  size_t write(uint8_t *destination) noexcept {
+  void write(uint8_t *destination, size_t *len) noexcept {
+#ifdef AXIS_DEBUG
+    sim_log::LogInfo("AXISSubordinate write\n");
+#endif
+
     if (not packet_buf_.done()) {
       sim_log::LogError(
           "simbricks::core::AXISSubordinate::write cannot write, packet within "
           "buffer isn't done yet\n");
       std::terminate();
     }
-    packet_buf_.assign(destination);
+    packet_buf_.assign(destination, len);
   }
 };
 

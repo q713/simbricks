@@ -57,6 +57,7 @@ clients = []
 gem5DebugFlags = '--debug-flags=SimBricksAll,SyscallAll,EthernetAll,PciDevice,PciHost,ExecEnable,ExecOpClass,ExecThread,ExecEffAddr,ExecResult,ExecMicro,ExecMacro,ExecUser,ExecKernel,ExecOpClass,ExecRegDelta,ExecFaulting,ExecAsid,ExecFlags,ExecCPSeq,ExecFaulting,ExecFetchSeq'
 #named_pipe_folder = "/local/jakobg/tracing-experiments/wrkdir"
 named_pipe_folder = "/usr/src/data-folder"
+#named_pipe_folder = "/local/jakobg/tracing-experiments/ntp-test-dir"
 cpu_freq = '5GHz'
 eth_latency_ns = 500
 link_latency_ns = 1000
@@ -74,7 +75,7 @@ synchronized = 1
 # network simulator (ns3)
 #################################
 network = NS3DumbbellNet('cosim-dumbbell-hybrid-example')
-link_rate_gb_s = 10
+link_rate_gb_s = 1# 10
 link_rate_opt = f'--LinkRate={link_rate_gb_s}Gb/s'
 link_latency_opt = f'--LinkLatency={link_latency_ns}ns'
 ecn_th_opt = '--EcnTh=0'
@@ -82,10 +83,11 @@ trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 #trace_file_path = f'{named_pipe_folder}/ns3-log-pipe-raw-log.txt'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 mtu_opt = f'--Mtu=1500'
-ns3_hosts_opt = '--NumNs3HostPairs=0'
-ns3_jitter_opt = '--EnableJitter'
-network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt} {ns3_jitter_opt}'
-#network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt}'
+ns3_hosts_opt = '--NumNs3HostPairs=3'
+#ns3_jitter_opt = f'--EnableJitter --Jitter={0}s' # f'--EnableJitter --Jitter={1}s'
+# network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt} {ns3_jitter_opt}'
+network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
+#network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt}'
 network.eth_latency = eth_latency_ns
 network.sync_mode = synchronized
 
@@ -103,6 +105,7 @@ server_nic.set_network(network)
 
 server_config = I40eLinuxNode()
 server_config.mtu = mtu
+server_config.kcmd_append = 'mce=off'
 server_config.ip = ip_provider.GetNext()
 server_config.app = NTPServer()
 
@@ -135,6 +138,7 @@ client_nic.set_network(network)
 
 client_config = I40eLinuxNode()
 client_config.mtu = mtu
+client_config.kcmd_append = 'mce=off'
 client_config.ip = ip_provider.GetNext()
 client_config.app = NTPClient(server_config.ip)
 

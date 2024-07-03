@@ -48,12 +48,12 @@ exporters:
     tls:
       insecure: true
 
-#connectors:
-#  spanmetrics:
-#    histogram:
-#      explicit:
-#        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
-#  #  namespace: span_metrics
+connectors:
+  spanmetrics:
+    histogram:
+      explicit:
+        buckets: [100us, 1ms, 2ms, 6ms, 10ms, 100ms, 250ms]
+  #  namespace: span_metrics
 
 processors:
   tail_sampling:
@@ -86,7 +86,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [tail_sampling]
-      exporters: [debug] # [spanmetrics, otlp]
-    #metrics/spanmetrics:
-    #  receivers: [spanmetrics]
-    #  exporters: [debug] # [prometheus]
+      exporters:  [spanmetrics, otlp] # [debug]
+    metrics/spanmetrics:
+      receivers: [spanmetrics]
+      exporters: [prometheus] # [debug]

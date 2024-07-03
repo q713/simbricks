@@ -212,6 +212,21 @@ class I40eLinuxNode(LinuxNode):
         super().__init__()
         self.drivers.append('i40e')
 
+class TimesyncNode(I40eLinuxNode):
+
+    def __init__(self):
+        super().__init__()
+        self.disk_image = 'timesync'
+        self.memory = 8192
+
+    def prepare_pre_cp(self):
+        return super().prepare_pre_cp() + [
+            'mount -t proc proc /proc',
+            'mount -t sysfs sysfs /sys',
+            'ip link set dev lo up',
+            #'ip addr add 127.0.0.1/8 dev lo',
+        ]
+
 
 class CorundumLinuxNode(LinuxNode):
 
@@ -603,7 +618,8 @@ class ColumboNetperfClient(AppConfig):
     def run_cmds(self, node):
         return [
             f'netperf -H {self.server_ip} -l {self.test_len} -t {self.sender_type}'
-            ' -- -o mean_latency,p50_latency,p90_latency,p99_latency'
+            ' -- -o mean_latency,p50_latency,p90_latency,p99_latency',
+            'sleep 1'
         ]
 
 class NTPServer(AppConfig):
@@ -619,13 +635,23 @@ echo "driftfile /var/lib/chrony/drift" >> /etc/chrochronyc trackingny.conf
 echo "local stratum 1" >> /etc/chrony.conf
 echo "allow 192.168.64.0/24" >> /etc/chrony.conf
 echo "ratelimit interval -2" >> /etc/chrony.conf
+echo "for i in {{0..60}}" >> query.sh
+echo "do" >> query.sh
+echo "    date +%s%N" >> query.sh
+echo "    m5 dumpstats" >> query.sh
+echo "    chronyc -n tracking" >> query.sh
+echo "    sleep 60" >> query.sh
+echo "done" >> query.sh
+chmod +x query.sh
 """
         ]
 
     def run_cmds(self, node):
         return [
             """
-            chronyd -4 -s -d -f /etc/chrony.conf
+            chronyd -4 -d -d -f /etc/chrony.conf &
+            ./query.sh &
+            sleep infinity
             """
         ]
 
@@ -639,19 +665,20 @@ class NTPClient(AppConfig):
     def prepare_pre_cp(self):
         # minpoll 2 maxpoll 2
         # echo "makestep 0.1 3" >> /etc/chrony.conf
+        # echo "makestep 1 -1" >> /etc/chrony.conf
+        # echo "    chronyc -n sourcestats" >> query.sh
+        # echo "    chronyc -n sources" >> query.sh
         return super().prepare_pre_cp() + [
             f"""
 echo "driftfile /var/lib/chrony/drift" >> /etc/chrony.conf
 echo "server {self.server_ip} iburst " >> /etc/chrony.conf
-echo "makestep 1 -1" >> /etc/chrony.conf
 
-echo "sleep 2" >> query.sh
-echo "for i in {{0..10}}" >> query.sh
+echo "for i in {{0..60}}" >> query.sh
 echo "do" >> query.sh
-echo "    sleep 8" >> query.sh
+echo "    date +%s%N" >> query.sh
+echo "    m5 dumpstats" >> query.sh
 echo "    chronyc -n tracking" >> query.sh
-echo "    chronyc -n sources" >> query.sh
-echo "    chronyc -n sourcestats" >> query.sh
+echo "    sleep 60" >> query.sh
 echo "done" >> query.sh
 chmod +x query.sh
 """
@@ -666,6 +693,180 @@ chmod +x query.sh
             wait $pid
             """
         ]
+
+class PTPServer(AppConfig):
+
+    def __init__(self):
+        super().__init__()
+
+    def prepare_pre_cp(self):
+        cmds = super().prepare_pre_cp()
+        # lower clock class -> higher priority to ensure this serve
+        # ends up grand master
+        cmds.append('sed -i '
+                    '-e "s/clockClass\t*[0-9-]*/clockClass\t128/g" '
+                    '-e "s/logAnnounceInterval\t*[0-9-]*/logAnnounceInterval\t-2/g" '
+                    '-e "s/logSyncInterval\t*[0-9-]*/logSyncInterval\t-5/g" '
+                    '-e "s/logMinDelayReqInterval\t*[0-9-]*/logMinDelayReqInterval\t-5/g" '
+                    '-e "s/logMinPdelayReqInterval\t*[0-9-]*/logMinPdelayReqInterval\t-5/g" '
+                    '-e "s/operLogSyncInterval[\t ]*[0-9-]*/operLogSyncInterval\t-5/g" '
+                    '-e "s/operLogPdelayReqInterval[\t ]*[0-9-]*/operLogPdelayReqInterval\t-5/g" '
+                    '/etc/linuxptp/ptp4l.conf')
+        cmds.append('cat /etc/linuxptp/ptp4l.conf')
+
+        cmds = cmds + [f"""
+echo "for i in {{0..60}}" >> query.sh
+echo "do" >> query.sh
+echo "    date +%s%N" >> query.sh
+echo "    m5 dumpstats" >> query.sh
+echo "    chronyc -n tracking" >> query.sh
+echo "    sleep 60" >> query.sh
+echo "done" >> query.sh
+chmod +x query.sh
+"""
+        ]
+
+        return cmds
+
+    def run_cmds(self, node):
+        return [
+            # initially set phc to system time, so we have a sane starting
+            # point
+            f'phc_ctl /dev/ptp0 set &',
+            f'ptp4l -m -q -f /etc/linuxptp/ptp4l.conf -i eth0 &',
+            f"""
+./query.sh &
+pid=$!
+wait $pid
+"""
+        ]
+
+
+class ChronyServer(AppConfig):
+
+    def __init__(self):
+        super().__init__()
+        self.loglevel = 0
+        self.nic_timestamping = False
+
+    def prepare_pre_cp(self):
+        cmds = super().prepare_pre_cp()
+        
+        cmds = cmds + [f"""
+echo "for i in {{0..60}}" >> query.sh
+echo "do" >> query.sh
+echo "    date +%s%N" >> query.sh
+echo "    m5 dumpstats" >> query.sh
+echo "    chronyc -n tracking" >> query.sh
+echo "    sleep 60" >> query.sh
+echo "done" >> query.sh
+chmod +x query.sh
+"""
+        ]
+
+        return cmds
+
+    def config_files(self):
+        cfg = (
+            f'bindcmdaddress 127.0.0.1\n'
+            f'allow 10.0.0.0/8\n'
+            f'driftfile /tmp/chrony-drift\n'
+            f'local stratum 1\n'
+            )
+        if self.nic_timestamping:
+            cfg += 'hwtimestamp * rxfilter ptp\n'
+            cfg += 'ptpport 319\n'
+        m = {'chrony.conf': self.strfile(cfg)}
+        return m
+
+    def run_cmds(self, node):
+        return [f'chronyd -d -x -f chrony.conf -L {self.loglevel} &', 
+                f"""
+./query.sh &
+pid=$!
+wait $pid
+"""
+        ]
+
+
+class ChronyClient(AppConfig):
+
+    def __init__(self):
+        super().__init__()
+        self.chrony_loglevel = 0
+        self.ntp_server = '10.0.0.1'
+        self.nic_timestamping = False
+        self.ptp = False
+
+    def prepare_pre_cp(self):
+        cmds = super().prepare_pre_cp()
+        if self.ptp:
+            cmds.append('sed -i '
+                        '-e "s/logAnnounceInterval\t*[0-9-]*/logAnnounceInterval\t-2/g" '
+                        '-e "s/logSyncInterval\t*[0-9-]*/logSyncInterval\t-5/g" '
+                        '-e "s/logMinDelayReqInterval\t*[0-9-]*/logMinDelayReqInterval\t-5/g" '
+                        '-e "s/logMinPdelayReqInterval\t*[0-9-]*/logMinPdelayReqInterval\t-5/g" '
+                        '-e "s/operLogSyncInterval[\t ]*[0-9-]*/operLogSyncInterval\t-5/g" '
+                        '-e "s/operLogPdelayReqInterval[\t ]*[0-9-]*/operLogPdelayReqInterval\t-5/g" '
+                        '/etc/linuxptp/ptp4l.conf')
+            cmds.append('cat /etc/linuxptp/ptp4l.conf')
+
+        cmds = cmds + [f"""
+echo "for i in {{0..60}}" >> query.sh
+echo "do" >> query.sh
+echo "    date +%s%N" >> query.sh
+echo "    m5 dumpstats" >> query.sh
+echo "    chronyc -n tracking" >> query.sh
+echo "    sleep 60" >> query.sh
+echo "done" >> query.sh
+chmod +x query.sh
+"""
+        ]
+
+        return cmds
+
+
+    def config_files(self):
+        if self.ptp:
+            cfg = (
+                f'bindcmdaddress 127.0.0.1\n'
+                f'refclock PHC /dev/ptp0 poll -2 dpoll -3\n'
+                f'driftfile /tmp/chrony-drift\n'
+                f'makestep 0.01 3\n'
+                )
+        else:
+            ptpport = ''
+            if self.nic_timestamping:
+                ptpport = 'port 319'
+            cfg = (
+                f'bindcmdaddress 127.0.0.1\n'
+                f'server {self.ntp_server} iburst minpoll -6 maxpoll -1 xleave {ptpport}\n'
+                f'driftfile /tmp/chrony-drift\n'
+                f'makestep 0.01 3\n'
+                )
+            if self.nic_timestamping:
+                cfg += 'hwtimestamp * rxfilter ptp\n'
+                cfg += 'ptpport 319\n'
+        m = {'chrony.conf': self.strfile(cfg)}
+        return m
+
+    def run_cmds(self, node):
+        #cmds = [f'sleep 0.5',
+        #        f'chronyd -d -f chrony.conf -L {self.chrony_loglevel} &',
+        #        f'sleep 1',
+        #        f'(while true; do chronyc tracking; sleep 1; done) &']
+        cmds = [f'chronyd -d -f chrony.conf -L {self.chrony_loglevel} &']
+        if self.ptp:
+            cmds = [f'ptp4l -m -q -f /etc/linuxptp/ptp4l.conf -i eth0 &'] + cmds
+
+        cmds = cmds + [f"""
+./query.sh &
+pid=$!
+wait $pid
+"""
+        ]
+
+        return cmds
 
 
 class VRReplica(AppConfig):

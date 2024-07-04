@@ -717,7 +717,7 @@ class PTPServer(AppConfig):
         # m5 and sys time query
         cmds = cmds + [f"""
 echo "for i in {{0..60}}" >> sys-query.sh
-echo "do" >> query.sh
+echo "do" >> sys-query.sh
 echo "    date +%s%N" >> sys-query.sh
 echo "    m5 dumpstats" >> sys-query.sh
 echo "    sleep 60" >> sys-query.sh
@@ -738,7 +738,6 @@ chmod +x sys-query.sh
 
     def run_cmds(self, node):
         return [
-            f'chronyd -d -x -f chrony.conf -L 0 &',
             # initially set phc to system time, so we have a sane starting
             # point
             f'phc_ctl /dev/ptp0 set &',
@@ -761,37 +760,27 @@ class ChronyServer(AppConfig):
     def prepare_pre_cp(self):
         cmds = super().prepare_pre_cp()
         
-        cmds = cmds + [f"""
-echo "for i in {{0..60}}" >> query.sh
-echo "do" >> query.sh
-echo "    date +%s%N" >> query.sh
-echo "    m5 dumpstats" >> query.sh
-echo "    chronyc -n tracking" >> query.sh
-echo "    sleep 60" >> query.sh
-echo "done" >> query.sh
-chmod +x query.sh
-"""
-        ]
-
-                # m5 and sys time query
+        # m5 and sys time query
         cmds = cmds + [f"""
 echo "for i in {{0..60}}" >> sys-query.sh
-echo "do" >> query.sh
-echo "    date +%s%N" >> sys-query.sh
-echo "    m5 dumpstats" >> sys-query.sh
-echo "    sleep 60" >> sys-query.sh
+echo "do" >> sys-query.sh
+echo "  date +%s%N" >> sys-query.sh
+echo "  m5 dumpstats" >> sys-query.sh
+echo "  sleep 60" >> sys-query.sh
 echo "done" >> sys-query.sh
 chmod +x sys-query.sh
-"""]
+"""     
+        ]
         # chrony query
         cmds = cmds + [f"""
 echo "for i in {{0..60}}" >> chrony-query.sh
-echo "do" >> query.sh
-echo "    chronyc -n tracking" >> chrony-query.sh
-echo "    sleep 60" >> chrony-query.sh
+echo "do" >> chrony-query.sh
+echo "  chronyc -n tracking" >> chrony-query.sh
+echo "  sleep 60" >> chrony-query.sh
 echo "done" >> chrony-query.sh
 chmod +x chrony-query.sh
-"""]
+"""     
+        ]
 
         return cmds
 
@@ -809,7 +798,7 @@ chmod +x chrony-query.sh
         return m
 
     def run_cmds(self, node):
-        return [f'chronyd -d -x -f chrony.conf -L {self.loglevel} &', 
+        return [f'chronyd -d -d -x -f chrony.conf -L {self.loglevel} &', 
                 f"""
 ./chrony-query.sh &
 ./sys-query.sh &
@@ -844,22 +833,24 @@ class ChronyClient(AppConfig):
         # m5 and sys time query
         cmds = cmds + [f"""
 echo "for i in {{0..60}}" >> sys-query.sh
-echo "do" >> query.sh
-echo "    date +%s%N" >> sys-query.sh
-echo "    m5 dumpstats" >> sys-query.sh
-echo "    sleep 60" >> sys-query.sh
+echo "do" >> sys-query.sh
+echo "  date +%s%N" >> sys-query.sh
+echo "  m5 dumpstats" >> sys-query.sh
+echo "  sleep 60" >> sys-query.sh
 echo "done" >> sys-query.sh
 chmod +x sys-query.sh
-"""]
+"""
+        ]
         # chrony query
         cmds = cmds + [f"""
 echo "for i in {{0..60}}" >> chrony-query.sh
-echo "do" >> query.sh
-echo "    chronyc -n tracking" >> chrony-query.sh
-echo "    sleep 60" >> chrony-query.sh
+echo "do" >> chrony-query.sh
+echo "  chronyc -n tracking" >> chrony-query.sh
+echo "  sleep 60" >> chrony-query.sh
 echo "done" >> chrony-query.sh
 chmod +x chrony-query.sh
-"""]
+"""
+        ]
 
         return cmds
 
@@ -893,7 +884,7 @@ chmod +x chrony-query.sh
         #        f'chronyd -d -f chrony.conf -L {self.chrony_loglevel} &',
         #        f'sleep 1',
         #        f'(while true; do chronyc tracking; sleep 1; done) &']
-        cmds = [f'chronyd -d -f chrony.conf -L {self.chrony_loglevel} &']
+        cmds = [f'chronyd -d -d -f chrony.conf -L {self.chrony_loglevel} &']
         if self.ptp:
             cmds = [f'ptp4l -m -q -f /etc/linuxptp/ptp4l.conf -i eth0 &'] + cmds
 

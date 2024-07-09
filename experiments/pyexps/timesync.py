@@ -51,6 +51,7 @@ num_pairs = 2
 use_pressure = True
 synchronized = 1
 use_ptp = True
+chrony_log_level = -1
 
 
 #################################
@@ -66,8 +67,8 @@ trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 mtu_opt = f'--Mtu=1500'
 ns3_hosts_opt = '--NumNs3HostPairs=3'
-network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
-#network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt}'
+#network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
+network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt}'
 network.eth_latency = eth_latency_ns
 network.sync_mode = synchronized
 
@@ -86,7 +87,7 @@ server_nic.set_network(network)
 server_config = TimesyncNode()
 server_config.mtu = mtu
 server_config.kcmd_append = 'mce=off'
-server_config.ip = '192.168.64.1'
+server_config.ip = '10.0.0.1'
 server_config.app = PTPServer() if use_ptp else ChronyServer()
 
 server = Gem5Host(server_config)
@@ -119,8 +120,10 @@ client_nic.set_network(network)
 client_config = TimesyncNode() 
 client_config.mtu = mtu
 client_config.kcmd_append = 'mce=off'
-client_config.ip = '192.168.64.2'
+client_config.ip = '10.0.0.2'
 client_config.app = ChronyClient() 
+client_config.ntp_server = server_config.ip
+client_config.chrony_loglevel = chrony_log_level
 client_config.ptp = use_ptp # TODO: enable hw ts 
 
 client = Gem5Host(client_config)

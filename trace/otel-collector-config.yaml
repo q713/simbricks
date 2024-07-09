@@ -86,7 +86,9 @@ service:
     traces:
       receivers: [otlp]
       processors: [tail_sampling]
-      exporters:  [spanmetrics, otlp] # [debug]
+      # exporters:  [debug] 
+      exporters:  [spanmetrics, otlp]
     metrics/spanmetrics:
       receivers: [spanmetrics]
-      exporters: [prometheus] # [debug]
+      # exporters: [debug]
+      exporters: [prometheus]

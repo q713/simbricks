@@ -47,7 +47,7 @@ link_latency_ns = 1000
 # sync_period_ns = link_latency_ns TODO: link latency and et latency?
 sys_clock = '1GHz'  # if not set, default 1GHz
 mtu = 1500
-num_pairs = 2
+num_pairs = 3
 use_pressure = True
 synchronized = 1
 use_ptp = True
@@ -66,7 +66,7 @@ trace_file_path = f'{named_pipe_folder}/ns3-log-pipe.pipe'
 #trace_file_path = f'{named_pipe_folder}/ns3-log-pipe-raw-log.txt'
 trace_file_opt = f'--EnableTracing={trace_file_path}'
 mtu_opt = f'--Mtu=1500'
-ns3_hosts_opt = '--NumNs3HostPairs=3'
+ns3_hosts_opt = f'--NumNs3HostPairs={num_pairs}'
 #network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt} {trace_file_opt}'
 network.opt = f'{link_rate_opt} {link_latency_opt} {ecn_th_opt} {mtu_opt} {ns3_hosts_opt}'
 network.eth_latency = eth_latency_ns
@@ -80,7 +80,7 @@ e.add_network(network)
 server_nic = I40eNIC()
 server_nic.eth_latency = eth_latency_ns
 nicbm_server_pipe = f"{named_pipe_folder}/nicbm-server-log-pipe.pipe"
-server_nic.log_file = nicbm_server_pipe
+# server_nic.log_file = nicbm_server_pipe
 server_nic.sync_mode = synchronized
 server_nic.set_network(network)
 
@@ -95,8 +95,8 @@ server.name = 'server.1'
 server.cpu_freq = cpu_freq
 server_pipe = f"{named_pipe_folder}/gem5-server-log-pipe.pipe"
 server_log = f'--debug-file {server_pipe}'
-server.extra_main_args = [server_log, gem5DebugFlags]
-server.variant = 'opt'
+# server.extra_main_args = [server_log, gem5DebugFlags]
+# server.variant = 'opt'
 server.sync_mode = synchronized
 
 server.add_nic(server_nic)
@@ -113,7 +113,7 @@ servers.append(server)
 client_nic = I40eNIC()
 client_nic.eth_latency = eth_latency_ns
 nicbm_client_pipe = f"{named_pipe_folder}/nicbm-client-log-pipe.pipe"
-client_nic.log_file = nicbm_client_pipe
+# client_nic.log_file = nicbm_client_pipe
 client_nic.sync_mode = synchronized
 client_nic.set_network(network)
 
@@ -131,8 +131,8 @@ client.name = 'client.1'
 client.cpu_freq = cpu_freq
 client_pipe = f"{named_pipe_folder}/gem5-client-log-pipe.pipe"
 client_log = f'--debug-file {client_pipe}'
-client.extra_main_args = [client_log, gem5DebugFlags]
-client.variant = 'opt'
+# client.extra_main_args = [client_log, gem5DebugFlags]
+# client.variant = 'opt'
 client.wait = True
 client.sync_mode = synchronized
 

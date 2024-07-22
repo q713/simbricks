@@ -28,50 +28,70 @@ The client pings the server.
 
 from simbricks.orchestration.experiments import Experiment
 from simbricks.orchestration.nodeconfig import (
-    I40eLinuxNode, IdleHost, PingClient
+    I40eLinuxNode, 
+    IdleHost, 
+    PingClient, 
+    CorundumLinuxNode
 )
-from simbricks.orchestration.simulators import Gem5Host, I40eNIC, SwitchNet
+from simbricks.orchestration.simulators import (
+    Gem5Host,
+    I40eNIC,
+    SwitchNet,
+    CorundumVerilatorNIC,
+    QemuHost
+)
 
-e = Experiment(name='simple_ping')
+e = Experiment(name="simple_ping")
 e.checkpoint = True  # use checkpoint and restore to speed up simulation
+eth_latency_ns = 500
+synchronized = 0
 
 # create client
-client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
-client_config.ip = '10.0.0.1'
-client_config.app = PingClient(server_ip='10.0.0.2')
+client_config = CorundumLinuxNode()  # boot Linux with corundum NIC driver
+#client_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
+client_config.ip = "10.0.0.1"
+client_config.app = PingClient(server_ip="10.0.0.2")
 client = Gem5Host(client_config)
-client.name = 'client'
+#client = QemuHost(client_config)
+client.name = "client"
+client.sync_mode = synchronized
 client.wait = True  # wait for client simulator to finish execution
 e.add_host(client)
 
 # attach client's NIC
-client_nic = I40eNIC()
+#client_nic = I40eNIC()
+client_nic = CorundumVerilatorNIC()
+client_nic.clock_freq = 10
+client_nic.eth_latency = eth_latency_ns
+client_nic.sync_mode = synchronized
 e.add_nic(client_nic)
 client.add_nic(client_nic)
 
 # create server
+#server_config = CorundumLinuxNode()
 server_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
-server_config.ip = '10.0.0.2'
+server_config.ip = "10.0.0.2"
 server_config.app = IdleHost()
 server = Gem5Host(server_config)
-server.name = 'server'
+#server = QemuHost(server_config)
+server.name = "server"
+server.sync_mode = synchronized
 e.add_host(server)
 
 # attach server's NIC
 server_nic = I40eNIC()
+#server_nic = CorundumVerilatorNIC()
+server_nic.eth_latency = eth_latency_ns
+server_nic.sync_mode = synchronized
 e.add_nic(server_nic)
 server.add_nic(server_nic)
 
 # connect NICs over network
 network = SwitchNet()
+network.eth_latency = eth_latency_ns
+network.sync_mode = synchronized
 e.add_network(network)
 client_nic.set_network(network)
 server_nic.set_network(network)
-
-# set more interesting link latencies than default
-eth_latency = 500 * 10**3  # 500 us
-network.eth_latency = eth_latency
-client_nic.eth_latency = eth_latency
-server_nic.eth_latency = eth_latency
 
 experiments = [e]

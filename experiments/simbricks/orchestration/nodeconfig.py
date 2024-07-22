@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import io
 import tarfile
+import os
 import typing as tp
 
 
@@ -226,6 +227,9 @@ class CorundumLinuxNode(LinuxNode):
     # pylint: disable=consider-using-with
     def config_files(self) -> tp.Dict[str, tp.IO]:
         m = {'mqnic.ko': open('sims/external/corundum/modules/mqnic/mqnic.ko', 'rb')}
+        mqnic_dump_path = 'sims/external/corundum/utils/mqnic-dump'
+        if os.path.isfile(mqnic_dump_path) :
+            m['mqnic-dump'] = open(mqnic_dump_path, 'rb')
         return {**m, **super().config_files()}
 
 
@@ -510,6 +514,7 @@ class PingClient(AppConfig):
 
     def run_cmds(self, node: NodeConfig) -> tp.List[str]:
         return [f'ping {self.server_ip} -c 10']
+        #return ['/tmp/guest/mqnic-dump -v -d /dev/mqnic0', '/tmp/guest/mqnic-dump -v -i eth0']
 
 
 class IperfTCPServer(AppConfig):

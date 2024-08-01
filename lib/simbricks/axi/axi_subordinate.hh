@@ -418,7 +418,8 @@ void AXISubordinateWrite<BytesAddr, BytesId, BytesData, MaxInFlight>::step(
               << " cur_off=" << cur_off_ << " step_size=" << cur_op_->step_size
               << " align=" << align << "\n";
 #endif
-    size_t num_bytes = std::min(BytesData - align, cur_op_->step_size);
+    size_t num_bytes = std::min(
+        {BytesData - align, cur_op_->step_size, cur_op_->len - cur_off_});
     std::memcpy(cur_op_->buf.get() + cur_off_, w_data_ + align, num_bytes);
     cur_off_ += num_bytes;
     assert(cur_off_ <= cur_op_->len && "AXI W cur_off_ > cur_op_->len");

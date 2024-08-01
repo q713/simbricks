@@ -52,6 +52,7 @@ client_config = CorundumLinuxNode()  # boot Linux with corundum NIC driver
 client_config.ip = "10.0.0.1"
 client_config.app = PingClient(server_ip="10.0.0.2")
 client = Gem5Host(client_config)
+#client.cpu_type = "X86KvmCPU"
 #client = QemuHost(client_config)
 client.name = "client"
 client.sync_mode = synchronized
@@ -73,6 +74,7 @@ server_config = I40eLinuxNode()  # boot Linux with i40e NIC driver
 server_config.ip = "10.0.0.2"
 server_config.app = IdleHost()
 server = Gem5Host(server_config)
+#server.cpu_type = "X86KvmCPU"
 #server = QemuHost(server_config)
 server.name = "server"
 server.sync_mode = synchronized

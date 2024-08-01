@@ -35,8 +35,8 @@
 #include <optional>
 #include <unordered_map>
 
-// #define AXI_R_DEBUG 0
-// #define AXI_W_DEBUG 0
+#define AXI_R_DEBUG 1
+#define AXI_W_DEBUG 1
 
 namespace simbricks {
 struct AXIOperation {
@@ -274,7 +274,7 @@ void AXISubordinateRead<BytesAddr, BytesId, BytesData, MaxInFlight>::step(
     /* data handshake complete, issue the next data segment */
 #if AXI_R_DEBUG
     std::cout << main_time_ << " AXI R: data handshake id=0x" << std::hex
-              << cur_op_->id << std::dec << " off=" << cur_off_ << "\n";
+              << cur_op_->id << std::dec << " off=" << cur_off_ << std::endl;
 #endif
     send_next_data_segment();
   }
@@ -296,9 +296,9 @@ void AXISubordinateRead<BytesAddr, BytesId, BytesData, MaxInFlight>::step(
         res.second &&
         "AXISubordinateRead::step() id_op_map_.emplace() must be successful");
 #if AXI_R_DEBUG
-    std::cout << main_time_ << " AXI R: new op addr=" << axi_op.addr
-              << " len=" << axi_op.len << " id=0x" << std::hex << axi_op.id
-              << std::dec << "\n";
+    std::cout << main_time_ << " AXI R: new op addr=0x" << std::hex
+              << axi_op.addr << " len=" << axi_op.len << " id=0x" << std::hex
+              << axi_op.id << std::dec << "\n";
 #endif
     do_read(axi_op);
   }
@@ -351,8 +351,17 @@ template <size_t BytesAddr, size_t BytesId, size_t BytesData,
 void AXISubordinateRead<BytesAddr, BytesId, BytesData,
                         MaxInFlight>::send_next_data_segment() {
   size_t align = (cur_op_->addr + cur_off_) % BytesData;
-  size_t num_bytes = std::min(BytesData - align, cur_op_->step_size);
+  size_t num_bytes = std::min(
+      {BytesData - align, cur_op_->step_size, cur_op_->len - cur_off_});
   std::memset(r_data_tmp_, 0, BytesData);
+#if AXI_R_DEBUG
+  if (cur_off_ + num_bytes > cur_op_->len) {
+    std::cout
+        << "AXISubordinateRead::send_next_data_segment: buffer is out of space"
+        << std::endl;
+    std::terminate();
+  }
+#endif
   std::memcpy(r_data_tmp_ + align, cur_op_->buf.get() + cur_off_, num_bytes);
 
   cur_off_ += num_bytes;

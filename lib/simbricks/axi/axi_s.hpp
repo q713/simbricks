@@ -237,8 +237,10 @@ class AXISManager {
   }
 
   [[nodiscard]] bool full() const noexcept {
-    std::cout << "cur_size_=" << cur_size_ << ", AmountSlots=" << AmountSlots
-              << std::endl;
+#ifdef AXIS_DEBUG
+    sim_log::LogInfo("AXISManager::full: cur_size_=%lu, AmountSlots=%lu\n",
+                     cur_size_, AmountSlots);
+#endif
     return cur_size_ >= AmountSlots;
   }
 
@@ -288,13 +290,19 @@ class AXISManager {
     }
 
     // TODO: no need to wait for tready here in principle
-    if (not buffer_ring_[read_index_].done() and
-        not tready_) {
+    if (not buffer_ring_[read_index_].done() and not tready_) {
+#ifdef AXIS_DEBUG
+      sim_log::LogInfo(
+          "AXISManager cannot put out packet data, no tready signal\n");
+#endif
       // no ready signal available
       return;
     }
 
     if (buffer_ring_[read_index_].done()) {
+#ifdef AXIS_DEBUG
+      sim_log::LogInfo("AXISManager done with packet\n");
+#endif
       // done with packet
       tvalid_ = 0;
       tlast_ = 0;
@@ -303,6 +311,9 @@ class AXISManager {
     }
 
     // put out more packet data
+#ifdef AXIS_DEBUG
+    sim_log::LogInfo("AXISManager put out more packet data\n");
+#endif
     reset(tkeep_, kKeepWidth);
     auto &buffer = buffer_ring_[read_index_];
     for (size_t index = 0; index < DataWidthBytes and not buffer.done();
@@ -387,8 +398,9 @@ class AXISSubordinate {
 
   bool isSet(const uint8_t *const bitmap, size_t index) const {
     if (index >= DataWidthBytes) {
-      sim_log::LogError("isSet index %zu larger then DataWidthBytes %zu", index,
-                        DataWidthBytes);
+      sim_log::LogError(
+          "AXISSubordinate::isSet: index %zu larger then DataWidthBytes %zu",
+          index, DataWidthBytes);
       std::terminate();
     }
     const size_t int_pos = index / 8;
@@ -425,10 +437,6 @@ class AXISSubordinate {
   }
 
   void step() noexcept {
-#ifdef AXIS_DEBUG
-    // sim_log::LogInfo("AXISSubordinate step\n");
-#endif
-
     tready_ = 1;
     if (not data_transfer_can_happen()) {
       return;
@@ -441,6 +449,9 @@ class AXISSubordinate {
       std::terminate();
     }
 
+#ifdef AXIS_DEBUG
+    sim_log::LogInfo("AXISSubordinate::step: set Next Bytes\n");
+#endif
     for (size_t index = 0; index < DataWidthBytes; index++) {
       if (not isSet(tkeep_, index)) {
         continue;
@@ -449,6 +460,10 @@ class AXISSubordinate {
     }
 
     if (static_cast<bool>(tlast_)) {
+#ifdef AXIS_DEBUG
+      sim_log::LogInfo(
+          "AXISSubordinate::step: tlast was set, transmittted packet\n");
+#endif
       packet_buf_.setDone();
     }
   }
